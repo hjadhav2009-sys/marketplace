@@ -28,6 +28,28 @@ assert.equal(labelOrder?.color, "Silver", "Label extracts color");
 assert.equal(labelOrder?.size, "Free Size", "Label extracts size");
 assert.equal(labelOrder?.orderNo, "290010756104090432_1", "Label extracts order number");
 
+const orderNumberBeforeAwb = parseText("Sub_Order_Labels_order_before_awb.pdf", [
+  {
+    pageNumber: 1,
+    text: `TAX INVOICE
+Supplier Name : Sullery
+Purchase Order No.
+290010756104090432
+Invoice No.
+zhjsh272529
+Customer Address
+Name Example
+560068
+Return Code
+Delhivery
+1490834915493571
+Product Details
+SKU Size Qty Color Order No.
+1202919298_6 Free Size 1 Silver 290010756104090432_1`
+  }
+]).labelOrders[0];
+assert.equal(orderNumberBeforeAwb?.awb, "1490834915493571", "Label prefers courier/return-code AWB even when order number appears first");
+
 const shadowfaxLabel = parseText("Sub_Order_Labels_shadowfax.pdf", [{ pageNumber: 1, text: fixture("label-page-shadowfax.txt") }]).labelOrders[0];
 assert.equal(shadowfaxLabel?.awb, "SF3423949467FPL", "Label extracts Shadowfax AWB");
 assert.equal(shadowfaxLabel?.sku, "176308762", "Label extracts Shadowfax SKU");
@@ -67,6 +89,17 @@ assert.equal(
   "Duplicate AWB inside one parsed file is flagged"
 );
 
+const crossSourceSameAwbResult = parseText("Sub_Order_Labels_and_Manifest_same_awb.pdf", [
+  { pageNumber: 1, text: fixture("label-page-1.txt") },
+  { pageNumber: 2, text: fixture("manifest-delhivery-page-1.txt") }
+]);
+assert.equal(crossSourceSameAwbResult.stats.duplicateAwbInsideFile, 0, "Label plus manifest match is not counted as an inside-file duplicate");
+assert.equal(
+  crossSourceSameAwbResult.issues.some((issue) => issue.issueType === "DUPLICATE_AWB_INSIDE_FILE"),
+  false,
+  "Cross-source AWB match is used for cross-check, not duplicate warning"
+);
+
 const lowConfidenceResult = parseText("Sub_Order_Labels_low_confidence.pdf", [
   {
     pageNumber: 1,
@@ -88,5 +121,53 @@ const crossCheckIssues = crossCheckMeeshoParsedRows({
   picklistSummaryRows: []
 });
 assert.equal(crossCheckIssues.some((issue) => issue.issueType === "SKU_MISMATCH"), true, "Cross-check detects SKU mismatch for same AWB");
+
+const summaryColorSplitIssues = crossCheckMeeshoParsedRows({
+  labelOrders: [],
+  manifestOrders: [
+    {
+      pageNumber: 1,
+      sourceType: "MANIFEST_ORDER",
+      courier: "Delhivery",
+      awb: "1490834915493571",
+      sku: "SAME_SKU",
+      qty: 2,
+      size: "Free Size",
+      orderNo: "ORDER1",
+      rawRowText: "1 ORDER1 1490834915493571 SAME_SKU 2 Free Size No",
+      confidence: 100,
+      issues: []
+    }
+  ],
+  picklistSummaryRows: [
+    {
+      pageNumber: 1,
+      sourceType: "PICKLIST_SUMMARY",
+      sku: "SAME_SKU",
+      color: "Silver",
+      size: "Free Size",
+      totalQuantity: 1,
+      rawRowText: "SAME_SKU Silver Free Size 1",
+      confidence: 100,
+      issues: []
+    },
+    {
+      pageNumber: 1,
+      sourceType: "PICKLIST_SUMMARY",
+      sku: "SAME_SKU",
+      color: "Black",
+      size: "Free Size",
+      totalQuantity: 1,
+      rawRowText: "SAME_SKU Black Free Size 1",
+      confidence: 100,
+      issues: []
+    }
+  ]
+});
+assert.equal(
+  summaryColorSplitIssues.some((issue) => issue.issueType === "SUMMARY_QTY_MISMATCH"),
+  false,
+  "Summary aggregate by SKU and size avoids false mismatch when manifest has no color"
+);
 
 console.log("Meesho parser tests passed.");

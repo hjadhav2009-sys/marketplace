@@ -42,10 +42,85 @@ function findLineValue(lines: string[], anchor: string) {
   return undefined;
 }
 
+function lineDetails(text: string) {
+  const lines = linesFromText(text);
+  let cursor = 0;
+
+  return lines.map((line, index) => {
+    const start = text.indexOf(line, cursor);
+    cursor = start >= 0 ? start + line.length : cursor;
+    return { index, line, start: Math.max(start, 0), end: Math.max(start, 0) + line.length };
+  });
+}
+
+function contextLines(lines: ReturnType<typeof lineDetails>, lineIndex: number, distance = 3) {
+  const from = Math.max(0, lineIndex - distance);
+  const to = Math.min(lines.length, lineIndex + distance + 1);
+  return lines
+    .slice(from, to)
+    .map((line) => line.line)
+    .join(" ");
+}
+
+function isExcludedAwbContext(context: string) {
+  return /Purchase\s+Order\s+No|Order\s+No|Invoice\s+No|GSTIN|Pincode|Pin\s+Code/i.test(context);
+}
+
 function extractAwb(text: string) {
-  const compact = compactWhitespace(text);
-  const candidates = compact.match(/\b(?:\d{10,20}|SF[A-Z0-9]{8,}|[A-Z]{2,}[A-Z0-9]{8,})\b/g) ?? [];
-  return candidates.map(normalizeAwb).find(isValidAwb);
+  const normalizedText = normalizeWhitespace(text);
+  const lines = lineDetails(normalizedText);
+  const productDetailsIndex = normalizedText.search(/Product\s+Details/i);
+  const awbPattern = /\b(?:\d{10,20}|SF[A-Z0-9]{8,}|[A-Z]{2,}[A-Z0-9]{8,})\b/g;
+  const candidates: Array<{ awb: string; score: number; index: number }> = [];
+
+  for (const match of normalizedText.matchAll(awbPattern)) {
+    if (match.index === undefined) {
+      continue;
+    }
+
+    const awb = normalizeAwb(match[0]);
+
+    if (!isValidAwb(awb)) {
+      continue;
+    }
+
+    const lineIndex = lines.find((line) => match.index >= line.start && match.index <= line.end)?.index ?? 0;
+    const anchorContext = contextLines(lines, lineIndex, 1);
+    const nearby = contextLines(lines, lineIndex, 3);
+    const beforeNearby = contextLines(lines, lineIndex, 5);
+
+    if (isExcludedAwbContext(anchorContext)) {
+      continue;
+    }
+
+    let score = 0;
+
+    if (productDetailsIndex < 0 || match.index < productDetailsIndex) {
+      score += 40;
+    } else {
+      score -= 30;
+    }
+
+    if (/Delhivery|Shadowfax|Xpress\s*Bees|XpressBees/i.test(nearby)) {
+      score += 55;
+    }
+
+    if (/Return\s+Code|Tracking|AWB|Courier/i.test(beforeNearby)) {
+      score += 45;
+    }
+
+    if (/Customer\s+Address/i.test(nearby) && !/Return\s+Code|Delhivery|Shadowfax|Xpress\s*Bees|XpressBees|AWB|Tracking|Courier/i.test(nearby)) {
+      score -= 60;
+    }
+
+    if (/^\d{6}$/.test(awb)) {
+      score -= 100;
+    }
+
+    candidates.push({ awb, score, index: match.index });
+  }
+
+  return candidates.sort((left, right) => right.score - left.score || left.index - right.index)[0]?.awb;
 }
 
 function extractProductRow(text: string) {

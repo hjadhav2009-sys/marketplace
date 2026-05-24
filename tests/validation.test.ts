@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
 import { planOrderImport } from "../lib/import/orders";
+import { canImportPreviewIssues } from "../lib/import/preview";
 import { planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
 import { getInitialProductImageState } from "../lib/product-image";
@@ -131,6 +132,8 @@ assert.equal(orderPlan.missingImageRows.length, 0, "Mapped SKUs are not marked a
 const missingImagePlan = planOrderImport([], [{ awb: "NO_IMAGE", sku: "UNMAPPED", qty: 1, orderNo: "ORDER5" }], new Set());
 assert.equal(missingImagePlan.created.length, 1, "Missing image rows still import as orders");
 assert.equal(missingImagePlan.missingImageRows.length, 1, "Missing image rows are counted for review");
+assert.equal(canImportPreviewIssues([{ issueType: "LOW_CONFIDENCE" }]), false, "Low confidence preview rows do not import by default");
+assert.equal(canImportPreviewIssues([{ issueType: "MISSING_IMAGE_MAPPING" }]), true, "Missing image mapping does not block preview import");
 
 assert.equal(canRoleAccessPath("OWNER", "/reports"), true, "Owner can access reports");
 assert.equal(canRoleAccessPath("PICKER", "/packing"), false, "Picker cannot access packing");

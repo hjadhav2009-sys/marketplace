@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
+import { hasBlockingPreviewIssue } from "@/lib/import/preview";
 import type { ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
 import { confirmParsedBatchAction } from "../../actions";
@@ -40,6 +41,16 @@ type BatchNotes = {
     missingImageRows?: number;
     blockingRows?: number;
   };
+  importStats?: {
+    attemptedRows?: number;
+    createdRows?: number;
+    updatedRows?: number;
+    duplicateRows?: number;
+    missingImageRows?: number;
+    skippedRows?: number;
+    errorRows?: number;
+    confirmedAt?: string;
+  };
 };
 
 function parseNotes(value: string | null): BatchNotes {
@@ -69,6 +80,10 @@ function parseIssues(value: string | null) {
 }
 
 function issueTone(issueType: string) {
+  if (issueType === "LOW_CONFIDENCE") {
+    return "bg-amber-50 text-amber-800 ring-amber-200";
+  }
+
   if (issueType.includes("MISSING_AWB") || issueType.includes("MISSING_SKU") || issueType.includes("MISMATCH")) {
     return "bg-rose-50 text-rose-700 ring-rose-200";
   }
@@ -82,6 +97,10 @@ function issueTone(issueType: string) {
   }
 
   return "bg-slate-50 text-slate-700 ring-slate-200";
+}
+
+function issueLabel(issueType: string) {
+  return issueType === "LOW_CONFIDENCE" ? "Needs review" : issueType;
 }
 
 function imageBadge(mapping: { imageUrl: string; imageHealth: string } | undefined) {
@@ -157,9 +176,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
   });
   const crossCheckIssueCount = batch.issues.filter((issue) => /MISMATCH|NOT_IN/i.test(issue.issueType)).length;
   const importableRows = previewRows.filter((row) => {
-    const hasBlockingIssue = row.parsedIssues.some((issue) => issue.issueType === "MISSING_AWB" || issue.issueType === "MISSING_SKU");
-    return (row.sourceType === "LABEL" || row.sourceType === "MANIFEST_ORDER") && row.awb && row.sku && !hasBlockingIssue;
+    return !row.imported && (row.sourceType === "LABEL" || row.sourceType === "MANIFEST_ORDER") && row.awb && row.sku && !hasBlockingPreviewIssue(row.parsedIssues);
   }).length;
+  const importStats = notes.importStats;
 
   return (
     <AppShell>
@@ -209,11 +228,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           ["Low confidence", notes.stats?.lowConfidenceRows ?? 0],
           ["Existing AWB", notes.stats?.existingDuplicateRows ?? batch.duplicateRows],
           ["Missing images", notes.stats?.missingImageRows ?? batch.missingImageRows],
-          ["Cross-checks", crossCheckIssueCount],
-          ["Created", batch.createdRows],
-          ["Updated", batch.updatedRows],
-          ["Skipped", batch.skippedRows + batch.duplicateRows],
-          ["Errors", batch.errorRows]
+          ["Cross-checks", crossCheckIssueCount]
         ].map(([label, value]) => (
           <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
@@ -221,6 +236,34 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           </div>
         ))}
       </section>
+
+      {importStats ? (
+        <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-slate-950">Import result</h2>
+              <p className="text-sm text-slate-600">
+                Confirmed {importStats.confirmedAt ? formatDateTime(new Date(importStats.confirmedAt)) : "recently"} after preview review.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              ["Attempted", importStats.attemptedRows ?? 0],
+              ["Created", importStats.createdRows ?? batch.createdRows],
+              ["Updated", importStats.updatedRows ?? batch.updatedRows],
+              ["Duplicate skipped", importStats.duplicateRows ?? batch.duplicateRows],
+              ["Missing images", importStats.missingImageRows ?? 0],
+              ["Errors", importStats.errorRows ?? 0]
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-md bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                <p className="mt-1 text-xl font-bold text-slate-950">{value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {batch.status !== "IMPORTED" && previewRows.length > 0 ? (
         <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -230,11 +273,16 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
               <p className="mt-1 text-sm text-slate-600">
                 {importableRows} ready row{importableRows === 1 ? "" : "s"} will import through the duplicate-safe AWB workflow.
               </p>
+              <p className="mt-1 text-sm font-medium text-amber-800">
+                Low confidence rows are not imported until fixed/reviewed.
+              </p>
             </div>
-            <form action={confirmParsedBatchAction}>
-              <input type="hidden" name="batchId" value={batch.id} />
-              <SubmitButton pendingText="Importing...">Confirm import</SubmitButton>
-            </form>
+            {importableRows > 0 ? (
+              <form action={confirmParsedBatchAction}>
+                <input type="hidden" name="batchId" value={batch.id} />
+                <SubmitButton pendingText="Importing...">Confirm import</SubmitButton>
+              </form>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -318,7 +366,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                           <div className="flex max-w-md flex-wrap gap-1">
                             {row.parsedIssues.slice(0, 4).map((issue) => (
                               <span key={`${row.id}-${issue.issueType}-${issue.message}`} className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ${issueTone(issue.issueType)}`}>
-                                {issue.issueType}
+                                {issueLabel(issue.issueType)}
                               </span>
                             ))}
                             {row.parsedIssues.length > 4 ? (

@@ -35,7 +35,7 @@ function duplicateCount(values: Array<string | undefined>) {
   return duplicates.size;
 }
 
-function duplicateIssues(values: Array<{ awb?: string; pageNumber: number; sku?: string }>) {
+function duplicateIssues(values: Array<{ awb?: string; pageNumber: number; sku?: string }>, sourceLabel: string) {
   const seen = new Map<string, number>();
   const issues: ParseIssue[] = [];
 
@@ -49,7 +49,7 @@ function duplicateIssues(values: Array<{ awb?: string; pageNumber: number; sku?:
     if (firstPage) {
       issues.push({
         issueType: "DUPLICATE_AWB_INSIDE_FILE",
-        message: `AWB ${row.awb} appears on pages ${firstPage} and ${row.pageNumber}.`,
+        message: `AWB ${row.awb} appears more than once in ${sourceLabel} rows on pages ${firstPage} and ${row.pageNumber}.`,
         severity: "WARNING",
         pageNumber: row.pageNumber,
         awb: row.awb,
@@ -178,22 +178,33 @@ export function crossCheckMeeshoParsedRows(input: {
     manifestTotals.set(key, (manifestTotals.get(key) ?? 0) + order.qty);
   }
 
+  const summaryTotals = new Map<string, { total: number; row: ParsedMeeshoPicklistSummaryRow }>();
+
   for (const row of input.picklistSummaryRows) {
     if (!row.sku || !row.totalQuantity) {
       continue;
     }
 
     const key = [row.sku, row.size ?? ""].join("|");
+    const existing = summaryTotals.get(key);
+
+    summaryTotals.set(key, {
+      total: (existing?.total ?? 0) + row.totalQuantity,
+      row: existing?.row ?? row
+    });
+  }
+
+  for (const [key, summary] of summaryTotals) {
     const manifestTotal = manifestTotals.get(key);
 
-    if (manifestTotal !== undefined && manifestTotal !== row.totalQuantity) {
+    if (manifestTotal !== undefined && manifestTotal !== summary.total) {
       issues.push({
         issueType: "SUMMARY_QTY_MISMATCH",
-        message: `Picklist ${row.sku} total ${row.totalQuantity} does not match manifest total ${manifestTotal}.`,
+        message: `Picklist aggregate ${summary.row.sku} total ${summary.total} does not match manifest total ${manifestTotal}.`,
         severity: "WARNING",
-        sku: row.sku,
-        pageNumber: row.pageNumber,
-        labelValue: row.totalQuantity,
+        sku: summary.row.sku,
+        pageNumber: summary.row.pageNumber,
+        labelValue: summary.total,
         manifestValue: manifestTotal
       });
     }
@@ -217,7 +228,8 @@ export function parseMeeshoTextPages(fileName: string, pages: MeeshoTextPage[]):
     });
   }
 
-  issues.push(...duplicateIssues(allOrders));
+  issues.push(...duplicateIssues(labelOrders, "label"));
+  issues.push(...duplicateIssues(manifest.manifestOrders, "manifest"));
   issues.push(...duplicateSummaryIssues(manifest.picklistSummaryRows));
   issues.push(
     ...crossCheckMeeshoParsedRows({
@@ -242,7 +254,7 @@ export function parseMeeshoTextPages(fileName: string, pages: MeeshoTextPage[]):
       missingAwb: countMissing(allOrders, "MISSING_AWB"),
       missingSku: countMissing(allOrders, "MISSING_SKU"),
       lowConfidenceRows: countMissing(allOrders, "LOW_CONFIDENCE") + countMissing(manifest.picklistSummaryRows, "LOW_CONFIDENCE"),
-      duplicateAwbInsideFile: duplicateCount(allOrders.map((row) => row.awb)),
+      duplicateAwbInsideFile: duplicateCount(labelOrders.map((row) => row.awb)) + duplicateCount(manifest.manifestOrders.map((row) => row.awb)),
       duplicateSkuSummaryRows: duplicateSummaryIssues(manifest.picklistSummaryRows).length
     }
   };

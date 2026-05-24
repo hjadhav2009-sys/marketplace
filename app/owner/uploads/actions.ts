@@ -6,6 +6,7 @@ import type { PaymentType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { importParsedOrderRows, type ParsedOrderImportRow } from "@/lib/import/orders";
+import { hasBlockingPreviewIssue } from "@/lib/import/preview";
 import {
   crossCheckMeeshoParsedRows,
   parseMeeshoPdfBuffer,
@@ -34,18 +35,12 @@ type PreviewRowDraft = {
   rawData: Record<string, unknown>;
 };
 
-const blockingIssueTypes = new Set(["MISSING_AWB", "MISSING_SKU"]);
-
 function isUploadFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }
 
 function hasIssue(row: PreviewRowDraft, issueType: string) {
   return row.issues.some((issue) => issue.issueType === issueType);
-}
-
-function hasBlockingIssue(issues: ParseIssue[]) {
-  return issues.some((issue) => blockingIssueTypes.has(issue.issueType));
 }
 
 function parseStoredIssues(value: string | null) {
@@ -301,7 +296,7 @@ export async function createUploadBatchAction(formData: FormData) {
     const orderDrafts = drafts.filter((row) => row.sourceType !== "PICKLIST_SUMMARY");
     const missingImageRows = drafts.filter((row) => hasIssue(row, "MISSING_IMAGE_MAPPING")).length;
     const duplicateRows = orderDrafts.filter((row) => hasIssue(row, "DUPLICATE_EXISTING_AWB") || hasIssue(row, "DUPLICATE_AWB_INSIDE_FILE")).length;
-    const blockingRows = orderDrafts.filter((row) => hasBlockingIssue(row.issues)).length;
+    const blockingRows = orderDrafts.filter((row) => hasBlockingPreviewIssue(row.issues)).length;
     const errorRows = orderDrafts.filter((row) => row.issues.some((issue) => issue.severity === "ERROR")).length;
     const lowConfidenceRows = orderDrafts.filter((row) => hasIssue(row, "LOW_CONFIDENCE")).length;
     const fileName = files.map((file) => file.name).join(" + ");
@@ -455,15 +450,21 @@ export async function confirmParsedBatchAction(formData: FormData) {
       const seenAwbs = new Set<string>();
       const importedPreviewIds: string[] = [];
       const rows: ParsedOrderImportRow[] = [];
+      let heldBlockingRows = 0;
 
       for (const preview of batch.previewRows) {
-        if (preview.sourceType !== importSourceType) {
+        if (preview.sourceType !== importSourceType || preview.imported) {
           continue;
         }
 
         const issues = parseStoredIssues(preview.issues);
 
-        if (hasBlockingIssue(issues) || !preview.awb || !preview.sku || seenAwbs.has(preview.awb)) {
+        if (hasBlockingPreviewIssue(issues) || !preview.awb || !preview.sku) {
+          heldBlockingRows += 1;
+          continue;
+        }
+
+        if (seenAwbs.has(preview.awb)) {
           continue;
         }
 
@@ -512,6 +513,15 @@ export async function confirmParsedBatchAction(formData: FormData) {
             imported: true
           }
         });
+
+        if (heldBlockingRows > 0) {
+          await prisma.uploadBatch.update({
+            where: { id: batch.id },
+            data: {
+              status: "REVIEWED"
+            }
+          });
+        }
 
         redirectTo = `/owner/uploads/${batch.id}/review?imported=1`;
       }

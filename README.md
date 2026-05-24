@@ -110,23 +110,20 @@ Do not expose the Supabase database password in GitHub, browser code, screenshot
 2. Enable SSL/HTTPS for the subdomain before testing login or future camera barcode scanning.
 3. Configure a Node.js app for this repository and confirm the default branch is `main`.
 4. Set production environment variables from `.env.production.example`.
-5. Install dependencies:
+5. Use these Hostinger Node.js app settings:
+
+```text
+Package manager: npm
+Node version: 22.x
+Build command: npm run build
+Output directory: .next
+Start command: npm start
+```
+
+6. Install dependencies:
 
 ```bash
 npm install
-```
-
-6. Run the production PostgreSQL migration:
-
-```bash
-npx prisma migrate deploy --schema prisma/schema.postgres.prisma
-```
-
-The project automatically uses `prisma/migrations-postgres` for this command when `DATABASE_URL` is a PostgreSQL URL.
-The equivalent npm script is:
-
-```bash
-npm run db:migrate:prod
 ```
 
 7. Build the app:
@@ -135,22 +132,30 @@ npm run db:migrate:prod
 npm run build
 ```
 
-With a PostgreSQL `DATABASE_URL`, the build script generates Prisma Client from `prisma/schema.postgres.prisma`.
-You can force the production schema with:
+With a PostgreSQL `DATABASE_URL`, `npm run build` automatically:
+
+- uses `prisma/schema.postgres.prisma`
+- runs the production migration with `prisma migrate deploy`
+- generates Prisma Client
+- runs `next build`
+
+Set `SKIP_PRISMA_MIGRATE=true` only if you already ran migrations separately and want the build to skip migration deployment.
+For manual production migration, run:
 
 ```bash
-npm run build:prod
+npm run db:migrate:prod
 ```
 
 8. Start the app:
 
 ```bash
-npm run start
+npm start
 ```
 
-If Hostinger needs the app to bind publicly inside its Node.js runtime, use:
+Production still supports the explicit production helpers:
 
 ```bash
+npm run build:prod
 npm run start:prod
 ```
 
@@ -198,8 +203,8 @@ temporary rows or logs, and every cleanup action is audited.
 
 1. Create the Supabase project.
 2. Set Hostinger environment variables from `.env.production.example`.
-3. Run production migrations with `npm run db:migrate:prod`.
-4. Build with `npm run build` or `npm run build:prod`.
+3. Set Hostinger to Node `22.x`, build command `npm run build`, output `.next`, and start command `npm start`.
+4. Build with `npm run build`; it deploys PostgreSQL migrations automatically when `DATABASE_URL` is PostgreSQL.
 5. Create real owner, picker, and packer users.
 6. Change or deactivate all demo passwords/users.
 7. Upload SKU image mappings.

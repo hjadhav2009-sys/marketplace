@@ -120,6 +120,9 @@ Output directory: .next
 Start command: npm start
 ```
 
+At runtime, `npm start` automatically binds Next.js to Hostinger's `PORT` environment variable and falls back to
+port `3000` for local production-style starts.
+
 6. Install dependencies:
 
 ```bash

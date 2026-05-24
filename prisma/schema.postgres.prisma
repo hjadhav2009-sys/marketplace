@@ -2,8 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Future Supabase/PostgreSQL schema. Use with:
-// npx prisma migrate dev --schema prisma/schema.postgres.prisma
+// Supabase/PostgreSQL production schema. Use with:
+// npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+// Production SQL migrations live in prisma/migrations-postgres.
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

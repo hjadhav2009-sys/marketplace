@@ -17,7 +17,7 @@ The app supports the daily local warehouse flow:
 - Tailwind CSS
 - Prisma ORM
 - SQLite for local development
-- PostgreSQL-ready schema for future Supabase
+- Supabase PostgreSQL for production hosting
 - Zod validation
 - Server actions
 - PWA-ready manifest and icon
@@ -73,6 +73,117 @@ http://192.168.1.25:3000
 ```
 
 Your phone and PC must be on the same network. If Windows Firewall prompts for Node.js, allow private network access.
+
+## Production deployment: Hostinger + Supabase
+
+Production uses Supabase PostgreSQL through `prisma/schema.postgres.prisma`. SQLite is for local development only and
+must not be used for Hostinger production.
+
+Production URL:
+
+```text
+https://pack.personalizedgiftday.com
+```
+
+Create `.env.production` from `.env.production.example` and set real values in Hostinger's Node.js app environment:
+
+```env
+DATABASE_URL="postgresql://..."
+SESSION_SECRET="a-long-random-secret"
+NEXT_PUBLIC_APP_URL="https://pack.personalizedgiftday.com"
+LOCAL_NETWORK_ONLY=false
+```
+
+Do not expose the Supabase database password in GitHub, browser code, screenshots, or worker devices.
+
+### Supabase setup
+
+1. Create a Supabase project.
+2. Open the project database settings and copy the PostgreSQL connection string.
+3. Use the pooled connection string if Hostinger has connection limits or short-lived app restarts.
+4. Put the connection string only in Hostinger environment variables as `DATABASE_URL`.
+5. Do not use Supabase Storage for product images. The app stores only external `imageUrl` values.
+
+### Hostinger setup
+
+1. Create the subdomain `pack.personalizedgiftday.com`.
+2. Enable SSL/HTTPS for the subdomain before testing login or future camera barcode scanning.
+3. Configure a Node.js app for this repository and confirm the default branch is `main`.
+4. Set production environment variables from `.env.production.example`.
+5. Install dependencies:
+
+```bash
+npm install
+```
+
+6. Run the production PostgreSQL migration:
+
+```bash
+npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+```
+
+The project automatically uses `prisma/migrations-postgres` for this command when `DATABASE_URL` is a PostgreSQL URL.
+The equivalent npm script is:
+
+```bash
+npm run db:migrate:prod
+```
+
+7. Build the app:
+
+```bash
+npm run build
+```
+
+With a PostgreSQL `DATABASE_URL`, the build script generates Prisma Client from `prisma/schema.postgres.prisma`.
+You can force the production schema with:
+
+```bash
+npm run build:prod
+```
+
+8. Start the app:
+
+```bash
+npm run start
+```
+
+If Hostinger needs the app to bind publicly inside its Node.js runtime, use:
+
+```bash
+npm run start:prod
+```
+
+### Production checklist
+
+- Change all demo passwords before real warehouse use.
+- Use a strong `SESSION_SECRET`.
+- Confirm the deployed branch is `main`.
+- Confirm `https://pack.personalizedgiftday.com` loads over HTTPS.
+- Test login.
+- Test account selection.
+- Test SKU image import.
+- Test PDF upload and parse review.
+- Test confirm import.
+- Test packing manual AWB search.
+
+### Data retention guidance
+
+The expected load of around 6 accounts and up to 600 orders per day is reasonable for a small Supabase PostgreSQL
+deployment, but monitor database growth. Keep operational orders active for daily work. Add future cleanup/export flows
+for old scan logs, old upload preview rows, and imported batch diagnostics once the shop has enough history to decide a
+retention window.
+
+### Production troubleshooting
+
+- Prisma connection failed: confirm `DATABASE_URL`, database password, Supabase project status, and whether the pooled
+  connection string is required.
+- SSL/domain not active: wait for DNS propagation, recheck the Hostinger subdomain, and confirm SSL is issued for
+  `pack.personalizedgiftday.com`.
+- Hostinger Node.js app not starting: check the Node.js version, start command, environment variables, build output, and
+  whether `npm install` completed successfully.
+- Supabase connection pool issue: switch to the pooled connection string, keep connection limits conservative, and avoid
+  opening database tools from many devices at once.
 
 ## Safe Local Usage
 
@@ -215,11 +326,14 @@ mapping health is recorded for owner reports when the browser detects a load fai
 ```bash
 npm run dev
 npm run build
+npm run build:prod
 npm run typecheck
 npm run lint
 npm run test:validators
 npm run validate
 npm run db:seed
+npm run db:migrate:prod
+npm run start:prod
 ```
 
 ## Database Notes
@@ -230,13 +344,16 @@ Local development uses `prisma/schema.prisma` with SQLite:
 DATABASE_URL="file:./dev.db"
 ```
 
-For future Supabase/PostgreSQL work, use the mirrored PostgreSQL schema:
+SQLite is for local development only. Supabase PostgreSQL is for production hosting.
+
+Production uses the mirrored PostgreSQL schema:
 
 ```bash
-npx prisma migrate dev --schema prisma/schema.postgres.prisma
+npx prisma migrate deploy --schema prisma/schema.postgres.prisma
 ```
 
-Then set `DATABASE_URL` to the Supabase PostgreSQL connection string.
+When `DATABASE_URL` starts with `postgres://` or `postgresql://`, Prisma uses the production migration path
+`prisma/migrations-postgres`.
 
 ## Privacy And Data Handling
 

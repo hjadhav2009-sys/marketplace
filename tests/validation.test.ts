@@ -9,6 +9,7 @@ import { planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappi
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
 import { canConfirmPacked } from "../lib/operations/packing";
 import { buildPickerSkuGroups } from "../lib/operations/picking";
+import { hashPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
 import { getInitialProductImageState } from "../lib/product-image";
 import { cutoffDate, isCleanupConfirmationValid, RETENTION_DAYS } from "../lib/retention";
@@ -236,6 +237,20 @@ assert.equal(
   productionChecks.some((check) => check.key === "database-url" && check.status === "NEEDS_ACTION"),
   true,
   "Production checks require PostgreSQL in production"
+);
+const demoPasswordChecks = runProductionChecks({
+  nodeEnv: "production",
+  sessionSecret: "this-is-a-long-production-secret-123",
+  nextPublicAppUrl: "https://pack.personalizedgiftday.com",
+  databaseUrl: "postgresql://user:pass@example.com:5432/db",
+  localNetworkOnly: "false",
+  demoUsers: [{ username: "packer", active: true, passwordHash: hashPassword("demo1234") }],
+  skuMappingCount: 1
+});
+assert.equal(
+  demoPasswordChecks.some((check) => check.key === "demo-passwords" && check.status === "NEEDS_ACTION"),
+  true,
+  "Production checks detect active seed users with stored demo password hash"
 );
 
 console.log("Validation tests passed.");

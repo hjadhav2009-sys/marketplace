@@ -1,4 +1,4 @@
-import { hashPassword } from "./password";
+import { verifyPassword } from "./password";
 
 export type ProductionCheckStatus = "OK" | "WARNING" | "NEEDS_ACTION";
 
@@ -31,7 +31,6 @@ export type ProductionCheckInput = {
 };
 
 const demoUsernames = new Set(["owner", "picker", "packer"]);
-const demoPasswordHash = hashPassword("demo1234");
 
 function statusForProduction(input: ProductionCheckInput, status: ProductionCheckStatus) {
   return input.nodeEnv === "production" ? status : status === "NEEDS_ACTION" ? "WARNING" : status;
@@ -43,7 +42,9 @@ export function runProductionChecks(input: ProductionCheckInput): ProductionChec
   const sessionSecret = input.sessionSecret ?? "";
   const databaseUrl = input.databaseUrl ?? "";
   const activeDemoUsers = (input.demoUsers ?? []).filter((user) => demoUsernames.has(user.username) && user.active);
-  const demoPasswordUsers = activeDemoUsers.filter((user) => user.passwordHash === demoPasswordHash);
+  const demoPasswordUsers = activeDemoUsers.filter(
+    (user) => typeof user.passwordHash === "string" && verifyPassword("demo1234", user.passwordHash)
+  );
 
   checks.push({
     key: "node-env",
@@ -106,7 +107,7 @@ export function runProductionChecks(input: ProductionCheckInput): ProductionChec
     message:
       demoPasswordUsers.length > 0
         ? `Demo password still detected for: ${demoPasswordUsers.map((user) => user.username).join(", ")}.`
-        : "No active seed user is using the demo password hash."
+        : "No active seed user is using the demo password."
   });
 
   checks.push({

@@ -167,13 +167,47 @@ npm run start:prod
 - Test confirm import.
 - Test packing manual AWB search.
 - Test barcode scanner on the HTTPS domain.
+- Open **Owner -> System** and resolve production warnings.
+- Export a test CSV from **Owner -> System**.
 
 ### Data retention guidance
 
 The expected load of around 6 accounts and up to 600 orders per day is reasonable for a small Supabase PostgreSQL
-deployment, but monitor database growth. Keep operational orders active for daily work. Add future cleanup/export flows
-for old scan logs, old upload preview rows, and imported batch diagnostics once the shop has enough history to decide a
-retention window.
+deployment, but monitor database growth. Keep operational orders active for daily work and use CSV exports plus cleanup
+tools to control temporary parser rows and operational logs.
+
+Sprint 4 adds the first retention tools under **Owner -> Cleanup**:
+
+- Upload preview rows: 30 days
+- Import row issues: 60 days
+- Scan logs: 90 days
+- Audit logs: 180 days
+
+Cleanup never deletes orders, SKU image mappings, accounts, or users. The owner must type `CLEANUP` before deleting old
+temporary rows or logs, and every cleanup action is audited.
+
+### Backup plan
+
+- Export CSV backups weekly from **Owner -> System**.
+- Keep the SKU image mapping CSV somewhere safe because it is operationally important.
+- Export orders, packed orders, problem orders, scan logs, upload batches, and SKU mappings before major cleanup.
+- Use Supabase database backup/export options for full database recovery.
+- Do not store product image files; only external image URLs are exported.
+
+### Final pre-deployment checklist
+
+1. Create the Supabase project.
+2. Set Hostinger environment variables from `.env.production.example`.
+3. Run production migrations with `npm run db:migrate:prod`.
+4. Build with `npm run build` or `npm run build:prod`.
+5. Create real owner, picker, and packer users.
+6. Change or deactivate all demo passwords/users.
+7. Upload SKU image mappings.
+8. Upload test Meesho label/manifest PDFs.
+9. Confirm import and duplicate protection.
+10. Test barcode scanning on HTTPS.
+11. Export a test CSV.
+12. Open **Owner -> System** and confirm production checks are OK.
 
 ### Production troubleshooting
 
@@ -304,6 +338,7 @@ the row before confirming import.
 4. Confirm import. Orders flow through the duplicate-safe `accountId + AWB` importer.
 5. Pickers pick by SKU/color/size groups.
 6. Packers scan or type AWB, verify product details, and confirm packed.
+7. Owner exports weekly CSV backups and runs cleanup when old temporary rows are eligible.
 
 ## Daily Picker Workflow
 

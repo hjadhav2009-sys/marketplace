@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
+import { canConfirmPacked } from "@/lib/operations/packing";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { problemOrderSchema } from "@/lib/validators";
@@ -25,20 +26,29 @@ export async function confirmPackedAction(formData: FormData) {
     redirect("/packing?error=invalid");
   }
 
-  if (order.packStatus !== "READY") {
-    redirect(`/packing/${encodeURIComponent(order.awb)}`);
+  if (!canConfirmPacked(order)) {
+    redirect(`/packing/${encodeURIComponent(order.awb)}?packed=already`);
   }
 
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: order.id },
+  const packed = await prisma.$transaction(async (tx) => {
+    const update = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        accountId: account.id,
+        packStatus: "READY"
+      },
       data: {
         status: "PACKED",
         packStatus: "PACKED",
         packedAt: new Date()
       }
-    }),
-    prisma.scanLog.create({
+    });
+
+    if (update.count === 0) {
+      return false;
+    }
+
+    await tx.scanLog.create({
       data: {
         accountId: account.id,
         orderId: order.id,
@@ -47,8 +57,14 @@ export async function confirmPackedAction(formData: FormData) {
         scannedById: user.id,
         note: "Packer confirmed order as packed."
       }
-    })
-  ]);
+    });
+
+    return true;
+  });
+
+  if (!packed) {
+    redirect(`/packing/${encodeURIComponent(order.awb)}?packed=already`);
+  }
 
   await recordAuditLog({
     userId: user.id,
@@ -88,6 +104,22 @@ export async function reportProblemFromScanAction(formData: FormData) {
 
   if (!order) {
     redirect("/packing?error=invalid");
+  }
+
+  if (order.packStatus === "PACKED") {
+    redirect(`/packing/${encodeURIComponent(order.awb)}?packed=already`);
+  }
+
+  const existingProblem = await prisma.problemOrder.findFirst({
+    where: {
+      accountId: account.id,
+      orderId: order.id,
+      status: "OPEN"
+    }
+  });
+
+  if (existingProblem) {
+    redirect(`/packing/${encodeURIComponent(order.awb)}?problem=existing`);
   }
 
   await prisma.$transaction([

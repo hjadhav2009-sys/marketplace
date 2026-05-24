@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { AwbBarcodeScanner } from "../components/AwbBarcodeScanner";
+import { isValidAwb, normalizeAwb } from "../lib/awb";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
 import { planOrderImport } from "../lib/import/orders";
 import { canImportPreviewIssues } from "../lib/import/preview";
 import { planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
+import { canConfirmPacked } from "../lib/operations/packing";
+import { buildPickerSkuGroups } from "../lib/operations/picking";
 import { getInitialProductImageState } from "../lib/product-image";
+import { canDeactivateUser, shouldCloseSessionsAfterPasswordReset, validateWorkerPassword } from "../lib/user-management";
 import {
   awbSearchSchema,
   loginSchema,
@@ -28,6 +33,9 @@ const sampleOrder = {
 
 assert.equal(parsedOrderSchema.safeParse(sampleOrder).success, true, "seed order should validate");
 assert.equal(awbSearchSchema.safeParse({ awb: sampleOrder.awb }).success, true, "seed AWB should validate");
+assert.equal(normalizeAwb(" 1490 8349 1549 3571 "), "1490834915493571", "numeric AWB normalizes");
+assert.equal(normalizeAwb("sf3423949467fpl"), "SF3423949467FPL", "Shadowfax AWB normalizes");
+assert.equal(isValidAwb("bad"), false, "bad AWB is rejected");
 assert.equal(uploadBatchSchema.safeParse({ filename: "labels.pdf" }).success, true, "PDF upload should validate");
 assert.equal(uploadBatchSchema.safeParse({ filename: "labels.xlsx" }).success, false, "non-PDF upload should fail");
 assert.equal(
@@ -137,9 +145,55 @@ assert.equal(canImportPreviewIssues([{ issueType: "MISSING_IMAGE_MAPPING" }]), t
 
 assert.equal(canRoleAccessPath("OWNER", "/reports"), true, "Owner can access reports");
 assert.equal(canRoleAccessPath("PICKER", "/packing"), false, "Picker cannot access packing");
+assert.equal(canRoleAccessPath("PACKER", "/owner/users"), false, "Packer cannot access owner pages");
 assert.equal(canRoleAccessPath("PACKER", "/problems"), true, "Packer can access problems");
 assert.equal(canAccessAccount({ role: "PICKER", accountId: "a1" }, "a1"), true, "Assigned user can access account");
 assert.equal(canAccessAccount({ role: "PICKER", accountId: "a1" }, "a2"), false, "Assigned user cannot access other account");
+assert.equal(canRoleAccessPath("PICKER", "/change-password"), true, "Workers can change password");
+
+assert.equal(canConfirmPacked({ packStatus: "READY" }), true, "Ready order can be packed");
+assert.equal(canConfirmPacked({ packStatus: "PACKED" }), false, "Packed order is idempotently skipped");
+
+const pickerGroups = buildPickerSkuGroups(
+  [
+    {
+      id: "o1",
+      awb: "A12345678",
+      sku: "SKU1",
+      qty: 1,
+      color: "Silver",
+      size: "Free Size",
+      courier: "Delhivery",
+      orderNo: "ORDER1",
+      pickStatus: "READY",
+      packStatus: "READY"
+    },
+    {
+      id: "o2",
+      awb: "A12345679",
+      sku: "SKU1",
+      qty: 2,
+      color: "Gold",
+      size: "Free Size",
+      courier: "Delhivery",
+      orderNo: "ORDER2",
+      pickStatus: "PICKED",
+      packStatus: "READY"
+    }
+  ],
+  [{ id: "m1", sku: "SKU1", imageUrl: "https://example.com/image.jpg", productName: "Pendant" }]
+);
+
+assert.equal(pickerGroups.length, 2, "Picker grouping separates SKU by color and size");
+assert.equal(pickerGroups.find((group) => group.color === "Silver")?.totalQuantity, 1, "Picker group sums quantity");
+assert.equal(pickerGroups.find((group) => group.color === "Gold")?.status, "PICKED", "Picked group status is derived");
+
+assert.equal(validateWorkerPassword("demo1234").valid, false, "Demo password is rejected");
+assert.equal(validateWorkerPassword("better123").valid, true, "Usable worker password passes");
+assert.equal(canDeactivateUser("u1", "u1"), false, "Owner cannot deactivate self");
+assert.equal(canDeactivateUser("u1", "u2"), true, "Owner can deactivate another user");
+assert.equal(shouldCloseSessionsAfterPasswordReset("owner", "worker"), true, "Owner reset closes worker sessions");
+assert.equal(shouldCloseSessionsAfterPasswordReset("owner", "owner"), false, "Owner self password change keeps current sessions");
 
 assert.equal(normalizeIp("::ffff:192.168.1.10"), "192.168.1.10", "IPv4-mapped IPs normalize");
 assert.equal(isIpInCidr("192.168.1.10", "192.168.0.0/16"), true, "Local CIDR allows Wi-Fi IP");
@@ -147,5 +201,6 @@ assert.equal(isAllowedLocalNetworkIp("8.8.8.8", "192.168.0.0/16"), false, "Exter
 assert.equal(isAllowedLocalNetworkIp("127.0.0.1", "192.168.0.0/16"), true, "Localhost is always allowed");
 
 assert.equal(getInitialProductImageState(null), "missing", "Product image fallback handles missing URL");
+assert.equal(typeof AwbBarcodeScanner, "function", "Scanner component compiles");
 
 console.log("Validation tests passed.");

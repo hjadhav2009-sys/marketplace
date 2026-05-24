@@ -18,16 +18,19 @@ const ownerLinks = [
   { href: "/packing", label: "Pack" },
   { href: "/problems", label: "Problems" },
   { href: "/reports", label: "Reports" },
-  { href: "/owner/users", label: "Users" }
+  { href: "/owner/users", label: "Users" },
+  { href: "/change-password", label: "Password" }
 ];
 
 const pickerLinks = [
-  { href: "/picker", label: "Pick" }
+  { href: "/picker", label: "Pick" },
+  { href: "/change-password", label: "Password" }
 ];
 
 const packerLinks = [
   { href: "/packing", label: "Pack" },
-  { href: "/problems", label: "Problems" }
+  { href: "/problems", label: "Problems" },
+  { href: "/change-password", label: "Password" }
 ];
 
 async function logoutAction() {

@@ -19,6 +19,7 @@
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "@types/pdf-parse": "^1.1.5",
+    "@zxing/browser": "^0.2.0",
     "exceljs": "^4.4.0",
     "next": "^15.0.0",
     "pdf-parse": "^2.4.5",

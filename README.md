@@ -7,8 +7,8 @@ The app supports the daily local warehouse flow:
 - Owner uploads Meesho label and/or supplier manifest PDFs for parser review.
 - The parser extracts AWB, courier, SKU, quantity, color, size, order number, product description, payment type, and related invoice fields where available.
 - Owner maps SKU to a Meesho product image URL. Product files are not stored.
-- Picker sees SKU-grouped mobile-first product cards.
-- Packer searches/scans AWB, verifies order details, confirms packed, or marks a problem order.
+- Picker sees SKU, color, and size grouped mobile-first product cards.
+- Packer scans AWB with the mobile browser camera or enters AWB manually, verifies order details, confirms packed, or marks a problem order.
 
 ## Tech Stack
 
@@ -166,6 +166,7 @@ npm run start:prod
 - Test PDF upload and parse review.
 - Test confirm import.
 - Test packing manual AWB search.
+- Test barcode scanner on the HTTPS domain.
 
 ### Data retention guidance
 
@@ -200,8 +201,8 @@ Workers do not need the codebase, VS Code, terminal, Prisma, or npm. Keep those 
 Every app page except the login screen requires an active login. Use strong passwords, keep the owner password private,
 and deactivate worker users from **Owner -> Users** if an unknown phone or browser appears.
 
-**Owner -> Users** is intentionally limited to session review and deactivation. User creation and password changes are
-planned for a later sprint.
+Owners can create picker/packer users, assign an account, edit names/usernames/roles, reset passwords, reactivate users,
+deactivate users, and close sessions for unknown devices. Workers can change their own password from the app header.
 
 Optional local network protection:
 
@@ -301,7 +302,56 @@ the row before confirming import.
 2. Review parsed rows, confidence, duplicates, missing AWBs/SKUs, missing image mappings, and cross-check issues.
 3. Fix missing SKU image mappings when needed.
 4. Confirm import. Orders flow through the duplicate-safe `accountId + AWB` importer.
-5. Workers pick by SKU and pack by AWB from their phone browsers on the same Wi-Fi.
+5. Pickers pick by SKU/color/size groups.
+6. Packers scan or type AWB, verify product details, and confirm packed.
+
+## Daily Picker Workflow
+
+1. Log in as a picker and choose the assigned seller account.
+2. Open **Pick**.
+3. Search or filter pending SKU groups.
+4. Match the product image, SKU, color, size, and total quantity.
+5. Open a SKU group to see AWBs and courier split.
+6. Mark the group picked, or mark a pick problem if stock/color/size is wrong.
+
+## Daily Packer Workflow
+
+1. Log in as a packer and choose the assigned seller account.
+2. Open **Pack**.
+3. Scan the AWB barcode from the shipping label with the browser camera, or type the AWB manually.
+4. Verify the product image, SKU, quantity, color, courier, account, order number, and AWB.
+5. Confirm packed. Repeating the same confirmation is safe and will not duplicate updates.
+6. Mark problem if the item is missing, wrong, or unclear.
+7. Use **Scan next** for the next label.
+
+## Barcode Scanner
+
+The AWB scanner runs in the browser with an open-source barcode reader. No APK is required.
+
+- Camera permission is requested by the packing page.
+- Rear/environment camera is preferred on phones.
+- Manual AWB entry is always visible and should be used if camera access fails.
+- Camera scanning usually requires HTTPS on phones. Localhost works for PC testing, but phone access over plain HTTP may be blocked by the browser.
+- Production should use `https://pack.personalizedgiftday.com` before relying on camera scanning.
+
+## Owner User Management
+
+Before daily use, open **Owner -> Users**:
+
+1. Create worker users for pickers and packers.
+2. Assign each worker to the correct Meesho seller account.
+3. Change all demo passwords.
+4. Use at least 8 characters and avoid `demo1234`.
+5. Close sessions if an unknown phone/browser appears.
+6. Deactivate users who should no longer access the app.
+
+Before each real packing day:
+
+1. Confirm worker users exist and can log in.
+2. Upload or update SKU image mappings.
+3. Upload Meesho PDFs and confirm import.
+4. Test one scanner read and one manual AWB lookup.
+5. Test one packing confirm on a known order.
 
 ## Duplicate Protection
 
@@ -363,6 +413,8 @@ When `DATABASE_URL` starts with `postgres://` or `postgresql://`, Prisma uses th
 - Upload actions do not persist raw PDF files.
 - The app does not scrape Meesho.
 
-## Future Scanner Hooks
+## Scanner Notes
 
-- Add a browser barcode scanner to `/packing` and submit scanned AWBs through `searchAwbAction`.
+- `/packing` submits camera scans and manual searches through the same backend AWB action.
+- The scanner does not store photos or video.
+- Barcode scanner support depends on the phone browser, camera permission, and HTTPS.

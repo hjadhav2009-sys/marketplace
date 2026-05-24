@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidAwb, normalizeAwb } from "./awb";
 
 export const loginSchema = z.object({
   username: z.string().trim().min(1, "Username is required"),
@@ -42,11 +43,10 @@ export const skuImageImportFileSchema = z.object({
 });
 
 export const awbSearchSchema = z.object({
-  awb: z
-    .string()
-    .trim()
-    .min(8, "Enter a valid AWB")
-    .regex(/^[A-Za-z0-9_-]+$/, "AWB can only contain letters, numbers, hyphens, or underscores")
+  awb: z.preprocess(
+    normalizeAwb,
+    z.string().refine(isValidAwb, "Enter a valid AWB")
+  )
 });
 
 export const parsedOrderSchema = z.object({

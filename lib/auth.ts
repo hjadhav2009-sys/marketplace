@@ -138,11 +138,15 @@ export async function getCurrentUser() {
   return user;
 }
 
-export async function requireUser(roles?: Role[]) {
+export async function requireUser(roles?: Role[], options?: { allowPasswordChangeRequired?: boolean }) {
   const user = await getCurrentUser();
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (user.mustChangePassword && !options?.allowPasswordChangeRequired) {
+    redirect("/change-password?required=1");
   }
 
   if (roles && !roles.includes(user.role)) {

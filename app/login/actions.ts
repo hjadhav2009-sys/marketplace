@@ -97,5 +97,9 @@ export async function loginAction(formData: FormData) {
     request
   });
 
+  if (user.mustChangePassword) {
+    redirect("/change-password?required=1");
+  }
+
   redirect("/accounts");
 }

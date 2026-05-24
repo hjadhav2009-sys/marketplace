@@ -1,8 +1,8 @@
 import type { Role, User } from "@prisma/client";
 
-const ownerPrefixes = ["/owner", "/picker", "/packing", "/problems", "/reports", "/accounts"];
-const pickerPrefixes = ["/picker", "/accounts"];
-const packerPrefixes = ["/packing", "/problems", "/accounts"];
+const ownerPrefixes = ["/owner", "/picker", "/packing", "/problems", "/reports", "/accounts", "/change-password"];
+const pickerPrefixes = ["/picker", "/accounts", "/change-password"];
+const packerPrefixes = ["/packing", "/problems", "/accounts", "/change-password"];
 
 export function canRoleAccessPath(role: Role, pathname: string) {
   if (pathname === "/" || pathname === "/login" || pathname === "/network-blocked") {

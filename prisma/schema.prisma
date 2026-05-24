@@ -71,26 +71,27 @@ enum ImageHealth {
 }
 
 model User {
-  id                String              @id @default(cuid())
-  username          String              @unique
-  passwordHash      String
-  name              String
-  role              Role
-  active            Boolean             @default(true)
-  failedLoginCount  Int                 @default(0)
-  lockedUntil       DateTime?
-  lastLoginAt       DateTime?
-  lastLoginIp       String?
-  lastUserAgent     String?
-  accountId         String?
-  account           Account?            @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  uploadedBatches   UploadBatch[]       @relation("UploadedBatches")
-  scanLogs          ScanLog[]           @relation("UserScanLogs")
-  problemOrders     ProblemOrder[]      @relation("ReportedProblems")
-  sessions          UserDeviceSession[]
-  auditLogs         AuditLog[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                 String              @id @default(cuid())
+  username           String              @unique
+  passwordHash       String
+  name               String
+  role               Role
+  active             Boolean             @default(true)
+  mustChangePassword Boolean             @default(false)
+  failedLoginCount   Int                 @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  lastLoginIp        String?
+  lastUserAgent      String?
+  accountId          String?
+  account            Account?            @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  uploadedBatches    UploadBatch[]       @relation("UploadedBatches")
+  scanLogs           ScanLog[]           @relation("UserScanLogs")
+  problemOrders      ProblemOrder[]      @relation("ReportedProblems")
+  sessions           UserDeviceSession[]
+  auditLogs          AuditLog[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model UserDeviceSession {
@@ -164,27 +165,27 @@ model SkuImageMapping {
 }
 
 model UploadBatch {
-  id              String           @id @default(cuid())
-  accountId       String
-  account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  createdByUserId String?          @map("uploadedById")
-  createdBy       User?            @relation("UploadedBatches", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  fileName        String           @map("filename")
-  importType      ImportType       @default(ORDER_LABEL)
-  status          BatchStatus      @default(UPLOADED)
-  totalRows       Int              @default(0)
-  createdRows     Int              @default(0)
-  updatedRows     Int              @default(0)
-  duplicateRows   Int              @default(0)
-  missingImageRows Int             @default(0)
-  skippedRows     Int              @default(0)
-  errorRows       Int              @default(0)
-  notes           String?
-  orders          Order[]
-  issues          ImportRowIssue[]
-  previewRows     UploadPreviewRow[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id               String             @id @default(cuid())
+  accountId        String
+  account          Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdByUserId  String?            @map("uploadedById")
+  createdBy        User?              @relation("UploadedBatches", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  fileName         String             @map("filename")
+  importType       ImportType         @default(ORDER_LABEL)
+  status           BatchStatus        @default(UPLOADED)
+  totalRows        Int                @default(0)
+  createdRows      Int                @default(0)
+  updatedRows      Int                @default(0)
+  duplicateRows    Int                @default(0)
+  missingImageRows Int                @default(0)
+  skippedRows      Int                @default(0)
+  errorRows        Int                @default(0)
+  notes            String?
+  orders           Order[]
+  issues           ImportRowIssue[]
+  previewRows      UploadPreviewRow[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   @@index([accountId, createdAt])
   @@index([accountId, importType, createdAt])

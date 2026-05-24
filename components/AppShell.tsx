@@ -19,6 +19,8 @@ const ownerLinks = [
   { href: "/problems", label: "Problems" },
   { href: "/reports", label: "Reports" },
   { href: "/owner/users", label: "Users" },
+  { href: "/owner/system", label: "System" },
+  { href: "/owner/cleanup", label: "Cleanup" },
   { href: "/change-password", label: "Password" }
 ];
 

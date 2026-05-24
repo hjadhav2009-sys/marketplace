@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import { AwbBarcodeScanner } from "../components/AwbBarcodeScanner";
 import { isValidAwb, normalizeAwb } from "../lib/awb";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
+import { formatCsvValue, rowsToCsv } from "../lib/csv";
 import { planOrderImport } from "../lib/import/orders";
 import { canImportPreviewIssues } from "../lib/import/preview";
 import { planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
 import { canConfirmPacked } from "../lib/operations/packing";
 import { buildPickerSkuGroups } from "../lib/operations/picking";
+import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
 import { getInitialProductImageState } from "../lib/product-image";
+import { cutoffDate, isCleanupConfirmationValid, RETENTION_DAYS } from "../lib/retention";
 import { canDeactivateUser, shouldCloseSessionsAfterPasswordReset, validateWorkerPassword } from "../lib/user-management";
 import {
   awbSearchSchema,
@@ -144,6 +147,8 @@ assert.equal(canImportPreviewIssues([{ issueType: "LOW_CONFIDENCE" }]), false, "
 assert.equal(canImportPreviewIssues([{ issueType: "MISSING_IMAGE_MAPPING" }]), true, "Missing image mapping does not block preview import");
 
 assert.equal(canRoleAccessPath("OWNER", "/reports"), true, "Owner can access reports");
+assert.equal(canRoleAccessPath("OWNER", "/owner/system"), true, "Owner can access system health");
+assert.equal(canRoleAccessPath("OWNER", "/owner/cleanup"), true, "Owner can access cleanup");
 assert.equal(canRoleAccessPath("PICKER", "/packing"), false, "Picker cannot access packing");
 assert.equal(canRoleAccessPath("PACKER", "/owner/users"), false, "Packer cannot access owner pages");
 assert.equal(canRoleAccessPath("PACKER", "/problems"), true, "Packer can access problems");
@@ -202,5 +207,35 @@ assert.equal(isAllowedLocalNetworkIp("127.0.0.1", "192.168.0.0/16"), true, "Loca
 
 assert.equal(getInitialProductImageState(null), "missing", "Product image fallback handles missing URL");
 assert.equal(typeof AwbBarcodeScanner, "function", "Scanner component compiles");
+
+assert.equal(formatCsvValue('A "quoted", value'), '"A ""quoted"", value"', "CSV values are safely escaped");
+assert.equal(rowsToCsv(["sku", "qty"], [["SKU1", 2]]), "sku,qty\nSKU1,2", "CSV rows format");
+
+assert.equal(RETENTION_DAYS.previewRows, 30, "Preview row retention is 30 days");
+assert.equal(RETENTION_DAYS.importIssues, 60, "Import issue retention is 60 days");
+assert.equal(RETENTION_DAYS.scanLogs, 90, "Scan log retention is 90 days");
+assert.equal(RETENTION_DAYS.auditLogs, 180, "Audit log retention is 180 days");
+assert.equal(cutoffDate(30, new Date("2026-05-25T00:00:00.000Z")).toISOString(), "2026-04-25T00:00:00.000Z", "Cleanup cutoff subtracts days");
+assert.equal(isCleanupConfirmationValid("CLEANUP"), true, "Cleanup confirmation accepts exact token");
+assert.equal(isCleanupConfirmationValid("delete"), false, "Cleanup confirmation rejects wrong token");
+
+const productionChecks = runProductionChecks({
+  nodeEnv: "production",
+  sessionSecret: "dev-only-change-me",
+  nextPublicAppUrl: "",
+  databaseUrl: "file:./dev.db",
+  localNetworkOnly: "true",
+  demoUsers: [{ username: "owner", active: true, passwordHash: "not-demo" }],
+  skuMappingCount: 0,
+  oldPreviewRowCount: 6000,
+  oldImportIssueCount: 0,
+  oldScanLogCount: 0
+});
+assert.equal(summarizeProductionChecks(productionChecks), "NEEDS_ACTION", "Production checks detect unsafe settings");
+assert.equal(
+  productionChecks.some((check) => check.key === "database-url" && check.status === "NEEDS_ACTION"),
+  true,
+  "Production checks require PostgreSQL in production"
+);
 
 console.log("Validation tests passed.");

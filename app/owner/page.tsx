@@ -47,10 +47,10 @@ export default async function OwnerDashboardPage() {
                 <div>
                   <p className="font-semibold text-slate-950">{order.sku}</p>
                   <p className="text-sm text-slate-600">
-                    AWB {order.awb} · Qty {order.quantity} · {order.courier ?? "Courier pending"}
+                    AWB {order.awb} · Qty {order.qty} · {order.courier ?? "Courier pending"}
                   </p>
                 </div>
-                <StatusBadge value={order.status} />
+                <StatusBadge value={order.packStatus} />
               </div>
             ))}
           </div>
@@ -69,7 +69,7 @@ export default async function OwnerDashboardPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-950">{batch.filename}</p>
+                    <p className="truncate font-semibold text-slate-950">{batch.fileName}</p>
                     <p className="text-sm text-slate-600">
                       {batch._count.orders} orders · {formatDateTime(batch.createdAt)}
                     </p>

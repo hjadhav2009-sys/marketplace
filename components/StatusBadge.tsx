@@ -9,7 +9,13 @@ const statusTone: Record<string, string> = {
   IMPORTED: "bg-teal-50 text-teal-700 ring-teal-200",
   REVIEWED: "bg-blue-50 text-blue-700 ring-blue-200",
   PARSED: "bg-violet-50 text-violet-700 ring-violet-200",
-  UPLOADED: "bg-slate-50 text-slate-700 ring-slate-200"
+  UPLOADED: "bg-slate-50 text-slate-700 ring-slate-200",
+  ACTIVE: "bg-teal-50 text-teal-700 ring-teal-200",
+  INACTIVE: "bg-slate-100 text-slate-600 ring-slate-200",
+  OWNER: "bg-pink-50 text-pink-700 ring-pink-200",
+  PICKER: "bg-blue-50 text-blue-700 ring-blue-200",
+  PACKER: "bg-amber-50 text-amber-800 ring-amber-200",
+  FAILED: "bg-rose-50 text-rose-700 ring-rose-200"
 };
 
 export function StatusBadge({ value }: { value: string }) {

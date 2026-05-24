@@ -27,7 +27,10 @@ export default async function ParseReviewPage({ params }: ReviewPageProps) {
       orders: {
         orderBy: { createdAt: "asc" }
       },
-      uploadedBy: true
+      issues: {
+        orderBy: { createdAt: "asc" }
+      },
+      createdBy: true
     }
   });
 
@@ -49,7 +52,7 @@ export default async function ParseReviewPage({ params }: ReviewPageProps) {
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <p className="text-sm text-slate-500">File</p>
-            <p className="font-semibold text-slate-950">{batch.filename}</p>
+            <p className="font-semibold text-slate-950">{batch.fileName}</p>
           </div>
           <div>
             <p className="text-sm text-slate-500">Uploaded</p>
@@ -57,9 +60,25 @@ export default async function ParseReviewPage({ params }: ReviewPageProps) {
           </div>
           <div>
             <p className="text-sm text-slate-500">Uploaded by</p>
-            <p className="font-semibold text-slate-950">{batch.uploadedBy?.name ?? "Unknown"}</p>
+            <p className="font-semibold text-slate-950">{batch.createdBy?.name ?? "Unknown"}</p>
           </div>
         </div>
+      </section>
+
+      <section className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {[
+          ["Total", batch.totalRows],
+          ["Created", batch.createdRows],
+          ["Updated", batch.updatedRows],
+          ["Duplicates", batch.duplicateRows],
+          ["Skipped", batch.skippedRows],
+          ["Errors", batch.errorRows]
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
+          </div>
+        ))}
       </section>
 
       <section className="mt-6">
@@ -89,12 +108,12 @@ export default async function ParseReviewPage({ params }: ReviewPageProps) {
                     <tr key={order.id}>
                       <td className="px-4 py-3 font-semibold text-slate-950">{order.awb}</td>
                       <td className="px-4 py-3">{order.sku}</td>
-                      <td className="px-4 py-3">{order.quantity}</td>
+                      <td className="px-4 py-3">{order.qty}</td>
                       <td className="px-4 py-3">{order.color ?? "Unknown"}</td>
                       <td className="px-4 py-3">{order.courier ?? "Unknown"}</td>
-                      <td className="px-4 py-3">{order.orderNumber}</td>
+                      <td className="px-4 py-3">{order.orderNo}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge value={order.status} />
+                        <StatusBadge value={order.packStatus} />
                       </td>
                     </tr>
                   ))}
@@ -104,6 +123,24 @@ export default async function ParseReviewPage({ params }: ReviewPageProps) {
           </div>
         )}
       </section>
+
+      {batch.issues.length > 0 ? (
+        <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <h2 className="font-semibold text-slate-950">Import row issues</h2>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {batch.issues.map((issue) => (
+              <div key={issue.id} className="px-4 py-3 text-sm">
+                <p className="font-semibold text-slate-950">
+                  {issue.issueType} {issue.rowNumber ? `· Row ${issue.rowNumber}` : ""}
+                </p>
+                <p className="mt-1 text-slate-600">{issue.message}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-5">
         <Link href="/owner/sku-mappings" className="text-sm font-semibold text-berry hover:text-pink-800">

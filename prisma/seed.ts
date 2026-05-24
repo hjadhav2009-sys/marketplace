@@ -86,14 +86,20 @@ async function main() {
     update: {
       imageUrl: "https://images-r.meesho.com/images/products/576264463/z71on.avif",
       productName: "Sports Jersey Number Personalized Pendant",
-      color: "Silver"
+      color: "Silver",
+      active: true,
+      source: "seed",
+      imageHealth: "MAPPED"
     },
     create: {
       accountId: account.id,
       sku: "1202919298_6",
       imageUrl: "https://images-r.meesho.com/images/products/576264463/z71on.avif",
       productName: "Sports Jersey Number Personalized Pendant",
-      color: "Silver"
+      color: "Silver",
+      active: true,
+      source: "seed",
+      imageHealth: "MAPPED"
     }
   });
 
@@ -101,47 +107,63 @@ async function main() {
     where: { id: "seed-sullery-batch-001" },
     update: {
       accountId: account.id,
-      uploadedById: owner.id,
-      filename: "meesho-labels-sample.pdf",
+      createdByUserId: owner.id,
+      fileName: "meesho-labels-sample.pdf",
+      importType: "ORDER_LABEL",
       status: "IMPORTED",
+      totalRows: 1,
+      createdRows: 1,
       notes: "Seeded sample batch for sprint-0 foundation."
     },
     create: {
       id: "seed-sullery-batch-001",
       accountId: account.id,
-      uploadedById: owner.id,
-      filename: "meesho-labels-sample.pdf",
+      createdByUserId: owner.id,
+      fileName: "meesho-labels-sample.pdf",
+      importType: "ORDER_LABEL",
       status: "IMPORTED",
+      totalRows: 1,
+      createdRows: 1,
       notes: "Seeded sample batch for sprint-0 foundation."
     }
   });
 
   await prisma.order.upsert({
-    where: { awb: "1490834915493571" },
+    where: {
+      accountId_awb: {
+        accountId: account.id,
+        awb: "1490834915493571"
+      }
+    },
     update: {
       accountId: account.id,
-      uploadBatchId: batch.id,
+      batchId: batch.id,
       courier: "Delhivery",
       sku: "1202919298_6",
-      quantity: 1,
+      qty: 1,
       color: "Silver",
-      orderNumber: "290010756104090432_1",
+      size: null,
+      orderNo: "290010756104090432_1",
       productDescription: "Sports Jersey Number Personalized Pendant",
       paymentType: "UNKNOWN",
+      imageUrl: "https://images-r.meesho.com/images/products/576264463/z71on.avif",
       city: null,
       state: null,
+      pickStatus: "READY",
+      packStatus: "READY",
       status: "READY"
     },
     create: {
       accountId: account.id,
-      uploadBatchId: batch.id,
+      batchId: batch.id,
       awb: "1490834915493571",
       courier: "Delhivery",
       sku: "1202919298_6",
-      quantity: 1,
+      qty: 1,
       color: "Silver",
-      orderNumber: "290010756104090432_1",
+      orderNo: "290010756104090432_1",
       productDescription: "Sports Jersey Number Personalized Pendant",
+      imageUrl: "https://images-r.meesho.com/images/products/576264463/z71on.avif",
       paymentType: "UNKNOWN",
       status: "READY"
     }

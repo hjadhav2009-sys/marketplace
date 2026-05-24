@@ -3,11 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAccount, requireUser } from "@/lib/auth";
+import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { getRequestMeta } from "@/lib/request-context";
 
 export async function resolveProblemOrderAction(formData: FormData) {
   const user = await requireUser(["OWNER", "PACKER"]);
   const account = await requireAccount(user);
+  const request = await getRequestMeta();
   const problemId = String(formData.get("problemId") ?? "");
 
   const problem = await prisma.problemOrder.findFirst({
@@ -35,7 +38,9 @@ export async function resolveProblemOrderAction(formData: FormData) {
     prisma.order.update({
       where: { id: problem.orderId },
       data: {
-        status: "READY"
+        status: "READY",
+        pickStatus: "READY",
+        packStatus: "READY"
       }
     }),
     prisma.scanLog.create({
@@ -49,6 +54,16 @@ export async function resolveProblemOrderAction(formData: FormData) {
       }
     })
   ]);
+
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "PROBLEM_ORDER_RESOLVED",
+    entityType: "ProblemOrder",
+    entityId: problem.id,
+    metadata: { awb: problem.order.awb },
+    request
+  });
 
   revalidatePath("/problems");
   revalidatePath("/picker");

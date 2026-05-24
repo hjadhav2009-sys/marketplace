@@ -20,6 +20,12 @@ enum BatchStatus {
   PARSED
   REVIEWED
   IMPORTED
+  FAILED
+}
+
+enum ImportType {
+  ORDER_LABEL
+  SKU_IMAGE
 }
 
 enum PaymentType {
@@ -29,6 +35,18 @@ enum PaymentType {
 }
 
 enum OrderStatus {
+  READY
+  PACKED
+  PROBLEM
+}
+
+enum PickStatus {
+  READY
+  PICKED
+  PROBLEM
+}
+
+enum PackStatus {
   READY
   PACKED
   PROBLEM
@@ -46,20 +64,66 @@ enum ProblemStatus {
   RESOLVED
 }
 
+enum ImageHealth {
+  UNKNOWN
+  MAPPED
+  BROKEN
+}
+
 model User {
-  id             String         @id @default(cuid())
-  username       String         @unique
-  passwordHash   String
-  name           String
-  role           Role
-  active         Boolean        @default(true)
-  accountId      String?
-  account        Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  uploadedBatches UploadBatch[] @relation("UploadedBatches")
-  scanLogs       ScanLog[]      @relation("UserScanLogs")
-  problemOrders  ProblemOrder[] @relation("ReportedProblems")
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                String              @id @default(cuid())
+  username          String              @unique
+  passwordHash      String
+  name              String
+  role              Role
+  active            Boolean             @default(true)
+  failedLoginCount  Int                 @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  lastUserAgent     String?
+  accountId         String?
+  account           Account?            @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  uploadedBatches   UploadBatch[]       @relation("UploadedBatches")
+  scanLogs          ScanLog[]           @relation("UserScanLogs")
+  problemOrders     ProblemOrder[]      @relation("ReportedProblems")
+  sessions          UserDeviceSession[]
+  auditLogs         AuditLog[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model UserDeviceSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress   String?
+  userAgent   String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  active      Boolean  @default(true)
+
+  @@index([userId, active])
+  @@index([lastSeenAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  accountId  String?
+  account    Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String?
+  entityId   String?
+  ipAddress  String?
+  userAgent  String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }
 
 model Account {
@@ -72,65 +136,91 @@ model Account {
   orders           Order[]
   scanLogs         ScanLog[]
   problemOrders    ProblemOrder[]
+  auditLogs        AuditLog[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 }
 
 model SkuImageMapping {
-  id          String   @id @default(cuid())
-  accountId   String
-  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  sku         String
-  imageUrl    String
-  productName String?
-  color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String      @id @default(cuid())
+  accountId      String
+  account        Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sku            String
+  imageUrl       String
+  productName    String?
+  color          String?
+  active         Boolean     @default(true)
+  lastImportedAt DateTime?
+  source         String?
+  notes          String?
+  imageHealth    ImageHealth @default(UNKNOWN)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@unique([accountId, sku])
   @@index([sku])
+  @@index([accountId, active])
+  @@index([accountId, imageHealth])
 }
 
 model UploadBatch {
-  id           String      @id @default(cuid())
-  accountId    String
-  account      Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  uploadedById String?
-  uploadedBy   User?       @relation("UploadedBatches", fields: [uploadedById], references: [id], onDelete: SetNull)
-  filename     String
-  status       BatchStatus @default(UPLOADED)
-  notes        String?
-  orders       Order[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id              String           @id @default(cuid())
+  accountId       String
+  account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdByUserId String?          @map("uploadedById")
+  createdBy       User?            @relation("UploadedBatches", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  fileName        String           @map("filename")
+  importType      ImportType       @default(ORDER_LABEL)
+  status          BatchStatus      @default(UPLOADED)
+  totalRows       Int              @default(0)
+  createdRows     Int              @default(0)
+  updatedRows     Int              @default(0)
+  duplicateRows   Int              @default(0)
+  skippedRows     Int              @default(0)
+  errorRows       Int              @default(0)
+  notes           String?
+  orders          Order[]
+  issues          ImportRowIssue[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@index([accountId, createdAt])
+  @@index([accountId, importType, createdAt])
 }
 
 model Order {
   id                 String         @id @default(cuid())
   accountId          String
   account            Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  uploadBatchId      String?
-  uploadBatch        UploadBatch?   @relation(fields: [uploadBatchId], references: [id], onDelete: SetNull)
-  awb                String         @unique
+  batchId            String?        @map("uploadBatchId")
+  uploadBatch        UploadBatch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  awb                String
   courier            String?
   sku                String
-  quantity           Int            @default(1)
+  qty                Int            @default(1) @map("quantity")
   color              String?
-  orderNumber        String         @unique
+  size               String?
+  orderNo            String         @map("orderNumber")
   productDescription String?
   paymentType        PaymentType    @default(UNKNOWN)
+  imageUrl           String?
   city               String?
   state              String?
+  pickStatus         PickStatus     @default(READY)
+  packStatus         PackStatus     @default(READY)
   status             OrderStatus    @default(READY)
   packedAt           DateTime?
+  importedAt         DateTime       @default(now())
   scanLogs           ScanLog[]
   problemOrders      ProblemOrder[]
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
+  @@unique([accountId, awb])
   @@index([accountId, sku])
+  @@index([accountId, orderNo])
+  @@index([accountId, packStatus])
+  @@index([accountId, pickStatus])
   @@index([accountId, status])
 }
 
@@ -168,4 +258,17 @@ model ProblemOrder {
 
   @@index([accountId, status])
   @@index([orderId])
+}
+
+model ImportRowIssue {
+  id        String      @id @default(cuid())
+  batchId   String
+  batch     UploadBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber Int?
+  issueType String
+  message   String
+  rawData   String?
+  createdAt DateTime    @default(now())
+
+  @@index([batchId, issueType])
 }

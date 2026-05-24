@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Account, Role, User } from "@prisma/client";
+import type { RequestMeta } from "./network";
 import { prisma } from "./prisma";
 
 const SESSION_COOKIE = "mpp_session";
@@ -10,6 +11,7 @@ const SESSION_MAX_AGE = 60 * 60 * 12;
 
 type SessionPayload = {
   userId: string;
+  sessionId: string;
 };
 
 function getSecret() {
@@ -53,9 +55,17 @@ function verifySignedCookie(value: string | undefined) {
   }
 }
 
-export async function createSession(userId: string) {
+export async function createSession(userId: string, request?: RequestMeta) {
   const cookieStore = await cookies();
-  const payload = encodePayload({ userId });
+  const session = await prisma.userDeviceSession.create({
+    data: {
+      userId,
+      ipAddress: request?.ipAddress,
+      userAgent: request?.userAgent,
+      active: true
+    }
+  });
+  const payload = encodePayload({ userId, sessionId: session.id });
 
   cookieStore.set(SESSION_COOKIE, `${payload}.${sign(payload)}`, {
     httpOnly: true,
@@ -64,10 +74,27 @@ export async function createSession(userId: string) {
     path: "/",
     maxAge: SESSION_MAX_AGE
   });
+
+  return session;
 }
 
 export async function clearSession() {
   const cookieStore = await cookies();
+  const payload = verifySignedCookie(cookieStore.get(SESSION_COOKIE)?.value);
+
+  if (payload?.sessionId) {
+    await prisma.userDeviceSession.updateMany({
+      where: {
+        id: payload.sessionId,
+        userId: payload.userId
+      },
+      data: {
+        active: false,
+        lastSeenAt: new Date()
+      }
+    });
+  }
+
   cookieStore.delete(SESSION_COOKIE);
   cookieStore.delete(ACCOUNT_COOKIE);
 }
@@ -76,16 +103,39 @@ export async function getCurrentUser() {
   const cookieStore = await cookies();
   const payload = verifySignedCookie(cookieStore.get(SESSION_COOKIE)?.value);
 
-  if (!payload?.userId) {
+  if (!payload?.userId || !payload.sessionId) {
     return null;
   }
 
-  return prisma.user.findFirst({
+  const user = await prisma.user.findFirst({
     where: {
       id: payload.userId,
-      active: true
+      active: true,
+      sessions: {
+        some: {
+          id: payload.sessionId,
+          active: true
+        }
+      }
     }
   });
+
+  if (!user) {
+    return null;
+  }
+
+  await prisma.userDeviceSession.updateMany({
+    where: {
+      id: payload.sessionId,
+      userId: user.id,
+      active: true
+    },
+    data: {
+      lastSeenAt: new Date()
+    }
+  });
+
+  return user;
 }
 
 export async function requireUser(roles?: Role[]) {

@@ -33,7 +33,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   }
 
   const { order, mapping } = result;
-  const canPack = order.status === "READY";
+  const canPack = order.packStatus === "READY";
+  const imageUrl = order.imageUrl ?? mapping?.imageUrl;
 
   return (
     <AppShell>
@@ -42,7 +43,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
         title={`AWB ${order.awb}`}
         description="Verify the product image and order details before confirming the shipment is packed."
       >
-        <StatusBadge value={order.status} />
+        <StatusBadge value={order.packStatus} />
       </PageHeader>
 
       {query?.packed ? (
@@ -59,7 +60,12 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
 
       <section className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-          <ProductImage src={mapping?.imageUrl} alt={mapping?.productName ?? order.sku} size="lg" />
+          <ProductImage
+            src={imageUrl}
+            alt={`${mapping?.productName ?? order.productDescription ?? "Product"} ${order.sku}`}
+            size="lg"
+            mappingId={mapping?.id}
+          />
           <h2 className="mt-4 text-xl font-bold text-slate-950">{mapping?.productName ?? order.productDescription ?? order.sku}</h2>
           <p className="mt-2 text-sm text-slate-600">{order.productDescription ?? "No product description extracted yet."}</p>
         </div>
@@ -73,7 +79,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-sm font-medium text-slate-500">Quantity</dt>
-                <dd className="mt-1 text-2xl font-bold text-berry">{order.quantity}</dd>
+                <dd className="mt-1 text-2xl font-bold text-berry">{order.qty}</dd>
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-sm font-medium text-slate-500">Color</dt>
@@ -89,7 +95,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-sm font-medium text-slate-500">Order number</dt>
-                <dd className="mt-1 break-words font-semibold text-slate-950">{order.orderNumber}</dd>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{order.orderNo}</dd>
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-sm font-medium text-slate-500">Payment</dt>

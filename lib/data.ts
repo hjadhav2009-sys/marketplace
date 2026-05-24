@@ -3,8 +3,8 @@ import { prisma } from "./prisma";
 
 export async function getDashboardStats(accountId: string) {
   const [readyOrders, packedOrders, problemOrders, skuMappings, batches] = await Promise.all([
-    prisma.order.count({ where: { accountId, status: "READY" } }),
-    prisma.order.count({ where: { accountId, status: "PACKED" } }),
+    prisma.order.count({ where: { accountId, packStatus: "READY" } }),
+    prisma.order.count({ where: { accountId, packStatus: "PACKED" } }),
     prisma.problemOrder.count({ where: { accountId, status: "OPEN" } }),
     prisma.skuImageMapping.count({ where: { accountId } }),
     prisma.uploadBatch.count({ where: { accountId } })
@@ -35,7 +35,7 @@ export async function getRecentBatches(accountId: string) {
   return prisma.uploadBatch.findMany({
     where: { accountId },
     include: {
-      uploadedBy: true,
+      createdBy: true,
       _count: {
         select: { orders: true }
       }
@@ -47,7 +47,24 @@ export async function getRecentBatches(accountId: string) {
 
 export async function getSkuMappings(accountId: string) {
   return prisma.skuImageMapping.findMany({
-    where: { accountId },
+    where: { accountId, active: true },
+    orderBy: { updatedAt: "desc" }
+  });
+}
+
+export async function searchSkuMappings(accountId: string, query?: string, active?: string) {
+  return prisma.skuImageMapping.findMany({
+    where: {
+      accountId,
+      active: active === "inactive" ? false : active === "all" ? undefined : true,
+      OR: query
+        ? [
+            { sku: { contains: query } },
+            { productName: { contains: query } },
+            { notes: { contains: query } }
+          ]
+        : undefined
+    },
     orderBy: { updatedAt: "desc" }
   });
 }
@@ -57,10 +74,10 @@ export async function getSkuGroups(accountId: string) {
     by: ["sku", "color"],
     where: {
       accountId,
-      status: "READY"
+      packStatus: "READY"
     },
     _sum: {
-      quantity: true
+      qty: true
     },
     _count: {
       id: true
@@ -84,7 +101,7 @@ export async function getSkuGroups(accountId: string) {
   return grouped.map((group) => ({
     sku: group.sku,
     color: group.color,
-    totalQuantity: group._sum.quantity ?? 0,
+    totalQuantity: group._sum.qty ?? 0,
     orderCount: group._count.id,
     mapping: mappingBySku.get(group.sku) ?? null
   }));
@@ -96,7 +113,7 @@ export async function getSkuDetail(accountId: string, sku: string) {
       where: {
         accountId,
         sku,
-        status: "READY"
+        packStatus: "READY"
       },
       orderBy: { createdAt: "asc" }
     }),
@@ -113,7 +130,7 @@ export async function getSkuDetail(accountId: string, sku: string) {
   return {
     orders,
     mapping,
-    totalQuantity: orders.reduce((sum, order) => sum + order.quantity, 0)
+    totalQuantity: orders.reduce((sum, order) => sum + order.qty, 0)
   };
 }
 
@@ -177,9 +194,10 @@ export async function getProblemOrders(accountId: string) {
 }
 
 export async function getReportSummary(accountId: string) {
-  const [ordersByStatus, scansToday, batches] = await Promise.all([
+  const startOfDay = new Date(new Date().setHours(0, 0, 0, 0));
+  const [ordersByStatus, scansToday, batches, duplicateIssuesToday, missingImageMappings, brokenImageMappings, auditLogs] = await Promise.all([
     prisma.order.groupBy({
-      by: ["status"],
+      by: ["packStatus"],
       where: { accountId },
       _count: { id: true }
     }),
@@ -187,7 +205,7 @@ export async function getReportSummary(accountId: string) {
       where: {
         accountId,
         createdAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0))
+          gte: startOfDay
         }
       }
     }),
@@ -200,12 +218,51 @@ export async function getReportSummary(accountId: string) {
       },
       orderBy: { createdAt: "desc" },
       take: 6
+    }),
+    prisma.importRowIssue.count({
+      where: {
+        issueType: "DUPLICATE_SKIPPED",
+        batch: {
+          accountId
+        },
+        createdAt: {
+          gte: startOfDay
+        }
+      }
+    }),
+    prisma.order.findMany({
+      where: {
+        accountId,
+        packStatus: "READY",
+        OR: [{ imageUrl: null }, { imageUrl: "" }]
+      },
+      distinct: ["sku"],
+      take: 20,
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.skuImageMapping.findMany({
+      where: {
+        accountId,
+        imageHealth: "BROKEN"
+      },
+      take: 20,
+      orderBy: { updatedAt: "desc" }
+    }),
+    prisma.auditLog.findMany({
+      where: { accountId },
+      include: { user: true },
+      orderBy: { createdAt: "desc" },
+      take: 12
     })
   ]);
 
   return {
     ordersByStatus,
     scansToday,
-    batches
+    batches,
+    duplicateIssuesToday,
+    missingImageMappings,
+    brokenImageMappings,
+    auditLogs
   };
 }

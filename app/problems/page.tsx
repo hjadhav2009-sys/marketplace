@@ -17,7 +17,7 @@ type ProblemsPageProps = {
 };
 
 export default async function ProblemOrdersPage({ searchParams }: ProblemsPageProps) {
-  const user = await requireUser(["OWNER", "PICKER", "PACKER"]);
+  const user = await requireUser(["OWNER", "PACKER"]);
   const account = await requireAccount(user);
   const [params, problems] = await Promise.all([searchParams, getProblemOrders(account.id)]);
 
@@ -72,7 +72,7 @@ export default async function ProblemOrdersPage({ searchParams }: ProblemsPagePr
                 </div>
                 <div>
                   <dt className="font-medium text-slate-500">Qty</dt>
-                  <dd className="mt-1 font-semibold text-slate-950">{problem.order.quantity}</dd>
+                  <dd className="mt-1 font-semibold text-slate-950">{problem.order.qty}</dd>
                 </div>
                 <div>
                   <dt className="font-medium text-slate-500">Color</dt>
@@ -80,7 +80,7 @@ export default async function ProblemOrdersPage({ searchParams }: ProblemsPagePr
                 </div>
                 <div>
                   <dt className="font-medium text-slate-500">Order</dt>
-                  <dd className="mt-1 break-words font-semibold text-slate-950">{problem.order.orderNumber}</dd>
+                  <dd className="mt-1 break-words font-semibold text-slate-950">{problem.order.orderNo}</dd>
                 </div>
               </dl>
 
@@ -88,7 +88,7 @@ export default async function ProblemOrdersPage({ searchParams }: ProblemsPagePr
                 <Link href={`/packing/${problem.order.awb}`} className="text-sm font-semibold text-berry hover:text-pink-800">
                   Open scan result
                 </Link>
-                {problem.status === "OPEN" && user.role !== "PICKER" ? (
+                {problem.status === "OPEN" ? (
                   <form action={resolveProblemOrderAction}>
                     <input type="hidden" name="problemId" value={problem.id} />
                     <SubmitButton pendingText="Resolving..." variant="secondary">

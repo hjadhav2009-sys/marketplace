@@ -35,7 +35,7 @@ export default async function PickerSkuDetailPage({ params }: PickerSkuDetailPag
 
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-          <ProductImage src={detail.mapping?.imageUrl} alt={detail.mapping?.productName ?? sku} size="lg" />
+          <ProductImage src={detail.mapping?.imageUrl} alt={detail.mapping?.productName ?? sku} size="lg" mappingId={detail.mapping?.id} />
           <h2 className="mt-4 text-xl font-bold text-slate-950">{detail.mapping?.productName ?? "Product not mapped"}</h2>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-md bg-slate-50 p-3">
@@ -76,12 +76,12 @@ export default async function PickerSkuDetailPage({ params }: PickerSkuDetailPag
                   <div>
                     <p className="font-semibold text-slate-950">AWB {order.awb}</p>
                     <p className="text-sm text-slate-600">
-                      Qty {order.quantity} · {order.color ?? "Color unknown"} · {order.courier ?? "Courier pending"}
+                      Qty {order.qty} · {order.color ?? "Color unknown"} · {order.courier ?? "Courier pending"}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">Order {order.orderNumber}</p>
+                    <p className="mt-1 text-xs text-slate-500">Order {order.orderNo}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <StatusBadge value={order.status} />
+                    <StatusBadge value={order.packStatus} />
                     <Link href={`/packing/${order.awb}`} className="text-sm font-semibold text-berry hover:text-pink-800">
                       Pack
                     </Link>

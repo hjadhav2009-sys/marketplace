@@ -3,20 +3,23 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
-import { getSkuMappings } from "@/lib/data";
+import { searchSkuMappings } from "@/lib/data";
 import { upsertSkuImageMappingAction } from "./actions";
 
 type SkuMappingsPageProps = {
   searchParams?: Promise<{
     error?: string;
     saved?: string;
+    q?: string;
+    active?: string;
   }>;
 };
 
 export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageProps) {
   const user = await requireUser(["OWNER"]);
   const account = await requireAccount(user);
-  const [params, mappings] = await Promise.all([searchParams, getSkuMappings(account.id)]);
+  const params = await searchParams;
+  const mappings = await searchSkuMappings(account.id, params?.q, params?.active);
 
   return (
     <AppShell>
@@ -24,6 +27,7 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
         eyebrow="SKU Images"
         title="Map SKU to product image URL"
         description="Store only the Meesho product image URL. These images power picker cards and the packer scan result screen."
+        action={{ href: "/owner/sku-mappings/import", label: "Import CSV/XLSX" }}
       />
 
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
@@ -78,6 +82,18 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                 className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
               />
             </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Notes</span>
+              <textarea
+                name="notes"
+                rows={3}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              />
+            </label>
+            <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+              <input name="active" type="checkbox" defaultChecked className="h-5 w-5 accent-pink-700" />
+              Active mapping
+            </label>
             <SubmitButton pendingText="Saving...">Save mapping</SubmitButton>
           </div>
         </form>
@@ -85,15 +101,38 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
         <div className="rounded-md border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-3">
             <h2 className="font-semibold text-slate-950">Current mappings</h2>
+            <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <input
+                name="q"
+                defaultValue={params?.q ?? ""}
+                placeholder="Search SKU or product"
+                className="min-h-11 rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              />
+              <select
+                name="active"
+                defaultValue={params?.active ?? "active"}
+                className="min-h-11 rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="all">All</option>
+              </select>
+              <button className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50">
+                Filter
+              </button>
+            </form>
           </div>
           <div className="divide-y divide-slate-100">
             {mappings.map((mapping) => (
               <div key={mapping.id} className="flex gap-4 px-4 py-4">
-                <ProductImage src={mapping.imageUrl} alt={mapping.productName ?? mapping.sku} size="sm" />
+                <ProductImage src={mapping.imageUrl} alt={mapping.productName ?? mapping.sku} size="sm" mappingId={mapping.id} />
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-950">{mapping.sku}</p>
+                  <p className="font-semibold text-slate-950">
+                    {mapping.sku} {!mapping.active ? <span className="text-xs text-slate-500">(inactive)</span> : null}
+                  </p>
                   <p className="text-sm text-slate-600">{mapping.productName ?? "No product name"}</p>
                   <p className="text-sm text-slate-500">{mapping.color ?? "Color not set"}</p>
+                  {mapping.notes ? <p className="mt-1 text-sm text-slate-500">{mapping.notes}</p> : null}
                 </div>
               </div>
             ))}

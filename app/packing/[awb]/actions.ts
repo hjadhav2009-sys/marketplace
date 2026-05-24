@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAccount, requireUser } from "@/lib/auth";
+import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { getRequestMeta } from "@/lib/request-context";
 import { problemOrderSchema } from "@/lib/validators";
 
 export async function confirmPackedAction(formData: FormData) {
   const user = await requireUser(["OWNER", "PACKER"]);
   const account = await requireAccount(user);
+  const request = await getRequestMeta();
   const orderId = String(formData.get("orderId") ?? "");
 
   const order = await prisma.order.findFirst({
@@ -22,7 +25,7 @@ export async function confirmPackedAction(formData: FormData) {
     redirect("/packing?error=invalid");
   }
 
-  if (order.status !== "READY") {
+  if (order.packStatus !== "READY") {
     redirect(`/packing/${encodeURIComponent(order.awb)}`);
   }
 
@@ -31,6 +34,7 @@ export async function confirmPackedAction(formData: FormData) {
       where: { id: order.id },
       data: {
         status: "PACKED",
+        packStatus: "PACKED",
         packedAt: new Date()
       }
     }),
@@ -46,6 +50,16 @@ export async function confirmPackedAction(formData: FormData) {
     })
   ]);
 
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "ORDER_PACKED",
+    entityType: "Order",
+    entityId: order.id,
+    metadata: { awb: order.awb },
+    request
+  });
+
   revalidatePath("/picker");
   revalidatePath("/packing");
   redirect(`/packing/${encodeURIComponent(order.awb)}?packed=1`);
@@ -54,6 +68,7 @@ export async function confirmPackedAction(formData: FormData) {
 export async function reportProblemFromScanAction(formData: FormData) {
   const user = await requireUser(["OWNER", "PACKER"]);
   const account = await requireAccount(user);
+  const request = await getRequestMeta();
   const parsed = problemOrderSchema.safeParse({
     orderId: formData.get("orderId"),
     reason: formData.get("reason"),
@@ -87,7 +102,7 @@ export async function reportProblemFromScanAction(formData: FormData) {
     }),
     prisma.order.update({
       where: { id: order.id },
-      data: { status: "PROBLEM" }
+      data: { status: "PROBLEM", packStatus: "PROBLEM", pickStatus: "PROBLEM" }
     }),
     prisma.scanLog.create({
       data: {
@@ -100,6 +115,16 @@ export async function reportProblemFromScanAction(formData: FormData) {
       }
     })
   ]);
+
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "PROBLEM_ORDER_CREATED",
+    entityType: "Order",
+    entityId: order.id,
+    metadata: { awb: order.awb, reason: parsed.data.reason },
+    request
+  });
 
   revalidatePath("/problems");
   revalidatePath("/picker");

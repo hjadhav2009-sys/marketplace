@@ -19,9 +19,26 @@ export const uploadBatchSchema = z.object({
 
 export const skuImageMappingSchema = z.object({
   sku: z.string().trim().min(1, "SKU is required"),
-  imageUrl: z.string().trim().url("Enter a valid image URL"),
+  imageUrl: z
+    .string()
+    .trim()
+    .url("Enter a valid image URL")
+    .refine((value) => value.startsWith("http://") || value.startsWith("https://"), "Image URL must start with http:// or https://"),
   productName: z.string().trim().optional(),
-  color: z.string().trim().optional()
+  color: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+  active: z.coerce.boolean().default(true)
+});
+
+export const skuImageImportFileSchema = z.object({
+  filename: z
+    .string()
+    .trim()
+    .min(1, "Choose an import file")
+    .refine(
+      (value) => [".csv", ".xlsx"].some((extension) => value.toLowerCase().endsWith(extension)),
+      "Upload a CSV or .xlsx Excel file"
+    )
 });
 
 export const awbSearchSchema = z.object({
@@ -36,9 +53,10 @@ export const parsedOrderSchema = z.object({
   awb: z.string().trim().min(8),
   courier: z.string().trim().optional(),
   sku: z.string().trim().min(1),
-  quantity: z.coerce.number().int().positive(),
+  qty: z.coerce.number().int().positive(),
   color: z.string().trim().optional(),
-  orderNumber: z.string().trim().min(1),
+  size: z.string().trim().optional(),
+  orderNo: z.string().trim().min(1),
   productDescription: z.string().trim().optional(),
   paymentType: z.enum(["PREPAID", "COD", "UNKNOWN"]).default("UNKNOWN"),
   city: z.string().trim().optional(),

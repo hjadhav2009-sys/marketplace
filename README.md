@@ -74,6 +74,31 @@ http://192.168.1.25:3000
 
 Your phone and PC must be on the same network. If Windows Firewall prompts for Node.js, allow private network access.
 
+## Safe Local Usage
+
+Run the app only on the shop/office PC. Workers should use the browser URL from their phones or desktops:
+
+```text
+http://YOUR_PC_IP:3000
+```
+
+Workers do not need the codebase, VS Code, terminal, Prisma, or npm. Keep those on the owner PC only.
+
+## Same Wi-Fi Security
+
+Every app page except the login screen requires an active login. Use strong passwords, keep the owner password private,
+and deactivate worker users from **Owner → Users** if an unknown phone or browser appears.
+
+Optional local network protection:
+
+```env
+LOCAL_NETWORK_ONLY=true
+ALLOWED_IP_RANGES="192.168.0.0/16,10.0.0.0/8,172.16.0.0/12"
+```
+
+Localhost is always allowed for owner testing on the PC. The app also reads `x-forwarded-for` / `x-real-ip` so it can
+work behind a reverse proxy later.
+
 ## Seed Login
 
 All seed users use password `demo1234`.
@@ -97,6 +122,57 @@ Seed account and order:
 | Order No | 290010756104090432_1 |
 | Product | Sports Jersey Number Personalized Pendant |
 | Image URL | https://images-r.meesho.com/images/products/576264463/z71on.avif |
+
+## SKU Image Import
+
+Owners can import persistent SKU-to-image mappings from:
+
+```text
+/owner/sku-mappings/import
+```
+
+CSV or `.xlsx` columns:
+
+```csv
+sku,image_url,product_name,notes
+1202919298_6,https://images-r.meesho.com/images/products/576264463/z71on.avif,Sports Jersey Number Personalized Pendant,Seed mapping
+```
+
+Required columns:
+
+- `sku`
+- `image_url`
+
+Optional columns:
+
+- `account`
+- `product_name`
+- `notes`
+- `active`
+
+Common alternate names are accepted, including `SKU`, `sku_code`, `supplier_sku`, `image`, `imageUrl`,
+`meesho_image_url`, `product_image_url`, `name`, `product_title`, and `account_name`.
+
+Existing mappings are upserted by `accountId + sku`. Same URL/data is counted as unchanged; changed rows update the
+stored URL and metadata. Product image files are never stored.
+
+## Duplicate Protection
+
+Orders are protected by the unique key `accountId + awb`. Re-uploading old + new Meesho picklist/label files will not
+duplicate work:
+
+- Missing AWB rows are rejected.
+- Existing AWBs are skipped when unchanged.
+- Existing AWBs can update safe fields such as courier, order number, SKU, quantity, color, and product description.
+- Batch review pages show created, updated, duplicate, skipped, and error counts.
+
+## Image Handling
+
+Only image URLs are stored. Images are loaded directly from their source URL in the browser; the app does not proxy,
+download, or store image files.
+
+If an image URL is missing or fails in the browser, product cards show a clean fallback with a “Check URL” prompt. Broken
+mapping health is recorded for owner reports when the browser detects a load failure.
 
 ## Useful Scripts
 

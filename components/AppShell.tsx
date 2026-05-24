@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { clearSession, requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { recordAuditLog } from "@/lib/audit";
+import { getRequestMeta } from "@/lib/request-context";
 
 type AppShellProps = {
   children: ReactNode;
@@ -15,12 +17,12 @@ const ownerLinks = [
   { href: "/picker", label: "Pick" },
   { href: "/packing", label: "Pack" },
   { href: "/problems", label: "Problems" },
-  { href: "/reports", label: "Reports" }
+  { href: "/reports", label: "Reports" },
+  { href: "/owner/users", label: "Users" }
 ];
 
 const pickerLinks = [
-  { href: "/picker", label: "Pick" },
-  { href: "/problems", label: "Problems" }
+  { href: "/picker", label: "Pick" }
 ];
 
 const packerLinks = [
@@ -31,6 +33,17 @@ const packerLinks = [
 async function logoutAction() {
   "use server";
 
+  const user = await requireUser();
+  const account = await requireAccount(user);
+  const request = await getRequestMeta();
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "LOGOUT",
+    entityType: "User",
+    entityId: user.id,
+    request
+  });
   await clearSession();
   redirect("/login");
 }

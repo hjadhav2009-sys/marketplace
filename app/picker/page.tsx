@@ -33,7 +33,12 @@ export default async function PickerSkuGroupsPage() {
               href={`/picker/${encodeURIComponent(group.sku)}`}
               className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-berry hover:shadow-soft"
             >
-              <ProductImage src={group.mapping?.imageUrl} alt={group.mapping?.productName ?? group.sku} size="lg" />
+              <ProductImage
+                src={group.mapping?.imageUrl}
+                alt={group.mapping?.productName ?? group.sku}
+                size="lg"
+                mappingId={group.mapping?.id}
+              />
               <div className="mt-4">
                 <p className="text-sm font-medium text-slate-500">SKU</p>
                 <h2 className="break-words text-xl font-bold text-slate-950">{group.sku}</h2>

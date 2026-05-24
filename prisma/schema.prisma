@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Local development uses SQLite through DATABASE_URL=file:./dev.db.
+// For Supabase/PostgreSQL, use prisma/schema.postgres.prisma with a PostgreSQL DATABASE_URL.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  PICKER
+  PACKER
+}
+
+enum BatchStatus {
+  UPLOADED
+  PARSED
+  REVIEWED
+  IMPORTED
+}
+
+enum PaymentType {
+  PREPAID
+  COD
+  UNKNOWN
+}
+
+enum OrderStatus {
+  READY
+  PACKED
+  PROBLEM
+}
+
+enum ScanOutcome {
+  FOUND
+  PACKED
+  PROBLEM
+  NOT_FOUND
+}
+
+enum ProblemStatus {
+  OPEN
+  RESOLVED
+}
+
+model User {
+  id             String         @id @default(cuid())
+  username       String         @unique
+  passwordHash   String
+  name           String
+  role           Role
+  active         Boolean        @default(true)
+  accountId      String?
+  account        Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  uploadedBatches UploadBatch[] @relation("UploadedBatches")
+  scanLogs       ScanLog[]      @relation("UserScanLogs")
+  problemOrders  ProblemOrder[] @relation("ReportedProblems")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Account {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  code             String            @unique
+  users            User[]
+  skuImageMappings SkuImageMapping[]
+  uploadBatches    UploadBatch[]
+  orders           Order[]
+  scanLogs         ScanLog[]
+  problemOrders    ProblemOrder[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model SkuImageMapping {
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sku         String
+  imageUrl    String
+  productName String?
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([accountId, sku])
+  @@index([sku])
+}
+
+model UploadBatch {
+  id           String      @id @default(cuid())
+  accountId    String
+  account      Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   User?       @relation("UploadedBatches", fields: [uploadedById], references: [id], onDelete: SetNull)
+  filename     String
+  status       BatchStatus @default(UPLOADED)
+  notes        String?
+  orders       Order[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([accountId, createdAt])
+}
+
+model Order {
+  id                 String         @id @default(cuid())
+  accountId          String
+  account            Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  uploadBatchId      String?
+  uploadBatch        UploadBatch?   @relation(fields: [uploadBatchId], references: [id], onDelete: SetNull)
+  awb                String         @unique
+  courier            String?
+  sku                String
+  quantity           Int            @default(1)
+  color              String?
+  orderNumber        String         @unique
+  productDescription String?
+  paymentType        PaymentType    @default(UNKNOWN)
+  city               String?
+  state              String?
+  status             OrderStatus    @default(READY)
+  packedAt           DateTime?
+  scanLogs           ScanLog[]
+  problemOrders      ProblemOrder[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([accountId, sku])
+  @@index([accountId, status])
+}
+
+model ScanLog {
+  id          String      @id @default(cuid())
+  accountId   String
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  orderId     String?
+  order       Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  awb         String
+  outcome     ScanOutcome
+  scannedById String?
+  scannedBy   User?       @relation("UserScanLogs", fields: [scannedById], references: [id], onDelete: SetNull)
+  note        String?
+  createdAt   DateTime    @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([awb])
+}
+
+model ProblemOrder {
+  id           String        @id @default(cuid())
+  accountId    String
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  orderId      String
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reason       String
+  details      String?
+  status       ProblemStatus @default(OPEN)
+  reportedById String?
+  reportedBy   User?         @relation("ReportedProblems", fields: [reportedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([accountId, status])
+  @@index([orderId])
+}

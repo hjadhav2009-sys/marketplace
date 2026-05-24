@@ -1,0 +1,75 @@
+import { redirect } from "next/navigation";
+import { SubmitButton } from "@/components/SubmitButton";
+import { getCurrentUser } from "@/lib/auth";
+import { loginAction } from "./actions";
+
+type LoginPageProps = {
+  searchParams?: Promise<{
+    error?: string;
+  }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const user = await getCurrentUser();
+
+  if (user) {
+    redirect("/accounts");
+  }
+
+  const params = await searchParams;
+  const hasError = params?.error === "invalid";
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4 py-10">
+      <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-soft">
+        <div className="mb-7">
+          <p className="text-sm font-semibold uppercase tracking-wide text-berry">Meesho Pick & Pack</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Sign in</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Local username and password login for the sprint-0 warehouse workflow.
+          </p>
+        </div>
+
+        {hasError ? (
+          <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            Check your username and password.
+          </div>
+        ) : null}
+
+        <form action={loginAction} className="space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Username</span>
+            <input
+              name="username"
+              autoComplete="username"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              placeholder="owner"
+              required
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Password</span>
+            <input
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              placeholder="demo1234"
+              required
+            />
+          </label>
+
+          <SubmitButton pendingText="Signing in...">Sign in</SubmitButton>
+        </form>
+
+        <div className="mt-6 rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+          Seed users: <span className="font-semibold text-slate-900">owner</span>,{" "}
+          <span className="font-semibold text-slate-900">picker</span>,{" "}
+          <span className="font-semibold text-slate-900">packer</span>. Password:{" "}
+          <span className="font-semibold text-slate-900">demo1234</span>.
+        </div>
+      </section>
+    </main>
+  );
+}

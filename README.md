@@ -245,6 +245,8 @@ temporary rows or logs, and every cleanup action is audited.
 
 - Prisma connection failed: confirm `DATABASE_URL`, database password, Supabase project status, and whether the pooled
   connection string is required.
+- Prisma says SQLite requires a `file:` URL but `.env` has a PostgreSQL `DATABASE_URL`: pull the latest build script fix
+  and run `npm run build` again so Prisma Client is regenerated with `prisma/schema.postgres.prisma`.
 - HTTPS domain not active: confirm Cloudflare Tunnel is running and the DNS route points to
   `pack.personalizedgiftday.com`.
 - Local app not starting: check Node.js version, `.env`, `node_modules`, build output, and whether another process is

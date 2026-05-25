@@ -34,6 +34,7 @@ echo.
 echo Local URL: http://localhost:3000
 echo Tunnel target: http://localhost:3000
 echo Worker URL: https://pack.personalizedgiftday.com
+echo Build config: npm run build reads .env and chooses the matching Prisma schema.
 echo.
 
 call npm run build

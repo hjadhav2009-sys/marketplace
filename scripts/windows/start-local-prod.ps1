@@ -25,6 +25,7 @@ Write-Host ""
 Write-Host "Local URL: http://localhost:3000"
 Write-Host "Tunnel target: http://localhost:3000"
 Write-Host "Worker URL: https://pack.personalizedgiftday.com"
+Write-Host "Build config: npm run build reads .env and chooses the matching Prisma schema."
 Write-Host ""
 
 npm.cmd run build

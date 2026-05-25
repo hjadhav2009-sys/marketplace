@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { AwbBarcodeScanner } from "../components/AwbBarcodeScanner";
 import { isValidAwb, normalizeAwb } from "../lib/awb";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
@@ -22,6 +25,8 @@ import {
   skuImageMappingSchema,
   uploadBatchSchema
 } from "../lib/validators";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const sampleOrder = {
   awb: "1490834915493571",
@@ -258,5 +263,17 @@ assert.equal(
   true,
   "Production checks detect active seed users with stored demo password hash"
 );
+
+const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+assert.match(
+  readme,
+  /Free-first daily setup: Windows PC \+ Supabase \+ Cloudflare Tunnel/,
+  "README documents the recommended free-first setup"
+);
+assert.match(readme, /Vercel is [\s\S]*not recommended here for heavy PDF parsing/, "README marks Vercel as not recommended for heavy PDF parsing");
+assert.equal(existsSync(join(repoRoot, "scripts", "windows", "start-local-prod.ps1")), true, "Windows production PowerShell script exists");
+assert.equal(existsSync(join(repoRoot, "scripts", "windows", "start-local-prod.bat")), true, "Windows production batch script exists");
+assert.equal(existsSync(join(repoRoot, "docs", "cloudflare-tunnel", "config.yml.example")), true, "Cloudflare Tunnel config example exists");
+assert.equal(existsSync(join(repoRoot, ".env.local.production.example")), true, "Local production env example exists");
 
 console.log("Validation tests passed.");

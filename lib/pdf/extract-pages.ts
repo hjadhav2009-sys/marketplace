@@ -65,6 +65,13 @@ export async function extractPdfPages(buffer: Buffer): Promise<PdfTextPage[]> {
         return [{ pageNumber: 1, text: result.text }];
       }
 
+      if (result.total && result.total > 0) {
+        return Array.from({ length: result.total }, (_, index) => ({
+          pageNumber: index + 1,
+          text: ""
+        }));
+      }
+
       return [];
     } finally {
       await parser.destroy();
@@ -93,6 +100,13 @@ export async function extractPdfPages(buffer: Buffer): Promise<PdfTextPage[]> {
 
   if (pages.length === 0 && result.text) {
     return [{ pageNumber: 1, text: result.text }];
+  }
+
+  if (pages.length === 0 && result.numpages && result.numpages > 0) {
+    return Array.from({ length: result.numpages }, (_, index) => ({
+      pageNumber: index + 1,
+      text: ""
+    }));
   }
 
   return pages;

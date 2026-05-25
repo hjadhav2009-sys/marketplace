@@ -82,11 +82,11 @@ export function runProductionChecks(input: ProductionCheckInput): ProductionChec
 
   checks.push({
     key: "local-network-only",
-    label: "Hostinger network setting",
+    label: "Tunnel network setting",
     status: isProduction && input.localNetworkOnly === "true" ? "WARNING" : "OK",
     message:
       isProduction && input.localNetworkOnly === "true"
-        ? "LOCAL_NETWORK_ONLY should be false for Hostinger production."
+        ? "LOCAL_NETWORK_ONLY should be false when workers access the app through the HTTPS Cloudflare Tunnel."
         : "LOCAL_NETWORK_ONLY setting is acceptable."
   });
 

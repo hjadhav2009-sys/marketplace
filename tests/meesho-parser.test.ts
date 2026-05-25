@@ -109,6 +109,89 @@ const lowConfidenceResult = parseText("Sub_Order_Labels_low_confidence.pdf", [
 assert.equal(lowConfidenceResult.labelOrders[0]?.issues.some((issue) => issue.issueType === "LOW_CONFIDENCE"), true, "Low confidence rows are flagged");
 assert.equal(lowConfidenceResult.labelOrders[0]?.issues.some((issue) => issue.issueType === "MISSING_AWB"), true, "Missing AWB is not silently imported");
 
+const scannedLikeResult = parseText("Scanned_like.pdf", [
+  { pageNumber: 1, text: "" },
+  { pageNumber: 2, text: "   " },
+  { pageNumber: 3, text: "x" }
+]);
+assert.equal(scannedLikeResult.diagnostics.pagesWithText, 0, "Empty scanned-like pages are not counted as text pages");
+assert.equal(scannedLikeResult.diagnostics.pagesWithoutText, 3, "Empty scanned-like pages are counted");
+assert.equal(scannedLikeResult.diagnostics.scannedPdfLikely, true, "Scanned-like PDFs are detected");
+assert.equal(
+  scannedLikeResult.diagnostics.parserWarnings.includes("This looks like a scanned/image PDF. OCR is required."),
+  true,
+  "Scanned-like PDFs show the OCR-required warning"
+);
+
+const mixedTextDiagnostics = parseText("Mixed_text.pdf", [
+  { pageNumber: 1, text: fixture("label-page-1.txt") },
+  { pageNumber: 2, text: "" }
+]);
+assert.equal(mixedTextDiagnostics.diagnostics.pagesWithText, 1, "Diagnostics count pages with text");
+assert.equal(mixedTextDiagnostics.diagnostics.pagesWithoutText, 1, "Diagnostics count pages without text");
+
+const unknownLayoutResult = parseText("Unknown_layout.pdf", [
+  {
+    pageNumber: 1,
+    text: "Warehouse packing report\nThis page has selectable text but no Meesho label or courier table markers."
+  }
+]);
+assert.equal(unknownLayoutResult.detectedType, "UNKNOWN", "Unknown text layout is classified as unknown");
+assert.equal(unknownLayoutResult.diagnostics.unknownLayoutPages, 1, "Unknown layout pages are counted");
+assert.equal(
+  unknownLayoutResult.issues.some((issue) => issue.issueType === "UNKNOWN_LAYOUT_PAGE"),
+  true,
+  "Unknown layout pages are flagged"
+);
+
+const orderNumberOnlyLabel = parseText("Sub_Order_Labels_order_number_only.pdf", [
+  {
+    pageNumber: 1,
+    text: `TAX INVOICE
+Supplier Name : Sullery
+Purchase Order No.
+290010756104090432
+Invoice No.
+INV123456
+GSTIN 29ABCDE1234F1Z5
+Customer Address
+560068
+Product Details
+SKU Size Qty Color Order No.
+1202919298_6 Free Size 1 Silver 290010756104090432_1`
+  }
+]).labelOrders[0];
+assert.equal(orderNumberOnlyLabel?.awb, undefined, "Label parser does not use order numbers, invoice numbers, GSTIN, or PIN codes as AWB");
+
+const wrappedManifest = parseText("Supplier_Manifest_wrapped.pdf", [
+  {
+    pageNumber: 1,
+    text: `Courier : Delhivery
+Supplier Name : Sullery
+S. No. Sub Order No. AWB SKU Qty. Size Packed
+1 290010756104
+090432_1 1490834915493571 SUL-PN-BC-SS-BL
+Allah40 1 Free Size No`
+  }
+]);
+assert.equal(wrappedManifest.manifestOrders[0]?.orderNo, "290010756104090432_1", "Manifest tolerates wrapped sub order number");
+assert.equal(wrappedManifest.manifestOrders[0]?.sku, "SUL-PN-BC-SS-BL-Allah40", "Manifest tolerates wrapped SKU");
+
+const unknownManifestRow = parseText("Supplier_Manifest_unknown_row.pdf", [
+  {
+    pageNumber: 1,
+    text: `Courier : Delhivery
+Supplier Name : Sullery
+S. No. Sub Order No. AWB SKU Qty. Size Packed
+1 unreadable row without enough columns`
+  }
+]);
+assert.equal(
+  unknownManifestRow.manifestOrders[0]?.issues.some((issue) => issue.issueType === "UNKNOWN_LAYOUT_ROW"),
+  true,
+  "Unknown manifest row blocks are marked for review"
+);
+
 const mismatchManifest = parseText("Supplier_Manifest_mismatch.pdf", [
   {
     pageNumber: 1,

@@ -62,8 +62,16 @@ function contextLines(lines: ReturnType<typeof lineDetails>, lineIndex: number, 
     .join(" ");
 }
 
+function previousContextLines(lines: ReturnType<typeof lineDetails>, lineIndex: number, distance = 2) {
+  const from = Math.max(0, lineIndex - distance);
+  return lines
+    .slice(from, lineIndex + 1)
+    .map((line) => line.line)
+    .join(" ");
+}
+
 function isExcludedAwbContext(context: string) {
-  return /Purchase\s+Order\s+No|Order\s+No|Invoice\s+No|GSTIN|Pincode|Pin\s+Code/i.test(context);
+  return /Purchase\s+Order\s+No|Sub\s+Order\s+No|Order\s+No|Invoice\s+No|Invoice\s+Date|Order\s+Date|GSTIN|Pincode|Pin\s+Code|Postal\s+Code/i.test(context);
 }
 
 function extractAwb(text: string) {
@@ -85,7 +93,7 @@ function extractAwb(text: string) {
     }
 
     const lineIndex = lines.find((line) => match.index >= line.start && match.index <= line.end)?.index ?? 0;
-    const anchorContext = contextLines(lines, lineIndex, 1);
+    const anchorContext = previousContextLines(lines, lineIndex, 2);
     const nearby = contextLines(lines, lineIndex, 3);
     const beforeNearby = contextLines(lines, lineIndex, 5);
 
@@ -101,6 +109,10 @@ function extractAwb(text: string) {
       score -= 30;
     }
 
+    if (productDetailsIndex > 0 && match.index < productDetailsIndex && productDetailsIndex - match.index < 800) {
+      score += 15;
+    }
+
     if (/Delhivery|Shadowfax|Xpress\s*Bees|XpressBees/i.test(nearby)) {
       score += 55;
     }
@@ -113,7 +125,7 @@ function extractAwb(text: string) {
       score -= 60;
     }
 
-    if (/^\d{6}$/.test(awb)) {
+    if (/^\d{6}$/.test(awb) || (/^[A-Z0-9]{15}$/.test(awb) && /GSTIN/i.test(anchorContext))) {
       score -= 100;
     }
 

@@ -22,6 +22,8 @@ export function normalizeSku(value: string | null | undefined) {
 
   return removeControlChars(value)
     .trim()
+    .replace(/\s*_\s*/g, "_")
+    .replace(/\s*-\s*/g, "-")
     .replace(/\s+/g, "-")
     .replace(/[^A-Za-z0-9_-]+/g, "-")
     .replace(/-+/g, "-")

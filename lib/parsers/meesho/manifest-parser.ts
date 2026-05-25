@@ -12,6 +12,13 @@ import {
 import type { MeeshoTextPage, ParsedMeeshoManifestOrder, ParsedMeeshoPicklistSummaryRow, ParseIssue } from "./types";
 
 const sizePattern = "(?:Free\\s+Size|XS|S|M|L|XL|XXL|XXXL|\\d+[A-Za-z]*)";
+const awbCandidatePattern = /\b(?:\d{10,20}|SF[A-Z0-9]{8,}|[A-Z]{2,}[A-Z0-9]{8,})\b/g;
+const awbCandidateTestPattern = /\b(?:\d{10,20}|SF[A-Z0-9]{8,}|[A-Z]{2,}[A-Z0-9]{8,})\b/;
+
+type ManifestRowBlock = {
+  rawRowText: string;
+  courier?: string;
+};
 
 function cleanLines(text: string) {
   return normalizeWhitespace(text)
@@ -109,22 +116,39 @@ export function parsePicklistSummaryPages(pages: MeeshoTextPage[]) {
   return rows;
 }
 
-function rowBlocksFromPage(page: MeeshoTextPage) {
+function rowBlocksFromPage(page: MeeshoTextPage, initialCourier?: string) {
   const lines = cleanLines(page.text);
-  const blocks: string[] = [];
+  const blocks: ManifestRowBlock[] = [];
   let current: string[] = [];
+  let activeCourier = initialCourier;
+
+  function flushCurrent() {
+    if (current.length === 0) {
+      return;
+    }
+
+    blocks.push({
+      rawRowText: current.join(" "),
+      courier: activeCourier
+    });
+    current = [];
+  }
 
   for (const line of lines) {
-    if (/^Courier\s*:/i.test(line) || /^Packed$/i.test(line) || /^Picklist$/i.test(line)) {
+    if (/^Courier\s*:/i.test(line)) {
+      flushCurrent();
+      activeCourier = findCourier(line);
+      continue;
+    }
+
+    if (/^Packed$/i.test(line) || /^Picklist$/i.test(line)) {
       continue;
     }
 
     const serialStart = /^\d{1,4}(?:\s+\S|$)/.test(line) && (!/^\d+$/.test(line) || current.length === 0);
 
     if (serialStart) {
-      if (current.length > 0) {
-        blocks.push(current.join(" "));
-      }
+      flushCurrent();
       current = [line];
       continue;
     }
@@ -134,17 +158,14 @@ function rowBlocksFromPage(page: MeeshoTextPage) {
     }
   }
 
-  if (current.length > 0) {
-    blocks.push(current.join(" "));
-  }
+  flushCurrent();
 
-  return blocks;
+  return { blocks, lastCourier: activeCourier };
 }
 
 function parseOrderBlock(pageNumber: number, rawRowText: string, courier?: string, supplierName?: string): ParsedMeeshoManifestOrder {
   const raw = compactWhitespace(rawRowText);
   const withoutSerial = raw.replace(/^\d+\s+/, "");
-  const candidatePattern = /\b(?:\d{10,20}|SF[A-Z0-9]{8,}|[A-Z]{2,}[A-Z0-9]{8,})\b/g;
   const issues: ParseIssue[] = [];
   let awb: string | undefined;
   let orderNo = "";
@@ -161,7 +182,7 @@ function parseOrderBlock(pageNumber: number, rawRowText: string, courier?: strin
       }
     | undefined;
 
-  for (const match of withoutSerial.matchAll(candidatePattern)) {
+  for (const match of withoutSerial.matchAll(awbCandidatePattern)) {
     const candidateAwb = normalizeAwb(match[0]);
 
     if (!isValidAwb(candidateAwb) || match.index === undefined) {
@@ -198,7 +219,7 @@ function parseOrderBlock(pageNumber: number, rawRowText: string, courier?: strin
     qty = fallback.qty;
     size = fallback.size;
   } else {
-    issues.push({ issueType: "UNPARSED_ROW_DETAIL", message: "Could not confidently split AWB, SKU, quantity, and size.", severity: "WARNING", pageNumber });
+    issues.push({ issueType: "UNKNOWN_LAYOUT_ROW", message: "Could not confidently split AWB, SKU, quantity, and size.", severity: "WARNING", pageNumber });
   }
 
   const scored = scoreAndIssues({
@@ -234,17 +255,25 @@ export function parseCourierOrderPages(pages: MeeshoTextPage[]) {
   let currentSupplier: string | undefined;
 
   for (const page of pages) {
+    const pageHasCourierTable = /Courier\s*:|Sub\s+Order\s+No|AWB\s+SKU|S\.?\s*No/i.test(page.text);
+
     if (/Courier\s*:/i.test(page.text)) {
-      currentCourier = findCourier(page.text);
       currentSupplier = findSupplier(page.text) ?? currentSupplier;
     }
 
-    if (!currentCourier || !/AWB|Sub\s+Order\s+No/i.test(page.text)) {
+    const { blocks, lastCourier } = rowBlocksFromPage(page, currentCourier);
+    currentCourier = lastCourier ?? currentCourier;
+
+    if (!currentCourier && blocks.every((block) => !block.courier)) {
       continue;
     }
 
-    for (const block of rowBlocksFromPage(page)) {
-      orders.push(parseOrderBlock(page.pageNumber, block, currentCourier, currentSupplier));
+    for (const block of blocks) {
+      if (!pageHasCourierTable && !awbCandidateTestPattern.test(block.rawRowText)) {
+        continue;
+      }
+
+      orders.push(parseOrderBlock(page.pageNumber, block.rawRowText, block.courier ?? currentCourier, currentSupplier));
     }
   }
 

@@ -9,7 +9,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { hasBlockingPreviewIssue } from "@/lib/import/preview";
-import type { ParseIssue } from "@/lib/parsers/meesho";
+import type { MeeshoParserDiagnostics, ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
 import { confirmParsedBatchAction } from "../../actions";
 
@@ -26,21 +26,30 @@ type ReviewPageProps = {
   }>;
 };
 
+type BatchStats = {
+  totalPages?: number;
+  pagesWithText?: number;
+  pagesWithoutText?: number;
+  parsedOrders?: number;
+  parsedSummaryRows?: number;
+  missingAwb?: number;
+  missingSku?: number;
+  lowConfidenceRows?: number;
+  duplicateAwbInsideFile?: number;
+  duplicateSkuSummaryRows?: number;
+  unknownLayoutPages?: number;
+  scannedPdfLikely?: boolean;
+  existingDuplicateRows?: number;
+  missingImageRows?: number;
+  blockingRows?: number;
+};
+
 type BatchNotes = {
   parserVersion?: string;
-  stats?: {
-    totalPages?: number;
-    parsedOrders?: number;
-    parsedSummaryRows?: number;
-    missingAwb?: number;
-    missingSku?: number;
-    lowConfidenceRows?: number;
-    duplicateAwbInsideFile?: number;
-    duplicateSkuSummaryRows?: number;
-    existingDuplicateRows?: number;
-    missingImageRows?: number;
-    blockingRows?: number;
-  };
+  diagnostics?: MeeshoParserDiagnostics[];
+  files?: Array<Partial<MeeshoParserDiagnostics> & { stats?: BatchStats }>;
+  failureReason?: string;
+  stats?: BatchStats;
   importStats?: {
     attemptedRows?: number;
     createdRows?: number;
@@ -77,6 +86,34 @@ function parseIssues(value: string | null) {
   } catch {
     return [] as ParseIssue[];
   }
+}
+
+function diagnosticsFromNotes(notes: BatchNotes): MeeshoParserDiagnostics[] {
+  if (Array.isArray(notes.diagnostics)) {
+    return notes.diagnostics;
+  }
+
+  if (!Array.isArray(notes.files)) {
+    return [];
+  }
+
+  return notes.files.map((file) => ({
+    fileName: file.fileName ?? "Unknown file",
+    detectedType: file.detectedType ?? "UNKNOWN",
+    pageCount: file.pageCount ?? file.stats?.totalPages ?? 0,
+    pagesWithText: file.pagesWithText ?? file.stats?.pagesWithText ?? 0,
+    pagesWithoutText: file.pagesWithoutText ?? file.stats?.pagesWithoutText ?? 0,
+    parsedOrders: file.parsedOrders ?? file.stats?.parsedOrders ?? 0,
+    parsedSummaryRows: file.parsedSummaryRows ?? file.stats?.parsedSummaryRows ?? 0,
+    missingAwb: file.missingAwb ?? file.stats?.missingAwb ?? 0,
+    missingSku: file.missingSku ?? file.stats?.missingSku ?? 0,
+    lowConfidenceRows: file.lowConfidenceRows ?? file.stats?.lowConfidenceRows ?? 0,
+    duplicateAwbInsideFile: file.duplicateAwbInsideFile ?? file.stats?.duplicateAwbInsideFile ?? 0,
+    unknownLayoutPages: file.unknownLayoutPages ?? file.stats?.unknownLayoutPages ?? 0,
+    scannedPdfLikely: file.scannedPdfLikely ?? file.stats?.scannedPdfLikely ?? false,
+    parserWarnings: file.parserWarnings ?? [],
+    pageDiagnostics: file.pageDiagnostics ?? []
+  }));
 }
 
 function issueTone(issueType: string) {
@@ -144,6 +181,17 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
   }
 
   const notes = parseNotes(batch.notes);
+  const diagnostics = diagnosticsFromNotes(notes);
+  const needsOcr = diagnostics.some((diagnostic) => diagnostic.scannedPdfLikely);
+  const parserWarnings = Array.from(new Set(diagnostics.flatMap((diagnostic) => diagnostic.parserWarnings)));
+  const problemPages = diagnostics.flatMap((diagnostic) =>
+    diagnostic.pageDiagnostics
+      .filter((page) => page.issues.length > 0)
+      .map((page) => ({
+        fileName: diagnostic.fileName,
+        ...page
+      }))
+  );
   const previewRows = batch.previewRows.map((row) => ({
     ...row,
     parsedIssues: parseIssues(row.issues)
@@ -167,18 +215,40 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
   const query = filters?.q?.trim().toLowerCase() ?? "";
   const selectedIssue = filters?.issue ?? "";
   const onlyProblems = filters?.problems === "1";
-  const filteredRows = previewRows.filter((row) => {
-    const haystack = [row.awb, row.sku, row.orderNo, row.courier, row.color, row.size, row.productDescription].filter(Boolean).join(" ").toLowerCase();
-    const matchesQuery = !query || haystack.includes(query);
-    const matchesIssue = !selectedIssue || row.parsedIssues.some((issue) => issue.issueType === selectedIssue);
-    const matchesProblems = !onlyProblems || row.parsedIssues.length > 0;
-    return matchesQuery && matchesIssue && matchesProblems;
-  });
+  const filteredRows = previewRows
+    .filter((row) => {
+      const haystack = [row.awb, row.sku, row.orderNo, row.courier, row.color, row.size, row.productDescription].filter(Boolean).join(" ").toLowerCase();
+      const matchesQuery = !query || haystack.includes(query);
+      const matchesIssue = !selectedIssue || row.parsedIssues.some((issue) => issue.issueType === selectedIssue);
+      const matchesProblems = !onlyProblems || row.parsedIssues.length > 0;
+      return matchesQuery && matchesIssue && matchesProblems;
+    })
+    .sort((left, right) => {
+      const leftLowConfidence = left.parsedIssues.some((issue) => issue.issueType === "LOW_CONFIDENCE") ? 0 : 1;
+      const rightLowConfidence = right.parsedIssues.some((issue) => issue.issueType === "LOW_CONFIDENCE") ? 0 : 1;
+      const leftError = left.parsedIssues.some((issue) => issue.severity === "ERROR") ? 0 : 1;
+      const rightError = right.parsedIssues.some((issue) => issue.severity === "ERROR") ? 0 : 1;
+
+      return (
+        leftLowConfidence - rightLowConfidence ||
+        leftError - rightError ||
+        right.parsedIssues.length - left.parsedIssues.length ||
+        (left.pageNumber ?? 0) - (right.pageNumber ?? 0)
+      );
+    });
   const crossCheckIssueCount = batch.issues.filter((issue) => /MISMATCH|NOT_IN/i.test(issue.issueType)).length;
   const importableRows = previewRows.filter((row) => {
     return !row.imported && (row.sourceType === "LABEL" || row.sourceType === "MANIFEST_ORDER") && row.awb && row.sku && !hasBlockingPreviewIssue(row.parsedIssues);
   }).length;
   const importStats = notes.importStats;
+  const exactErrorMessage =
+    filters?.error === "parse-failed"
+      ? notes.failureReason ?? parserWarnings[0] ?? "Parsing failed before review rows could be created."
+      : filters?.error === "no-importable-rows"
+        ? "No rows are importable yet. Review missing AWB, missing SKU, and low confidence issues."
+        : filters?.error
+          ? "Import could not be completed. Review the issue list and try again."
+          : null;
 
   return (
     <AppShell>
@@ -195,9 +265,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           Import confirmed. Created, updated, duplicate, and issue counts are refreshed below.
         </div>
       ) : null}
-      {filters?.error ? (
+      {exactErrorMessage ? (
         <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-          Import could not be completed. Review the issue list and try again.
+          {exactErrorMessage}
         </div>
       ) : null}
 
@@ -221,11 +291,14 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       <section className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
           ["Pages", notes.stats?.totalPages ?? "-"],
+          ["Pages with text", notes.stats?.pagesWithText ?? "-"],
+          ["No text pages", notes.stats?.pagesWithoutText ?? 0],
           ["Parsed orders", notes.stats?.parsedOrders ?? batch.totalRows],
           ["Summary rows", notes.stats?.parsedSummaryRows ?? 0],
           ["Missing AWB", notes.stats?.missingAwb ?? 0],
           ["Missing SKU", notes.stats?.missingSku ?? 0],
           ["Low confidence", notes.stats?.lowConfidenceRows ?? 0],
+          ["Unknown pages", notes.stats?.unknownLayoutPages ?? 0],
           ["Existing AWB", notes.stats?.existingDuplicateRows ?? batch.duplicateRows],
           ["Missing images", notes.stats?.missingImageRows ?? batch.missingImageRows],
           ["Cross-checks", crossCheckIssueCount]
@@ -236,6 +309,84 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           </div>
         ))}
       </section>
+
+      {diagnostics.length > 0 ? (
+        <section className="mt-4 rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-slate-950">Parser Diagnostics</h2>
+              <p className="mt-1 text-sm text-slate-600">PDF text extraction, layout detection, and parser warnings for this upload.</p>
+            </div>
+            {needsOcr ? (
+              <span className="inline-flex w-fit rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                Needs OCR
+              </span>
+            ) : null}
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {diagnostics.map((diagnostic) => (
+              <div key={diagnostic.fileName} className="px-4 py-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-950">{diagnostic.fileName}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {diagnostic.detectedType} / {diagnostic.pageCount} page{diagnostic.pageCount === 1 ? "" : "s"} / {diagnostic.pagesWithText} with text / {diagnostic.pagesWithoutText} without text
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {diagnostic.scannedPdfLikely ? (
+                      <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                        Needs OCR
+                      </span>
+                    ) : null}
+                    {diagnostic.unknownLayoutPages > 0 ? (
+                      <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                        Unknown pages: {diagnostic.unknownLayoutPages}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {diagnostic.parserWarnings.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {diagnostic.parserWarnings.map((warning) => (
+                      <p key={`${diagnostic.fileName}-${warning}`} className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          {problemPages.length > 0 ? (
+            <div className="border-t border-slate-200 px-4 py-4">
+              <h3 className="text-sm font-semibold text-slate-950">Problem pages</h3>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {problemPages.map((page) => (
+                  <div key={`${page.fileName}-${page.pageNumber}-${page.issues.join("-")}`} className="rounded-md bg-slate-50 p-3 text-sm">
+                    <p className="font-semibold text-slate-950">
+                      {page.fileName} / Page {page.pageNumber}
+                    </p>
+                    <p className="mt-1 text-slate-600">
+                      Section: {page.detectedSection}; text length: {page.textLength}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {page.issues.map((issue) => (
+                        <span key={`${page.fileName}-${page.pageNumber}-${issue}`} className="inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                          {issue}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {importStats ? (
         <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">

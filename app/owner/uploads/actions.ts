@@ -10,6 +10,7 @@ import { hasBlockingPreviewIssue } from "@/lib/import/preview";
 import {
   crossCheckMeeshoParsedRows,
   parseMeeshoPdfBuffer,
+  type MeeshoParserDiagnostics,
   type MeeshoParseResult,
   type ParseIssue
 } from "@/lib/parsers/meesho";
@@ -161,41 +162,69 @@ async function parseUploadedPdf(file: File) {
   return parseMeeshoPdfBuffer(buffer, parsed.data.filename);
 }
 
+function buildFailedDiagnostic(fileName: string, message: string): MeeshoParserDiagnostics {
+  return {
+    fileName,
+    detectedType: "UNKNOWN",
+    pageCount: 0,
+    pagesWithText: 0,
+    pagesWithoutText: 0,
+    parsedOrders: 0,
+    parsedSummaryRows: 0,
+    missingAwb: 0,
+    missingSku: 0,
+    lowConfidenceRows: 0,
+    duplicateAwbInsideFile: 0,
+    unknownLayoutPages: 0,
+    scannedPdfLikely: false,
+    parserWarnings: [message],
+    pageDiagnostics: []
+  };
+}
+
 function buildNotes(input: {
   results: MeeshoParseResult[];
+  failedDiagnostics?: MeeshoParserDiagnostics[];
   parsedOrders: number;
   parsedSummaryRows: number;
   existingDuplicateRows: number;
   missingImageRows: number;
   blockingRows: number;
+  failureReason?: string;
 }) {
-  const stats = input.results.reduce(
+  const diagnostics = [...input.results.map((result) => result.diagnostics), ...(input.failedDiagnostics ?? [])];
+  const stats = diagnostics.reduce(
     (acc, result) => ({
-      totalPages: acc.totalPages + result.stats.totalPages,
-      missingAwb: acc.missingAwb + result.stats.missingAwb,
-      missingSku: acc.missingSku + result.stats.missingSku,
-      lowConfidenceRows: acc.lowConfidenceRows + result.stats.lowConfidenceRows,
-      duplicateAwbInsideFile: acc.duplicateAwbInsideFile + result.stats.duplicateAwbInsideFile,
-      duplicateSkuSummaryRows: acc.duplicateSkuSummaryRows + result.stats.duplicateSkuSummaryRows
+      totalPages: acc.totalPages + result.pageCount,
+      pagesWithText: acc.pagesWithText + result.pagesWithText,
+      pagesWithoutText: acc.pagesWithoutText + result.pagesWithoutText,
+      missingAwb: acc.missingAwb + result.missingAwb,
+      missingSku: acc.missingSku + result.missingSku,
+      lowConfidenceRows: acc.lowConfidenceRows + result.lowConfidenceRows,
+      duplicateAwbInsideFile: acc.duplicateAwbInsideFile + result.duplicateAwbInsideFile,
+      unknownLayoutPages: acc.unknownLayoutPages + result.unknownLayoutPages,
+      scannedPdfLikely: acc.scannedPdfLikely || result.scannedPdfLikely
     }),
     {
       totalPages: 0,
+      pagesWithText: 0,
+      pagesWithoutText: 0,
       missingAwb: 0,
       missingSku: 0,
       lowConfidenceRows: 0,
       duplicateAwbInsideFile: 0,
-      duplicateSkuSummaryRows: 0
+      unknownLayoutPages: 0,
+      scannedPdfLikely: false
     }
   );
+  const parserWarnings = diagnostics.flatMap((result) => result.parserWarnings);
+  const failureReason = input.failureReason ?? parserWarnings[0];
 
   return JSON.stringify({
-    parserVersion: "sprint-2",
-    files: input.results.map((result) => ({
-      fileName: result.fileName,
-      detectedType: result.detectedType,
-      pageCount: result.pageCount,
-      stats: result.stats
-    })),
+    parserVersion: "sprint-6",
+    diagnostics,
+    files: diagnostics,
+    failureReason,
     stats: {
       ...stats,
       parsedOrders: input.parsedOrders,
@@ -226,11 +255,30 @@ export async function createUploadBatchAction(formData: FormData) {
   }
 
   let redirectTo = "/owner/uploads/new?error=parse-failed";
+  let createdBatchId: string | null = null;
 
   try {
-    const results = await Promise.all(files.map(parseUploadedPdf));
+    const results: MeeshoParseResult[] = [];
+    const failedDiagnostics: MeeshoParserDiagnostics[] = [];
+
+    for (const file of files) {
+      try {
+        results.push(await parseUploadedPdf(file));
+      } catch (error) {
+        failedDiagnostics.push(
+          buildFailedDiagnostic(file.name, error instanceof Error ? error.message : "Unknown PDF parse error.")
+        );
+      }
+    }
+
+    const parseFailureIssues: ParseIssue[] = failedDiagnostics.map((diagnostic) => ({
+      issueType: "PDF_PARSE_FAILED",
+      message: diagnostic.parserWarnings[0] ?? "The PDF parser failed before diagnostics could be collected.",
+      severity: "ERROR"
+    }));
     const combinedIssues = [
       ...results.flatMap((result) => result.issues),
+      ...parseFailureIssues,
       ...crossCheckMeeshoParsedRows({
         labelOrders: results.flatMap((result) => result.labelOrders),
         manifestOrders: results.flatMap((result) => result.manifestOrders),
@@ -300,6 +348,10 @@ export async function createUploadBatchAction(formData: FormData) {
     const errorRows = orderDrafts.filter((row) => row.issues.some((issue) => issue.severity === "ERROR")).length;
     const lowConfidenceRows = orderDrafts.filter((row) => hasIssue(row, "LOW_CONFIDENCE")).length;
     const fileName = files.map((file) => file.name).join(" + ");
+    const hasParserDiagnosticsWarning =
+      failedDiagnostics.length > 0 ||
+      results.some((result) => result.diagnostics.scannedPdfLikely || result.diagnostics.unknownLayoutPages > 0);
+    const status = orderDrafts.length === 0 ? "FAILED" : hasParserDiagnosticsWarning ? "REVIEWED" : "PARSED";
 
     const batch = await prisma.uploadBatch.create({
       data: {
@@ -307,22 +359,25 @@ export async function createUploadBatchAction(formData: FormData) {
         createdByUserId: user.id,
         fileName,
         importType: "ORDER_LABEL",
-        status: "PARSED",
+        status,
         totalRows: orderDrafts.length,
         duplicateRows,
         missingImageRows,
         skippedRows: blockingRows,
-        errorRows,
+        errorRows: errorRows + parseFailureIssues.length,
         notes: buildNotes({
           results,
+          failedDiagnostics,
           parsedOrders: orderDrafts.length,
           parsedSummaryRows: drafts.length - orderDrafts.length,
           existingDuplicateRows: orderDrafts.filter((row) => hasIssue(row, "DUPLICATE_EXISTING_AWB")).length,
           missingImageRows,
-          blockingRows
+          blockingRows,
+          failureReason: parseFailureIssues[0]?.message
         })
       }
     });
+    createdBatchId = batch.id;
 
     if (drafts.length > 0) {
       await prisma.uploadPreviewRow.createMany({
@@ -399,6 +454,51 @@ export async function createUploadBatchAction(formData: FormData) {
     revalidatePath("/owner");
     redirectTo = `/owner/uploads/${batch.id}/review`;
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown parse error";
+
+    if (!createdBatchId) {
+      try {
+        const failedDiagnostics = files.map((file) => buildFailedDiagnostic(file.name, message));
+        const batch = await prisma.uploadBatch.create({
+          data: {
+            accountId: account.id,
+            createdByUserId: user.id,
+            fileName: files.map((file) => file.name).join(" + "),
+            importType: "ORDER_LABEL",
+            status: "FAILED",
+            totalRows: 0,
+            skippedRows: 0,
+            errorRows: 1,
+            notes: buildNotes({
+              results: [],
+              failedDiagnostics,
+              parsedOrders: 0,
+              parsedSummaryRows: 0,
+              existingDuplicateRows: 0,
+              missingImageRows: 0,
+              blockingRows: 0,
+              failureReason: message
+            })
+          }
+        });
+
+        await prisma.importRowIssue.create({
+          data: {
+            batchId: batch.id,
+            issueType: "PDF_PARSE_FAILED",
+            message,
+            rawData: JSON.stringify({ fileNames: files.map((file) => file.name) })
+          }
+        });
+
+        redirectTo = `/owner/uploads/${batch.id}/review?error=parse-failed`;
+      } catch {
+        redirectTo = "/owner/uploads/new?error=parse-failed";
+      }
+    } else {
+      redirectTo = `/owner/uploads/${createdBatchId}/review?error=parse-failed`;
+    }
+
     await recordAuditLog({
       userId: user.id,
       accountId: account.id,
@@ -407,11 +507,10 @@ export async function createUploadBatchAction(formData: FormData) {
       metadata: {
         phase: "parse-failed",
         fileNames: files.map((file) => file.name),
-        message: error instanceof Error ? error.message : "Unknown parse error"
+        message
       },
       request
     });
-    redirectTo = "/owner/uploads/new?error=parse-failed";
   }
 
   redirect(redirectTo);

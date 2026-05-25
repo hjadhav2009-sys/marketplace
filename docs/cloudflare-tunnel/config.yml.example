@@ -1,0 +1,7 @@
+tunnel: meesho-pick-pack
+credentials-file: path-to-credentials-json
+
+ingress:
+  - hostname: pack.personalizedgiftday.com
+    service: http://localhost:3000
+  - service: http_status:404

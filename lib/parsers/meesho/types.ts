@@ -1,6 +1,7 @@
 export type MeeshoDetectedType = "LABEL_PDF" | "MANIFEST_PDF" | "UNKNOWN";
 export type MeeshoPaymentType = "PREPAID" | "COD" | "UNKNOWN";
 export type ParseIssueSeverity = "ERROR" | "WARNING";
+export type MeeshoDetectedSection = "LABEL" | "MANIFEST_COURIER" | "PICKLIST_SUMMARY" | "UNKNOWN" | "EMPTY";
 
 export type ParseIssue = {
   issueType: string;
@@ -66,6 +67,8 @@ export type ParsedMeeshoPicklistSummaryRow = {
 
 export type MeeshoParseStats = {
   totalPages: number;
+  pagesWithText: number;
+  pagesWithoutText: number;
   parsedOrders: number;
   parsedSummaryRows: number;
   missingAwb: number;
@@ -73,6 +76,37 @@ export type MeeshoParseStats = {
   lowConfidenceRows: number;
   duplicateAwbInsideFile: number;
   duplicateSkuSummaryRows: number;
+  unknownLayoutPages: number;
+  scannedPdfLikely: boolean;
+};
+
+export type MeeshoPageExtractionDiagnostics = {
+  pageNumber: number;
+  textLength: number;
+  hasProductDetails: boolean;
+  hasTaxInvoice: boolean;
+  hasPicklistTable: boolean;
+  hasCourierTable: boolean;
+  detectedSection: MeeshoDetectedSection;
+  issues: string[];
+};
+
+export type MeeshoParserDiagnostics = {
+  fileName: string;
+  detectedType: MeeshoDetectedType;
+  pageCount: number;
+  pagesWithText: number;
+  pagesWithoutText: number;
+  parsedOrders: number;
+  parsedSummaryRows: number;
+  missingAwb: number;
+  missingSku: number;
+  lowConfidenceRows: number;
+  duplicateAwbInsideFile: number;
+  unknownLayoutPages: number;
+  scannedPdfLikely: boolean;
+  parserWarnings: string[];
+  pageDiagnostics: MeeshoPageExtractionDiagnostics[];
 };
 
 export type MeeshoParseResult = {
@@ -84,6 +118,7 @@ export type MeeshoParseResult = {
   picklistSummaryRows: ParsedMeeshoPicklistSummaryRow[];
   issues: ParseIssue[];
   stats: MeeshoParseStats;
+  diagnostics: MeeshoParserDiagnostics;
 };
 
 export type MeeshoTextPage = {

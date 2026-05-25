@@ -74,10 +74,22 @@ http://192.168.1.25:3000
 
 Your phone and PC must be on the same network. If Windows Firewall prompts for Node.js, allow private network access.
 
-## Production deployment: Hostinger + Supabase
+## Free-first daily setup: Windows PC + Supabase + Cloudflare Tunnel
 
-Production uses Supabase PostgreSQL through `prisma/schema.postgres.prisma`. SQLite is for local development only and
-must not be used for Hostinger production.
+This is the recommended production workflow for the warehouse today.
+
+- The app runs on the owner Windows PC.
+- Supabase Free PostgreSQL stores the database.
+- Workers open `https://pack.personalizedgiftday.com` in a browser.
+- Cloudflare Tunnel forwards that HTTPS domain to `http://localhost:3000` on the owner PC.
+- PDF parsing runs locally on the PC, which is more reliable than serverless for heavier Meesho PDFs.
+- The browser camera barcode scanner works through HTTPS.
+- The app code, terminal, Prisma, and npm stay on the owner PC. Workers only use the browser login.
+- Product images are only external URLs stored in the database. Product image files are not uploaded or stored.
+- Hostinger Node.js is not needed for this mode.
+- Vercel is not needed for this mode.
+
+The owner PC must stay powered on, connected to the internet, and running both the app and Cloudflare Tunnel during work.
 
 Production URL:
 
@@ -85,109 +97,110 @@ Production URL:
 https://pack.personalizedgiftday.com
 ```
 
-Create `.env.production` from `.env.production.example` and set real values in Hostinger's Node.js app environment:
+Create `.env` from `.env.local.production.example` on the owner PC:
 
 ```env
-DATABASE_URL="postgresql://..."
-SESSION_SECRET="a-long-random-secret"
-NEXT_PUBLIC_APP_URL="https://pack.personalizedgiftday.com"
+DATABASE_URL=<supabase postgres url>
+SESSION_SECRET=<long secret>
+NEXT_PUBLIC_APP_URL=https://pack.personalizedgiftday.com
+NEXT_PUBLIC_APP_NAME=Meesho Pick & Pack
 LOCAL_NETWORK_ONLY=false
+NODE_ENV=production
 ```
 
 Do not expose the Supabase database password in GitHub, browser code, screenshots, or worker devices.
+
+Start local production on Windows:
+
+```powershell
+scripts\windows\start-local-prod.ps1
+```
+
+or double-click:
+
+```text
+scripts\windows\start-local-prod.bat
+```
+
+The script checks Node.js, checks `.env`, installs dependencies when `node_modules` is missing, builds the app, and starts
+`npm start` on `http://localhost:3000`.
 
 ### Supabase setup
 
 1. Create a Supabase project.
 2. Open the project database settings and copy the PostgreSQL connection string.
-3. Use the pooled connection string if Hostinger has connection limits or short-lived app restarts.
-4. Put the connection string only in Hostinger environment variables as `DATABASE_URL`.
+3. Use the pooled connection string if connection limits or short-lived restarts become a problem.
+4. Put the connection string only in the owner PC `.env` as `DATABASE_URL`.
 5. Do not use Supabase Storage for product images. The app stores only external `imageUrl` values.
 
-### Hostinger setup
-
-1. Create the subdomain `pack.personalizedgiftday.com`.
-2. Enable SSL/HTTPS for the subdomain before testing login or future camera barcode scanning.
-3. Configure a Node.js app for this repository and confirm the default branch is `main`.
-4. Set production environment variables from `.env.production.example`.
-5. Use these Hostinger Node.js app settings:
-
-```text
-Package manager: npm
-Node version: 22.x
-Build command: npm run build
-Output directory: .next
-Start command: npm start
-```
-
-At runtime, `npm start` automatically binds Next.js to Hostinger's `PORT` environment variable and falls back to
-port `3000` for local production-style starts.
-
-6. Install dependencies:
-
-```bash
-npm install
-```
-
-7. Build the app:
-
-```bash
-npm run build
-```
-
-With a PostgreSQL `DATABASE_URL`, `npm run build` automatically:
-
-- uses `prisma/schema.postgres.prisma`
-- runs the production migration with `prisma migrate deploy`
-- generates Prisma Client
-- runs `next build`
-
-Set `SKIP_PRISMA_MIGRATE=true` only if you already ran migrations separately and want the build to skip migration deployment.
-For manual production migration, run:
-
-```bash
-npm run db:migrate:prod
-```
-
-8. Start the app:
-
-```bash
-npm start
-```
-
-After the first production deploy, the Supabase database may have no users because Hostinger does not provide
-terminal access for `npm run db:seed`. If login fails because no users exist, open:
+For a fresh Supabase database, open this once after the app starts:
 
 ```text
 https://pack.personalizedgiftday.com/setup
 ```
 
-Create the first owner user and first account there. The setup page only works while the `User` table is empty;
-after the first user exists it redirects to `/login`.
+Create the first owner user and first account there. The setup page only works while the `User` table is empty; after the
+first user exists it redirects to `/login`.
 
-Production still supports the explicit production helpers:
+### Cloudflare Tunnel setup
 
-```bash
-npm run build:prod
-npm run start:prod
+Install `cloudflared` on Windows, then run:
+
+```powershell
+cloudflared tunnel login
+cloudflared tunnel create meesho-pick-pack
+cloudflared tunnel route dns meesho-pick-pack pack.personalizedgiftday.com
+cloudflared tunnel run meesho-pick-pack
+```
+
+Use `docs/cloudflare-tunnel/config.yml.example` for a named tunnel config:
+
+```yaml
+tunnel: meesho-pick-pack
+credentials-file: path-to-credentials-json
+ingress:
+  - hostname: pack.personalizedgiftday.com
+    service: http://localhost:3000
+  - service: http_status:404
 ```
 
 ### Production checklist
 
 - Change all demo passwords before real warehouse use.
 - Use a strong `SESSION_SECRET`.
-- Confirm the deployed branch is `main`.
-- Confirm `https://pack.personalizedgiftday.com` loads over HTTPS.
+- Keep the owner PC awake during warehouse work.
+- Confirm `npm start` is running locally on `http://localhost:3000`.
+- Confirm Cloudflare Tunnel is running and `https://pack.personalizedgiftday.com` loads over HTTPS.
 - On a fresh Supabase database, open `/setup` once to create the first owner and account.
-- Test login.
-- Test account selection.
-- Test SKU image import.
-- Test PDF upload and parse review.
-- Test confirm import.
-- Test packing manual AWB search.
-- Test barcode scanner on the HTTPS domain.
+- Test login, account selection, SKU image import, PDF upload, parse review, confirm import, manual AWB search, and scanner.
 - Open **Owner -> System** and resolve production warnings.
 - Export a test CSV from **Owner -> System**.
+
+### Alternative deployment: VPS
+
+A small VPS can also run this app with Supabase PostgreSQL. Use Node.js 22+, set the same environment variables, run
+`npm run build`, and start with `npm start`. A VPS is usually a better hosted option than shared Node.js when PDF parsing
+must stay reliable.
+
+### Alternative deployment attempts
+
+Hostinger shared Node.js and Vercel compatibility files are kept where useful, but they are not the recommended path for
+this warehouse workflow.
+
+- Hostinger shared Node.js caused deployment, domain, and runtime confusion in testing. Keep it only as a lower-priority
+  experiment.
+- Vercel is convenient for many Next.js apps, but it is not recommended here for heavy PDF parsing because serverless
+  limits can make large text extraction less predictable.
+- If using any hosted runtime, still use Supabase PostgreSQL through `prisma/schema.postgres.prisma`; keep SQLite for
+  local development only.
+
+The explicit production helpers still exist:
+
+```bash
+npm run build:prod
+npm run start:prod
+npm run db:migrate:prod
+```
 
 ### Data retention guidance
 
@@ -213,12 +226,12 @@ temporary rows or logs, and every cleanup action is audited.
 - Use Supabase database backup/export options for full database recovery.
 - Do not store product image files; only external image URLs are exported.
 
-### Final pre-deployment checklist
+### Daily startup checklist
 
-1. Create the Supabase project.
-2. Set Hostinger environment variables from `.env.production.example`.
-3. Set Hostinger to Node `22.x`, build command `npm run build`, output `.next`, and start command `npm start`.
-4. Build with `npm run build`; it deploys PostgreSQL migrations automatically when `DATABASE_URL` is PostgreSQL.
+1. Start the app on the owner PC with `scripts\windows\start-local-prod.ps1`.
+2. Start Cloudflare Tunnel with `cloudflared tunnel run meesho-pick-pack`.
+3. Confirm `http://localhost:3000` works on the owner PC.
+4. Confirm `https://pack.personalizedgiftday.com` works from a worker phone.
 5. Create real owner, picker, and packer users.
 6. Change or deactivate all demo passwords/users.
 7. Upload SKU image mappings.
@@ -232,16 +245,22 @@ temporary rows or logs, and every cleanup action is audited.
 
 - Prisma connection failed: confirm `DATABASE_URL`, database password, Supabase project status, and whether the pooled
   connection string is required.
-- SSL/domain not active: wait for DNS propagation, recheck the Hostinger subdomain, and confirm SSL is issued for
+- HTTPS domain not active: confirm Cloudflare Tunnel is running and the DNS route points to
   `pack.personalizedgiftday.com`.
-- Hostinger Node.js app not starting: check the Node.js version, start command, environment variables, build output, and
-  whether `npm install` completed successfully.
+- Local app not starting: check Node.js version, `.env`, `node_modules`, build output, and whether another process is
+  already using port `3000`.
 - Supabase connection pool issue: switch to the pooled connection string, keep connection limits conservative, and avoid
   opening database tools from many devices at once.
 
 ## Safe Local Usage
 
-Run the app only on the shop/office PC. Workers should use the browser URL from their phones or desktops:
+Run the app only on the shop/office PC. In the recommended daily setup, workers should use the HTTPS tunnel URL:
+
+```text
+https://pack.personalizedgiftday.com
+```
+
+For same-Wi-Fi development only, workers can use the PC IP address:
 
 ```text
 http://YOUR_PC_IP:3000
@@ -336,18 +355,24 @@ does not persist the original PDF.
 
 ## Parser Design
 
-Sprint 2 uses server-side text extraction and layout-tolerant reconstruction:
+Sprint 6 uses local server-side text extraction, page diagnostics, and layout-tolerant reconstruction:
 
 - PDF text is extracted page by page with an open-source Node parser.
+- Every upload stores parser diagnostics in `UploadBatch.notes`, including page count, pages with/without text, missing
+  AWB/SKU counts, duplicate AWBs inside the file, low confidence rows, unknown layout pages, and parser warnings.
+- Page diagnostics record text length, detected sections, and page-level issues.
 - Label pages are anchored around invoice, AWB, courier, and Product Details text.
+- AWB candidates are scored so order numbers, invoice numbers, GSTIN values, and PIN codes are ignored.
 - Manifest courier tables are reconstructed from line groups so wrapped sub order numbers and wrapped SKUs can be fixed.
 - Hidden/control separators in SKUs are normalized, for example `SUL-PN-BC-SS-BL...Allah40` becomes `SUL-PN-BC-SS-BL-Allah40`.
+- Unknown manifest row blocks are marked for review instead of being silently ignored.
 - Each parsed row gets a confidence score and issue badges.
 - Rows with missing AWB or SKU are held for review and are not imported as normal orders.
 - Uploading both labels and manifest enables cross-checks for missing AWBs, SKU mismatches, quantity mismatches, courier warnings, and picklist total mismatches.
 
-OCR for scanned or image-only PDFs is planned for a later sprint. If parser confidence is low, the owner should review
-the row before confirming import.
+If text extraction is empty or almost empty, the review screen shows: `This looks like a scanned/image PDF. OCR is required.`
+The OCR-ready interface lives in `lib/parsers/ocr`, but heavy OCR is not implemented yet. If parser confidence is low,
+the owner should review the row before confirming import.
 
 ## Daily Workflow
 
@@ -438,6 +463,7 @@ npm run validate
 npm run db:seed
 npm run db:migrate:prod
 npm run start:prod
+scripts\windows\start-local-prod.ps1
 ```
 
 ## Database Notes

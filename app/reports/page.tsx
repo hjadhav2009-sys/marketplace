@@ -103,6 +103,7 @@ export default async function ReportsPage() {
             {summary.brokenImageMappings.map((mapping) => (
               <div key={mapping.id} className="px-4 py-3 text-sm">
                 <p className="font-semibold text-slate-950">{mapping.sku}</p>
+                <p className="text-xs font-semibold text-rose-700">Image health: {mapping.imageHealth}</p>
                 <p className="break-all text-slate-600">{mapping.imageUrl}</p>
               </div>
             ))}

@@ -1,4 +1,5 @@
-import type { MeeshoPaymentType } from "./types";
+import { normalizeSkuForMatching } from "@/lib/sku";
+import type { MeeshoPaymentType, ParseIssue } from "./types";
 
 const hiddenSeparatorPattern = /[\uFFFE\uFFFD\u200B-\u200F\u202A-\u202E]/g;
 const controlPattern = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
@@ -16,18 +17,23 @@ export function compactWhitespace(value: string) {
 }
 
 export function normalizeSku(value: string | null | undefined) {
-  if (!value) {
-    return "";
+  return normalizeSkuForMatching(value);
+}
+
+export function skuNormalizationIssue(value: string | null | undefined, normalizedSku: string, pageNumber: number): ParseIssue | null {
+  const raw = removeControlChars(value ?? "").trim();
+
+  if (!raw || raw === normalizedSku) {
+    return null;
   }
 
-  return removeControlChars(value)
-    .trim()
-    .replace(/\s*_\s*/g, "_")
-    .replace(/\s*-\s*/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/[^A-Za-z0-9_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+  return {
+    issueType: "SKU_NORMALIZED",
+    message: `SKU normalized from "${raw}" to "${normalizedSku}".`,
+    severity: "WARNING",
+    pageNumber,
+    sku: normalizedSku
+  };
 }
 
 export function normalizeAwb(value: string | null | undefined) {

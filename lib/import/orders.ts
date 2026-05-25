@@ -2,6 +2,7 @@ import type { Account, Order, PaymentType, User } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
+import { normalizeSkuForMatching } from "@/lib/sku";
 
 export type ParsedOrderImportRow = {
   rowNumber?: number;
@@ -32,10 +33,14 @@ function trimValue(value?: string | null) {
   return value?.trim() ?? "";
 }
 
+function trimSku(value?: string | null) {
+  return normalizeSkuForMatching(value);
+}
+
 function hasSafeOrderChanges(existing: ExistingOrder, row: ParsedOrderImportRow) {
   return (
     trimValue(existing.courier) !== trimValue(row.courier) ||
-    existing.sku !== trimValue(row.sku) ||
+    existing.sku !== trimSku(row.sku) ||
     existing.qty !== (row.qty ?? 1) ||
     trimValue(existing.color) !== trimValue(row.color) ||
     trimValue(existing.size) !== trimValue(row.size) ||
@@ -87,7 +92,7 @@ export function planOrderImport(
   return rows.reduce<OrderImportPlan>(
     (plan, row) => {
       const awb = trimValue(row.awb);
-      const sku = trimValue(row.sku);
+      const sku = trimSku(row.sku);
 
       if (!awb) {
         plan.errors.push({ row, issueType: "MISSING_AWB", message: "AWB is required." });
@@ -146,7 +151,7 @@ export async function importParsedOrderRows(input: {
       });
 
   const awbs = input.rows.map((row) => trimValue(row.awb)).filter(Boolean);
-  const skus = input.rows.map((row) => trimValue(row.sku)).filter(Boolean);
+  const skus = input.rows.map((row) => trimSku(row.sku)).filter(Boolean);
   const [existingOrders, mappings] = await Promise.all([
     prisma.order.findMany({
       where: {
@@ -184,14 +189,14 @@ export async function importParsedOrderRows(input: {
         batchId: batch.id,
         rowNumber: row.rowNumber,
         issueType: "MISSING_IMAGE_MAPPING",
-        message: `No active image mapping found for SKU ${trimValue(row.sku)}.`,
+        message: `No active image mapping found for SKU ${trimSku(row.sku)}.`,
         rawData: JSON.stringify(row)
       }
     });
   }
 
   for (const row of plan.created) {
-    const sku = trimValue(row.sku);
+    const sku = trimSku(row.sku);
     await prisma.order.create({
       data: {
         accountId: input.account.id,
@@ -213,7 +218,7 @@ export async function importParsedOrderRows(input: {
   }
 
   for (const row of plan.updated) {
-    const sku = trimValue(row.sku);
+    const sku = trimSku(row.sku);
     await prisma.order.updateMany({
       where: {
         accountId: input.account.id,

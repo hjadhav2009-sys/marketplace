@@ -7,7 +7,8 @@ import {
   normalizeQty,
   normalizeSku,
   normalizeWhitespace,
-  scoreAndIssues
+  scoreAndIssues,
+  skuNormalizationIssue
 } from "./normalize";
 import type { MeeshoTextPage, ParsedMeeshoManifestOrder, ParsedMeeshoPicklistSummaryRow, ParseIssue } from "./types";
 
@@ -49,6 +50,7 @@ function parseSummaryRow(pageNumber: number, rawRowText: string, supplierName?: 
   }
 
   const sku = normalizeSku(match[1]);
+  const skuIssue = skuNormalizationIssue(match[1], sku, pageNumber);
   const color = match[2];
   const size = compactWhitespace(match[3]);
   const totalQuantity = normalizeQty(match[4]);
@@ -89,7 +91,7 @@ function parseSummaryRow(pageNumber: number, rawRowText: string, supplierName?: 
     totalQuantity,
     rawRowText: row,
     confidence,
-    issues
+    issues: skuIssue ? [skuIssue, ...issues] : issues
   };
 }
 
@@ -177,6 +179,7 @@ function parseOrderBlock(pageNumber: number, rawRowText: string, courier?: strin
         awb: string;
         orderNo: string;
         sku: string;
+        rawSku: string;
         qty?: number;
         size?: string;
       }
@@ -195,10 +198,12 @@ function parseOrderBlock(pageNumber: number, rawRowText: string, courier?: strin
     const detailMatch = compactWhitespace(afterAwb).match(new RegExp(`^(.+?)\\s+(\\d+)\\s+(${sizePattern})(?:\\s+(?:Yes|No|Y|N|Packed))?$`, "i"));
 
     if (detailMatch) {
+      const rawSku = detailMatch[1];
       const candidate = {
         awb: candidateAwb,
         orderNo: candidateOrderNo,
-        sku: normalizeSku(detailMatch[1]),
+        sku: normalizeSku(rawSku),
+        rawSku,
         qty: normalizeQty(detailMatch[2]),
         size: compactWhitespace(detailMatch[3])
       };
@@ -218,6 +223,10 @@ function parseOrderBlock(pageNumber: number, rawRowText: string, courier?: strin
     sku = fallback.sku;
     qty = fallback.qty;
     size = fallback.size;
+    const skuIssue = skuNormalizationIssue(fallback.rawSku, sku, pageNumber);
+    if (skuIssue) {
+      issues.push(skuIssue);
+    }
   } else {
     issues.push({ issueType: "UNKNOWN_LAYOUT_ROW", message: "Could not confidently split AWB, SKU, quantity, and size.", severity: "WARNING", pageNumber });
   }

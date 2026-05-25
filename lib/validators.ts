@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidAwb, normalizeAwb } from "./awb";
+import { normalizeSkuForMatching } from "./sku";
 
 export const loginSchema = z.object({
   username: z.string().trim().min(1, "Username is required"),
@@ -19,7 +20,10 @@ export const uploadBatchSchema = z.object({
 });
 
 export const skuImageMappingSchema = z.object({
-  sku: z.string().trim().min(1, "SKU is required"),
+  sku: z.preprocess(
+    (value) => normalizeSkuForMatching(typeof value === "string" ? value : ""),
+    z.string().min(1, "SKU is required")
+  ),
   imageUrl: z
     .string()
     .trim()
@@ -52,7 +56,10 @@ export const awbSearchSchema = z.object({
 export const parsedOrderSchema = z.object({
   awb: z.string().trim().min(8),
   courier: z.string().trim().optional(),
-  sku: z.string().trim().min(1),
+  sku: z.preprocess(
+    (value) => normalizeSkuForMatching(typeof value === "string" ? value : ""),
+    z.string().min(1)
+  ),
   qty: z.coerce.number().int().positive(),
   color: z.string().trim().optional(),
   size: z.string().trim().optional(),

@@ -154,13 +154,15 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
           <div className="divide-y divide-slate-100">
             {mappings.map((mapping) => (
               <div key={mapping.id} className="flex gap-4 px-4 py-4">
-                <ProductImage src={mapping.imageUrl} alt={mapping.productName ?? mapping.sku} size="sm" mappingId={mapping.id} />
+                <ProductImage src={mapping.imageUrl} alt={mapping.productName ?? mapping.sku} size="sm" mappingId={mapping.id} showDebug />
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-950">
                     {mapping.sku} {!mapping.active ? <span className="text-xs text-slate-500">(inactive)</span> : null}
                   </p>
                   <p className="text-sm text-slate-600">{mapping.productName ?? "No product name"}</p>
                   <p className="text-sm text-slate-500">{mapping.color ?? "Color not set"}</p>
+                  <p className="text-xs font-semibold text-slate-500">Image health: {mapping.imageHealth}</p>
+                  <p className="break-all text-xs text-slate-400">{mapping.imageUrl}</p>
                   {mapping.notes ? <p className="mt-1 text-sm text-slate-500">{mapping.notes}</p> : null}
                 </div>
               </div>

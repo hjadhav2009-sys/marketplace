@@ -7,7 +7,7 @@ import { isValidAwb, normalizeAwb } from "../lib/awb";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
 import { formatCsvValue, rowsToCsv } from "../lib/csv";
 import { planOrderImport } from "../lib/import/orders";
-import { canImportPreviewIssues } from "../lib/import/preview";
+import { canImportPreviewIssues, isOrderPreviewSourceType, reviewProblemIssues } from "../lib/import/preview";
 import { planAccountSkuMappingImport, planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
 import { findAwbSearchMatches } from "../lib/operations/awb-search";
@@ -15,9 +15,10 @@ import { canConfirmPacked } from "../lib/operations/packing";
 import { buildPickerSkuGroups } from "../lib/operations/picking";
 import { hashPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
-import { getInitialProductImageState } from "../lib/product-image";
+import { getInitialProductImageState, productImageStateText } from "../lib/product-image";
 import { cutoffDate, isCleanupConfirmationValid, RETENTION_DAYS } from "../lib/retention";
 import { canUseFirstRunSetup, validateFirstRunSetupPassword } from "../lib/setup";
+import { normalizeSkuForMatching } from "../lib/sku";
 import { canDeactivateUser, shouldCloseSessionsAfterPasswordReset, validateWorkerPassword } from "../lib/user-management";
 import {
   awbSearchSchema,
@@ -283,6 +284,9 @@ assert.equal(missingImagePlan.created.length, 1, "Missing image rows still impor
 assert.equal(missingImagePlan.missingImageRows.length, 1, "Missing image rows are counted for review");
 assert.equal(canImportPreviewIssues([{ issueType: "LOW_CONFIDENCE" }]), false, "Low confidence preview rows do not import by default");
 assert.equal(canImportPreviewIssues([{ issueType: "MISSING_IMAGE_MAPPING" }]), true, "Missing image mapping does not block preview import");
+assert.equal(isOrderPreviewSourceType("PICKLIST_SUMMARY"), false, "Picklist summary rows are not order preview rows");
+assert.equal(reviewProblemIssues([]).length, 0, "Picklist summary rows without AWB do not create missing-AWB problems by default");
+assert.equal(reviewProblemIssues([{ issueType: "UNKNOWN_LAYOUT_ROW" }]).length, 1, "Unknown layout rows show in review problems");
 
 assert.equal(canRoleAccessPath("OWNER", "/reports"), true, "Owner can access reports");
 assert.equal(canRoleAccessPath("OWNER", "/owner/system"), true, "Owner can access system health");
@@ -330,6 +334,29 @@ const pickerGroups = buildPickerSkuGroups(
 assert.equal(pickerGroups.length, 2, "Picker grouping separates SKU by color and size");
 assert.equal(pickerGroups.find((group) => group.color === "Silver")?.totalQuantity, 1, "Picker group sums quantity");
 assert.equal(pickerGroups.find((group) => group.color === "Gold")?.status, "PICKED", "Picked group status is derived");
+assert.equal(pickerGroups[0]?.imageUrl, "https://example.com/image.jpg", "Picker group uses mapping image when order image is null");
+
+const pickerGroupsWithOrderImage = buildPickerSkuGroups(
+  [
+    {
+      id: "o3",
+      awb: "A12345680",
+      sku: "SKU2",
+      qty: 1,
+      color: null,
+      size: null,
+      courier: "Delhivery",
+      orderNo: "ORDER3",
+      productDescription: "Old image product",
+      imageUrl: "https://example.com/old-order-image.jpg",
+      pickStatus: "READY",
+      packStatus: "READY"
+    }
+  ],
+  [{ id: "m2", sku: "SKU2", imageUrl: "https://example.com/current-mapping-image.jpg", productName: "Current mapped product" }]
+);
+assert.equal(pickerGroupsWithOrderImage[0]?.imageUrl, "https://example.com/current-mapping-image.jpg", "Picker group prefers current mapping image when available");
+assert.equal(normalizeSkuForMatching("SUL - PN - BC _ SS"), "SUL-PN-BC_SS", "SKU normalization removes spaces around hyphen and underscore");
 
 assert.equal(validateWorkerPassword("demo1234").valid, false, "Demo password is rejected");
 assert.equal(validateWorkerPassword("better123").valid, true, "Usable worker password passes");
@@ -349,6 +376,9 @@ assert.equal(isAllowedLocalNetworkIp("8.8.8.8", "192.168.0.0/16"), false, "Exter
 assert.equal(isAllowedLocalNetworkIp("127.0.0.1", "192.168.0.0/16"), true, "Localhost is always allowed");
 
 assert.equal(getInitialProductImageState(null), "missing", "Product image fallback handles missing URL");
+assert.equal(getInitialProductImageState("not-a-url"), "broken", "Product image state separates invalid URLs from missing mappings");
+assert.equal(productImageStateText("missing", false), "Missing mapping", "Product image state labels missing mapping clearly");
+assert.equal(productImageStateText("broken", true), "Loading failed", "Product image state labels failed image loads clearly");
 assert.equal(typeof AwbBarcodeScanner, "function", "Scanner component compiles");
 
 assert.equal(formatCsvValue('A "quoted", value'), '"A ""quoted"", value"', "CSV values are safely escaped");

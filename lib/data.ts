@@ -2,6 +2,7 @@ import type { Account } from "@prisma/client";
 import { findAwbSearchMatches } from "./operations/awb-search";
 import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups } from "./operations/picking";
 import { prisma } from "./prisma";
+import { normalizeSkuForMatching } from "./sku";
 
 export async function getDashboardStats(accountId: string) {
   const [readyOrders, packedOrders, problemOrders, skuMappings, batches] = await Promise.all([
@@ -83,13 +84,15 @@ export async function getSkuGroups(accountId: string, options: { query?: string;
       sku: "asc"
     }
   });
+  const orderSkus = Array.from(new Set(orders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
 
   const mappings = await prisma.skuImageMapping.findMany({
     where: {
       accountId,
       sku: {
-        in: Array.from(new Set(orders.map((order) => order.sku)))
-      }
+        in: orderSkus
+      },
+      active: true
     }
   });
 
@@ -103,6 +106,7 @@ export async function getSkuDetail(
 ) {
   const color = decodePickerDimension(options.color);
   const size = decodePickerDimension(options.size);
+  const normalizedSku = normalizeSkuForMatching(sku);
   const [orders, mapping] = await Promise.all([
     prisma.order.findMany({
       where: {
@@ -116,13 +120,13 @@ export async function getSkuDetail(
       },
       orderBy: { createdAt: "asc" }
     }),
-    prisma.skuImageMapping.findUnique({
+    prisma.skuImageMapping.findFirst({
       where: {
-        accountId_sku: {
-          accountId,
-          sku
-        }
-      }
+        accountId,
+        active: true,
+        sku: { in: Array.from(new Set([sku, normalizedSku].filter(Boolean))) }
+      },
+      orderBy: { updatedAt: "desc" }
     })
   ]);
 

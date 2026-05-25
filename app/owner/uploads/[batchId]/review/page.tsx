@@ -8,9 +8,10 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
-import { hasBlockingPreviewIssue } from "@/lib/import/preview";
+import { hasBlockingPreviewIssue, isOrderPreviewSourceType, reviewProblemIssues } from "@/lib/import/preview";
 import type { MeeshoParserDiagnostics, ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
+import { normalizeSkuForMatching } from "@/lib/sku";
 import { confirmParsedBatchAction } from "../../actions";
 
 type ReviewPageProps = {
@@ -196,21 +197,23 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
     ...row,
     parsedIssues: parseIssues(row.issues)
   }));
-  const skus = Array.from(new Set(previewRows.map((row) => row.sku).filter((sku): sku is string => Boolean(sku))));
+  const skus = Array.from(new Set(previewRows.flatMap((row) => [row.sku, normalizeSkuForMatching(row.sku)].filter((sku): sku is string => Boolean(sku)))));
   const mappings = await prisma.skuImageMapping.findMany({
     where: {
       accountId: account.id,
-      sku: { in: skus }
+      sku: { in: skus },
+      active: true
     },
     select: {
       id: true,
       sku: true,
       imageUrl: true,
       productName: true,
+      color: true,
       imageHealth: true
     }
   });
-  const mappingBySku = new Map(mappings.map((mapping) => [mapping.sku, mapping]));
+  const mappingBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
   const issueTypes = Array.from(new Set(previewRows.flatMap((row) => row.parsedIssues.map((issue) => issue.issueType)))).sort();
   const query = filters?.q?.trim().toLowerCase() ?? "";
   const selectedIssue = filters?.issue ?? "";
@@ -236,9 +239,17 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         (left.pageNumber ?? 0) - (right.pageNumber ?? 0)
       );
     });
+  const filteredOrderRows = filteredRows.filter((row) => isOrderPreviewSourceType(row.sourceType));
+  const filteredSummaryRows = filteredRows.filter((row) => row.sourceType === "PICKLIST_SUMMARY");
+  const problemRows = filteredRows.flatMap((row) =>
+    reviewProblemIssues(row.parsedIssues).map((issue) => ({
+      row,
+      issue
+    }))
+  );
   const crossCheckIssueCount = batch.issues.filter((issue) => /MISMATCH|NOT_IN/i.test(issue.issueType)).length;
   const importableRows = previewRows.filter((row) => {
-    return !row.imported && (row.sourceType === "LABEL" || row.sourceType === "MANIFEST_ORDER") && row.awb && row.sku && !hasBlockingPreviewIssue(row.parsedIssues);
+    return !row.imported && isOrderPreviewSourceType(row.sourceType) && row.awb && row.sku && !hasBlockingPreviewIssue(row.parsedIssues);
   }).length;
   const importStats = notes.importStats;
   const exactErrorMessage =
@@ -440,7 +451,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
 
       <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-semibold text-slate-950">Parsed preview rows</h2>
+          <h2 className="font-semibold text-slate-950">Review filters</h2>
         </div>
         <form className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[1fr_220px_auto_auto]" method="get">
           <input
@@ -465,10 +476,58 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             Apply
           </button>
         </form>
+      </section>
 
-        {filteredRows.length === 0 ? (
+      <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="font-semibold text-slate-950">Problem rows needing review</h2>
+        </div>
+        {problemRows.length === 0 ? (
           <div className="px-4 py-8">
-            <EmptyState title="No preview rows match" description="Clear filters or upload another Meesho PDF to review parsed rows." />
+            <EmptyState title="No problem rows match" description="Missing AWB, missing SKU, unknown layout, and low confidence rows will appear here." />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Issue</th>
+                  <th className="px-4 py-3">Source page</th>
+                  <th className="px-4 py-3">SKU</th>
+                  <th className="px-4 py-3">AWB</th>
+                  <th className="px-4 py-3">Raw issue message</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {problemRows.map(({ row, issue }) => (
+                  <tr key={`${row.id}-${issue.issueType}-${issue.message}`}>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ${issueTone(issue.issueType)}`}>
+                        {issueLabel(issue.issueType)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-950">{row.sourceType}</p>
+                      <p className="text-xs text-slate-500">Page {issue.pageNumber ?? row.pageNumber ?? "-"}</p>
+                    </td>
+                    <td className="px-4 py-3">{row.sku ?? "Missing"}</td>
+                    <td className="px-4 py-3">{row.awb ?? (row.sourceType === "PICKLIST_SUMMARY" ? "-" : "Missing")}</td>
+                    <td className="px-4 py-3 text-slate-600">{issue.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="font-semibold text-slate-950">Parsed order rows</h2>
+        </div>
+        {filteredOrderRows.length === 0 ? (
+          <div className="px-4 py-8">
+            <EmptyState title="No order rows match" description="Label and courier manifest order rows will appear here." />
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -487,14 +546,14 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredRows.map((row) => {
-                  const mapping = row.sku ? mappingBySku.get(row.sku) : undefined;
+                {filteredOrderRows.map((row) => {
+                  const mapping = row.sku ? mappingBySku.get(normalizeSkuForMatching(row.sku)) : undefined;
 
                   return (
                     <tr key={row.id} className={row.imported ? "bg-teal-50/40" : undefined}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <ProductImage src={mapping?.imageUrl} alt={`${mapping?.productName ?? row.productDescription ?? row.sku ?? "Product"} ${row.sku ?? ""}`} size="sm" showBadge={false} mappingId={mapping?.id} />
+                          <ProductImage src={mapping?.imageUrl} alt={`${mapping?.productName ?? row.productDescription ?? row.sku ?? "Product"} ${row.sku ?? ""}`} size="sm" showBadge={false} mappingId={mapping?.id} showDebug />
                           {imageBadge(mapping)}
                         </div>
                       </td>
@@ -528,6 +587,54 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                           </div>
                         )}
                       </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="font-semibold text-slate-950">Picklist SKU summary rows</h2>
+        </div>
+        {filteredSummaryRows.length === 0 ? (
+          <div className="px-4 py-8">
+            <EmptyState title="No picklist summary rows match" description="Picklist SKU totals appear separately because they do not contain AWB values." />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">SKU</th>
+                  <th className="px-4 py-3">Product image</th>
+                  <th className="px-4 py-3">Product name</th>
+                  <th className="px-4 py-3">Color</th>
+                  <th className="px-4 py-3">Size</th>
+                  <th className="px-4 py-3">Total quantity</th>
+                  <th className="px-4 py-3">Image mapping status</th>
+                  <th className="px-4 py-3">Source page</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredSummaryRows.map((row) => {
+                  const mapping = row.sku ? mappingBySku.get(normalizeSkuForMatching(row.sku)) : undefined;
+
+                  return (
+                    <tr key={row.id}>
+                      <td className="px-4 py-3 font-semibold text-slate-950">{row.sku ?? "Missing"}</td>
+                      <td className="px-4 py-3">
+                        <ProductImage src={mapping?.imageUrl} alt={`${mapping?.productName ?? row.sku ?? "Product"} ${row.sku ?? ""}`} size="sm" showBadge={false} mappingId={mapping?.id} showDebug />
+                      </td>
+                      <td className="px-4 py-3">{mapping?.productName ?? "Not mapped"}</td>
+                      <td className="px-4 py-3">{row.color ?? mapping?.color ?? "-"}</td>
+                      <td className="px-4 py-3">{row.size ?? "-"}</td>
+                      <td className="px-4 py-3">{row.qty ?? "-"}</td>
+                      <td className="px-4 py-3">{imageBadge(mapping)}</td>
+                      <td className="px-4 py-3">Page {row.pageNumber ?? "-"}</td>
                     </tr>
                   );
                 })}

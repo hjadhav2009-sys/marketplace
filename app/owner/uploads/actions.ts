@@ -6,7 +6,7 @@ import type { PaymentType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { importParsedOrderRows, type ParsedOrderImportRow } from "@/lib/import/orders";
-import { hasBlockingPreviewIssue } from "@/lib/import/preview";
+import { hasBlockingPreviewIssue, isOrderPreviewSourceType } from "@/lib/import/preview";
 import {
   crossCheckMeeshoParsedRows,
   parseMeeshoPdfBuffer,
@@ -341,7 +341,7 @@ export async function createUploadBatchAction(formData: FormData) {
       }
     }
 
-    const orderDrafts = drafts.filter((row) => row.sourceType !== "PICKLIST_SUMMARY");
+    const orderDrafts = drafts.filter((row) => isOrderPreviewSourceType(row.sourceType));
     const missingImageRows = drafts.filter((row) => hasIssue(row, "MISSING_IMAGE_MAPPING")).length;
     const duplicateRows = orderDrafts.filter((row) => hasIssue(row, "DUPLICATE_EXISTING_AWB") || hasIssue(row, "DUPLICATE_AWB_INSIDE_FILE")).length;
     const blockingRows = orderDrafts.filter((row) => hasBlockingPreviewIssue(row.issues)).length;

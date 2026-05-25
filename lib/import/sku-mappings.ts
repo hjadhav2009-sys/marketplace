@@ -2,6 +2,7 @@ import type { Account, SkuImageMapping, User } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
+import { normalizeSkuForMatching } from "@/lib/sku";
 
 export type RawImportRow = Record<string, string>;
 
@@ -108,7 +109,8 @@ export function normalizeSkuImageRows(rows: RawImportRow[]) {
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
-    const sku = getAliasedValue(row, skuAliases);
+    const rawSku = getAliasedValue(row, skuAliases);
+    const sku = normalizeSkuForMatching(rawSku);
     const imageUrl = getAliasedValue(row, imageAliases);
     const productName = getAliasedField(row, nameAliases);
     const color = getAliasedField(row, colorAliases);

@@ -107,7 +107,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
               href={pickerDetailHref(group.sku, group.color, group.size)}
               className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-berry hover:shadow-soft"
             >
-              <ProductImage src={group.imageUrl} alt={group.productName ?? group.sku} size="lg" mappingId={group.mapping?.id} />
+              <ProductImage src={group.imageUrl} alt={group.productName ?? group.sku} size="lg" mappingId={group.mapping?.id} showDebug={user.role === "OWNER"} />
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <StatusBadge value={group.status} />
                 {group.missingImage ? <StatusBadge value="MISSING_IMAGE" /> : null}

@@ -8,9 +8,10 @@ import {
   normalizeQty,
   normalizeSku,
   normalizeWhitespace,
-  scoreAndIssues
+  scoreAndIssues,
+  skuNormalizationIssue
 } from "./normalize";
-import type { MeeshoTextPage, ParsedMeeshoLabelOrder } from "./types";
+import type { MeeshoTextPage, ParsedMeeshoLabelOrder, ParseIssue } from "./types";
 
 function linesFromText(text: string) {
   return normalizeWhitespace(text)
@@ -152,13 +153,14 @@ function extractProductRow(text: string) {
 
   const beforeOrder = row.slice(0, orderMatch.index).trim();
   const tokens = beforeOrder.split(/\s+/).filter(Boolean);
-  const sku = normalizeSku(tokens[0]);
+  const rawSku = tokens[0];
+  const sku = normalizeSku(rawSku);
   const qtyIndex = tokens.findLastIndex((token) => /^\d+$/.test(token));
   const qty = normalizeQty(qtyIndex >= 0 ? tokens[qtyIndex] : undefined);
   const size = qtyIndex > 1 ? tokens.slice(1, qtyIndex).join(" ") : undefined;
   const color = qtyIndex >= 0 ? tokens.slice(qtyIndex + 1).join(" ") || undefined : undefined;
 
-  return { sku, qty, size, color, orderNo };
+  return { sku, rawSku, qty, size, color, orderNo };
 }
 
 function extractProductDescription(text: string) {
@@ -201,6 +203,9 @@ export function parseMeeshoLabelPage(page: MeeshoTextPage): ParsedMeeshoLabelOrd
     paymentType,
     pageNumber: page.pageNumber
   });
+  const normalizationIssues = [
+    skuNormalizationIssue(productRow.rawSku, productRow.sku ?? "", page.pageNumber)
+  ].filter((issue): issue is ParseIssue => Boolean(issue));
 
   return {
     pageNumber: page.pageNumber,
@@ -224,7 +229,7 @@ export function parseMeeshoLabelPage(page: MeeshoTextPage): ParsedMeeshoLabelOrd
     state: null,
     rawText: text,
     confidence: scored.confidence,
-    issues: scored.issues
+    issues: [...normalizationIssues, ...scored.issues]
   };
 }
 

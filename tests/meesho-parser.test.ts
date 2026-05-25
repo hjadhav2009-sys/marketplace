@@ -181,6 +181,11 @@ Allah40 1 Free Size No`
 ]);
 assert.equal(wrappedManifest.manifestOrders[0]?.orderNo, "290010756104090432_1", "Manifest tolerates wrapped sub order number");
 assert.equal(wrappedManifest.manifestOrders[0]?.sku, "SUL-PN-BC-SS-BL-Allah40", "Manifest tolerates wrapped SKU");
+assert.equal(
+  wrappedManifest.manifestOrders[0]?.issues.some((issue) => issue.issueType === "SKU_NORMALIZED"),
+  true,
+  "Manifest warns when a parsed SKU is normalized"
+);
 
 const unknownManifestRow = parseText("Supplier_Manifest_unknown_row.pdf", [
   {

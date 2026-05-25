@@ -1,4 +1,5 @@
 import type { PackStatus, PickStatus } from "@prisma/client";
+import { normalizeSkuForMatching } from "@/lib/sku";
 
 export type PickerOrderInput = {
   id: string;
@@ -67,14 +68,15 @@ export function pickerDetailPath(sku: string, color: string | null | undefined, 
 }
 
 export function buildPickerSkuGroups(orders: PickerOrderInput[], mappings: PickerMappingInput[]) {
-  const mappingBySku = new Map(mappings.map((mapping) => [mapping.sku, mapping]));
+  const mappingBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
   const groups = new Map<string, PickerSkuGroup>();
 
   for (const order of orders) {
     const color = cleanDimension(order.color);
     const size = cleanDimension(order.size);
     const key = pickerGroupKey(order.sku, color, size);
-    const mapping = mappingBySku.get(order.sku) ?? null;
+    const mapping = mappingBySku.get(normalizeSkuForMatching(order.sku)) ?? null;
+    const imageUrl = mapping?.imageUrl ?? order.imageUrl ?? null;
     const existing =
       groups.get(key) ??
       ({
@@ -87,9 +89,9 @@ export function buildPickerSkuGroups(orders: PickerOrderInput[], mappings: Picke
         pendingCount: 0,
         problemCount: 0,
         status: "READY",
-        missingImage: !(order.imageUrl || mapping?.imageUrl),
+        missingImage: !imageUrl,
         productName: mapping?.productName ?? order.productDescription ?? null,
-        imageUrl: order.imageUrl ?? mapping?.imageUrl ?? null,
+        imageUrl,
         mapping
       } satisfies PickerSkuGroup);
 
@@ -104,7 +106,12 @@ export function buildPickerSkuGroups(orders: PickerOrderInput[], mappings: Picke
       existing.pendingCount += 1;
     }
 
-    existing.missingImage = existing.missingImage && !(order.imageUrl || mapping?.imageUrl);
+    if (mapping?.imageUrl && existing.imageUrl !== mapping.imageUrl) {
+      existing.imageUrl = mapping.imageUrl;
+      existing.mapping = mapping;
+    }
+
+    existing.missingImage = existing.missingImage && !imageUrl;
     groups.set(key, existing);
   }
 

@@ -605,10 +605,13 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         )}
       </section>
 
-      <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-semibold text-slate-950">Picklist SKU summary rows</h2>
-        </div>
+      <details className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">
+          Picklist SKU summary rows
+          <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+            {filteredSummaryRows.length}
+          </span>
+        </summary>
         {filteredSummaryRows.length === 0 ? (
           <div className="px-4 py-8">
             <EmptyState title="No picklist summary rows match" description="Picklist SKU totals appear separately because they do not contain AWB values." />
@@ -659,7 +662,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             </table>
           </div>
         )}
-      </section>
+      </details>
 
       {batch.issues.length > 0 ? (
         <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">

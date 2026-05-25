@@ -77,8 +77,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
         </div>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
-        <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="grid gap-5 pb-28 lg:grid-cols-[0.75fr_1.25fr] lg:pb-0">
+        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
           <ProductImage
             src={imageUrl}
             alt={`${mapping?.productName ?? order.productDescription ?? "Product"} ${order.sku}`}
@@ -87,8 +87,17 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             showDebug={user.role === "OWNER"}
             imageHealth={mapping?.imageHealth}
           />
-          <h2 className="mt-4 text-xl font-bold text-slate-950">{mapping?.productName ?? order.productDescription ?? order.sku}</h2>
-          <p className="mt-2 text-sm text-slate-600">{order.productDescription ?? "No product description extracted yet."}</p>
+          <div className="p-4">
+            <p className="line-clamp-2 text-base font-semibold text-slate-700">
+              {mapping?.productName ?? order.productDescription ?? "Product details not mapped"}
+            </p>
+            <h2 className="mt-3 break-words text-3xl font-black text-slate-950 sm:text-2xl">{order.sku}</h2>
+            <div className="mt-4 rounded-md bg-slate-950 p-4 text-white">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Quantity to pack</p>
+              <p className="mt-1 text-6xl font-black leading-none text-white">{order.qty}</p>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{order.productDescription ?? "No product description extracted yet."}</p>
+          </div>
         </div>
 
         <div className="space-y-5">
@@ -145,7 +154,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
 
           <div className="grid gap-5 md:grid-cols-2">
             {canPack ? (
-              <form action={confirmPackedAction} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <form action={confirmPackedAction} className="hidden rounded-md border border-slate-200 bg-white p-4 shadow-sm md:block">
                 <input type="hidden" name="orderId" value={order.id} />
                 <h3 className="font-semibold text-slate-950">Confirm packed</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -184,32 +193,34 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             )}
 
             {canReportProblem ? (
-              <form action={reportProblemFromScanAction} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-                <input type="hidden" name="orderId" value={order.id} />
-                <h3 className="font-semibold text-slate-950">Mark problem</h3>
-                <label className="mt-3 block">
-                  <span className="text-sm font-medium text-slate-700">Reason</span>
-                  <input
-                    name="reason"
-                    required
-                    placeholder="Missing item, color mismatch..."
-                    className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
-                  />
-                </label>
-                <label className="mt-3 block">
-                  <span className="text-sm font-medium text-slate-700">Details</span>
-                  <textarea
-                    name="details"
-                    rows={3}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
-                  />
-                </label>
-                <div className="mt-4">
-                  <SubmitButton pendingText="Saving..." variant="secondary">
-                    Save problem
-                  </SubmitButton>
-                </div>
-              </form>
+              <details className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                <summary className="cursor-pointer text-base font-semibold text-slate-950">Mark problem</summary>
+                <form action={reportProblemFromScanAction} className="mt-4">
+                  <input type="hidden" name="orderId" value={order.id} />
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-700">Reason</span>
+                    <input
+                      name="reason"
+                      required
+                      placeholder="Missing item, color mismatch..."
+                      className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+                    />
+                  </label>
+                  <label className="mt-3 block">
+                    <span className="text-sm font-medium text-slate-700">Details</span>
+                    <textarea
+                      name="details"
+                      rows={3}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+                    />
+                  </label>
+                  <div className="mt-4">
+                    <SubmitButton pendingText="Saving..." variant="secondary">
+                      Save problem
+                    </SubmitButton>
+                  </div>
+                </form>
+              </details>
             ) : order.packStatus === "PACKED" ? (
               <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h3 className="font-semibold text-slate-950">Problem reporting closed</h3>
@@ -227,10 +238,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             )}
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <h3 className="font-semibold text-slate-950">Recent scan log</h3>
-            </div>
+          <details className="rounded-md border border-slate-200 bg-white shadow-sm">
+            <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">Recent scan log</summary>
             <div className="divide-y divide-slate-100">
               {order.scanLogs.map((log) => (
                 <div key={log.id} className="px-4 py-3 text-sm">
@@ -244,14 +253,32 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
                 <div className="px-4 py-5 text-sm text-slate-500">No scans logged yet.</div>
               ) : null}
             </div>
-          </div>
+          </details>
         </div>
       </section>
 
-      <div className="mt-5">
+      <div className="mt-5 hidden lg:block">
         <Link href="/packing" className="rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
           Scan next AWB
         </Link>
+      </div>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-6xl gap-2">
+          {canPack ? (
+            <form action={confirmPackedAction} className="flex-1">
+              <input type="hidden" name="orderId" value={order.id} />
+              <SubmitButton pendingText="Confirming..." className="w-full">
+                Confirm packed
+              </SubmitButton>
+            </form>
+          ) : null}
+          <Link
+            href="/packing"
+            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm"
+          >
+            Scan next
+          </Link>
+        </div>
       </div>
     </AppShell>
   );

@@ -444,6 +444,11 @@ assert.equal(
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 const buildScript = readFileSync(join(repoRoot, "scripts", "build.mjs"), "utf8");
 const pdfExtractor = readFileSync(join(repoRoot, "lib", "pdf", "extract-pages.ts"), "utf8");
+const pickerPage = readFileSync(join(repoRoot, "app", "picker", "page.tsx"), "utf8");
+const pickerDetailPage = readFileSync(join(repoRoot, "app", "picker", "[sku]", "page.tsx"), "utf8");
+const packingPage = readFileSync(join(repoRoot, "app", "packing", "page.tsx"), "utf8");
+const packingResultPage = readFileSync(join(repoRoot, "app", "packing", "[awb]", "page.tsx"), "utf8");
+const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
 const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.prisma"), "utf8");
 const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
@@ -460,6 +465,13 @@ assert.equal(buildScript.indexOf('import "dotenv/config";') < buildScript.indexO
 assert.equal(pdfExtractor.includes(".next/server/chunks/pdf.worker.mjs"), false, "PDF extraction does not reference Next server worker chunks");
 assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF extraction preloads the PDF.js worker module explicitly");
 assert.match(pdfExtractor, /PDF text extraction failed before pages could be read\./, "PDF extraction reports startup failures before page reads");
+assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");
+assert.match(pickerPage, /sticky top-\[88px\]/, "Picker filters stay reachable on mobile");
+assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
+assert.match(packingPage, /<AwbBarcodeScanner[\s\S]*Selected account/, "Packing page places the scanner before lower-priority dashboard details");
+assert.match(packingResultPage, /Quantity to pack/, "Packing result makes quantity prominent on mobile");
+assert.match(packingResultPage, /fixed inset-x-0 bottom-0/, "Packing result has mobile sticky confirm actions");
+assert.match(reviewPage, /<details[\s\S]*Picklist SKU summary rows/, "Upload review makes picklist summary rows collapsible");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(gitignore, /\*\.pdf/, "Git ignores real PDF files");

@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getSkuGroups } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
+import { markSkuGroupPickedAction } from "./[sku]/actions";
 
 type PickerSkuGroupsPageProps = {
   searchParams?: Promise<{
@@ -14,6 +15,7 @@ type PickerSkuGroupsPageProps = {
     filter?: string;
     picked?: string;
     problem?: string;
+    large?: string;
   }>;
 };
 
@@ -33,6 +35,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
   const account = await requireAccount(user);
   const params = await searchParams;
   const activeFilter = params?.filter ?? "pending";
+  const largeImageMode = params?.large === "1";
   const groups = await getSkuGroups(account.id, { query: params?.q, filter: activeFilter });
 
   return (
@@ -40,7 +43,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
       <PageHeader
         eyebrow="Picker"
         title="SKU grouped pick list"
-        description="Pick by product image and SKU. Groups are separated by color and size so counts stay clear."
+        description="Pick by product image, SKU, color, size, and quantity."
       />
 
       {params?.picked ? (
@@ -55,7 +58,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
         </div>
       ) : null}
 
-      <form className="mb-5 grid gap-3 rounded-md border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_auto]">
+      <form className="sticky top-[88px] z-20 mb-4 grid gap-3 rounded-md border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur md:top-[106px] md:grid-cols-[1fr_auto] md:p-4">
         <label className="block">
           <span className="text-sm font-medium text-slate-700">Search SKU or product</span>
           <input
@@ -83,7 +86,11 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
               {filter.label}
             </label>
           ))}
-          <button className="min-h-12 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm">
+          <label className="inline-flex min-h-12 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+            <input type="checkbox" name="large" value="1" defaultChecked={largeImageMode} className="accent-pink-700" />
+            Large images
+          </label>
+          <button className="min-h-12 rounded-md bg-slate-950 px-5 py-2 text-sm font-semibold text-white shadow-sm">
             Apply
           </button>
         </div>
@@ -100,60 +107,89 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
           action={user.role === "OWNER" ? { href: "/owner/uploads/new", label: "Upload labels" } : undefined}
         />
       ) : (
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {groups.map((group) => (
-            <Link
-              key={`${group.sku}-${group.color ?? "none"}-${group.size ?? "none"}`}
-              href={pickerDetailHref(group.sku, group.color, group.size)}
-              className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-berry hover:shadow-soft"
-            >
-              <ProductImage
-                src={group.imageUrl}
-                alt={group.productName ?? group.sku}
-                size="lg"
-                mappingId={group.mapping?.id}
-                showDebug={user.role === "OWNER"}
-                imageHealth={group.mapping?.imageHealth}
-              />
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <StatusBadge value={group.status} />
-                {group.missingImage ? <StatusBadge value="MISSING_IMAGE" /> : null}
-                {group.mapping?.imageHealth === "BROKEN" ? (
-                  <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                    {user.role === "OWNER" ? "Broken image URL" : "Image issue"}
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-3">
-                <p className="text-sm font-medium text-slate-500">SKU</p>
-                <h2 className="break-words text-xl font-bold text-slate-950">{group.sku}</h2>
-                <p className="mt-1 text-sm text-slate-600">{group.productName ?? "Product name not mapped"}</p>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-                <div className="rounded-md bg-slate-50 px-2 py-3">
-                  <p className="text-xs font-medium text-slate-500">Color</p>
-                  <p className="mt-1 truncate font-semibold text-slate-950">{group.color ?? group.mapping?.color ?? "Unknown"}</p>
+        <section className={`grid gap-4 ${largeImageMode ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}`}>
+          {groups.map((group) => {
+            const detailHref = pickerDetailHref(group.sku, group.color, group.size);
+            const encodedColor = encodePickerDimension(group.color);
+            const encodedSize = encodePickerDimension(group.size);
+
+            return (
+              <article
+                key={`${group.sku}-${group.color ?? "none"}-${group.size ?? "none"}`}
+                className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm"
+              >
+                <ProductImage
+                  src={group.imageUrl}
+                  alt={group.productName ?? group.sku}
+                  size="lg"
+                  mappingId={group.mapping?.id}
+                  showDebug={user.role === "OWNER"}
+                  imageHealth={group.mapping?.imageHealth}
+                />
+                <div className="space-y-4 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge value={group.status} />
+                    {group.missingImage ? <StatusBadge value="MISSING_IMAGE" /> : null}
+                    {group.mapping?.imageHealth === "BROKEN" ? (
+                      <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                        {user.role === "OWNER" ? "Broken image URL" : "Image issue"}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <h2 className="break-words text-2xl font-black leading-tight text-slate-950">{group.sku}</h2>
+                    <p className="mt-1 line-clamp-2 min-h-10 text-base leading-5 text-slate-600">
+                      {group.productName ?? "Product name not mapped"}
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-slate-800">
+                      {[group.color ?? group.mapping?.color, group.size].filter(Boolean).join(" / ") || "Color or size unknown"}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-[1.1fr_1fr] gap-3">
+                    <div className="rounded-md bg-slate-950 p-4 text-white">
+                      <p className="text-sm font-semibold text-slate-300">Total qty</p>
+                      <p className="mt-1 text-5xl font-black leading-none">{group.totalQuantity}</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <div className="rounded-md bg-slate-50 px-3 py-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending</p>
+                        <p className="text-xl font-black text-slate-950">{group.pendingCount}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Picked</p>
+                          <p className="text-lg font-black text-slate-950">{group.pickedCount}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Problem</p>
+                          <p className="text-lg font-black text-slate-950">{group.problemCount}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <Link href={detailHref} className="inline-flex min-h-12 items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">
+                      Open
+                    </Link>
+                    <form action={markSkuGroupPickedAction}>
+                      <input type="hidden" name="sku" value={group.sku} />
+                      <input type="hidden" name="color" value={encodedColor} />
+                      <input type="hidden" name="size" value={encodedSize} />
+                      <button type="submit" className="min-h-12 w-full rounded-md bg-berry px-3 py-2 text-sm font-bold text-white">
+                        Picked
+                      </button>
+                    </form>
+                    <Link href={`${detailHref}#problem-actions`} className="inline-flex min-h-12 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+                      Problem
+                    </Link>
+                  </div>
                 </div>
-                <div className="rounded-md bg-slate-50 px-2 py-3">
-                  <p className="text-xs font-medium text-slate-500">Size</p>
-                  <p className="mt-1 truncate font-semibold text-slate-950">{group.size ?? "Unknown"}</p>
-                </div>
-                <div className="rounded-md bg-pink-50 px-2 py-3">
-                  <p className="text-xs font-medium text-pink-700">Qty</p>
-                  <p className="mt-1 text-2xl font-bold text-berry">{group.totalQuantity}</p>
-                </div>
-                <div className="rounded-md bg-teal-50 px-2 py-3">
-                  <p className="text-xs font-medium text-teal-700">Orders</p>
-                  <p className="mt-1 text-2xl font-bold text-mint">{group.orderCount}</p>
-                </div>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="rounded-md bg-slate-50 py-2 text-slate-600">Pending {group.pendingCount}</div>
-                <div className="rounded-md bg-slate-50 py-2 text-slate-600">Picked {group.pickedCount}</div>
-                <div className="rounded-md bg-slate-50 py-2 text-slate-600">Problem {group.problemCount}</div>
-              </div>
-            </Link>
-          ))}
+              </article>
+            );
+          })}
         </section>
       )}
     </AppShell>

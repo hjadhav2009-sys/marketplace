@@ -50,7 +50,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
       <PageHeader
         eyebrow="Picker"
         title={sku}
-        description="Verify the product image and gather every order in this SKU, color, and size group."
+        description="Verify the product, quantity, color, and size before marking the group picked."
       >
         <div className="flex flex-wrap gap-2">
           <StatusBadge value={groupStatus} />
@@ -85,9 +85,9 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
         </div>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+      <section className="grid gap-5 pb-24 lg:grid-cols-[0.8fr_1.2fr] lg:pb-0">
         <div className="space-y-5">
-          <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <ProductImage
               src={imageUrl}
               alt={detail.mapping?.productName ?? sku}
@@ -96,28 +96,39 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
               showDebug={user.role === "OWNER"}
               imageHealth={detail.mapping?.imageHealth}
             />
-            <h2 className="mt-4 text-xl font-bold text-slate-950">{detail.mapping?.productName ?? "Product not mapped"}</h2>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-md bg-slate-50 p-3">
-                <dt className="font-medium text-slate-500">Total quantity</dt>
-                <dd className="mt-1 text-3xl font-bold text-berry">{detail.totalQuantity}</dd>
+            <div className="p-4">
+              <h2 className="break-words text-3xl font-black leading-tight text-slate-950">{sku}</h2>
+              <p className="mt-2 text-base leading-6 text-slate-600">{detail.mapping?.productName ?? "Product not mapped"}</p>
+              <dl className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-md bg-slate-950 p-4 text-white">
+                  <dt className="text-sm font-semibold text-slate-300">Total quantity</dt>
+                  <dd className="mt-1 text-5xl font-black leading-none">{detail.totalQuantity}</dd>
+                </div>
+                <div className="rounded-md bg-slate-50 p-4">
+                  <dt className="text-sm font-semibold text-slate-500">Orders</dt>
+                  <dd className="mt-1 text-4xl font-black text-slate-950">{detail.orders.length}</dd>
+                </div>
+                <div className="rounded-md bg-slate-50 p-3">
+                  <dt className="text-sm font-semibold text-slate-500">Color</dt>
+                  <dd className="mt-1 text-lg font-bold text-slate-950">{groupColor ?? "Unknown"}</dd>
+                </div>
+                <div className="rounded-md bg-slate-50 p-3">
+                  <dt className="text-sm font-semibold text-slate-500">Size</dt>
+                  <dd className="mt-1 text-lg font-bold text-slate-950">{groupSize ?? "Unknown"}</dd>
+                </div>
+              </dl>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {courierEntries.map(([courier, count]) => (
+                  <span key={courier} className="rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">
+                    {courier}: {count}
+                  </span>
+                ))}
               </div>
-              <div className="rounded-md bg-slate-50 p-3">
-                <dt className="font-medium text-slate-500">Orders</dt>
-                <dd className="mt-1 text-3xl font-bold text-mint">{detail.orders.length}</dd>
-              </div>
-              <div className="rounded-md bg-slate-50 p-3">
-                <dt className="font-medium text-slate-500">Color</dt>
-                <dd className="mt-1 font-semibold text-slate-950">{groupColor ?? "Unknown"}</dd>
-              </div>
-              <div className="rounded-md bg-slate-50 p-3">
-                <dt className="font-medium text-slate-500">Size</dt>
-                <dd className="mt-1 font-semibold text-slate-950">{groupSize ?? "Unknown"}</dd>
-              </div>
-            </dl>
+            </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div id="problem-actions" className="-mt-24 pt-24" />
+          <div className="hidden rounded-md border border-slate-200 bg-white p-4 shadow-sm lg:block">
             <h2 className="font-semibold text-slate-950">Pick actions</h2>
             <form action={markSkuGroupPickedAction} className="mt-4">
               <input type="hidden" name="sku" value={sku} />
@@ -158,7 +169,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
         </div>
 
         <div className="space-y-5">
-          <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="hidden rounded-md border border-slate-200 bg-white p-4 shadow-sm lg:block">
             <h2 className="font-semibold text-slate-950">Courier split</h2>
             {courierEntries.length === 0 ? (
               <p className="mt-3 text-sm text-slate-500">No courier split yet.</p>
@@ -191,11 +202,11 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
                 {detail.orders.map((order) => (
                   <div key={order.id} className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center">
                     <div>
-                      <p className="font-semibold text-slate-950">AWB {order.awb}</p>
-                      <p className="text-sm text-slate-600">
-                        Qty {order.qty} - {order.color ?? "Color unknown"} - {order.size ?? "Size unknown"} - {order.courier ?? "Courier pending"}
+                      <p className="break-all text-lg font-black text-slate-950">AWB {order.awb}</p>
+                      <p className="mt-1 text-base font-semibold text-slate-700">
+                        Qty {order.qty} / {order.color ?? "Color unknown"} / {order.size ?? "Size unknown"}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">Order {order.orderNo}</p>
+                      <p className="mt-1 text-sm text-slate-500">{order.courier ?? "Courier pending"} / Order {order.orderNo}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <StatusBadge value={order.pickStatus} />
@@ -210,8 +221,47 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
               </div>
             )}
           </div>
+
+          <details className="rounded-md border border-slate-200 bg-white p-4 shadow-sm lg:hidden">
+            <summary className="cursor-pointer text-base font-bold text-slate-950">Mark group problem</summary>
+            <form action={markSkuGroupProblemAction} className="mt-4">
+              <input type="hidden" name="sku" value={sku} />
+              <input type="hidden" name="color" value={hiddenColor} />
+              <input type="hidden" name="size" value={hiddenSize} />
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700">Reason</span>
+                <input
+                  name="reason"
+                  required
+                  placeholder="Stock missing, wrong color..."
+                  className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+                />
+              </label>
+              <div className="mt-4">
+                <SubmitButton pendingText="Saving..." variant="secondary">
+                  Save pick problem
+                </SubmitButton>
+              </div>
+            </form>
+          </details>
         </div>
       </section>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-7xl grid-cols-[1fr_1fr] gap-2">
+          <form action={markSkuGroupPickedAction}>
+            <input type="hidden" name="sku" value={sku} />
+            <input type="hidden" name="color" value={hiddenColor} />
+            <input type="hidden" name="size" value={hiddenSize} />
+            <button type="submit" className="min-h-14 w-full rounded-md bg-berry px-4 py-3 text-base font-black text-white shadow-sm">
+              Mark all picked
+            </button>
+          </form>
+          <Link href="/picker?filter=pending" className="inline-flex min-h-14 items-center justify-center rounded-md bg-slate-950 px-4 py-3 text-base font-black text-white shadow-sm">
+            Back to picker
+          </Link>
+        </div>
+      </div>
     </AppShell>
   );
 }

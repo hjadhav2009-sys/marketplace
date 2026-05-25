@@ -28,10 +28,12 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
       <PageHeader
         eyebrow="Packer"
         title="Scan or search AWB"
-        description="Scan the shipping label barcode or type the AWB. Manual entry stays available on every device."
+        description="Scan the shipping label barcode or type the AWB."
       />
 
-      <section className="mb-5 grid gap-3 sm:grid-cols-3">
+      <AwbBarcodeScanner action={searchAwbAction} defaultAwb={params?.q} />
+
+      <section className="mt-5 grid gap-3 sm:grid-cols-3">
         <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected account</p>
           <p className="mt-1 text-lg font-bold text-slate-950">{account.name}</p>
@@ -76,19 +78,17 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
         </div>
       ) : null}
 
-      <AwbBarcodeScanner action={searchAwbAction} defaultAwb={params?.q} />
-
-      <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-semibold text-slate-950">Recent scans</h2>
-        </div>
+      <details className="mt-5 rounded-md border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">
+          Recent scans
+        </summary>
         <div className="divide-y divide-slate-100">
           {dashboard.recentScans.map((scan) => (
             <div key={scan.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
               <div>
-                <p className="font-semibold text-slate-950">AWB {scan.awb}</p>
+                <p className="break-all text-base font-bold text-slate-950">AWB {scan.awb}</p>
                 <p className="text-slate-500">
-                  {scan.scannedBy?.name ?? "Unknown"} - {formatDateTime(scan.createdAt)}
+                  {scan.scannedBy?.name ?? "Unknown"} / {formatDateTime(scan.createdAt)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
             <div className="px-4 py-6 text-center text-sm text-slate-500">No recent scans yet.</div>
           ) : null}
         </div>
-      </section>
+      </details>
     </AppShell>
   );
 }

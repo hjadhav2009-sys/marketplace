@@ -17,7 +17,7 @@ type ProductImageProps = {
 const sizeClass = {
   sm: "h-16 w-16",
   md: "h-28 w-28",
-  lg: "h-40 w-full sm:h-52"
+  lg: "aspect-square w-full"
 };
 
 function initialState(src: string | null | undefined, imageHealth: string | null | undefined) {

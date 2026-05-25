@@ -199,12 +199,12 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-      <section className="rounded-md border border-slate-200 bg-slate-950 p-4 text-white shadow-sm">
-        <div className="flex items-center justify-between gap-3">
+    <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+      <section className="rounded-md border border-slate-200 bg-slate-950 p-4 text-white shadow-sm sm:p-5">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold">Camera scanner</h2>
-            <p className="mt-1 text-sm text-slate-300">Point the frame at the AWB barcode on the shipping label.</p>
+            <h2 className="text-xl font-bold sm:text-lg">Camera scanner</h2>
+            <p className="mt-1 text-base leading-6 text-slate-300 sm:text-sm">Point the frame at the AWB barcode on the shipping label.</p>
           </div>
           <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
             {cameraState === "scanning" ? "Scanning" : cameraState === "starting" ? "Starting" : "Ready"}
@@ -238,31 +238,31 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
           </p>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={startScanner}
             disabled={cameraState === "starting" || cameraState === "scanning"}
-            className="min-h-12 rounded-md bg-white px-5 py-2 text-sm font-bold text-slate-950 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-14 rounded-md bg-white px-5 py-3 text-base font-bold text-slate-950 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-12 sm:text-sm"
           >
             Start camera
           </button>
           <button
             type="button"
             onClick={stopScanner}
-            className="min-h-12 rounded-md border border-slate-600 px-5 py-2 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+            className="min-h-14 rounded-md border border-slate-600 px-5 py-3 text-base font-semibold text-slate-100 transition hover:bg-slate-800 sm:min-h-12 sm:text-sm"
           >
             Stop
           </button>
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-950">Manual AWB entry</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Manual search is always available if camera scanning fails.</p>
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-xl font-bold text-slate-950 sm:text-lg sm:font-semibold">Manual AWB entry</h2>
+        <p className="mt-1 text-base leading-6 text-slate-600 sm:text-sm">Manual search is always available if camera scanning fails.</p>
         <form action={action} className="mt-5 space-y-4">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">AWB</span>
+            <span className="text-base font-semibold text-slate-700 sm:text-sm sm:font-medium">AWB</span>
             <input
               name="awb"
               inputMode="text"
@@ -270,48 +270,49 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
               value={manualAwb}
               onChange={(event) => setManualAwb(event.target.value)}
               placeholder="1490834915493571"
-              className="mt-1 min-h-14 w-full rounded-md border border-slate-300 px-3 py-2 text-xl font-semibold uppercase outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              className="mt-2 min-h-16 w-full rounded-md border border-slate-300 px-4 py-3 text-2xl font-black uppercase outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100 sm:min-h-14 sm:text-xl"
               required
             />
           </label>
           <div className="min-h-20">
             {normalizeAwb(manualAwb).length > 0 && normalizeAwb(manualAwb).length < 5 ? (
-              <p className="text-sm text-slate-500">Type at least last 5 AWB characters for live suggestions.</p>
+              <p className="text-base text-slate-500 sm:text-sm">Type at least last 5 AWB characters for live suggestions.</p>
             ) : null}
             {suggestionState === "loading" ? (
-              <p className="text-sm font-medium text-slate-500">Searching...</p>
+              <p className="text-base font-medium text-slate-500 sm:text-sm">Searching...</p>
             ) : null}
             {suggestionState === "error" ? (
-              <p className="text-sm font-medium text-rose-700">Live suggestions failed. Manual submit still works.</p>
+              <p className="text-base font-medium text-rose-700 sm:text-sm">Live suggestions failed. Manual submit still works.</p>
             ) : null}
             {suggestionState === "ready" && suggestions.length === 0 ? (
-              <p className="text-sm font-medium text-amber-800">No matching AWB found for this account.</p>
+              <p className="text-base font-medium text-amber-800 sm:text-sm">No matching AWB found for this account.</p>
             ) : null}
             {suggestions.length > 0 ? (
               <div className="space-y-2">
                 {suggestions.length === 1 ? (
-                  <p className="text-sm font-medium text-teal-700">One match found. Open it or submit the search.</p>
+                  <p className="text-base font-medium text-teal-700 sm:text-sm">One match found. Open it or submit the search.</p>
                 ) : (
-                  <p className="text-sm font-medium text-slate-600">{suggestions.length} matches found. Choose the correct AWB.</p>
+                  <p className="text-base font-medium text-slate-600 sm:text-sm">{suggestions.length} matches found. Choose the correct AWB.</p>
                 )}
-                <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">
+                <div className="max-h-[28rem] space-y-2 overflow-y-auto">
                   {suggestions.map((suggestion) => (
                     <a
                       key={suggestion.awb}
                       href={`/packing/${encodeURIComponent(suggestion.awb)}`}
-                      className="grid grid-cols-[auto_1fr_auto] gap-3 p-3 transition hover:bg-slate-50"
+                      className="grid grid-cols-[4rem_1fr] gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm transition hover:border-berry hover:bg-slate-50 sm:grid-cols-[auto_1fr_auto]"
                     >
                       <ProductImage src={suggestion.imageUrl} alt={`${suggestion.sku} ${suggestion.awb}`} size="sm" showBadge={false} />
                       <span className="min-w-0">
-                        <span className="block break-all text-sm font-bold text-slate-950">{suggestion.awb}</span>
-                        <span className="mt-1 block text-sm text-slate-600">
-                          {suggestion.sku} / {suggestion.color ?? "Color unknown"} / Qty {suggestion.qty}
+                        <span className="block break-all text-lg font-black text-slate-950 sm:text-sm sm:font-bold">{suggestion.awb}</span>
+                        <span className="mt-1 block text-base font-semibold text-slate-800 sm:text-sm sm:font-normal sm:text-slate-600">
+                          {suggestion.sku}
                         </span>
-                        <span className="mt-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
-                          {suggestion.courier ?? "Courier pending"} / {suggestion.packStatus}
+                        <span className="mt-1 block text-sm font-medium text-slate-600">
+                          Qty {suggestion.qty} / {suggestion.color ?? "Color unknown"} / {suggestion.courier ?? "Courier pending"}
                         </span>
+                        <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{suggestion.packStatus}</span>
                       </span>
-                      <span className="self-center rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                      <span className="col-span-2 justify-self-start rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 sm:col-span-1 sm:self-center sm:justify-self-auto">
                         {suggestion.matchType}
                       </span>
                     </a>
@@ -320,7 +321,9 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
               </div>
             ) : null}
           </div>
-          <SubmitButton pendingText="Searching...">Find order</SubmitButton>
+          <SubmitButton pendingText="Searching..." className="w-full">
+            Find order
+          </SubmitButton>
         </form>
       </section>
 

@@ -300,6 +300,9 @@ must type `DELETE IMAGE CACHE` before deleting image cache files.
   and that the worker is using the latest password.
 - Login works on desktop but fails on mobile local IP: set `SESSION_COOKIE_SECURE=false` for local HTTP. Use
   `SESSION_COOKIE_SECURE=true` only for HTTPS, such as Cloudflare Tunnel.
+- PDF upload shows `PDF upload tools could not load` and the terminal says `Body exceeded 1 MB limit`: increase the
+  Next.js Server Action body size limit in `next.config.ts`. This app sets `serverActions.bodySizeLimit` to `100mb` for
+  local Meesho label/manifest imports.
 - Images slow on picker: prepare the local image cache after PDF import. Worker cards use cached local images only; compact mode stays available for fastest text-only work.
 - Meesho image URLs are external and can be slow, expired, or blocked. Export broken mapping CSV from **Owner -> SKU Images**, refresh URLs from Meesho, import the updated sheet, then re-cache.
 - HTTPS domain not active: confirm Cloudflare Tunnel is running and the DNS route points to

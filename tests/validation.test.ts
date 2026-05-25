@@ -397,6 +397,7 @@ assert.equal(
 
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 const buildScript = readFileSync(join(repoRoot, "scripts", "build.mjs"), "utf8");
+const pdfExtractor = readFileSync(join(repoRoot, "lib", "pdf", "extract-pages.ts"), "utf8");
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
 const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.prisma"), "utf8");
 const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
@@ -410,6 +411,9 @@ assert.match(readme, /Do not commit real Meesho PDFs/, "README warns against com
 assert.match(readme, /Vercel is [\s\S]*not recommended here for heavy PDF parsing/, "README marks Vercel as not recommended for heavy PDF parsing");
 assert.match(readme, /SQLite requires a `file:` URL/, "README documents the Prisma provider mismatch rebuild fix");
 assert.equal(buildScript.indexOf('import "dotenv/config";') < buildScript.indexOf("process.env.DATABASE_URL"), true, "Build loads .env before choosing Prisma schema");
+assert.equal(pdfExtractor.includes(".next/server/chunks/pdf.worker.mjs"), false, "PDF extraction does not reference Next server worker chunks");
+assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF extraction preloads the PDF.js worker module explicitly");
+assert.match(pdfExtractor, /PDF text extraction failed before pages could be read\./, "PDF extraction reports startup failures before page reads");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(gitignore, /\*\.pdf/, "Git ignores real PDF files");

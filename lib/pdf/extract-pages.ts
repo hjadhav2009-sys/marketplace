@@ -3,6 +3,8 @@ export type PdfTextPage = {
   text: string;
 };
 
+const PDF_EXTRACTION_STARTUP_ERROR = "PDF text extraction failed before pages could be read.";
+
 type PdfTextItem = {
   str?: string;
 };
@@ -37,6 +39,14 @@ type PdfParseModule = {
   PDFParse?: PdfParseClass;
 };
 
+type PdfJsWorkerModule = {
+  WorkerMessageHandler?: unknown;
+};
+
+type PdfJsWorkerGlobal = typeof globalThis & {
+  pdfjsWorker?: PdfJsWorkerModule;
+};
+
 type PdfParseFunction = (
   buffer: Buffer,
   options?: {
@@ -44,9 +54,40 @@ type PdfParseFunction = (
   }
 ) => Promise<PdfParseResult>;
 
+async function ensurePdfJsFakeWorkerLoaded() {
+  const workerGlobal = globalThis as PdfJsWorkerGlobal;
+
+  if (workerGlobal.pdfjsWorker?.WorkerMessageHandler) {
+    return;
+  }
+
+  const worker = (await import("pdfjs-dist/legacy/build/pdf.worker.mjs")) as PdfJsWorkerModule;
+
+  if (!worker.WorkerMessageHandler) {
+    throw new Error("PDF worker failed to load.");
+  }
+
+  workerGlobal.pdfjsWorker = worker;
+}
+
+function toStartupExtractionError(error: unknown) {
+  const extractionError = new Error(PDF_EXTRACTION_STARTUP_ERROR);
+  if (error instanceof Error) {
+    extractionError.stack = `${extractionError.stack}\nCaused by: ${error.stack ?? error.message}`;
+  }
+  return extractionError;
+}
+
 export async function extractPdfPages(buffer: Buffer): Promise<PdfTextPage[]> {
   const pages: PdfTextPage[] = [];
-  const pdfParseModule = (await import("pdf-parse")) as PdfParseModule | PdfParseFunction;
+  let pdfParseModule: PdfParseModule | PdfParseFunction;
+
+  try {
+    await ensurePdfJsFakeWorkerLoaded();
+    pdfParseModule = (await import("pdf-parse")) as PdfParseModule | PdfParseFunction;
+  } catch (error) {
+    throw toStartupExtractionError(error);
+  }
 
   if (typeof pdfParseModule !== "function" && pdfParseModule.PDFParse) {
     const parser = new pdfParseModule.PDFParse({ data: buffer });
@@ -73,6 +114,8 @@ export async function extractPdfPages(buffer: Buffer): Promise<PdfTextPage[]> {
       }
 
       return [];
+    } catch (error) {
+      throw toStartupExtractionError(error);
     } finally {
       await parser.destroy();
     }
@@ -85,18 +128,28 @@ export async function extractPdfPages(buffer: Buffer): Promise<PdfTextPage[]> {
   }
 
   let pageNumber = 0;
-  const result = await parse(buffer, {
-    pagerender: async (pageData) => {
-      pageNumber += 1;
-      const content = await pageData.getTextContent({
-        normalizeWhitespace: false,
-        disableCombineTextItems: false
-      });
-      const text = content.items.map((item) => item.str ?? "").join("\n");
-      pages.push({ pageNumber, text });
-      return text;
+  let result: PdfParseResult;
+
+  try {
+    result = await parse(buffer, {
+      pagerender: async (pageData) => {
+        pageNumber += 1;
+        const content = await pageData.getTextContent({
+          normalizeWhitespace: false,
+          disableCombineTextItems: false
+        });
+        const text = content.items.map((item) => item.str ?? "").join("\n");
+        pages.push({ pageNumber, text });
+        return text;
+      }
+    });
+  } catch (error) {
+    if (pages.length === 0) {
+      throw toStartupExtractionError(error);
     }
-  });
+
+    throw error;
+  }
 
   if (pages.length === 0 && result.text) {
     return [{ pageNumber: 1, text: result.text }];

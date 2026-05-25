@@ -107,10 +107,22 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
               href={pickerDetailHref(group.sku, group.color, group.size)}
               className="rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-berry hover:shadow-soft"
             >
-              <ProductImage src={group.imageUrl} alt={group.productName ?? group.sku} size="lg" mappingId={group.mapping?.id} showDebug={user.role === "OWNER"} />
+              <ProductImage
+                src={group.imageUrl}
+                alt={group.productName ?? group.sku}
+                size="lg"
+                mappingId={group.mapping?.id}
+                showDebug={user.role === "OWNER"}
+                imageHealth={group.mapping?.imageHealth}
+              />
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <StatusBadge value={group.status} />
                 {group.missingImage ? <StatusBadge value="MISSING_IMAGE" /> : null}
+                {group.mapping?.imageHealth === "BROKEN" ? (
+                  <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                    {user.role === "OWNER" ? "Broken image URL" : "Image issue"}
+                  </span>
+                ) : null}
               </div>
               <div className="mt-3">
                 <p className="text-sm font-medium text-slate-500">SKU</p>

@@ -2,6 +2,7 @@ import type { Account } from "@prisma/client";
 import { findAwbSearchMatches } from "./operations/awb-search";
 import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups } from "./operations/picking";
 import { prisma } from "./prisma";
+import { normalizeSkuMappingImageFilter } from "./product-image";
 import { normalizeSkuForMatching } from "./sku";
 
 export async function getDashboardStats(accountId: string) {
@@ -55,11 +56,15 @@ export async function getSkuMappings(accountId: string) {
   });
 }
 
-export async function searchSkuMappings(accountId: string, query?: string, active?: string) {
+export async function searchSkuMappings(accountId: string, query?: string, active?: string, image?: string) {
+  const imageFilter = normalizeSkuMappingImageFilter(image);
+
   return prisma.skuImageMapping.findMany({
     where: {
       accountId,
       active: active === "inactive" ? false : active === "all" ? undefined : true,
+      imageHealth: imageFilter === "mapped" ? "MAPPED" : imageFilter === "broken" ? "BROKEN" : undefined,
+      imageUrl: imageFilter === "missing" ? "" : undefined,
       OR: query
         ? [
             { sku: { contains: query } },
@@ -256,26 +261,26 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
     query,
     limit
   });
-  const skusMissingImages = Array.from(new Set(matches.filter((order) => !order.imageUrl).map((order) => order.sku)));
+  const matchSkus = Array.from(new Set(matches.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
   const mappings =
-    skusMissingImages.length > 0
+    matchSkus.length > 0
       ? await prisma.skuImageMapping.findMany({
           where: {
             accountId,
-            sku: { in: skusMissingImages },
+            sku: { in: matchSkus },
             active: true
           },
           select: {
             sku: true,
             imageUrl: true
           }
-        })
+      })
       : [];
-  const imageBySku = new Map(mappings.map((mapping) => [mapping.sku, mapping.imageUrl]));
+  const imageBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping.imageUrl]));
 
   return matches.map((order) => ({
     ...order,
-    imageUrl: order.imageUrl ?? imageBySku.get(order.sku) ?? null
+    imageUrl: imageBySku.get(normalizeSkuForMatching(order.sku)) ?? order.imageUrl ?? null
   }));
 }
 
@@ -305,13 +310,13 @@ export async function getOrderWithImage(accountId: string, awb: string) {
     return null;
   }
 
-  const mapping = await prisma.skuImageMapping.findUnique({
+  const mapping = await prisma.skuImageMapping.findFirst({
     where: {
-      accountId_sku: {
-        accountId,
-        sku: order.sku
-      }
-    }
+      accountId,
+      active: true,
+      sku: { in: Array.from(new Set([order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))) }
+    },
+    orderBy: { updatedAt: "desc" }
   });
 
   return {

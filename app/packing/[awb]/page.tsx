@@ -37,7 +37,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   const canPack = order.packStatus === "READY";
   const canReportProblem = order.packStatus === "READY";
   const openProblem = order.problemOrders[0];
-  const imageUrl = order.imageUrl ?? mapping?.imageUrl;
+  const imageUrl = mapping?.imageUrl ?? order.imageUrl;
 
   return (
     <AppShell>
@@ -84,6 +84,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             alt={`${mapping?.productName ?? order.productDescription ?? "Product"} ${order.sku}`}
             size="lg"
             mappingId={mapping?.id}
+            showDebug={user.role === "OWNER"}
+            imageHealth={mapping?.imageHealth}
           />
           <h2 className="mt-4 text-xl font-bold text-slate-950">{mapping?.productName ?? order.productDescription ?? order.sku}</h2>
           <p className="mt-2 text-sm text-slate-600">{order.productDescription ?? "No product description extracted yet."}</p>

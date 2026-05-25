@@ -11,6 +11,7 @@ import { formatDateTime } from "@/lib/format";
 import { hasBlockingPreviewIssue, isOrderPreviewSourceType, reviewProblemIssues } from "@/lib/import/preview";
 import type { MeeshoParserDiagnostics, ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
+import { picklistSummaryProductNameLabel } from "@/lib/product-image";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { confirmParsedBatchAction } from "../../actions";
 
@@ -147,7 +148,7 @@ function imageBadge(mapping: { imageUrl: string; imageHealth: string } | undefin
   }
 
   if (mapping.imageHealth === "BROKEN") {
-    return <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">Broken URL</span>;
+    return <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">Broken image URL</span>;
   }
 
   return <span className="inline-flex rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700 ring-1 ring-teal-200">Image mapped</span>;
@@ -553,7 +554,15 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                     <tr key={row.id} className={row.imported ? "bg-teal-50/40" : undefined}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <ProductImage src={mapping?.imageUrl} alt={`${mapping?.productName ?? row.productDescription ?? row.sku ?? "Product"} ${row.sku ?? ""}`} size="sm" showBadge={false} mappingId={mapping?.id} showDebug />
+                          <ProductImage
+                            src={mapping?.imageUrl}
+                            alt={`${mapping?.productName ?? row.productDescription ?? row.sku ?? "Product"} ${row.sku ?? ""}`}
+                            size="sm"
+                            showBadge={false}
+                            mappingId={mapping?.id}
+                            showDebug
+                            imageHealth={mapping?.imageHealth}
+                          />
                           {imageBadge(mapping)}
                         </div>
                       </td>
@@ -627,9 +636,17 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                     <tr key={row.id}>
                       <td className="px-4 py-3 font-semibold text-slate-950">{row.sku ?? "Missing"}</td>
                       <td className="px-4 py-3">
-                        <ProductImage src={mapping?.imageUrl} alt={`${mapping?.productName ?? row.sku ?? "Product"} ${row.sku ?? ""}`} size="sm" showBadge={false} mappingId={mapping?.id} showDebug />
+                        <ProductImage
+                          src={mapping?.imageUrl}
+                          alt={`${mapping?.productName ?? row.sku ?? "Product"} ${row.sku ?? ""}`}
+                          size="sm"
+                          showBadge={false}
+                          mappingId={mapping?.id}
+                          showDebug
+                          imageHealth={mapping?.imageHealth}
+                        />
                       </td>
-                      <td className="px-4 py-3">{mapping?.productName ?? "Not mapped"}</td>
+                      <td className="px-4 py-3">{picklistSummaryProductNameLabel(mapping)}</td>
                       <td className="px-4 py-3">{row.color ?? mapping?.color ?? "-"}</td>
                       <td className="px-4 py-3">{row.size ?? "-"}</td>
                       <td className="px-4 py-3">{row.qty ?? "-"}</td>

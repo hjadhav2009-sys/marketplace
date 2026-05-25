@@ -88,7 +88,14 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="space-y-5">
           <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <ProductImage src={imageUrl} alt={detail.mapping?.productName ?? sku} size="lg" mappingId={detail.mapping?.id} showDebug={user.role === "OWNER"} />
+            <ProductImage
+              src={imageUrl}
+              alt={detail.mapping?.productName ?? sku}
+              size="lg"
+              mappingId={detail.mapping?.id}
+              showDebug={user.role === "OWNER"}
+              imageHealth={detail.mapping?.imageHealth}
+            />
             <h2 className="mt-4 text-xl font-bold text-slate-950">{detail.mapping?.productName ?? "Product not mapped"}</h2>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-md bg-slate-50 p-3">

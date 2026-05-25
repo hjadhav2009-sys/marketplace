@@ -15,7 +15,14 @@ import { canConfirmPacked } from "../lib/operations/packing";
 import { buildPickerSkuGroups } from "../lib/operations/picking";
 import { hashPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
-import { getInitialProductImageState, productImageStateText } from "../lib/product-image";
+import {
+  getInitialProductImageState,
+  imageHealthLabel,
+  normalizeSkuMappingImageFilter,
+  picklistSummaryProductNameLabel,
+  productImageStateText,
+  skuMappingMatchesImageFilter
+} from "../lib/product-image";
 import { cutoffDate, isCleanupConfirmationValid, RETENTION_DAYS } from "../lib/retention";
 import { canUseFirstRunSetup, validateFirstRunSetupPassword } from "../lib/setup";
 import { normalizeSkuForMatching } from "../lib/sku";
@@ -376,9 +383,18 @@ assert.equal(isAllowedLocalNetworkIp("8.8.8.8", "192.168.0.0/16"), false, "Exter
 assert.equal(isAllowedLocalNetworkIp("127.0.0.1", "192.168.0.0/16"), true, "Localhost is always allowed");
 
 assert.equal(getInitialProductImageState(null), "missing", "Product image fallback handles missing URL");
+assert.equal(getInitialProductImageState("https://example.com/image.jpg"), "loading", "Product image starts loading for valid URL");
 assert.equal(getInitialProductImageState("not-a-url"), "broken", "Product image state separates invalid URLs from missing mappings");
 assert.equal(productImageStateText("missing", false), "Missing mapping", "Product image state labels missing mapping clearly");
-assert.equal(productImageStateText("broken", true), "Loading failed", "Product image state labels failed image loads clearly");
+assert.equal(productImageStateText("loading", true, true), "Still loading image", "Product image state labels slow image loads clearly");
+assert.equal(productImageStateText("broken", true), "Image URL failed", "Product image state labels failed image loads clearly");
+assert.equal(picklistSummaryProductNameLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "MAPPED", productName: null }), "Mapped, no product name", "Picklist summary shows mapped SKU without product name");
+assert.equal(picklistSummaryProductNameLabel(null), "No mapping", "Picklist summary shows no mapping separately");
+assert.equal(imageHealthLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "BROKEN" }), "Broken image URL", "Broken image health label is clear");
+assert.equal(normalizeSkuMappingImageFilter("broken"), "broken", "SKU mapping image filter accepts broken");
+assert.equal(normalizeSkuMappingImageFilter("surprise"), "all", "SKU mapping image filter falls back to all");
+assert.equal(skuMappingMatchesImageFilter({ imageUrl: "https://example.com/image.jpg", imageHealth: "BROKEN" }, "broken"), true, "SKU mapping helper matches broken mappings");
+assert.equal(skuMappingMatchesImageFilter({ imageUrl: "", imageHealth: "UNKNOWN" }, "missing"), true, "SKU mapping helper matches missing URLs");
 assert.equal(typeof AwbBarcodeScanner, "function", "Scanner component compiles");
 
 assert.equal(formatCsvValue('A "quoted", value'), '"A ""quoted"", value"', "CSV values are safely escaped");

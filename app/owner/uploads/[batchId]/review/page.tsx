@@ -8,12 +8,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
+import { cachedProductImageUrl } from "@/lib/image-cache";
 import { hasBlockingPreviewIssue, isOrderPreviewSourceType, reviewProblemIssues } from "@/lib/import/preview";
 import type { MeeshoParserDiagnostics, ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
 import { picklistSummaryProductNameLabel } from "@/lib/product-image";
 import { normalizeSkuForMatching } from "@/lib/sku";
-import { confirmParsedBatchAction } from "../../actions";
+import { confirmParsedBatchAction, prepareBatchProductImagesAction } from "../../actions";
 
 type ReviewPageProps = {
   params: Promise<{
@@ -24,6 +25,13 @@ type ReviewPageProps = {
     issue?: string;
     problems?: string;
     imported?: string;
+    prepared?: string;
+    totalSkus?: string;
+    alreadyCached?: string;
+    newlyCached?: string;
+    failed?: string;
+    noMapping?: string;
+    noImageUrl?: string;
     error?: string;
   }>;
 };
@@ -60,6 +68,7 @@ type BatchNotes = {
     missingImageRows?: number;
     skippedRows?: number;
     errorRows?: number;
+    metadataAutoFilled?: number;
     confirmedAt?: string;
   };
 };
@@ -142,16 +151,24 @@ function issueLabel(issueType: string) {
   return issueType === "LOW_CONFIDENCE" ? "Needs review" : issueType;
 }
 
-function imageBadge(mapping: { imageUrl: string; imageHealth: string } | undefined) {
+function imageBadge(mapping: { imageUrl: string; imageHealth: string; cacheStatus?: string | null } | undefined) {
   if (!mapping) {
     return <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">Missing image</span>;
+  }
+
+  if (mapping.cacheStatus === "CACHED") {
+    return <span className="inline-flex rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700 ring-1 ring-teal-200">Cached locally</span>;
+  }
+
+  if (mapping.cacheStatus === "BROKEN" || mapping.imageHealth === "BROKEN") {
+    return <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">Image URL failed</span>;
   }
 
   if (mapping.imageHealth === "BROKEN") {
     return <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">Broken image URL</span>;
   }
 
-  return <span className="inline-flex rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700 ring-1 ring-teal-200">Image mapped</span>;
+  return <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">Image not prepared</span>;
 }
 
 export default async function ParseReviewPage({ params, searchParams }: ReviewPageProps) {
@@ -211,10 +228,19 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       imageUrl: true,
       productName: true,
       color: true,
-      imageHealth: true
+      size: true,
+      imageHealth: true,
+      cacheStatus: true,
+      cacheFilePath: true,
+      cacheOriginalImageUrl: true,
+      cacheCachedAt: true
     }
   });
-  const mappingBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
+  const mappingsWithCachedUrls = mappings.map((mapping) => ({
+    ...mapping,
+    cachedImageUrl: cachedProductImageUrl(mapping)
+  }));
+  const mappingBySku = new Map(mappingsWithCachedUrls.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
   const issueTypes = Array.from(new Set(previewRows.flatMap((row) => row.parsedIssues.map((issue) => issue.issueType)))).sort();
   const query = filters?.q?.trim().toLowerCase() ?? "";
   const selectedIssue = filters?.issue ?? "";
@@ -275,6 +301,13 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       {filters?.imported ? (
         <div className="mb-4 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-700">
           Import confirmed. Created, updated, duplicate, and issue counts are refreshed below.
+        </div>
+      ) : null}
+      {filters?.prepared ? (
+        <div className="mb-4 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800">
+          Prepared today&apos;s images. Total SKUs: {filters.totalSkus ?? 0}; already cached: {filters.alreadyCached ?? 0};
+          newly cached: {filters.newlyCached ?? 0}; failed: {filters.failed ?? 0}; no mapping: {filters.noMapping ?? 0};
+          no image URL: {filters.noImageUrl ?? 0}.
         </div>
       ) : null}
       {exactErrorMessage ? (
@@ -417,6 +450,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
               ["Updated", importStats.updatedRows ?? batch.updatedRows],
               ["Duplicate skipped", importStats.duplicateRows ?? batch.duplicateRows],
               ["Missing images", importStats.missingImageRows ?? 0],
+              ["Metadata filled", importStats.metadataAutoFilled ?? 0],
               ["Errors", importStats.errorRows ?? 0]
             ].map(([label, value]) => (
               <div key={label} className="rounded-md bg-slate-50 p-3">
@@ -424,6 +458,23 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                 <p className="mt-1 text-xl font-bold text-slate-950">{value}</p>
               </div>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {batch.status === "IMPORTED" || importStats ? (
+        <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-slate-950">Prepare today&apos;s product images</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Caches only missing or stale local card images for SKUs in this imported batch.
+              </p>
+            </div>
+            <form action={prepareBatchProductImagesAction}>
+              <input type="hidden" name="batchId" value={batch.id} />
+              <SubmitButton pendingText="Preparing...">Prepare today&apos;s product images</SubmitButton>
+            </form>
           </div>
         </section>
       ) : null}
@@ -557,13 +608,15 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <ProductImage
-                            src={mapping?.imageUrl}
+                            src={mapping?.cachedImageUrl}
                             alt={`${mapping?.productName ?? row.productDescription ?? row.sku ?? "Product"} ${row.sku ?? ""}`}
                             size="sm"
                             showBadge={false}
                             mappingId={mapping?.id}
                             showDebug
                             imageHealth={mapping?.imageHealth}
+                            cacheStatus={mapping?.cacheStatus}
+                            originalImageUrl={mapping?.imageUrl}
                           />
                           {imageBadge(mapping)}
                         </div>
@@ -642,13 +695,15 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                       <td className="px-4 py-3 font-semibold text-slate-950">{row.sku ?? "Missing"}</td>
                       <td className="px-4 py-3">
                         <ProductImage
-                          src={mapping?.imageUrl}
+                          src={mapping?.cachedImageUrl}
                           alt={`${mapping?.productName ?? row.sku ?? "Product"} ${row.sku ?? ""}`}
                           size="sm"
                           showBadge={false}
                           mappingId={mapping?.id}
                           showDebug
                           imageHealth={mapping?.imageHealth}
+                          cacheStatus={mapping?.cacheStatus}
+                          originalImageUrl={mapping?.imageUrl}
                         />
                       </td>
                       <td className="px-4 py-3">{picklistSummaryProductNameLabel(mapping)}</td>

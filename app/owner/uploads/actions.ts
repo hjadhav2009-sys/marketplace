@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { PaymentType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
+import { cacheProductCardImage, imageCacheNeedsRefresh } from "@/lib/image-cache";
 import { importParsedOrderRows, type ParsedOrderImportRow } from "@/lib/import/orders";
 import { hasBlockingPreviewIssue, isOrderPreviewSourceType } from "@/lib/import/preview";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
+import { normalizeSkuForMatching } from "@/lib/sku";
 import { uploadBatchSchema } from "@/lib/validators";
 
 type PreviewRowDraft = {
@@ -34,6 +36,17 @@ type PreviewRowDraft = {
   confidence: number;
   issues: ParseIssue[];
   rawData: Record<string, unknown>;
+};
+
+type CacheQueueMapping = {
+  id: string;
+  accountId: string;
+  sku: string;
+  imageUrl: string;
+  cacheStatus: string;
+  cacheFilePath: string | null;
+  cacheOriginalImageUrl: string | null;
+  cacheCachedAt: Date | null;
 };
 
 function isUploadFile(value: FormDataEntryValue | null): value is File {
@@ -234,6 +247,46 @@ function buildNotes(input: {
       blockingRows: input.blockingRows
     }
   });
+}
+
+async function runWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      await worker(item);
+    }
+  });
+
+  await Promise.all(workers);
+}
+
+async function cacheQueueMapping(mapping: CacheQueueMapping) {
+  const meta = await cacheProductCardImage({
+    accountId: mapping.accountId,
+    sku: mapping.sku,
+    originalImageUrl: mapping.imageUrl
+  });
+
+  await prisma.skuImageMapping.update({
+    where: { id: mapping.id },
+    data: {
+      imageHealth: meta.status === "CACHED" ? "MAPPED" : "BROKEN",
+      cacheStatus: meta.status,
+      cacheFilePath: meta.filePath,
+      cacheContentType: meta.contentType,
+      cacheOriginalImageUrl: meta.originalImageUrl,
+      cacheCachedAt: meta.cachedAt ? new Date(meta.cachedAt) : null,
+      cacheLastUsedAt: meta.lastUsedAt ? new Date(meta.lastUsedAt) : new Date(),
+      cacheWidth: meta.width,
+      cacheHeight: meta.height,
+      cacheFileSizeBytes: meta.fileSizeBytes,
+      cacheError: meta.error
+    }
+  });
+
+  return meta.status;
 }
 
 export async function createUploadBatchAction(formData: FormData) {
@@ -645,4 +698,136 @@ export async function confirmParsedBatchAction(formData: FormData) {
   }
 
   redirect(redirectTo);
+}
+
+export async function prepareBatchProductImagesAction(formData: FormData) {
+  const user = await requireUser(["OWNER"]);
+  const account = await requireAccount(user);
+  const request = await getRequestMeta();
+  const batchId = String(formData.get("batchId") ?? "");
+
+  if (!batchId) {
+    redirect("/owner/uploads/new?error=invalid-batch");
+  }
+
+  const batch = await prisma.uploadBatch.findFirst({
+    where: {
+      id: batchId,
+      accountId: account.id
+    },
+    include: {
+      orders: {
+        select: {
+          sku: true
+        }
+      }
+    }
+  });
+
+  if (!batch) {
+    redirect("/owner/uploads/new?error=invalid-batch");
+  }
+
+  const batchSkus = Array.from(new Set(batch.orders.map((order) => normalizeSkuForMatching(order.sku)).filter(Boolean)));
+  const mappings =
+    batchSkus.length > 0
+      ? await prisma.skuImageMapping.findMany({
+          where: {
+            accountId: account.id,
+            sku: { in: batchSkus },
+            active: true
+          },
+          select: {
+            id: true,
+            accountId: true,
+            sku: true,
+            imageUrl: true,
+            cacheStatus: true,
+            cacheFilePath: true,
+            cacheOriginalImageUrl: true,
+            cacheCachedAt: true
+          }
+        })
+      : [];
+  const mappingBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
+  const now = new Date();
+  const queue: CacheQueueMapping[] = [];
+  let alreadyCached = 0;
+  let noMapping = 0;
+  let noImageUrl = 0;
+  let newlyCached = 0;
+  let failed = 0;
+
+  if (mappings.length > 0) {
+    await prisma.skuImageMapping.updateMany({
+      where: {
+        id: { in: mappings.map((mapping) => mapping.id) },
+        accountId: account.id
+      },
+      data: {
+        cacheLastUsedAt: now
+      }
+    });
+  }
+
+  for (const sku of batchSkus) {
+    const mapping = mappingBySku.get(sku);
+
+    if (!mapping) {
+      noMapping += 1;
+      continue;
+    }
+
+    if (!mapping.imageUrl) {
+      noImageUrl += 1;
+      continue;
+    }
+
+    if (!imageCacheNeedsRefresh(mapping)) {
+      alreadyCached += 1;
+      continue;
+    }
+
+    queue.push({
+      ...mapping,
+      imageUrl: mapping.imageUrl
+    });
+  }
+
+  await runWithConcurrency(queue, 3, async (mapping) => {
+    const status = await cacheQueueMapping(mapping);
+
+    if (status === "CACHED") {
+      newlyCached += 1;
+    } else {
+      failed += 1;
+    }
+  });
+
+  const result = {
+    totalSkus: batchSkus.length,
+    alreadyCached,
+    newlyCached,
+    failed,
+    noMapping,
+    noImageUrl
+  };
+
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "BATCH_IMAGE_CACHE_PREPARE",
+    entityType: "UploadBatch",
+    entityId: batch.id,
+    metadata: result,
+    request
+  });
+
+  revalidatePath(`/owner/uploads/${batch.id}/review`);
+  revalidatePath("/owner/sku-mappings");
+  revalidatePath("/picker");
+  revalidatePath("/packing");
+  redirect(
+    `/owner/uploads/${batch.id}/review?prepared=1&totalSkus=${result.totalSkus}&alreadyCached=${result.alreadyCached}&newlyCached=${result.newlyCached}&failed=${result.failed}&noMapping=${result.noMapping}&noImageUrl=${result.noImageUrl}`
+  );
 }

@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState, type MouseEvent } from "react";
-import { getInitialProductImageState, isLoadableImageUrl, productImageStateText, type ProductImageState } from "@/lib/product-image";
+import {
+  getInitialDisplayImageState,
+  isDisplayableImageSrc,
+  isLoadableImageUrl,
+  productImageStateText,
+  type ProductImageState
+} from "@/lib/product-image";
 import { markProductImageBrokenAction, markProductImageMappedAction } from "./product-image-actions";
 
 type ProductImageProps = {
@@ -12,6 +18,8 @@ type ProductImageProps = {
   mappingId?: string | null;
   showDebug?: boolean;
   imageHealth?: string | null;
+  cacheStatus?: string | null;
+  originalImageUrl?: string | null;
 };
 
 const sizeClass = {
@@ -20,27 +28,38 @@ const sizeClass = {
   lg: "aspect-square w-full"
 };
 
-function initialState(src: string | null | undefined, imageHealth: string | null | undefined) {
-  return imageHealth === "BROKEN" && src ? "broken" : getInitialProductImageState(src);
+function initialState(src: string | null | undefined, imageHealth: string | null | undefined, cacheStatus: string | null | undefined) {
+  return (imageHealth === "BROKEN" || cacheStatus === "BROKEN") && !src ? "broken" : getInitialDisplayImageState(src);
 }
 
-export function ProductImage({ src, alt, size = "md", showBadge = true, mappingId, showDebug = false, imageHealth }: ProductImageProps) {
-  const [state, setState] = useState<ProductImageState>(initialState(src, imageHealth));
+export function ProductImage({
+  src,
+  alt,
+  size = "md",
+  showBadge = true,
+  mappingId,
+  showDebug = false,
+  imageHealth,
+  cacheStatus,
+  originalImageUrl
+}: ProductImageProps) {
+  const [state, setState] = useState<ProductImageState>(initialState(src, imageHealth, cacheStatus));
   const [slowLoading, setSlowLoading] = useState(false);
   const [manualCheck, setManualCheck] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
-  const validSrc = isLoadableImageUrl(src) ? src : null;
+  const validSrc = isDisplayableImageSrc(src) ? src : null;
+  const isExternalSrc = isLoadableImageUrl(validSrc);
   const hasSource = Boolean(validSrc);
-  const stateText = productImageStateText(state, hasSource, slowLoading);
+  const stateText = productImageStateText(state, hasSource, slowLoading, cacheStatus);
 
   useEffect(() => {
-    setState(initialState(src, imageHealth));
+    setState(initialState(src, imageHealth, cacheStatus));
     setSlowLoading(false);
     setManualCheck(false);
     if (src && !validSrc && mappingId) {
       void markProductImageBrokenAction(mappingId);
     }
-  }, [imageHealth, mappingId, src, validSrc]);
+  }, [cacheStatus, imageHealth, mappingId, src, validSrc]);
 
   useEffect(() => {
     if (!validSrc || state !== "loading") {
@@ -64,15 +83,15 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
     stopParentNavigation(event);
     setSlowLoading(false);
     setManualCheck(true);
-    setState(validSrc ? "loading" : getInitialProductImageState(src));
+    setState(validSrc ? "loading" : getInitialDisplayImageState(src));
     setRetryVersion((version) => version + 1);
   }
 
   function openImageUrl(event: MouseEvent<HTMLButtonElement>) {
     stopParentNavigation(event);
 
-    if (src) {
-      window.open(src, "_blank", "noopener,noreferrer");
+    if (originalImageUrl ?? src) {
+      window.open(originalImageUrl ?? src ?? "", "_blank", "noopener,noreferrer");
     }
   }
 
@@ -90,7 +109,6 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
     >
       {state === "loading" ? <div className="absolute inset-0 animate-pulse bg-slate-200" /> : null}
       {validSrc && state !== "broken" ? (
-        // Loading directly from the source URL avoids proxying or storing product images.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={`${validSrc}-${retryVersion}`}
@@ -102,7 +120,7 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
           onLoad={() => {
             setState("loaded");
             setSlowLoading(false);
-            if (mappingId && (imageHealth === "BROKEN" || manualCheck)) {
+            if (isExternalSrc && mappingId && (imageHealth === "BROKEN" || manualCheck)) {
               void markProductImageMappedAction(mappingId);
             }
             setManualCheck(false);
@@ -111,7 +129,7 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
             setState("broken");
             setSlowLoading(false);
             setManualCheck(false);
-            if (mappingId) {
+            if (isExternalSrc && mappingId) {
               void markProductImageBrokenAction(mappingId);
             }
           }}
@@ -122,13 +140,18 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
             {state === "broken" ? "Check URL" : "No image"}
           </span>
           <span className="mt-1 text-xs text-slate-500">{stateText}</span>
-          {showDebug && state === "broken" && validSrc ? (
+          {showDebug && state === "broken" && validSrc && isExternalSrc ? (
             <button
               type="button"
               onClick={retryImage}
               className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
             >
               Check this image
+            </button>
+          ) : null}
+          {showDebug && originalImageUrl ? (
+            <button type="button" onClick={openImageUrl} className="mt-2 text-xs font-semibold text-berry underline">
+              Open original URL
             </button>
           ) : null}
         </div>
@@ -143,12 +166,12 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
           {badge.label}
         </span>
       ) : null}
-      {showDebug && state === "broken" && src ? (
+      {showDebug && state === "broken" && (originalImageUrl ?? src) ? (
         <div className="absolute inset-x-2 bottom-2 rounded bg-white/95 px-2 py-1 text-[10px] font-medium text-slate-600">
           <button type="button" onClick={openImageUrl} className="font-semibold text-berry underline">
-            Open image URL
+            Open original URL
           </button>
-          <p className="mt-1 truncate">{src}</p>
+          <p className="mt-1 truncate">{originalImageUrl ?? src}</p>
         </div>
       ) : null}
     </div>

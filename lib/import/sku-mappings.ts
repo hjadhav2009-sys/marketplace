@@ -11,14 +11,6 @@ export type NormalizedSkuImageRow = {
   accountName?: string;
   sku: string;
   imageUrl: string;
-  productName?: string;
-  color?: string;
-  notes?: string;
-  active: boolean;
-  productNameProvided: boolean;
-  colorProvided: boolean;
-  notesProvided: boolean;
-  activeProvided: boolean;
   rawData: RawImportRow;
 };
 
@@ -52,9 +44,7 @@ export type AccountSkuMappingImportPlan = {
 
 const skuAliases = ["sku", "skucode", "suppliersku"];
 const imageAliases = ["image", "imageurl", "image_url", "meeshoimageurl", "productimageurl"];
-const nameAliases = ["name", "productname", "producttitle"];
 const accountAliases = ["account", "accountname", "accountcode"];
-const colorAliases = ["color", "colour"];
 
 function normalizeHeader(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -93,16 +83,6 @@ export function isValidImportImageUrl(value: string) {
   }
 }
 
-function parseActive(value: string) {
-  const normalized = value.trim().toLowerCase();
-
-  if (!normalized) {
-    return true;
-  }
-
-  return !["false", "0", "no", "n", "inactive"].includes(normalized);
-}
-
 export function normalizeSkuImageRows(rows: RawImportRow[]) {
   const normalized: NormalizedSkuImageRow[] = [];
   const errors: ImportIssue[] = [];
@@ -112,10 +92,6 @@ export function normalizeSkuImageRows(rows: RawImportRow[]) {
     const rawSku = getAliasedValue(row, skuAliases);
     const sku = normalizeSkuForMatching(rawSku);
     const imageUrl = getAliasedValue(row, imageAliases);
-    const productName = getAliasedField(row, nameAliases);
-    const color = getAliasedField(row, colorAliases);
-    const notes = getAliasedField(row, ["notes"]);
-    const active = getAliasedField(row, ["active"]);
 
     if (!sku) {
       errors.push({
@@ -152,14 +128,6 @@ export function normalizeSkuImageRows(rows: RawImportRow[]) {
       accountName: getAliasedValue(row, accountAliases) || undefined,
       sku,
       imageUrl,
-      productName: productName.value || undefined,
-      color: color.value || undefined,
-      notes: notes.value || undefined,
-      active: active.found ? parseActive(active.value) : true,
-      productNameProvided: productName.found,
-      colorProvided: color.found,
-      notesProvided: notes.found,
-      activeProvided: active.found,
       rawData: row
     });
   });
@@ -167,18 +135,12 @@ export function normalizeSkuImageRows(rows: RawImportRow[]) {
   return { normalized, errors };
 }
 
-function sameMapping(mapping: Pick<SkuImageMapping, "imageUrl" | "productName" | "color" | "notes" | "active">, row: NormalizedSkuImageRow) {
-  return (
-    mapping.imageUrl === row.imageUrl &&
-    (!row.productNameProvided || (mapping.productName ?? "") === (row.productName ?? "")) &&
-    (!row.colorProvided || (mapping.color ?? "") === (row.color ?? "")) &&
-    (!row.notesProvided || (mapping.notes ?? "") === (row.notes ?? "")) &&
-    (!row.activeProvided || mapping.active === row.active)
-  );
+function sameMapping(mapping: Pick<SkuImageMapping, "imageUrl">, row: NormalizedSkuImageRow) {
+  return mapping.imageUrl === row.imageUrl;
 }
 
 export function planSkuMappingImport(
-  existingMappings: Array<Pick<SkuImageMapping, "sku" | "imageUrl" | "productName" | "color" | "notes" | "active">>,
+  existingMappings: Array<Pick<SkuImageMapping, "sku" | "imageUrl">>,
   rows: RawImportRow[]
 ): SkuMappingImportPlan {
   const { normalized, errors } = normalizeSkuImageRows(rows);
@@ -216,7 +178,7 @@ function findAccountForRow(accounts: SkuMappingAccountRef[], selectedAccount: Sk
 }
 
 export function planAccountSkuMappingImport(
-  existingMappings: Array<Pick<SkuImageMapping, "accountId" | "sku" | "imageUrl" | "productName" | "color" | "notes" | "active">>,
+  existingMappings: Array<Pick<SkuImageMapping, "accountId" | "sku" | "imageUrl">>,
   rows: RawImportRow[],
   accounts: SkuMappingAccountRef[],
   selectedAccount: SkuMappingAccountRef,
@@ -315,13 +277,11 @@ export async function importSkuMappingsFromRows(input: {
         accountId: row.accountId,
         sku: row.sku,
         imageUrl: row.imageUrl,
-        productName: row.productNameProvided ? row.productName : null,
-        color: row.colorProvided ? row.color : null,
-        active: row.active,
-        notes: row.notesProvided ? row.notes : null,
+        active: true,
         source: input.fileName,
         lastImportedAt: new Date(),
-        imageHealth: "MAPPED"
+        imageHealth: "UNKNOWN",
+        cacheStatus: "NOT_CACHED"
       }
     });
   }
@@ -336,13 +296,12 @@ export async function importSkuMappingsFromRows(input: {
       },
       data: {
         imageUrl: row.imageUrl,
-        productName: row.productNameProvided ? row.productName : undefined,
-        color: row.colorProvided ? row.color : undefined,
-        active: row.activeProvided ? row.active : undefined,
-        notes: row.notesProvided ? row.notes : undefined,
         source: input.fileName,
         lastImportedAt: new Date(),
-        imageHealth: "MAPPED"
+        imageHealth: "UNKNOWN",
+        cacheStatus: "RECHECK_NEEDED",
+        cacheOriginalImageUrl: null,
+        cacheError: null
       }
     });
   }

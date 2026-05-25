@@ -32,6 +32,7 @@ export const skuImageMappingSchema = z.object({
     .refine((value) => value.startsWith("http://") || value.startsWith("https://"), "Image URL must start with http:// or https://"),
   productName: z.string().trim().optional(),
   color: z.string().trim().optional(),
+  size: z.string().trim().optional(),
   notes: z.string().trim().optional(),
   active: z.coerce.boolean().default(true)
 });

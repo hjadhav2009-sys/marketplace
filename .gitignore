@@ -17,6 +17,7 @@ prisma/dev.db-journal
 # real warehouse documents
 *.pdf
 !tests/fixtures/**/*.txt
+storage/product-images/
 
 # env
 .env

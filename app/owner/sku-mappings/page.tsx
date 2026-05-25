@@ -5,14 +5,24 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { searchSkuMappings } from "@/lib/data";
 import { formatDateTime } from "@/lib/format";
-import { imageHealthLabel, normalizeSkuMappingImageFilter } from "@/lib/product-image";
-import { recheckVisibleSkuImagesAction, upsertSkuImageMappingAction } from "./actions";
+import { cachedProductImageUrl } from "@/lib/image-cache";
+import { imageCacheStatusLabel, imageHealthLabel, normalizeSkuMappingImageFilter } from "@/lib/product-image";
+import {
+  cacheSkuImageAction,
+  cacheVisibleSkuImagesAction,
+  recheckVisibleSkuImagesAction,
+  upsertSkuImageMappingAction
+} from "./actions";
 
 type SkuMappingsPageProps = {
   searchParams?: Promise<{
     error?: string;
     saved?: string;
     recheck?: string;
+    cached?: string;
+    already?: string;
+    failed?: string;
+    cacheError?: string;
     q?: string;
     active?: string;
     image?: string;
@@ -24,7 +34,10 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
   const account = await requireAccount(user);
   const params = await searchParams;
   const imageFilter = normalizeSkuMappingImageFilter(params?.image);
-  const mappings = await searchSkuMappings(account.id, params?.q, params?.active, imageFilter);
+  const mappings = (await searchSkuMappings(account.id, params?.q, params?.active, imageFilter)).map((mapping) => ({
+    ...mapping,
+    cachedImageUrl: cachedProductImageUrl(mapping)
+  }));
   const returnToParams = new URLSearchParams();
 
   if (params?.q) {
@@ -46,9 +59,15 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
       <PageHeader
         eyebrow="SKU Images"
         title="Map SKU to product image URL"
-        description="Store only the Meesho product image URL. These images power picker cards and the packer scan result screen."
+        description="Import SKU and image URL only. Product name, color, and size fill from orders when labels are imported."
         action={{ href: "/owner/sku-mappings/import", label: "Import CSV/XLSX" }}
       />
+
+      {params?.cached || params?.failed || params?.already ? (
+        <div className="mb-5 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800">
+          Image cache updated. Newly cached: {params.cached ?? 0}; already cached: {params.already ?? 0}; failed: {params.failed ?? 0}.
+        </div>
+      ) : null}
 
       <section className="mb-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -61,19 +80,25 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
               href="/owner/sku-mappings/export?format=csv"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-berry hover:text-berry"
             >
-              Export selected CSV
+              Full export CSV
             </a>
             <a
               href="/owner/sku-mappings/export?format=xlsx"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-berry hover:text-berry"
             >
-              Export selected XLSX
+              Full export XLSX
             </a>
             <a
-              href="/owner/sku-mappings/export?scope=all&format=csv"
+              href="/owner/sku-mappings/template?format=xlsx"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-berry hover:text-berry"
             >
-              Export all accounts
+              Simple template
+            </a>
+            <a
+              href="/owner/sku-mappings/export?cache=not-cached&format=csv"
+              className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 shadow-sm hover:border-amber-300"
+            >
+              Export not cached
             </a>
             <a
               href="/owner/sku-mappings/export?health=broken&format=csv"
@@ -143,6 +168,14 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
               />
             </label>
             <label className="block">
+              <span className="text-sm font-medium text-slate-700">Size</span>
+              <input
+                name="size"
+                placeholder="Free Size"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              />
+            </label>
+            <label className="block">
               <span className="text-sm font-medium text-slate-700">Notes</span>
               <textarea
                 name="notes"
@@ -162,8 +195,8 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
           <div className="border-b border-slate-200 px-4 py-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <h2 className="font-semibold text-slate-950">Current mappings</h2>
-              <form action={recheckVisibleSkuImagesAction}>
-                <input type="hidden" name="returnTo" value={`${returnTo}${returnTo.includes("?") ? "&" : "?"}recheck=1`} />
+              <form action={cacheVisibleSkuImagesAction}>
+                <input type="hidden" name="returnTo" value={returnTo} />
                 {mappings.map((mapping) => (
                   <input key={mapping.id} type="hidden" name="mappingId" value={mapping.id} />
                 ))}
@@ -171,7 +204,7 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                   type="submit"
                   className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-berry hover:text-berry"
                 >
-                  Recheck visible images
+                  Cache visible SKUs
                 </button>
               </form>
             </div>
@@ -197,9 +230,10 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                 className="min-h-11 rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
               >
                 <option value="all">All image states</option>
-                <option value="mapped">Mapped</option>
+                <option value="cached">Cached</option>
+                <option value="not-cached">Not cached</option>
                 <option value="broken">Broken</option>
-                <option value="missing">Missing/empty URL</option>
+                <option value="recheck-needed">Recheck needed</option>
               </select>
               <button className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50">
                 Filter
@@ -214,7 +248,9 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                     <th className="px-4 py-3">Preview</th>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Product name</th>
+                    <th className="px-4 py-3">Color / Size</th>
                     <th className="px-4 py-3">Image URL</th>
+                    <th className="px-4 py-3">Cache status</th>
                     <th className="px-4 py-3">Image health</th>
                     <th className="px-4 py-3">Actions</th>
                     <th className="px-4 py-3">Last imported</th>
@@ -226,19 +262,32 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                     <tr key={mapping.id}>
                       <td className="px-4 py-3">
                         <ProductImage
-                          src={mapping.imageUrl}
+                          src={mapping.cachedImageUrl}
                           alt={mapping.productName ?? mapping.sku}
                           size="sm"
                           mappingId={mapping.id}
                           showDebug
                           imageHealth={mapping.imageHealth}
+                          cacheStatus={mapping.cacheStatus}
+                          originalImageUrl={mapping.imageUrl}
                         />
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-950">
                         {mapping.sku} {!mapping.active ? <span className="text-xs text-slate-500">(inactive)</span> : null}
                       </td>
                       <td className="px-4 py-3 text-slate-600">{mapping.productName ?? "No product name"}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {[mapping.color, mapping.size].filter(Boolean).join(" / ") || "-"}
+                      </td>
                       <td className="max-w-xs break-all px-4 py-3 text-xs text-slate-500">{mapping.imageUrl || "Missing/empty URL"}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                          {imageCacheStatusLabel(mapping)}
+                        </span>
+                        {mapping.cacheLastUsedAt ? (
+                          <p className="mt-1 text-xs text-slate-500">Used {formatDateTime(mapping.cacheLastUsedAt)}</p>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
                           {imageHealthLabel(mapping)}
@@ -258,6 +307,13 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                           ) : (
                             <span className="text-xs font-medium text-slate-500">No URL</span>
                           )}
+                          <form action={cacheSkuImageAction}>
+                            <input type="hidden" name="returnTo" value={returnTo} />
+                            <input type="hidden" name="mappingId" value={mapping.id} />
+                            <button className="text-xs font-semibold text-berry underline">
+                              Cache this SKU
+                            </button>
+                          </form>
                           <form action={recheckVisibleSkuImagesAction}>
                             <input type="hidden" name="returnTo" value={`${returnTo}${returnTo.includes("?") ? "&" : "?"}recheck=1`} />
                             <input type="hidden" name="mappingId" value={mapping.id} />

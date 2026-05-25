@@ -166,6 +166,7 @@ export async function changeUserPasswordAction(formData: FormData) {
   const request = await getRequestMeta();
   const userId = String(formData.get("userId") ?? "");
   const password = String(formData.get("password") ?? "");
+  const mustChangePassword = formData.get("mustChangePassword") === "on";
   const passwordResult = validateWorkerPassword(password);
 
   if (!userId || !passwordResult.valid) {
@@ -188,9 +189,10 @@ export async function changeUserPasswordAction(formData: FormData) {
         where: { id: user.id },
         data: {
           passwordHash: hashPassword(password),
-          mustChangePassword: true,
+          mustChangePassword,
           failedLoginCount: 0,
-          lockedUntil: null
+          lockedUntil: null,
+          active: true
         }
       }),
       prisma.userDeviceSession.updateMany({
@@ -209,9 +211,10 @@ export async function changeUserPasswordAction(formData: FormData) {
       where: { id: user.id },
       data: {
         passwordHash: hashPassword(password),
-        mustChangePassword: false,
+        mustChangePassword,
         failedLoginCount: 0,
-        lockedUntil: null
+        lockedUntil: null,
+        active: true
       }
     });
   }
@@ -219,15 +222,56 @@ export async function changeUserPasswordAction(formData: FormData) {
   await recordAuditLog({
     userId: owner.id,
     accountId: account.id,
-    action: "USER_PASSWORD_CHANGED",
+    action: "OWNER_PASSWORD_RESET",
     entityType: "User",
     entityId: user.id,
-    metadata: { username: user.username, changedByOwner: true, mustChangePassword: sessionsClosed, sessionsClosed },
+    metadata: { username: user.username, changedByOwner: true, mustChangePassword, sessionsClosed },
     request
   });
 
   revalidatePath("/owner/users");
   redirect("/owner/users?password=1");
+}
+
+export async function unlockUserAction(formData: FormData) {
+  const owner = await requireUser(["OWNER"]);
+  const account = await requireAccount(owner);
+  const request = await getRequestMeta();
+  const userId = String(formData.get("userId") ?? "");
+
+  if (!userId) {
+    redirect("/owner/users?error=invalid");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId }
+  });
+
+  if (!user) {
+    redirect("/owner/users?error=invalid");
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      failedLoginCount: 0,
+      lockedUntil: null,
+      active: true
+    }
+  });
+
+  await recordAuditLog({
+    userId: owner.id,
+    accountId: account.id,
+    action: "OWNER_USER_UNLOCKED",
+    entityType: "User",
+    entityId: user.id,
+    metadata: { username: user.username },
+    request
+  });
+
+  revalidatePath("/owner/users");
+  redirect("/owner/users?unlocked=1");
 }
 
 export async function deactivateUserAction(formData: FormData) {
@@ -262,7 +306,7 @@ export async function deactivateUserAction(formData: FormData) {
   await recordAuditLog({
     userId: owner.id,
     accountId: account.id,
-    action: "USER_DEACTIVATED",
+    action: "OWNER_USER_DEACTIVATED",
     entityType: "User",
     entityId: user.id,
     metadata: { username: user.username },
@@ -299,7 +343,7 @@ export async function reactivateUserAction(formData: FormData) {
   await recordAuditLog({
     userId: owner.id,
     accountId: account.id,
-    action: "USER_REACTIVATED",
+    action: "OWNER_USER_REACTIVATED",
     entityType: "User",
     entityId: user.id,
     metadata: { username: user.username },
@@ -339,7 +383,7 @@ export async function closeUserSessionsAction(formData: FormData) {
   await recordAuditLog({
     userId: owner.id,
     accountId: account.id,
-    action: "USER_SESSIONS_CLOSED",
+    action: "OWNER_USER_SESSIONS_CLOSED",
     entityType: "User",
     entityId: user.id,
     metadata: { username: user.username },

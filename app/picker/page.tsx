@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getSkuGroups } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
+import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { markSkuGroupPickedAction } from "./[sku]/actions";
 
 type PickerSkuGroupsPageProps = {
@@ -91,21 +92,21 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
         </div>
       ) : null}
 
-      <form className="sticky top-[88px] z-20 mb-4 grid gap-3 rounded-md border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur md:top-[106px] md:grid-cols-[1fr_auto] md:p-4">
+      <form className="sticky top-[88px] z-20 mb-4 grid gap-2 rounded-md border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur md:top-[106px] md:grid-cols-[1fr_auto] md:p-3">
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Search SKU or product</span>
+          <span className="sr-only">Search SKU or product</span>
           <input
             name="q"
             defaultValue={params?.q}
             placeholder="1202919298_6"
-            className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+            className="min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
           />
         </label>
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {filters.map((filter) => (
             <label
               key={filter.value}
-              className={`inline-flex min-h-12 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${
+              className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
                 activeFilter === filter.value ? "border-berry bg-pink-50 text-berry" : "border-slate-200 bg-white text-slate-700"
               }`}
             >
@@ -119,12 +120,12 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
               {filter.label}
             </label>
           ))}
-          <label className="inline-flex min-h-12 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+          <label className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
             <input type="checkbox" name="large" value="1" defaultChecked={largeImageMode} className="accent-pink-700" />
             Large images
           </label>
           <input type="hidden" name="view" value={compactMode ? "compact" : "cards"} />
-          <button className="min-h-12 rounded-md bg-slate-950 px-5 py-2 text-sm font-semibold text-white shadow-sm">
+          <button className="min-h-10 shrink-0 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm">
             Apply
           </button>
         </div>
@@ -166,6 +167,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             const detailHref = pickerDetailHref(group.sku, group.color, group.size);
             const encodedColor = encodePickerDimension(group.color);
             const encodedSize = encodePickerDimension(group.size);
+            const canCacheImage = user.role === "OWNER" && group.mapping?.id && group.mapping.imageUrl && group.mapping.cacheStatus !== "CACHED";
 
             return (
               <article
@@ -180,6 +182,8 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                     mappingId={group.mapping?.id}
                     showDebug={user.role === "OWNER"}
                     imageHealth={group.mapping?.imageHealth}
+                    cacheStatus={group.mapping?.cacheStatus}
+                    originalImageUrl={group.mapping?.imageUrl}
                   />
                 )}
                 <div className="space-y-4 p-4">
@@ -191,6 +195,11 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                         {user.role === "OWNER" ? "Broken image URL" : "Image issue"}
                       </span>
                     ) : null}
+                    {!compactMode && !group.imageUrl && user.role !== "OWNER" ? (
+                      <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                        Ask owner to prepare image
+                      </span>
+                    ) : null}
                   </div>
 
                   <div>
@@ -200,9 +209,14 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                         {group.productName ?? (group.mapping?.imageUrl ? "Mapped image, no product name" : "Product name not mapped")}
                       </p>
                     )}
-                    <p className="mt-2 text-base font-semibold text-slate-800">
-                      {[group.color ?? group.mapping?.color, group.size].filter(Boolean).join(" / ") || "Color or size unknown"}
-                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
+                        {group.color ?? group.mapping?.color ?? "Color unknown"}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
+                        {group.size ?? group.mapping?.size ?? "Size unknown"}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-[1.1fr_1fr] gap-3">
@@ -244,6 +258,15 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                       Problem
                     </Link>
                   </div>
+                  {canCacheImage ? (
+                    <form action={cacheSkuImageAction}>
+                      <input type="hidden" name="mappingId" value={group.mapping?.id} />
+                      <input type="hidden" name="returnTo" value={`/picker?filter=${activeFilter}&view=${compactMode ? "compact" : "cards"}`} />
+                      <button className="min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+                        Cache now
+                      </button>
+                    </form>
+                  ) : null}
                 </div>
               </article>
             );

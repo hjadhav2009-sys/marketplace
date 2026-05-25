@@ -6,8 +6,8 @@ The app supports the daily local warehouse flow:
 
 - Owner uploads Meesho label and/or supplier manifest PDFs for parser review.
 - The parser extracts AWB, courier, SKU, quantity, color, size, order number, product description, payment type, and related invoice fields where available.
-- Owner maps SKU to a Meesho product image URL. Product files are not stored.
-- Picker sees SKU, color, and size grouped mobile-first product cards.
+- Owner maps SKU to a Meesho product image URL and prepares local cached product card images.
+- Picker sees SKU, color, size, quantity, and cached-image mobile-first product cards.
 - Packer scans AWB with the mobile browser camera or enters AWB manually, verifies order details, confirms packed, or marks a problem order.
 
 ## Tech Stack
@@ -85,7 +85,7 @@ This is the recommended production workflow for the warehouse today.
 - PDF parsing runs locally on the PC, which is more reliable than serverless for heavier Meesho PDFs.
 - The browser camera barcode scanner works through HTTPS.
 - The app code, terminal, Prisma, and npm stay on the owner PC. Workers only use the browser login.
-- Product images are only external URLs stored in the database. Product image files are not uploaded or stored.
+- Product image URLs and cache metadata are stored in the database. Local card image files live only on the owner PC under `storage/product-images/`.
 - Hostinger Node.js is not needed for this mode.
 - Vercel is not needed for this mode.
 
@@ -127,20 +127,38 @@ If login works on the owner PC but not on a mobile local IP, check **Owner -> Sy
 
 Do not expose the Supabase database password in GitHub, browser code, screenshots, or worker devices.
 
-Start local production on Windows:
+Daily start on the server PC:
 
-```powershell
-scripts\windows\start-local-prod.ps1
-```
-
-or double-click:
+Double-click:
 
 ```text
+scripts\windows\start-meesho-app.bat
+```
+
+The double-click launcher loads `.env` with Node/dotenv, masks the database URL in logs, selects SQLite or PostgreSQL
+build mode automatically, prints the local/mobile/Cloudflare URLs, builds, and starts the app.
+
+You can also start from PowerShell:
+
+```powershell
+scripts\windows\start-meesho-app.ps1
+```
+
+Compatibility launchers still exist:
+
+```text
+scripts\windows\start-local-prod.ps1
 scripts\windows\start-local-prod.bat
 ```
 
-The script checks Node.js, checks `.env`, installs dependencies when `node_modules` is missing, builds the app, and starts
+The launcher checks Node.js, checks `.env`, installs dependencies when `node_modules` is missing, builds the app, and starts
 `npm start` on `http://localhost:3000`.
+
+Check `.env` without starting the app:
+
+```bash
+npm run check:env
+```
 
 ### Supabase setup
 
@@ -148,7 +166,7 @@ The script checks Node.js, checks `.env`, installs dependencies when `node_modul
 2. Open the project database settings and copy the PostgreSQL connection string.
 3. Use the pooled connection string if connection limits or short-lived restarts become a problem.
 4. Put the connection string only in the owner PC `.env` as `DATABASE_URL`.
-5. Do not use Supabase Storage for product images. The app stores only external `imageUrl` values.
+5. Do not use Supabase Storage for product images. The app stores external `imageUrl` values plus local cache metadata; the cache files stay on the owner PC.
 
 For a fresh Supabase database, open this once after the app starts:
 
@@ -158,6 +176,8 @@ https://pack.personalizedgiftday.com/setup
 
 Create the first owner user and first account there. The setup page only works while the `User` table is empty; after the
 first user exists it redirects to `/login`.
+
+For a complete first-time server PC checklist, see `docs/windows-server-setup.md`.
 
 ### Cloudflare Tunnel setup
 
@@ -170,7 +190,8 @@ cloudflared tunnel route dns meesho-pick-pack pack.personalizedgiftday.com
 cloudflared tunnel run meesho-pick-pack
 ```
 
-Use `docs/cloudflare-tunnel/config.yml.example` for a named tunnel config:
+Use `docs/cloudflare-tunnel/config.yml.example` for a named tunnel config. See
+`docs/cloudflare-tunnel/security-setup.md` for safety notes.
 
 ```yaml
 tunnel: meesho-pick-pack
@@ -235,17 +256,21 @@ Sprint 4 adds the first retention tools under **Owner -> Cleanup**:
 Cleanup never deletes orders, SKU image mappings, accounts, or users. The owner must type `CLEANUP` before deleting old
 temporary rows or logs, and every cleanup action is audited.
 
+Product image cache cleanup is also available under **Owner -> Cleanup**. It deletes only local cached card files and
+their `meta.json` sidecars when they have not been used for 30+ days. It never deletes orders or SKU mappings. The owner
+must type `DELETE IMAGE CACHE` before deleting image cache files.
+
 ### Backup plan
 
 - Export CSV backups weekly from **Owner -> System**.
 - Keep the SKU image mapping CSV somewhere safe because it is operationally important.
 - Export orders, packed orders, problem orders, scan logs, upload batches, and SKU mappings before major cleanup.
 - Use Supabase database backup/export options for full database recovery.
-- Do not store product image files; only external image URLs are exported.
+- Local image cache files can be regenerated from SKU image URLs. Back up mappings and orders first; the image cache is optional.
 
 ### Daily startup checklist
 
-1. Start the app on the owner PC with `scripts\windows\start-local-prod.ps1`.
+1. Start the app on the owner PC by double-clicking `scripts\windows\start-meesho-app.bat`.
 2. Start Cloudflare Tunnel with `cloudflared tunnel run meesho-pick-pack`.
 3. Confirm `http://localhost:3000` works on the owner PC.
 4. Confirm `https://pack.personalizedgiftday.com` works from a worker phone.
@@ -254,9 +279,10 @@ temporary rows or logs, and every cleanup action is audited.
 7. Upload SKU image mappings.
 8. Upload test Meesho label/manifest PDFs.
 9. Confirm import and duplicate protection.
-10. Test barcode scanning on HTTPS.
-11. Export a test CSV.
-12. Open **Owner -> System** and confirm production checks are OK.
+10. Click **Prepare today's product images** on the import review page.
+11. Test barcode scanning on HTTPS.
+12. Export a test CSV.
+13. Open **Owner -> System** and confirm production checks are OK.
 
 ### Production troubleshooting
 
@@ -274,9 +300,8 @@ temporary rows or logs, and every cleanup action is audited.
   and that the worker is using the latest password.
 - Login works on desktop but fails on mobile local IP: set `SESSION_COOKIE_SECURE=false` for local HTTP. Use
   `SESSION_COOKIE_SECURE=true` only for HTTPS, such as Cloudflare Tunnel.
-- Images slow on picker: use compact mode and **Load more** so the browser does not request every product image at once.
-- Meesho image URLs are external and can be slow, expired, or blocked. Product image files are not stored by this app.
-  Export broken mapping CSV from **Owner -> SKU Images**, refresh URLs from Meesho, and import the updated sheet.
+- Images slow on picker: prepare the local image cache after PDF import. Worker cards use cached local images only; compact mode stays available for fastest text-only work.
+- Meesho image URLs are external and can be slow, expired, or blocked. Export broken mapping CSV from **Owner -> SKU Images**, refresh URLs from Meesho, import the updated sheet, then re-cache.
 - HTTPS domain not active: confirm Cloudflare Tunnel is running and the DNS route points to
   `pack.personalizedgiftday.com`.
 - Local app not starting: check Node.js version, `.env`, `node_modules`, build output, and whether another process is
@@ -353,18 +378,26 @@ Owners can export the current mapping database from:
 /owner/sku-mappings
 ```
 
-Export the selected account by default, or use **Export all accounts** when preparing a full owner workbook. Add new SKUs
-or update image URLs in Excel, then import again from:
+The full export includes:
+
+```csv
+sku,image_url,product_name,color,size,cache_status,image_health,last_used_at,updated_at
+```
+
+Use the simple template for daily imports. You only need SKU + image URL. Product name/color/size will be filled from
+orders automatically when labels or PDFs are parsed later.
+
+Add new SKUs or update image URLs in Excel, then import again from:
 
 ```text
 /owner/sku-mappings/import
 ```
 
-CSV or `.xlsx` columns:
+Simple CSV or `.xlsx` columns:
 
 ```csv
-account,sku,image_url,product_name,color,notes,active
-Sullery,1202919298_6,https://images-r.meesho.com/images/products/576264463/z71on.avif,Sports Jersey Number Personalized Pendant,Silver,Seed mapping,true
+sku,image_url
+1202919298_6,https://images-r.meesho.com/images/products/576264463/z71on.avif
 ```
 
 Required columns:
@@ -375,20 +408,16 @@ Required columns:
 Optional columns:
 
 - `account`
-- `product_name`
-- `color`
-- `notes`
-- `active`
 
 Common alternate names are accepted, including `SKU`, `sku_code`, `supplier_sku`, `image`, `imageUrl`,
-`meesho_image_url`, `product_image_url`, `name`, `product_title`, `account_name`, and `account_code`.
+`meesho_image_url`, `product_image_url`, `account_name`, and `account_code`.
 
 When importing for the selected account, empty or present account cells import into that selected account. When importing
 for all accounts, account cells match by account name or account code; empty account cells still use the selected account.
 
-Existing mappings are remembered and upserted by `accountId + sku`. Same URL/data is counted as unchanged. Changed
-URL/name/color/notes/active fields update the old mapping. New SKUs are created. Invalid image URLs become row errors and
-can be downloaded as an error CSV. Product image files are never stored.
+Existing mappings are remembered and upserted by `accountId + sku`. Same URL is counted as unchanged. Changed URLs update
+the old mapping and mark its local cache for recheck. New SKUs are created. Invalid image URLs become row errors and can
+be downloaded as an error CSV. Product image cache files are stored only on the owner PC and are ignored by Git.
 
 Do not commit real Meesho PDFs. Use sanitized text fixtures only.
 
@@ -430,9 +459,10 @@ before confirming import.
 2. Review parsed rows, confidence, duplicates, missing AWBs/SKUs, missing image mappings, and cross-check issues.
 3. Fix missing SKU image mappings when needed.
 4. Confirm import. Orders flow through the duplicate-safe `accountId + AWB` importer.
-5. Pickers pick by SKU/color/size groups.
-6. Packers scan or type AWB, verify product details, and confirm packed.
-7. Owner exports weekly CSV backups and runs cleanup when old temporary rows are eligible.
+5. Click **Prepare today's product images** so the app downloads local card images for SKUs in that batch.
+6. Pickers pick by SKU/color/size groups.
+7. Packers scan or type AWB, verify product details, and confirm packed.
+8. Owner exports weekly CSV backups and runs cleanup when old temporary rows or old image cache files are eligible.
 
 ## Daily Picker Workflow
 
@@ -496,11 +526,26 @@ duplicate work:
 
 ## Image Handling
 
-Only image URLs are stored. Images are loaded directly from their source URL in the browser; the app does not proxy,
-download, or store image files.
+SKU mappings store image URLs and cache metadata in the database. The database never stores image bytes.
 
-If an image URL is missing or fails in the browser, product cards show a clean fallback with a "Check URL" prompt. Broken
-mapping health is recorded for owner reports when the browser detects a load failure.
+Local cached product card images are stored on the owner PC:
+
+```text
+storage/product-images/meesho/<accountId>/<safeSku>/
+```
+
+Each cached SKU folder contains a `card.webp` or `card.jpg` plus `meta.json`. The target card size is 600x600 at good
+mobile/desktop card quality. If image conversion is unavailable on Windows, the app saves the downloaded original as the
+local card file and serves it with the correct content type.
+
+The cache is not committed to GitHub. `storage/product-images/` is ignored by `.gitignore`.
+
+Worker picker and packing cards use cached local images only. They do not load slow external Meesho URLs. If an image is
+not prepared or the URL failed, the card still opens and packing can still be confirmed.
+
+Storage estimate: 600x600 card images are usually small. 10,000 cached images commonly fit within a few GB depending on
+source format and conversion availability. The optional cache target is 5000 MB, and old unused cache files can be
+deleted from **Owner -> Cleanup** after 30+ days.
 
 ## Useful Scripts
 
@@ -508,6 +553,7 @@ mapping health is recorded for owner reports when the browser detects a load fai
 npm run dev
 npm run build
 npm run build:prod
+npm run check:env
 npm run typecheck
 npm run lint
 npm run test:validators
@@ -516,6 +562,7 @@ npm run db:seed
 npm run db:migrate:prod
 npm run start:prod
 scripts\windows\start-local-prod.ps1
+scripts\windows\start-meesho-app.bat
 ```
 
 ## Database Notes

@@ -9,6 +9,7 @@ import { requireAccount, requireUser } from "@/lib/auth";
 import { getOrderWithImage } from "@/lib/data";
 import { formatDateTime } from "@/lib/format";
 import { packingResultLabel } from "@/lib/operations/packing";
+import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { confirmPackedAction, reportProblemFromScanAction } from "./actions";
 
 type ScanResultPageProps = {
@@ -37,7 +38,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   const canPack = order.packStatus === "READY";
   const canReportProblem = order.packStatus === "READY";
   const openProblem = order.problemOrders[0];
-  const imageUrl = mapping?.imageUrl ?? order.imageUrl;
+  const imageUrl = mapping?.cachedImageUrl ?? null;
+  const canCacheImage = user.role === "OWNER" && mapping?.id && mapping.imageUrl && mapping.cacheStatus !== "CACHED";
 
   return (
     <AppShell>
@@ -86,11 +88,25 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             mappingId={mapping?.id}
             showDebug={user.role === "OWNER"}
             imageHealth={mapping?.imageHealth}
+            cacheStatus={mapping?.cacheStatus}
+            originalImageUrl={mapping?.imageUrl}
           />
           <div className="p-4">
             <p className="line-clamp-2 text-base font-semibold text-slate-700">
               {mapping?.productName ?? order.productDescription ?? "Product details not mapped"}
             </p>
+            {!imageUrl && user.role !== "OWNER" ? (
+              <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">Image not prepared.</p>
+            ) : null}
+            {canCacheImage ? (
+              <form action={cacheSkuImageAction} className="mt-3">
+                <input type="hidden" name="mappingId" value={mapping?.id} />
+                <input type="hidden" name="returnTo" value={`/packing/${encodeURIComponent(order.awb)}`} />
+                <button className="min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+                  Cache now
+                </button>
+              </form>
+            ) : null}
             <h2 className="mt-3 break-words text-3xl font-black text-slate-950 sm:text-2xl">{order.sku}</h2>
             <div className="mt-4 rounded-md bg-slate-950 p-4 text-white">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Quantity to pack</p>

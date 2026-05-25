@@ -1,4 +1,4 @@
-import type { Account, Order, PaymentType, User } from "@prisma/client";
+import type { Account, Order, PaymentType, SkuImageMapping, User } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +28,7 @@ export type OrderImportPlan = {
 };
 
 type ExistingOrder = Pick<Order, "awb" | "courier" | "sku" | "qty" | "color" | "size" | "orderNo" | "productDescription" | "paymentType">;
+type MetadataMapping = Pick<SkuImageMapping, "id" | "sku" | "productName" | "color" | "size">;
 
 function trimValue(value?: string | null) {
   return value?.trim() ?? "";
@@ -60,6 +61,7 @@ function withImportStats(
     missingImageRows: number;
     skippedRows: number;
     errorRows: number;
+    metadataAutoFilled?: number;
   }
 ) {
   let parsed: Record<string, unknown> = {};
@@ -124,6 +126,43 @@ export function planOrderImport(
   );
 }
 
+export function buildSkuMetadataAutoFillUpdates(mappings: MetadataMapping[], rows: ParsedOrderImportRow[]) {
+  const mappingBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
+  const updates = new Map<string, { id: string; sku: string; productName?: string; color?: string; size?: string }>();
+
+  for (const row of rows) {
+    const sku = trimSku(row.sku);
+    const mapping = mappingBySku.get(sku);
+
+    if (!mapping) {
+      continue;
+    }
+
+    const update = updates.get(mapping.id) ?? { id: mapping.id, sku: mapping.sku };
+    const productName = trimValue(row.productDescription);
+    const color = trimValue(row.color);
+    const size = trimValue(row.size);
+
+    if (!mapping.productName && !update.productName && productName) {
+      update.productName = productName;
+    }
+
+    if (!mapping.color && !update.color && color) {
+      update.color = color;
+    }
+
+    if (!mapping.size && !update.size && size) {
+      update.size = size;
+    }
+
+    if (update.productName || update.color || update.size) {
+      updates.set(mapping.id, update);
+    }
+  }
+
+  return Array.from(updates.values());
+}
+
 export async function importParsedOrderRows(input: {
   rows: ParsedOrderImportRow[];
   fileName: string;
@@ -164,12 +203,21 @@ export async function importParsedOrderRows(input: {
         accountId: input.account.id,
         sku: { in: skus },
         active: true
+      },
+      select: {
+        id: true,
+        sku: true,
+        imageUrl: true,
+        productName: true,
+        color: true,
+        size: true
       }
     })
   ]);
 
-  const mappingBySku = new Map(mappings.map((mapping) => [mapping.sku, mapping]));
+  const mappingBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
   const plan = planOrderImport(existingOrders, input.rows, new Set(mappingBySku.keys()));
+  const metadataAutoFillUpdates = buildSkuMetadataAutoFillUpdates(mappings, input.rows);
 
   for (const error of plan.errors) {
     await prisma.importRowIssue.create({
@@ -251,6 +299,17 @@ export async function importParsedOrderRows(input: {
     });
   }
 
+  for (const update of metadataAutoFillUpdates) {
+    await prisma.skuImageMapping.update({
+      where: { id: update.id },
+      data: {
+        productName: update.productName,
+        color: update.color,
+        size: update.size
+      }
+    });
+  }
+
   const importStats = {
     attemptedRows: input.rows.length,
     createdRows: plan.created.length,
@@ -258,7 +317,8 @@ export async function importParsedOrderRows(input: {
     duplicateRows: plan.duplicates.length,
     missingImageRows: plan.missingImageRows.length,
     skippedRows: plan.duplicates.length,
-    errorRows: plan.errors.length
+    errorRows: plan.errors.length,
+    metadataAutoFilled: metadataAutoFillUpdates.length
   };
   const updatedBatch = input.batchId
     ? await prisma.uploadBatch.update({
@@ -297,7 +357,8 @@ export async function importParsedOrderRows(input: {
       updatedRows: plan.updated.length,
       duplicateRows: plan.duplicates.length,
       missingImageRows: plan.missingImageRows.length,
-      errorRows: plan.errors.length
+      errorRows: plan.errors.length,
+      metadataAutoFilled: metadataAutoFillUpdates.length
     },
     request: input.request
   });

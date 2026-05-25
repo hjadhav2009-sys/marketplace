@@ -57,7 +57,7 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
       <PageHeader
         eyebrow="SKU Import"
         title="Import SKU image mappings"
-        description="Upload a CSV or .xlsx file with SKU and image URL columns. Existing mappings are updated by account and SKU."
+        description="Upload only SKU and image URL. Product name, color, and size will be filled from parsed orders automatically."
       />
 
       {params?.error ? (
@@ -106,8 +106,15 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
             </label>
             <div className="rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
               Required columns: <span className="font-semibold">sku</span>,{" "}
-              <span className="font-semibold">image_url</span>. Optional columns: account, product_name, color, notes,
-              active.
+              <span className="font-semibold">image_url</span>. Optional column: account for all-account imports.
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm font-semibold">
+              <Link href="/owner/sku-mappings/template?format=csv" className="text-berry hover:text-pink-800">
+                Download CSV template
+              </Link>
+              <Link href="/owner/sku-mappings/template?format=xlsx" className="text-berry hover:text-pink-800">
+                Download Excel template
+              </Link>
             </div>
             <SubmitButton pendingText="Importing...">Import mappings</SubmitButton>
           </div>

@@ -20,9 +20,12 @@ export type PickerMappingInput = {
   id?: string;
   sku: string;
   imageUrl: string | null;
+  cachedImageUrl?: string | null;
   productName: string | null;
   color?: string | null;
+  size?: string | null;
   imageHealth?: string | null;
+  cacheStatus?: string | null;
 };
 
 export type PickerSkuGroup = {
@@ -79,7 +82,7 @@ export function buildPickerSkuGroups(orders: PickerOrderInput[], mappings: Picke
     const size = cleanDimension(order.size);
     const key = pickerGroupKey(order.sku, color, size);
     const mapping = mappingBySku.get(normalizeSkuForMatching(order.sku)) ?? null;
-    const imageUrl = mapping?.imageUrl ?? order.imageUrl ?? null;
+    const imageUrl = mapping?.cachedImageUrl ?? null;
     const existing =
       groups.get(key) ??
       ({
@@ -109,8 +112,8 @@ export function buildPickerSkuGroups(orders: PickerOrderInput[], mappings: Picke
       existing.pendingCount += 1;
     }
 
-    if (mapping?.imageUrl && existing.imageUrl !== mapping.imageUrl) {
-      existing.imageUrl = mapping.imageUrl;
+    if (mapping?.cachedImageUrl && existing.imageUrl !== mapping.cachedImageUrl) {
+      existing.imageUrl = mapping.cachedImageUrl;
       existing.mapping = mapping;
     }
 

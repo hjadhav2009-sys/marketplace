@@ -1,4 +1,5 @@
 import type { Account } from "@prisma/client";
+import { cachedProductImageUrl } from "./image-cache";
 import { findAwbSearchMatches } from "./operations/awb-search";
 import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups, paginatePickerSkuGroups } from "./operations/picking";
 import { withDevTiming } from "./perf";
@@ -59,20 +60,31 @@ export async function getSkuMappings(accountId: string) {
 
 export async function searchSkuMappings(accountId: string, query?: string, active?: string, image?: string) {
   const imageFilter = normalizeSkuMappingImageFilter(image);
+  const imageWhere =
+    imageFilter === "cached"
+      ? { cacheStatus: "CACHED" as const }
+      : imageFilter === "not-cached"
+        ? { cacheStatus: "NOT_CACHED" as const }
+        : imageFilter === "recheck-needed"
+          ? { cacheStatus: "RECHECK_NEEDED" as const }
+          : imageFilter === "broken"
+            ? { OR: [{ cacheStatus: "BROKEN" as const }, { imageHealth: "BROKEN" as const }] }
+            : {};
+  const queryWhere = query
+    ? {
+        OR: [
+          { sku: { contains: query } },
+          { productName: { contains: query } },
+          { notes: { contains: query } }
+        ]
+      }
+    : {};
 
   return prisma.skuImageMapping.findMany({
     where: {
       accountId,
       active: active === "inactive" ? false : active === "all" ? undefined : true,
-      imageHealth: imageFilter === "mapped" ? "MAPPED" : imageFilter === "broken" ? "BROKEN" : undefined,
-      imageUrl: imageFilter === "missing" ? "" : undefined,
-      OR: query
-        ? [
-            { sku: { contains: query } },
-            { productName: { contains: query } },
-            { notes: { contains: query } }
-          ]
-        : undefined
+      AND: [imageWhere, queryWhere]
     },
     orderBy: { updatedAt: "desc" }
   });
@@ -126,12 +138,29 @@ export async function getSkuGroups(
         imageUrl: true,
         productName: true,
         color: true,
-        imageHealth: true
+        size: true,
+        imageHealth: true,
+        cacheStatus: true,
+        cacheFilePath: true,
+        cacheOriginalImageUrl: true,
+        cacheCachedAt: true
       }
     })
   );
 
-  return paginatePickerSkuGroups(filterPickerSkuGroups(buildPickerSkuGroups(orders, mappings), options), options);
+  return paginatePickerSkuGroups(
+    filterPickerSkuGroups(
+      buildPickerSkuGroups(
+        orders,
+        mappings.map((mapping) => ({
+          ...mapping,
+          cachedImageUrl: cachedProductImageUrl(mapping)
+        }))
+      ),
+      options
+    ),
+    options
+  );
 }
 
 export async function getSkuDetail(
@@ -181,7 +210,12 @@ export async function getSkuDetail(
         imageUrl: true,
         productName: true,
         color: true,
-        imageHealth: true
+        size: true,
+        imageHealth: true,
+        cacheStatus: true,
+        cacheFilePath: true,
+        cacheOriginalImageUrl: true,
+        cacheCachedAt: true
       },
       orderBy: { updatedAt: "desc" }
     })
@@ -195,7 +229,12 @@ export async function getSkuDetail(
 
   return {
     orders,
-    mapping,
+    mapping: mapping
+      ? {
+          ...mapping,
+          cachedImageUrl: cachedProductImageUrl(mapping)
+        }
+      : null,
     totalQuantity: orders.reduce((sum, order) => sum + order.qty, 0),
     pickedCount: orders.filter((order) => order.pickStatus === "PICKED").length,
     pendingCount: orders.filter((order) => order.pickStatus === "READY").length,
@@ -336,15 +375,21 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
           },
           select: {
             sku: true,
-            imageUrl: true
+            imageUrl: true,
+            cacheStatus: true,
+            cacheFilePath: true,
+            cacheOriginalImageUrl: true,
+            cacheCachedAt: true
           }
-      })
+        })
       : [];
-  const imageBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping.imageUrl]));
+  const imageBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), cachedProductImageUrl(mapping)]));
+  const cacheStatusBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping.cacheStatus]));
 
   return matches.map((order) => ({
     ...order,
-    imageUrl: imageBySku.get(normalizeSkuForMatching(order.sku)) ?? order.imageUrl ?? null
+    imageUrl: imageBySku.get(normalizeSkuForMatching(order.sku)) ?? null,
+    cacheStatus: cacheStatusBySku.get(normalizeSkuForMatching(order.sku)) ?? null
   }));
 }
 
@@ -422,7 +467,12 @@ export async function getOrderWithImage(accountId: string, awb: string) {
 
   return {
     order,
-    mapping
+    mapping: mapping
+      ? {
+          ...mapping,
+          cachedImageUrl: cachedProductImageUrl(mapping)
+        }
+      : null
   };
 }
 

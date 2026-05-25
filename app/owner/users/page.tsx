@@ -11,6 +11,7 @@ import {
   createUserAction,
   deactivateUserAction,
   reactivateUserAction,
+  unlockUserAction,
   updateUserAction
 } from "./actions";
 
@@ -22,6 +23,7 @@ type UsersPageProps = {
     deactivated?: string;
     reactivated?: string;
     sessions?: string;
+    unlocked?: string;
     error?: string;
   }>;
 };
@@ -47,6 +49,13 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
         sessions: {
           orderBy: { lastSeenAt: "desc" },
           take: 4
+        },
+        _count: {
+          select: {
+            sessions: {
+              where: { active: true }
+            }
+          }
         }
       },
       orderBy: [{ active: "desc" }, { role: "asc" }, { username: "asc" }]
@@ -70,6 +79,7 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
       {params?.deactivated ? <SuccessBanner message="User deactivated and sessions closed." /> : null}
       {params?.reactivated ? <SuccessBanner message="User reactivated." /> : null}
       {params?.sessions ? <SuccessBanner message="User sessions closed." /> : null}
+      {params?.unlocked ? <SuccessBanner message="User unlocked." /> : null}
 
       {params?.error ? (
         <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
@@ -78,6 +88,9 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
       ) : null}
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-4 rounded-md bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+          Passwords are securely hashed and cannot be viewed. Owner can reset passwords and force a password change on next login.
+        </div>
         <h2 className="text-lg font-bold text-slate-950">Create user</h2>
         <form action={createUserAction} className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <TextField name="name" label="Name" placeholder="Packing staff" />
@@ -122,8 +135,23 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                   <p className="mt-1 text-sm text-slate-500">
                     Last login {formatDateTime(user.lastLoginAt)} - {user.lastLoginIp ?? "IP not recorded"}
                   </p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                    <span className="rounded-full bg-slate-100 px-2 py-1">Active sessions: {user._count.sessions}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1">Failed logins: {user.failedLoginCount}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1">
+                      Locked until: {user.lockedUntil ? formatDateTime(user.lockedUntil) : "Not locked"}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {user.lockedUntil || user.failedLoginCount > 0 ? (
+                    <form action={unlockUserAction}>
+                      <input type="hidden" name="userId" value={user.id} />
+                      <SubmitButton pendingText="Unlocking..." variant="secondary">
+                        Unlock
+                      </SubmitButton>
+                    </form>
+                  ) : null}
                   {user.active && !isSelf ? (
                     <form action={deactivateUserAction}>
                       <input type="hidden" name="userId" value={user.id} />
@@ -188,6 +216,10 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                   <input type="hidden" name="userId" value={user.id} />
                   <h3 className="font-semibold text-slate-950">Change password</h3>
                   <TextField name="password" label="New password" type="password" placeholder="At least 8 characters" />
+                  <label className="mt-3 flex items-start gap-3 rounded-md bg-slate-50 p-3 text-sm font-medium text-slate-700">
+                    <input name="mustChangePassword" type="checkbox" defaultChecked={!isSelf} className="mt-1 h-4 w-4 rounded border-slate-300" />
+                    Force password change on next login
+                  </label>
                   <p className="mt-2 text-sm text-slate-500">
                     Use at least 12 characters with letters, numbers, and a symbol for production.
                     Resetting another user&apos;s password closes their active sessions.

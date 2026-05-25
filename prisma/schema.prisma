@@ -70,6 +70,13 @@ enum ImageHealth {
   BROKEN
 }
 
+enum ImageCacheStatus {
+  NOT_CACHED
+  CACHED
+  BROKEN
+  RECHECK_NEEDED
+}
+
 model User {
   id                 String              @id @default(cuid())
   username           String              @unique
@@ -143,25 +150,38 @@ model Account {
 }
 
 model SkuImageMapping {
-  id             String      @id @default(cuid())
-  accountId      String
-  account        Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  sku            String
-  imageUrl       String
-  productName    String?
-  color          String?
-  active         Boolean     @default(true)
-  lastImportedAt DateTime?
-  source         String?
-  notes          String?
-  imageHealth    ImageHealth @default(UNKNOWN)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id                    String           @id @default(cuid())
+  accountId             String
+  account               Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sku                   String
+  imageUrl              String
+  productName           String?
+  color                 String?
+  size                  String?
+  active                Boolean          @default(true)
+  lastImportedAt        DateTime?
+  source                String?
+  notes                 String?
+  imageHealth           ImageHealth      @default(UNKNOWN)
+  cacheStatus           ImageCacheStatus @default(NOT_CACHED)
+  cacheFilePath         String?
+  cacheContentType      String?
+  cacheOriginalImageUrl String?
+  cacheCachedAt         DateTime?
+  cacheLastUsedAt       DateTime?
+  cacheWidth            Int?
+  cacheHeight           Int?
+  cacheFileSizeBytes    Int?
+  cacheError            String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   @@unique([accountId, sku])
   @@index([sku])
   @@index([accountId, active])
   @@index([accountId, imageHealth])
+  @@index([accountId, cacheStatus])
+  @@index([cacheLastUsedAt])
 }
 
 model UploadBatch {

@@ -21,6 +21,7 @@ export async function GET(request: Request) {
       awb: order.awb,
       sku: order.sku,
       imageUrl: order.imageUrl,
+      cacheStatus: order.cacheStatus,
       color: order.color,
       qty: order.qty,
       courier: order.courier,

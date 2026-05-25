@@ -19,6 +19,7 @@ type AwbSuggestion = {
   awb: string;
   sku: string;
   imageUrl?: string | null;
+  cacheStatus?: string | null;
   color?: string | null;
   qty: number;
   courier?: string | null;
@@ -301,7 +302,13 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
                       href={`/packing/${encodeURIComponent(suggestion.awb)}`}
                       className="grid grid-cols-[4rem_1fr] gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm transition hover:border-berry hover:bg-slate-50 sm:grid-cols-[auto_1fr_auto]"
                     >
-                      <ProductImage src={suggestion.imageUrl} alt={`${suggestion.sku} ${suggestion.awb}`} size="sm" showBadge={false} />
+                      <ProductImage
+                        src={suggestion.imageUrl}
+                        alt={`${suggestion.sku} ${suggestion.awb}`}
+                        size="sm"
+                        showBadge={false}
+                        cacheStatus={suggestion.cacheStatus}
+                      />
                       <span className="min-w-0">
                         <span className="block break-all text-lg font-black text-slate-950 sm:text-sm sm:font-bold">{suggestion.awb}</span>
                         <span className="mt-1 block text-base font-semibold text-slate-800 sm:text-sm sm:font-normal sm:text-slate-600">

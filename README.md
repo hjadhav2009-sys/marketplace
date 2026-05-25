@@ -178,6 +178,7 @@ Create the first owner user and first account there. The setup page only works w
 first user exists it redirects to `/login`.
 
 For a complete first-time server PC checklist, see `docs/windows-server-setup.md`.
+For the final production smoke-test checklist, see `docs/manual-smoke-test.md`.
 
 ### Cloudflare Tunnel setup
 
@@ -265,6 +266,7 @@ must type `DELETE IMAGE CACHE` before deleting image cache files.
 - Export CSV backups weekly from **Owner -> System**.
 - Keep the SKU image mapping CSV somewhere safe because it is operationally important.
 - Export orders, packed orders, problem orders, scan logs, upload batches, and SKU mappings before major cleanup.
+- Back up `.env` securely outside Git because it contains the database connection and signing secrets.
 - Use Supabase database backup/export options for full database recovery.
 - Local image cache files can be regenerated from SKU image URLs. Back up mappings and orders first; the image cache is optional.
 
@@ -293,6 +295,11 @@ must type `DELETE IMAGE CACHE` before deleting image cache files.
   `postgres://`.
 - `DATABASE_URL` format errors: remove accidental spaces and quotes, confirm it is a full Supabase PostgreSQL URL, and
   keep SQLite development URLs as `file:./...`.
+- `DATABASE_URL must start with postgresql://, postgres://, or file:` means the `.env` value is malformed. Remove any
+  accidental duplicate prefix such as `DATABASE_URL=DATABASE_URL=...`.
+- `Authentication failed` from Prisma usually means the Supabase database password or connection string is wrong.
+- `Column does not exist` usually means a migration has not been applied. Run `npm run check:production-readiness`; set
+  `AUTO_APPLY_MIGRATIONS=true` only when you want the startup preflight to apply pending migrations automatically.
 - Prisma says SQLite requires a `file:` URL but `.env` has a PostgreSQL `DATABASE_URL`: pull the latest build script fix
   and run `npm run build` again so Prisma Client is regenerated with `prisma/schema.postgres.prisma`.
 - Login fails: read the login page message first. `Invalid username or password`, `Account inactive`, `Session expired`,
@@ -564,6 +571,7 @@ npm run dev
 npm run build
 npm run build:prod
 npm run check:env
+npm run check:production-readiness
 npm run typecheck
 npm run lint
 npm run test:validators

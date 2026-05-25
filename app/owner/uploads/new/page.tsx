@@ -17,6 +17,8 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
   const errorMessage =
     params?.error === "missing-file"
       ? "Upload a label PDF, a manifest PDF, or both."
+      : params?.error === "too-large"
+        ? "The PDF upload is larger than 100 MB. Split the Meesho download into smaller files and upload again."
       : params?.error === "parse-failed"
         ? "The PDF could not be parsed. Try a text-based Meesho PDF; scanned image PDFs will need OCR in a later sprint."
         : params?.error

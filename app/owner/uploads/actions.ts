@@ -18,6 +18,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
+import { PDF_UPLOAD_MAX_BYTES } from "@/lib/upload-limits";
 import { uploadBatchSchema } from "@/lib/validators";
 
 type PreviewRowDraft = {
@@ -297,6 +298,10 @@ export async function createUploadBatchAction(formData: FormData) {
 
   if (files.length === 0) {
     redirect("/owner/uploads/new?error=missing-file");
+  }
+
+  if (files.some((file) => file.size > PDF_UPLOAD_MAX_BYTES)) {
+    redirect("/owner/uploads/new?error=too-large");
   }
 
   for (const file of files) {
@@ -653,7 +658,8 @@ export async function confirmParsedBatchAction(formData: FormData) {
           fileName: batch.fileName,
           account,
           user,
-          request
+          request,
+          heldRows: heldBlockingRows
         });
 
         await prisma.uploadPreviewRow.updateMany({

@@ -119,7 +119,8 @@ export async function getSkuGroups(
       orderBy: {
         sku: "asc"
       }
-    })
+    }),
+    800
   );
   const orderSkus = Array.from(new Set(orders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
 
@@ -145,7 +146,8 @@ export async function getSkuGroups(
         cacheOriginalImageUrl: true,
         cacheCachedAt: true
       }
-    })
+    }),
+    800
   );
 
   return paginatePickerSkuGroups(

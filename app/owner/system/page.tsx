@@ -87,6 +87,12 @@ export default async function OwnerSystemPage() {
         <StatCard label="Scans today" value={compactNumber(health.todayScanCount)} />
         <StatCard label="Missing image SKUs" value={compactNumber(health.missingImageSkuCount)} tone={health.missingImageSkuCount > 0 ? "clay" : "mint"} />
         <StatCard label="Broken image URLs" value={compactNumber(health.brokenImageUrlCount)} tone={health.brokenImageUrlCount > 0 ? "clay" : "mint"} />
+        <StatCard label="Image cache folder" value={health.imageCacheRootExists ? "Ready" : "Missing"} tone={health.imageCacheRootExists ? "mint" : "clay"} />
+        <StatCard
+          label="Pending migrations"
+          value={health.pendingMigrationCount === null ? "Unknown" : compactNumber(health.pendingMigrationCount)}
+          tone={health.pendingMigrationCount && health.pendingMigrationCount > 0 ? "clay" : "mint"}
+        />
         <StatCard label="Preview rows" value={compactNumber(health.uploadPreviewRowCount)} />
         <StatCard label="Import issues" value={compactNumber(health.importRowIssueCount)} />
         <StatCard label="Scan logs" value={compactNumber(health.scanLogCount)} />

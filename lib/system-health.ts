@@ -1,8 +1,12 @@
 import packageJson from "../package.json";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { sessionCookieSecurityDiagnostics } from "./auth-helpers";
+import { productImageCacheRoot } from "./image-cache";
 import { prisma } from "./prisma";
 import { runProductionChecks, summarizeProductionChecks } from "./production-checks";
 import { cleanupCutoffs } from "./cleanup";
+import { normalizeSkuForMatching } from "./sku";
 
 export type SystemHealth = Awaited<ReturnType<typeof getSystemHealth>>;
 
@@ -10,6 +14,56 @@ function startOfToday() {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
   return date;
+}
+
+function normalizedDatabaseUrl() {
+  let value = String(process.env.DATABASE_URL ?? "").trim().replace(/^['"]|['"]$/g, "");
+
+  if (value.startsWith("DATABASE_URL=")) {
+    value = value.slice("DATABASE_URL=".length).trim().replace(/^['"]|['"]$/g, "");
+  }
+
+  return value;
+}
+
+function migrationDirectory() {
+  const databaseUrl = normalizedDatabaseUrl();
+
+  return databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://")
+    ? join(process.cwd(), "prisma", "migrations-postgres")
+    : join(process.cwd(), "prisma", "migrations");
+}
+
+function localMigrationNames() {
+  const dir = migrationDirectory();
+
+  if (!existsSync(dir)) {
+    return [] as string[];
+  }
+
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+}
+
+async function getMigrationStatus() {
+  try {
+    const localNames = localMigrationNames();
+    const rows = await prisma.$queryRawUnsafe<Array<{ migration_name: string }>>(
+      'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL'
+    );
+    const appliedNames = new Set(rows.map((row) => row.migration_name));
+
+    return {
+      pendingMigrationCount: localNames.filter((name) => !appliedNames.has(name)).length,
+      migrationCheckError: null
+    };
+  } catch (error) {
+    return {
+      pendingMigrationCount: null,
+      migrationCheckError: error instanceof Error ? error.message : "Unknown migration status error"
+    };
+  }
 }
 
 export async function getSystemHealth() {
@@ -29,12 +83,17 @@ export async function getSystemHealth() {
   }
 
   if (!databaseConnected) {
+    const imageCacheRootExists = existsSync(productImageCacheRoot());
     const productionChecks = runProductionChecks({
       nodeEnv: process.env.NODE_ENV,
       sessionSecret: process.env.SESSION_SECRET,
       nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
       databaseUrl: process.env.DATABASE_URL,
-      localNetworkOnly: process.env.LOCAL_NETWORK_ONLY
+      localNetworkOnly: process.env.LOCAL_NETWORK_ONLY,
+      databasePingMs,
+      imageCacheRootExists,
+      pendingMigrationCount: null,
+      migrationCheckError: "Database connection failed."
     });
 
     return {
@@ -62,6 +121,9 @@ export async function getSystemHealth() {
       oldImportIssueCount: 0,
       oldScanLogCount: 0,
       oldAuditLogCount: 0,
+      imageCacheRootExists,
+      pendingMigrationCount: null,
+      migrationCheckError: "Database connection failed.",
       productionChecks,
       overallStatus: "NEEDS_ACTION" as const
     };
@@ -89,7 +151,7 @@ export async function getSystemHealth() {
     activeReadyOrders,
     activeMappings
   ] = await Promise.all([
-    prisma.account.count(),
+    prisma.account.count({ where: { active: true } }),
     prisma.user.count({ where: { active: true } }),
     prisma.uploadBatch.count({ where: { createdAt: { gte: today } } }),
     prisma.order.count({ where: { importedAt: { gte: today } } }),
@@ -137,9 +199,19 @@ export async function getSystemHealth() {
       }
     })
   ]);
+  const [{ pendingMigrationCount, migrationCheckError }, imageCacheRootExists] = await Promise.all([
+    getMigrationStatus(),
+    Promise.resolve(existsSync(productImageCacheRoot()))
+  ]);
 
-  const mappingKeys = new Set(activeMappings.filter((mapping) => mapping.imageUrl).map((mapping) => `${mapping.accountId}:${mapping.sku}`));
-  const missingImageSkuCount = activeReadyOrders.filter((order) => !order.imageUrl && !mappingKeys.has(`${order.accountId}:${order.sku}`)).length;
+  const mappingKeys = new Set(
+    activeMappings
+      .filter((mapping) => mapping.imageUrl)
+      .map((mapping) => `${mapping.accountId}:${normalizeSkuForMatching(mapping.sku)}`)
+  );
+  const missingImageSkuCount = activeReadyOrders.filter(
+    (order) => !order.imageUrl && !mappingKeys.has(`${order.accountId}:${normalizeSkuForMatching(order.sku)}`)
+  ).length;
 
   const productionChecks = runProductionChecks({
     nodeEnv: process.env.NODE_ENV,
@@ -152,7 +224,11 @@ export async function getSystemHealth() {
     oldPreviewRowCount,
     oldImportIssueCount,
     oldScanLogCount,
-    oldAuditLogCount
+    oldAuditLogCount,
+    databasePingMs,
+    imageCacheRootExists,
+    pendingMigrationCount,
+    migrationCheckError
   });
 
   return {
@@ -180,6 +256,9 @@ export async function getSystemHealth() {
     oldImportIssueCount,
     oldScanLogCount,
     oldAuditLogCount,
+    imageCacheRootExists,
+    pendingMigrationCount,
+    migrationCheckError,
     productionChecks,
     overallStatus: databaseConnected ? summarizeProductionChecks(productionChecks) : "NEEDS_ACTION"
   };

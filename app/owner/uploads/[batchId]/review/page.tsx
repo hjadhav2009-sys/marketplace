@@ -449,6 +449,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
               ["Created", importStats.createdRows ?? batch.createdRows],
               ["Updated", importStats.updatedRows ?? batch.updatedRows],
               ["Duplicate skipped", importStats.duplicateRows ?? batch.duplicateRows],
+              ["Held for review", importStats.skippedRows ?? batch.skippedRows],
               ["Missing images", importStats.missingImageRows ?? 0],
               ["Metadata filled", importStats.metadataAutoFilled ?? 0],
               ["Errors", importStats.errorRows ?? 0]

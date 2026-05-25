@@ -28,6 +28,10 @@ export type ProductionCheckInput = {
   oldImportIssueCount?: number;
   oldScanLogCount?: number;
   oldAuditLogCount?: number;
+  databasePingMs?: number | null;
+  imageCacheRootExists?: boolean;
+  pendingMigrationCount?: number | null;
+  migrationCheckError?: string | null;
 };
 
 const demoUsernames = new Set(["owner", "picker", "packer"]);
@@ -81,6 +85,33 @@ export function runProductionChecks(input: ProductionCheckInput): ProductionChec
   });
 
   checks.push({
+    key: "database-latency",
+    label: "Database latency",
+    status: typeof input.databasePingMs === "number" && input.databasePingMs > 500 ? "WARNING" : "OK",
+    message:
+      typeof input.databasePingMs === "number"
+        ? `Database ping is ${input.databasePingMs}ms.`
+        : "Database ping is unavailable."
+  });
+
+  checks.push({
+    key: "pending-migrations",
+    label: "Pending migrations",
+    status:
+      typeof input.pendingMigrationCount === "number" && input.pendingMigrationCount > 0
+        ? "NEEDS_ACTION"
+        : input.migrationCheckError
+          ? "WARNING"
+          : "OK",
+    message:
+      typeof input.pendingMigrationCount === "number"
+        ? input.pendingMigrationCount > 0
+          ? `${input.pendingMigrationCount} database migration(s) are not applied. Run the production readiness check or enable AUTO_APPLY_MIGRATIONS=true before start.`
+          : "All local migrations appear to be applied."
+        : `Migration status could not be checked${input.migrationCheckError ? `: ${input.migrationCheckError}` : "."}`
+  });
+
+  checks.push({
     key: "local-network-only",
     label: "Tunnel network setting",
     status: isProduction && input.localNetworkOnly === "true" ? "WARNING" : "OK",
@@ -115,6 +146,16 @@ export function runProductionChecks(input: ProductionCheckInput): ProductionChec
     label: "SKU mappings",
     status: (input.skuMappingCount ?? 0) > 0 ? "OK" : "WARNING",
     message: (input.skuMappingCount ?? 0) > 0 ? "SKU image mappings exist." : "Import SKU image mappings before daily use."
+  });
+
+  checks.push({
+    key: "image-cache",
+    label: "Image cache folder",
+    status: input.imageCacheRootExists === false ? "WARNING" : "OK",
+    message:
+      input.imageCacheRootExists === false
+        ? "Local image cache folder is missing. It will be created when the owner prepares product images."
+        : "Local image cache folder is present or ready."
   });
 
   checks.push({

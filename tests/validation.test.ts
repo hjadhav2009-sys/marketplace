@@ -336,6 +336,29 @@ assert.equal(orderPlan.missingImageRows.length, 0, "Mapped SKUs are not marked a
 const missingImagePlan = planOrderImport([], [{ awb: "NO_IMAGE", sku: "UNMAPPED", qty: 1, orderNo: "ORDER5" }], new Set());
 assert.equal(missingImagePlan.created.length, 1, "Missing image rows still import as orders");
 assert.equal(missingImagePlan.missingImageRows.length, 1, "Missing image rows are counted for review");
+const repeatedPdfPlan = planOrderImport(
+  [
+    {
+      awb: "OLD_AWB",
+      courier: "Delhivery",
+      sku: "SKU1",
+      qty: 1,
+      color: "Silver",
+      size: null,
+      orderNo: "ORDER1",
+      productDescription: "Pendant",
+      paymentType: "UNKNOWN"
+    }
+  ],
+  [
+    { awb: "OLD_AWB", courier: "Delhivery", sku: "SKU1", qty: 1, color: "Silver", orderNo: "ORDER1", productDescription: "Pendant" },
+    { awb: "NEW_LATER_AWB", sku: "SKU1", qty: 1, orderNo: "ORDER6" },
+    { awb: "NEW_LATER_AWB", sku: "SKU1", qty: 1, orderNo: "ORDER6" }
+  ],
+  new Set(["SKU1"])
+);
+assert.equal(repeatedPdfPlan.created.length, 1, "Later PDF with old + new AWB creates only the new AWB once");
+assert.equal(repeatedPdfPlan.duplicates.length, 2, "Repeated PDF rows and duplicate rows are skipped safely");
 const metadataAutoFill = buildSkuMetadataAutoFillUpdates(
   [
     { id: "m1", sku: "SKU_META_EMPTY", productName: null, color: null, size: null },
@@ -378,6 +401,7 @@ assert.equal(canRoleAccessPath("PICKER", "/change-password"), true, "Workers can
 
 assert.equal(canConfirmPacked({ packStatus: "READY" }), true, "Ready order can be packed");
 assert.equal(canConfirmPacked({ packStatus: "PACKED" }), false, "Packed order is idempotently skipped");
+assert.equal(canConfirmPacked({ packStatus: "PROBLEM" }), false, "Problem order cannot be packed accidentally");
 
 const pickerGroups = buildPickerSkuGroups(
   [
@@ -625,6 +649,18 @@ assert.equal(
   true,
   "Changed image URL needs cache refresh"
 );
+assert.equal(
+  imageCacheNeedsRefresh({
+    accountId: "a1",
+    sku: "SKU1",
+    imageUrl: "https://example.com/image.jpg",
+    cacheStatus: "CACHED",
+    cacheFilePath: "meesho/a1/SKU1/card.webp",
+    cacheOriginalImageUrl: "https://example.com/image.jpg"
+  }),
+  false,
+  "Cached same SKU and same URL is skipped during image preparation"
+);
 const imageCacheTestRoot = mkdtempSync(join(tmpdir(), "meesho-image-cache-"));
 try {
   await writeImageCacheMeta({
@@ -701,6 +737,20 @@ assert.equal(
   true,
   "Production checks detect active seed users with stored demo password hash"
 );
+assert.equal(
+  runProductionChecks({
+    nodeEnv: "production",
+    sessionSecret: "this-is-a-long-production-secret-123",
+    nextPublicAppUrl: "https://pack.personalizedgiftday.com",
+    databaseUrl: "postgresql://user:pass@example.com:5432/db",
+    localNetworkOnly: "false",
+    databasePingMs: 900,
+    pendingMigrationCount: 1,
+    imageCacheRootExists: false
+  }).some((check) => check.key === "pending-migrations" && check.status === "NEEDS_ACTION"),
+  true,
+  "Production checks warn about pending migrations"
+);
 
 const envUtils = await import(new URL("../scripts/windows/env-utils.mjs", import.meta.url).href);
 assert.equal(
@@ -718,8 +768,15 @@ assert.equal(envSummary.schema, "prisma/schema.postgres.prisma", "Launcher/check
 assert.equal(envSummary.sessionCookieSecure, "false", "Launcher/check-env defaults local HTTP cookies to non-secure mode");
 
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+const packageJsonText = readFileSync(join(repoRoot, "package.json"), "utf8");
+const nextConfig = readFileSync(join(repoRoot, "next.config.ts"), "utf8");
 const buildScript = readFileSync(join(repoRoot, "scripts", "build.mjs"), "utf8");
+const startScript = readFileSync(join(repoRoot, "scripts", "start.mjs"), "utf8");
+const readinessScript = readFileSync(join(repoRoot, "scripts", "check-production-readiness.mjs"), "utf8");
 const pdfExtractor = readFileSync(join(repoRoot, "lib", "pdf", "extract-pages.ts"), "utf8");
+const importOrders = readFileSync(join(repoRoot, "lib", "import", "orders.ts"), "utf8");
+const uploadLimits = readFileSync(join(repoRoot, "lib", "upload-limits.ts"), "utf8");
+const uploadActions = readFileSync(join(repoRoot, "app", "owner", "uploads", "actions.ts"), "utf8");
 const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
 const awbScannerComponent = readFileSync(join(repoRoot, "components", "AwbBarcodeScanner.tsx"), "utf8");
 const productImageRoute = readFileSync(join(repoRoot, "app", "product-images", "[...path]", "route.ts"), "utf8");
@@ -739,12 +796,15 @@ const appShell = readFileSync(join(repoRoot, "components", "AppShell.tsx"), "utf
 const dataHelpers = readFileSync(join(repoRoot, "lib", "data.ts"), "utf8");
 const changePasswordAction = readFileSync(join(repoRoot, "app", "change-password", "actions.ts"), "utf8");
 const ownerSystemPage = readFileSync(join(repoRoot, "app", "owner", "system", "page.tsx"), "utf8");
+const systemHealth = readFileSync(join(repoRoot, "lib", "system-health.ts"), "utf8");
+const productionChecksSource = readFileSync(join(repoRoot, "lib", "production-checks.ts"), "utf8");
 const windowsProdPs1 = readFileSync(join(repoRoot, "scripts", "windows", "start-local-prod.ps1"), "utf8");
 const windowsLauncher = readFileSync(join(repoRoot, "scripts", "windows", "start-local-prod.mjs"), "utf8");
 const windowsEnvUtils = readFileSync(join(repoRoot, "scripts", "windows", "env-utils.mjs"), "utf8");
 const windowsCheckEnv = readFileSync(join(repoRoot, "scripts", "windows", "check-env.mjs"), "utf8");
 const windowsServerSetupDoc = readFileSync(join(repoRoot, "docs", "windows-server-setup.md"), "utf8");
 const cloudflareSecurityDoc = readFileSync(join(repoRoot, "docs", "cloudflare-tunnel", "security-setup.md"), "utf8");
+const manualSmokeTestDoc = readFileSync(join(repoRoot, "docs", "manual-smoke-test.md"), "utf8");
 const localProdEnvExample = readFileSync(join(repoRoot, ".env.local.production.example"), "utf8");
 const prodEnvExample = readFileSync(join(repoRoot, ".env.production.example"), "utf8");
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
@@ -764,13 +824,30 @@ assert.match(readme, /Meesho image URLs are external/, "README documents externa
 assert.match(readme, /You only need SKU \+ image URL/, "README documents simple SKU image import");
 assert.match(readme, /storage\/product-images\/meesho\/<accountId>\/<safeSku>/, "README documents local image cache storage");
 assert.match(readme, /start-meesho-app\.bat/, "README documents the double-click Windows launcher");
+assert.match(readme, /Body exceeded 1 MB limit/, "README documents the large PDF Server Action limit fix");
+assert.match(readme, /check:production-readiness/, "README documents the production readiness check");
+assert.match(readme, /Back up `.env` securely/, "README documents secure env backup");
 assert.match(windowsServerSetupDoc, /Workers do not need the code/, "Windows setup doc explains workers use browser only");
 assert.match(cloudflareSecurityDoc, /does not require opening router ports|without opening router ports/, "Cloudflare safety doc explains no router ports");
 assert.match(cloudflareSecurityDoc, /SESSION_COOKIE_SECURE=true/, "Cloudflare safety doc documents HTTPS cookie mode");
+assert.match(manualSmokeTestDoc, /duplicate PDF upload|Repeated Imports/i, "Manual smoke test covers duplicate PDF upload");
+assert.match(manualSmokeTestDoc, /create a second Meesho account/i, "Manual smoke test covers second account creation");
+assert.match(packageJsonText, /check:production-readiness/, "Package scripts include production readiness check");
+assert.match(nextConfig, /bodySizeLimit:\s*"100mb"/, "Next config allows large local Meesho PDF uploads");
 assert.equal(buildScript.indexOf('import "dotenv/config";') < buildScript.indexOf("process.env.DATABASE_URL"), true, "Build loads .env before choosing Prisma schema");
+assert.match(startScript, /check-production-readiness\.mjs/, "Startup runs production readiness preflight");
+assert.match(readinessScript, /AUTO_APPLY_MIGRATIONS/, "Production readiness check supports automatic migration apply opt-in");
+assert.match(readinessScript, /prisma", "migrate", "status"/, "Production readiness check verifies migration status");
+assert.match(readinessScript, /\$queryRaw`SELECT 1`/, "Production readiness check pings the database");
 assert.equal(pdfExtractor.includes(".next/server/chunks/pdf.worker.mjs"), false, "PDF extraction does not reference Next server worker chunks");
 assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF extraction preloads the PDF.js worker module explicitly");
 assert.match(pdfExtractor, /PDF text extraction failed before pages could be read\./, "PDF extraction reports startup failures before page reads");
+assert.match(uploadLimits, /PDF_UPLOAD_MAX_BYTES\s*=\s*100 \* 1024 \* 1024/, "Upload action has a 100 MB friendly file-size guard");
+assert.match(uploadActions, /error=too-large/, "Upload action redirects to friendly too-large PDF error");
+assert.match(uploadActions, /const hasLabels[\s\S]*LABEL[\s\S]*MANIFEST_ORDER/, "Confirm import prefers label rows over manifest rows");
+assert.match(uploadActions, /seenAwbs\.has/, "Confirm import skips duplicate AWB rows inside one preview batch");
+assert.match(importOrders, /heldRows/, "Order import stats include held-for-review rows");
+assert.match(reviewPage, /Held for review/, "Import result shows held-for-review count");
 assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");
 assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination");
 assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
@@ -791,6 +868,7 @@ assert.match(packingSearchRoute, /cachedImageUrl/, "AWB suggestion API returns c
 assert.doesNotMatch(packingSearchRoute, /imageUrl: order\.imageUrl/, "AWB suggestion API does not return slow external image URLs");
 assert.match(dataHelpers, /awb: query[\s\S]*endsWith: query[\s\S]*contains: query/, "AWB search queries exact, suffix, then contains");
 assert.match(dataHelpers, /withDevTiming\("packing awb search"[\s\S]*500\)/, "AWB search has 500ms dev timing logs");
+assert.match(dataHelpers, /withDevTiming\("picker orders"[\s\S]*800[\s\S]*\);/, "Picker order query has 800ms dev timing logs");
 assert.match(packingActions, /writeScanLogLater[\s\S]*redirect\(`\/packing\/\$\{encodeURIComponent\(matchedOrder\.awb\)\}`\)/, "Packing search redirects before scan logging can block order opening");
 assert.match(productImageRoute, /getCurrentUser/, "Cached image route checks session without login redirect");
 assert.match(productImageRoute, /verifySignedCachedImageUrl/, "Cached image route verifies signed image URLs");
@@ -820,6 +898,11 @@ assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/,
 assert.match(changePasswordAction, /await clearSession\(\);\s*redirect\("\/login\?passwordChanged=1"\)/, "Password changes clear session and redirect to login");
 assert.match(ownerSystemPage, /Cookie secure mode/, "Owner system page shows auth cookie diagnostics");
 assert.match(ownerSystemPage, /Database ping/, "Owner system page shows database latency");
+assert.match(ownerSystemPage, /Pending migrations/, "Owner system page shows pending migration status");
+assert.match(ownerSystemPage, /Image cache folder/, "Owner system page shows missing image cache status");
+assert.match(systemHealth, /pendingMigrationCount/, "System health detects pending migration count when possible");
+assert.match(productionChecksSource, /database-latency/, "Production checks warn on high database latency");
+assert.match(productionChecksSource, /image-cache/, "Production checks warn when image cache folder is missing");
 assert.match(windowsProdPs1, /start-local-prod\.mjs/, "Windows PowerShell launcher delegates to Node launcher");
 assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local production env example supports local Wi-Fi HTTP cookies");
 assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");

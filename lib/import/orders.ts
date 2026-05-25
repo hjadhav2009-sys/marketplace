@@ -90,6 +90,7 @@ export function planOrderImport(
   mappedSkus: Set<string>
 ): OrderImportPlan {
   const existingByAwb = new Map(existingOrders.map((order) => [order.awb, order]));
+  const seenAwbs = new Set<string>();
 
   return rows.reduce<OrderImportPlan>(
     (plan, row) => {
@@ -105,6 +106,13 @@ export function planOrderImport(
         plan.errors.push({ row, issueType: "MISSING_SKU", message: "SKU is required." });
         return plan;
       }
+
+      if (seenAwbs.has(awb)) {
+        plan.duplicates.push(row);
+        return plan;
+      }
+
+      seenAwbs.add(awb);
 
       const existing = existingByAwb.get(awb);
 
@@ -170,6 +178,7 @@ export async function importParsedOrderRows(input: {
   user: User;
   request?: RequestMeta;
   batchId?: string;
+  heldRows?: number;
 }) {
   const batch = input.batchId
     ? await prisma.uploadBatch.update({
@@ -311,12 +320,12 @@ export async function importParsedOrderRows(input: {
   }
 
   const importStats = {
-    attemptedRows: input.rows.length,
+    attemptedRows: input.rows.length + (input.heldRows ?? 0),
     createdRows: plan.created.length,
     updatedRows: plan.updated.length,
     duplicateRows: plan.duplicates.length,
     missingImageRows: plan.missingImageRows.length,
-    skippedRows: plan.duplicates.length,
+    skippedRows: plan.duplicates.length + (input.heldRows ?? 0),
     errorRows: plan.errors.length,
     metadataAutoFilled: metadataAutoFillUpdates.length
   };
@@ -328,6 +337,9 @@ export async function importParsedOrderRows(input: {
           createdRows: plan.created.length,
           updatedRows: plan.updated.length,
           duplicateRows: plan.duplicates.length,
+          missingImageRows: plan.missingImageRows.length,
+          skippedRows: importStats.skippedRows,
+          errorRows: plan.errors.length,
           notes: withImportStats(batch.notes, importStats)
         }
       })

@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getSkuGroups } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
+import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { markSkuGroupPickedAction } from "./[sku]/actions";
 
 type PickerSkuGroupsPageProps = {
@@ -166,6 +167,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             const detailHref = pickerDetailHref(group.sku, group.color, group.size);
             const encodedColor = encodePickerDimension(group.color);
             const encodedSize = encodePickerDimension(group.size);
+            const canCacheImage = user.role === "OWNER" && group.mapping?.id && group.mapping.imageUrl && group.mapping.cacheStatus !== "CACHED";
 
             return (
               <article
@@ -191,6 +193,11 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                     {group.mapping?.imageHealth === "BROKEN" ? (
                       <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
                         {user.role === "OWNER" ? "Broken image URL" : "Image issue"}
+                      </span>
+                    ) : null}
+                    {!compactMode && !group.imageUrl && user.role !== "OWNER" ? (
+                      <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                        Ask owner to prepare image
                       </span>
                     ) : null}
                   </div>
@@ -251,6 +258,15 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                       Problem
                     </Link>
                   </div>
+                  {canCacheImage ? (
+                    <form action={cacheSkuImageAction}>
+                      <input type="hidden" name="mappingId" value={group.mapping?.id} />
+                      <input type="hidden" name="returnTo" value={`/picker?filter=${activeFilter}&view=${compactMode ? "compact" : "cards"}`} />
+                      <button className="min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+                        Cache now
+                      </button>
+                    </form>
+                  ) : null}
                 </div>
               </article>
             );

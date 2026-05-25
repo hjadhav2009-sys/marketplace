@@ -9,6 +9,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getSkuDetail } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
+import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { markSkuGroupPickedAction, markSkuGroupProblemAction } from "./actions";
 
 type PickerSkuDetailPageProps = {
@@ -44,6 +45,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
   const hiddenSize = query?.size ?? encodePickerDimension(groupSize);
   const courierEntries = Object.entries(detail.courierCounts);
   const groupStatus = detail.problemCount > 0 ? "PROBLEM" : detail.pendingCount === 0 ? "PICKED" : "READY";
+  const canCacheImage = user.role === "OWNER" && detail.mapping?.id && detail.mapping.imageUrl && detail.mapping.cacheStatus !== "CACHED";
 
   return (
     <AppShell>
@@ -101,6 +103,18 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
             <div className="p-4">
               <h2 className="break-words text-3xl font-black leading-tight text-slate-950">{sku}</h2>
               <p className="mt-2 text-base leading-6 text-slate-600">{detail.mapping?.productName ?? "Product not mapped"}</p>
+              {!imageUrl && user.role !== "OWNER" ? (
+                <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">Ask owner to prepare image.</p>
+              ) : null}
+              {canCacheImage ? (
+                <form action={cacheSkuImageAction} className="mt-3">
+                  <input type="hidden" name="mappingId" value={detail.mapping?.id} />
+                  <input type="hidden" name="returnTo" value={`/picker/${encodeURIComponent(sku)}?color=${hiddenColor}&size=${hiddenSize}`} />
+                  <button className="min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+                    Cache now
+                  </button>
+                </form>
+              ) : null}
               <dl className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-md bg-slate-950 p-4 text-white">
                   <dt className="text-sm font-semibold text-slate-300">Total quantity</dt>

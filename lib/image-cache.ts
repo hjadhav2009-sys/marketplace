@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { User } from "@prisma/client";
 
 export const PRODUCT_CARD_IMAGE_SIZE = 600;
 export const PRODUCT_CARD_IMAGE_QUALITY = 82;
@@ -11,6 +12,7 @@ export const IMAGE_CACHE_DOWNLOAD_TIMEOUT_MS = 10_000;
 export const IMAGE_CACHE_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 export const IMAGE_CACHE_MARKETPLACE = "meesho";
 export const IMAGE_CACHE_CONFIRMATION = "DELETE IMAGE CACHE";
+export const ALLOWED_CACHED_IMAGE_FILE_NAMES = new Set(["card.webp", "card.jpg", "card.jpeg", "card.png", "card.avif"]);
 
 export type ImageCacheStatus = "CACHED" | "BROKEN" | "NOT_CACHED" | "RECHECK_NEEDED";
 
@@ -49,6 +51,14 @@ export type ImageCacheCleanupCandidate = {
   sku: string;
   lastUsedAt: Date;
   fileSizeBytes: number;
+};
+
+export type ProductImageCacheRoutePath = {
+  marketplace: typeof IMAGE_CACHE_MARKETPLACE;
+  accountId: string;
+  safeSku: string;
+  fileName: string;
+  relativePath: string;
 };
 
 type SharpFactory = (input: Buffer) => {
@@ -100,6 +110,47 @@ export function productImageCacheDir(input: { accountId: string; sku: string; ro
 
 export function productImageCacheMetaPath(input: { accountId: string; sku: string; root?: string; marketplace?: string }) {
   return path.join(productImageCacheDir(input), "meta.json");
+}
+
+export function isAllowedCachedImageFileName(fileName: string) {
+  return ALLOWED_CACHED_IMAGE_FILE_NAMES.has(fileName);
+}
+
+function isSafeRouteSegment(value: string | null | undefined) {
+  return Boolean(value) && value !== "." && value !== ".." && !value?.includes("/") && !value?.includes("\\");
+}
+
+export function parseProductImageCacheRoutePath(pathSegments: string[] | undefined | null): ProductImageCacheRoutePath | null {
+  if (!pathSegments || pathSegments.length !== 4) {
+    return null;
+  }
+
+  const [marketplace, accountId, safeSku, fileName] = pathSegments;
+
+  if (
+    marketplace !== IMAGE_CACHE_MARKETPLACE ||
+    !isSafeRouteSegment(accountId) ||
+    !isSafeRouteSegment(safeSku) ||
+    !isAllowedCachedImageFileName(fileName)
+  ) {
+    return null;
+  }
+
+  return {
+    marketplace,
+    accountId,
+    safeSku,
+    fileName,
+    relativePath: pathSegments.join("/")
+  };
+}
+
+export function canUserAccessCachedImage(user: Pick<User, "role" | "accountId"> | null | undefined, accountId: string) {
+  if (!user) {
+    return false;
+  }
+
+  return user.role === "OWNER" || user.accountId === accountId;
 }
 
 export async function readImageCacheMeta(input: { accountId: string; sku: string; root?: string; marketplace?: string }) {
@@ -209,8 +260,20 @@ function inferContentType(url: string, responseContentType: string | null) {
   return "image/jpeg";
 }
 
-function fallbackCardFileName(contentType: string) {
-  return contentType === "image/webp" ? "card.webp" : "card.jpg";
+export function cardFileNameForContentType(contentType: string) {
+  if (contentType === "image/webp") {
+    return "card.webp";
+  }
+
+  if (contentType === "image/png") {
+    return "card.png";
+  }
+
+  if (contentType === "image/avif") {
+    return "card.avif";
+  }
+
+  return "card.jpg";
 }
 
 async function downloadImage(url: string) {
@@ -351,7 +414,7 @@ async function makeCardImage(downloaded: { buffer: Buffer; contentType: string }
       return {
         buffer: downloaded.buffer,
         contentType: downloaded.contentType,
-        fileName: fallbackCardFileName(downloaded.contentType),
+        fileName: cardFileNameForContentType(downloaded.contentType),
         width: dimensions?.width ?? null,
         height: dimensions?.height ?? null,
         conversionError: error instanceof Error ? `Image conversion failed; cached original. ${error.message}` : "Image conversion failed; cached original."
@@ -364,7 +427,7 @@ async function makeCardImage(downloaded: { buffer: Buffer; contentType: string }
   return {
     buffer: downloaded.buffer,
     contentType: downloaded.contentType,
-    fileName: fallbackCardFileName(downloaded.contentType),
+    fileName: cardFileNameForContentType(downloaded.contentType),
     width: dimensions?.width ?? null,
     height: dimensions?.height ?? null,
     conversionError: "Image conversion unavailable; cached original."

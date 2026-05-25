@@ -18,8 +18,12 @@ import { formatCsvValue, rowsToCsv } from "../lib/csv";
 import { buildSkuMetadataAutoFillUpdates, planOrderImport } from "../lib/import/orders";
 import {
   cachedProductImageUrl,
+  canUserAccessCachedImage,
+  cardFileNameForContentType,
   findImageCacheCleanupCandidates,
   imageCacheNeedsRefresh,
+  isAllowedCachedImageFileName,
+  parseProductImageCacheRoutePath,
   productImageCacheDir,
   productImageCacheRelativeDir,
   readImageCacheMeta,
@@ -479,6 +483,21 @@ assert.equal(skuMappingMatchesImageFilter({ imageUrl: "https://example.com/image
 assert.equal(skuMappingMatchesImageFilter({ imageUrl: "https://example.com/image.jpg", cacheStatus: "NOT_CACHED" }, "not-cached"), true, "SKU mapping helper matches not-cached mappings");
 assert.equal(safeImageCacheSegment("SKU 1/2"), "SKU_1_2", "Image cache segment removes path separators");
 assert.equal(productImageCacheRelativeDir({ accountId: "account/1", sku: "SKU 1/2" }), "meesho/account_1/SKU_1_2", "Account and SKU cache path is deterministic");
+for (const fileName of ["card.webp", "card.jpg", "card.jpeg", "card.png", "card.avif"]) {
+  assert.equal(isAllowedCachedImageFileName(fileName), true, `${fileName} is allowed as a cached card image`);
+}
+assert.equal(cardFileNameForContentType("image/avif"), "card.avif", "AVIF cached originals keep avif extension");
+assert.equal(cardFileNameForContentType("image/png"), "card.png", "PNG cached originals keep png extension");
+assert.equal(cardFileNameForContentType("image/webp"), "card.webp", "WebP cached originals keep webp extension");
+assert.equal(cardFileNameForContentType("image/jpeg"), "card.jpg", "JPEG cached originals use jpg extension");
+assert.equal(isAllowedCachedImageFileName("meta.json"), false, "meta.json is not served by cached image route");
+assert.equal(isAllowedCachedImageFileName("other.jpg"), false, "Arbitrary cached image files are not served");
+assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "card.webp"])?.relativePath, "meesho/a1/SKU1/card.webp", "Valid cache route path parses");
+assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "meta.json"]), null, "Cache route rejects meta.json");
+assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "..", "card.webp"]), null, "Cache route rejects traversal segments");
+assert.equal(canUserAccessCachedImage({ role: "OWNER", accountId: null }, "a2"), true, "Owner can access any account cached image");
+assert.equal(canUserAccessCachedImage({ role: "PICKER", accountId: "a1" }, "a2"), false, "Worker cannot access another account cached image");
+assert.equal(canUserAccessCachedImage(null, "a1"), false, "Unauthenticated cached image access is denied");
 assert.equal(
   cachedProductImageUrl({
     accountId: "a1",
@@ -593,20 +612,43 @@ assert.equal(
   "Production checks detect active seed users with stored demo password hash"
 );
 
+const envUtils = await import(new URL("../scripts/windows/env-utils.mjs", import.meta.url).href);
+assert.equal(
+  envUtils.maskDatabaseUrl("postgresql://user:secret@example.supabase.co:5432/postgres").includes("secret"),
+  false,
+  "Launcher/check-env masks DATABASE_URL passwords"
+);
+const envSummary = envUtils.validateEnvironment({
+  DATABASE_URL: "DATABASE_URL=postgresql://user:secret@example.supabase.co:5432/postgres",
+  SESSION_SECRET: "this-is-a-long-production-secret-123",
+  NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+});
+assert.equal(envSummary.ok, true, "Launcher/check-env tolerates duplicated DATABASE_URL prefix without leaking it");
+assert.equal(envSummary.schema, "prisma/schema.postgres.prisma", "Launcher/check-env selects PostgreSQL schema");
+assert.equal(envSummary.sessionCookieSecure, "false", "Launcher/check-env defaults local HTTP cookies to non-secure mode");
+
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 const buildScript = readFileSync(join(repoRoot, "scripts", "build.mjs"), "utf8");
 const pdfExtractor = readFileSync(join(repoRoot, "lib", "pdf", "extract-pages.ts"), "utf8");
 const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
 const awbScannerComponent = readFileSync(join(repoRoot, "components", "AwbBarcodeScanner.tsx"), "utf8");
+const productImageRoute = readFileSync(join(repoRoot, "app", "product-images", "[...path]", "route.ts"), "utf8");
 const pickerPage = readFileSync(join(repoRoot, "app", "picker", "page.tsx"), "utf8");
 const pickerDetailPage = readFileSync(join(repoRoot, "app", "picker", "[sku]", "page.tsx"), "utf8");
 const packingPage = readFileSync(join(repoRoot, "app", "packing", "page.tsx"), "utf8");
 const packingResultPage = readFileSync(join(repoRoot, "app", "packing", "[awb]", "page.tsx"), "utf8");
 const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
 const skuExportRoute = readFileSync(join(repoRoot, "app", "owner", "sku-mappings", "export", "route.ts"), "utf8");
+const ownerUsersPage = readFileSync(join(repoRoot, "app", "owner", "users", "page.tsx"), "utf8");
+const ownerUsersActions = readFileSync(join(repoRoot, "app", "owner", "users", "actions.ts"), "utf8");
 const changePasswordAction = readFileSync(join(repoRoot, "app", "change-password", "actions.ts"), "utf8");
 const ownerSystemPage = readFileSync(join(repoRoot, "app", "owner", "system", "page.tsx"), "utf8");
 const windowsProdPs1 = readFileSync(join(repoRoot, "scripts", "windows", "start-local-prod.ps1"), "utf8");
+const windowsLauncher = readFileSync(join(repoRoot, "scripts", "windows", "start-local-prod.mjs"), "utf8");
+const windowsEnvUtils = readFileSync(join(repoRoot, "scripts", "windows", "env-utils.mjs"), "utf8");
+const windowsCheckEnv = readFileSync(join(repoRoot, "scripts", "windows", "check-env.mjs"), "utf8");
+const windowsServerSetupDoc = readFileSync(join(repoRoot, "docs", "windows-server-setup.md"), "utf8");
+const cloudflareSecurityDoc = readFileSync(join(repoRoot, "docs", "cloudflare-tunnel", "security-setup.md"), "utf8");
 const localProdEnvExample = readFileSync(join(repoRoot, ".env.local.production.example"), "utf8");
 const prodEnvExample = readFileSync(join(repoRoot, ".env.production.example"), "utf8");
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
@@ -625,6 +667,10 @@ assert.match(readme, /SESSION_COOKIE_SECURE=false/, "README documents local HTTP
 assert.match(readme, /Meesho image URLs are external/, "README documents external image URL reliability");
 assert.match(readme, /You only need SKU \+ image URL/, "README documents simple SKU image import");
 assert.match(readme, /storage\/product-images\/meesho\/<accountId>\/<safeSku>/, "README documents local image cache storage");
+assert.match(readme, /start-meesho-app\.bat/, "README documents the double-click Windows launcher");
+assert.match(windowsServerSetupDoc, /Workers do not need the code/, "Windows setup doc explains workers use browser only");
+assert.match(cloudflareSecurityDoc, /does not require opening router ports|without opening router ports/, "Cloudflare safety doc explains no router ports");
+assert.match(cloudflareSecurityDoc, /SESSION_COOKIE_SECURE=true/, "Cloudflare safety doc documents HTTPS cookie mode");
 assert.equal(buildScript.indexOf('import "dotenv/config";') < buildScript.indexOf("process.env.DATABASE_URL"), true, "Build loads .env before choosing Prisma schema");
 assert.equal(pdfExtractor.includes(".next/server/chunks/pdf.worker.mjs"), false, "PDF extraction does not reference Next server worker chunks");
 assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF extraction preloads the PDF.js worker module explicitly");
@@ -643,15 +689,27 @@ assert.match(packingResultPage, /mapping\?\.cachedImageUrl/, "Packing card uses 
 assert.match(reviewPage, /<details[\s\S]*Picklist SKU summary rows/, "Upload review makes picklist summary rows collapsible");
 assert.match(reviewPage, /Prepare today&apos;s product images/, "Upload review exposes daily image cache preparation");
 assert.match(awbScannerComponent, /cacheStatus={suggestion.cacheStatus}/, "Manual AWB suggestions pass cached image status");
+assert.match(productImageRoute, /getCurrentUser/, "Cached image route checks session without login redirect");
+assert.match(productImageRoute, /status: 401/, "Cached image route returns 401 for unauthenticated image requests");
+assert.match(productImageRoute, /canUserAccessCachedImage/, "Cached image route enforces account access");
 assert.match(skuExportRoute, /cache_status/, "Full SKU export includes cache status");
 assert.match(skuExportRoute, /product_name[\s\S]*color[\s\S]*size/, "Full SKU export includes auto-filled metadata");
+assert.match(ownerUsersPage, /Passwords are securely hashed and cannot be viewed/, "Owner users page explains passwords cannot be viewed");
+assert.match(ownerUsersPage, /Force password change on next login/, "Owner password reset can force next-login password change");
+assert.match(ownerUsersActions, /passwordHash: hashPassword\(password\)/, "Owner password reset stores only a password hash");
+assert.match(ownerUsersActions, /userDeviceSession\.updateMany/, "Owner password reset closes active sessions for workers");
+assert.match(ownerUsersActions, /OWNER_PASSWORD_RESET/, "Owner password reset is audited");
+assert.match(ownerUsersActions, /OWNER_USER_UNLOCKED/, "Owner unlock is audited");
+assert.match(windowsLauncher + windowsEnvUtils, /dotenv/, "Windows launcher loads .env with dotenv");
+assert.match(windowsLauncher, /SKIP_PRISMA_MIGRATE/, "Windows launcher defaults migration skip for local production");
+assert.match(windowsCheckEnv, /printEnvironmentSummary/, "check-env prints a masked environment summary");
 assert.match(productImageComponent, /decoding="async"/, "Product images decode asynchronously");
 assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
 assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
 assert.match(changePasswordAction, /await clearSession\(\);\s*redirect\("\/login\?passwordChanged=1"\)/, "Password changes clear session and redirect to login");
 assert.match(ownerSystemPage, /Cookie secure mode/, "Owner system page shows auth cookie diagnostics");
 assert.match(ownerSystemPage, /Database ping/, "Owner system page shows database latency");
-assert.match(windowsProdPs1, /SESSION_COOKIE_SECURE = "false"|SESSION_COOKIE_SECURE=false/, "Windows local production script defaults local HTTP cookie mode to false");
+assert.match(windowsProdPs1, /start-local-prod\.mjs/, "Windows PowerShell launcher delegates to Node launcher");
 assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local production env example supports local Wi-Fi HTTP cookies");
 assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
@@ -662,7 +720,10 @@ assert.match(gitignore, /\*\.pdf/, "Git ignores real PDF files");
 assert.match(gitignore, /storage\/product-images\//, "Git ignores local product image cache");
 assert.equal(existsSync(join(repoRoot, "scripts", "windows", "start-local-prod.ps1")), true, "Windows production PowerShell script exists");
 assert.equal(existsSync(join(repoRoot, "scripts", "windows", "start-local-prod.bat")), true, "Windows production batch script exists");
+assert.equal(existsSync(join(repoRoot, "scripts", "windows", "start-meesho-app.bat")), true, "Windows double-click launcher exists");
 assert.equal(existsSync(join(repoRoot, "docs", "cloudflare-tunnel", "config.yml.example")), true, "Cloudflare Tunnel config example exists");
+assert.equal(existsSync(join(repoRoot, "docs", "cloudflare-tunnel", "security-setup.md")), true, "Cloudflare security setup doc exists");
+assert.equal(existsSync(join(repoRoot, "docs", "windows-server-setup.md")), true, "Windows server setup doc exists");
 assert.equal(existsSync(join(repoRoot, ".env.local.production.example")), true, "Local production env example exists");
 
 console.log("Validation tests passed.");

@@ -127,20 +127,38 @@ If login works on the owner PC but not on a mobile local IP, check **Owner -> Sy
 
 Do not expose the Supabase database password in GitHub, browser code, screenshots, or worker devices.
 
-Start local production on Windows:
+Daily start on the server PC:
 
-```powershell
-scripts\windows\start-local-prod.ps1
-```
-
-or double-click:
+Double-click:
 
 ```text
+scripts\windows\start-meesho-app.bat
+```
+
+The double-click launcher loads `.env` with Node/dotenv, masks the database URL in logs, selects SQLite or PostgreSQL
+build mode automatically, prints the local/mobile/Cloudflare URLs, builds, and starts the app.
+
+You can also start from PowerShell:
+
+```powershell
+scripts\windows\start-meesho-app.ps1
+```
+
+Compatibility launchers still exist:
+
+```text
+scripts\windows\start-local-prod.ps1
 scripts\windows\start-local-prod.bat
 ```
 
-The script checks Node.js, checks `.env`, installs dependencies when `node_modules` is missing, builds the app, and starts
+The launcher checks Node.js, checks `.env`, installs dependencies when `node_modules` is missing, builds the app, and starts
 `npm start` on `http://localhost:3000`.
+
+Check `.env` without starting the app:
+
+```bash
+npm run check:env
+```
 
 ### Supabase setup
 
@@ -159,6 +177,8 @@ https://pack.personalizedgiftday.com/setup
 Create the first owner user and first account there. The setup page only works while the `User` table is empty; after the
 first user exists it redirects to `/login`.
 
+For a complete first-time server PC checklist, see `docs/windows-server-setup.md`.
+
 ### Cloudflare Tunnel setup
 
 Install `cloudflared` on Windows, then run:
@@ -170,7 +190,8 @@ cloudflared tunnel route dns meesho-pick-pack pack.personalizedgiftday.com
 cloudflared tunnel run meesho-pick-pack
 ```
 
-Use `docs/cloudflare-tunnel/config.yml.example` for a named tunnel config:
+Use `docs/cloudflare-tunnel/config.yml.example` for a named tunnel config. See
+`docs/cloudflare-tunnel/security-setup.md` for safety notes.
 
 ```yaml
 tunnel: meesho-pick-pack
@@ -249,7 +270,7 @@ must type `DELETE IMAGE CACHE` before deleting image cache files.
 
 ### Daily startup checklist
 
-1. Start the app on the owner PC with `scripts\windows\start-local-prod.ps1`.
+1. Start the app on the owner PC by double-clicking `scripts\windows\start-meesho-app.bat`.
 2. Start Cloudflare Tunnel with `cloudflared tunnel run meesho-pick-pack`.
 3. Confirm `http://localhost:3000` works on the owner PC.
 4. Confirm `https://pack.personalizedgiftday.com` works from a worker phone.
@@ -532,6 +553,7 @@ deleted from **Owner -> Cleanup** after 30+ days.
 npm run dev
 npm run build
 npm run build:prod
+npm run check:env
 npm run typecheck
 npm run lint
 npm run test:validators
@@ -540,6 +562,7 @@ npm run db:seed
 npm run db:migrate:prod
 npm run start:prod
 scripts\windows\start-local-prod.ps1
+scripts\windows\start-meesho-app.bat
 ```
 
 ## Database Notes

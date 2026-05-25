@@ -1,6 +1,12 @@
 import { readFile, stat } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import { absoluteCachedImagePath, contentTypeForCachedImage } from "@/lib/image-cache";
+import { getCurrentUser } from "@/lib/auth";
+import {
+  absoluteCachedImagePath,
+  canUserAccessCachedImage,
+  contentTypeForCachedImage,
+  parseProductImageCacheRoutePath
+} from "@/lib/image-cache";
 
 type ProductImageRouteContext = {
   params: Promise<{
@@ -10,11 +16,26 @@ type ProductImageRouteContext = {
 
 export async function GET(_request: Request, context: ProductImageRouteContext) {
   const params = await context.params;
-  const relativePath = params.path?.join("/") ?? "";
-  const filePath = absoluteCachedImagePath(relativePath);
+  const parsedPath = parseProductImageCacheRoutePath(params.path);
+
+  if (!parsedPath) {
+    return NextResponse.json({ error: "Image not found" }, { status: 404 });
+  }
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  if (!canUserAccessCachedImage(user, parsedPath.accountId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const filePath = absoluteCachedImagePath(parsedPath.relativePath);
 
   if (!filePath) {
-    return NextResponse.json({ error: "Invalid image path" }, { status: 400 });
+    return NextResponse.json({ error: "Image not found" }, { status: 404 });
   }
 
   try {

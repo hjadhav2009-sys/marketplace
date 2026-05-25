@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { execFileSync } from "node:child_process";
 
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";

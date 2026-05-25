@@ -16,6 +16,9 @@ type PickerSkuGroupsPageProps = {
     picked?: string;
     problem?: string;
     large?: string;
+    limit?: string;
+    page?: string;
+    view?: string;
   }>;
 };
 
@@ -36,7 +39,37 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
   const params = await searchParams;
   const activeFilter = params?.filter ?? "pending";
   const largeImageMode = params?.large === "1";
-  const groups = await getSkuGroups(account.id, { query: params?.q, filter: activeFilter });
+  const compactMode = params?.view !== "cards" && !largeImageMode;
+  const pagedGroups = await getSkuGroups(account.id, {
+    query: params?.q,
+    filter: activeFilter,
+    page: params?.page,
+    limit: params?.limit
+  });
+  const groups = pagedGroups.groups;
+  const loadMoreParams = new URLSearchParams();
+  const cardViewParams = new URLSearchParams();
+  const compactViewParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries({
+    q: params?.q,
+    filter: activeFilter,
+    large: params?.large,
+    limit: params?.limit
+  })) {
+    if (value) {
+      loadMoreParams.set(key, value);
+      cardViewParams.set(key, value);
+      compactViewParams.set(key, value);
+    }
+  }
+
+  loadMoreParams.set("page", String(pagedGroups.nextPage));
+  loadMoreParams.set("view", compactMode ? "compact" : "cards");
+  cardViewParams.set("view", "cards");
+  compactViewParams.set("view", "compact");
+  cardViewParams.delete("large");
+  compactViewParams.delete("large");
 
   return (
     <AppShell>
@@ -90,11 +123,32 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             <input type="checkbox" name="large" value="1" defaultChecked={largeImageMode} className="accent-pink-700" />
             Large images
           </label>
+          <input type="hidden" name="view" value={compactMode ? "compact" : "cards"} />
           <button className="min-h-12 rounded-md bg-slate-950 px-5 py-2 text-sm font-semibold text-white shadow-sm">
             Apply
           </button>
         </div>
       </form>
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+        <p className="font-semibold text-slate-700">
+          Showing {pagedGroups.visibleCount} of {pagedGroups.total} SKU groups
+        </p>
+        <div className="flex gap-2">
+          <Link
+            href={`/picker?${compactViewParams}`}
+            className={`rounded-md px-3 py-2 font-semibold ${compactMode ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}
+          >
+            Compact
+          </Link>
+          <Link
+            href={`/picker?${cardViewParams}`}
+            className={`rounded-md px-3 py-2 font-semibold ${compactMode ? "border border-slate-200 bg-white text-slate-700" : "bg-slate-950 text-white"}`}
+          >
+            Image cards
+          </Link>
+        </div>
+      </div>
 
       {groups.length === 0 ? (
         <EmptyState
@@ -107,7 +161,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
           action={user.role === "OWNER" ? { href: "/owner/uploads/new", label: "Upload labels" } : undefined}
         />
       ) : (
-        <section className={`grid gap-4 ${largeImageMode ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}`}>
+        <section className={`grid gap-4 ${compactMode ? "md:grid-cols-2 xl:grid-cols-3" : largeImageMode ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}`}>
           {groups.map((group) => {
             const detailHref = pickerDetailHref(group.sku, group.color, group.size);
             const encodedColor = encodePickerDimension(group.color);
@@ -118,14 +172,16 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                 key={`${group.sku}-${group.color ?? "none"}-${group.size ?? "none"}`}
                 className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm"
               >
-                <ProductImage
-                  src={group.imageUrl}
-                  alt={group.productName ?? group.sku}
-                  size="lg"
-                  mappingId={group.mapping?.id}
-                  showDebug={user.role === "OWNER"}
-                  imageHealth={group.mapping?.imageHealth}
-                />
+                {compactMode ? null : (
+                  <ProductImage
+                    src={group.imageUrl}
+                    alt={group.productName ?? group.sku}
+                    size="lg"
+                    mappingId={group.mapping?.id}
+                    showDebug={user.role === "OWNER"}
+                    imageHealth={group.mapping?.imageHealth}
+                  />
+                )}
                 <div className="space-y-4 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge value={group.status} />
@@ -139,9 +195,11 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
 
                   <div>
                     <h2 className="break-words text-2xl font-black leading-tight text-slate-950">{group.sku}</h2>
-                    <p className="mt-1 line-clamp-2 min-h-10 text-base leading-5 text-slate-600">
-                      {group.productName ?? "Product name not mapped"}
-                    </p>
+                    {compactMode ? null : (
+                      <p className="mt-1 line-clamp-2 min-h-10 text-base leading-5 text-slate-600">
+                        {group.productName ?? (group.mapping?.imageUrl ? "Mapped image, no product name" : "Product name not mapped")}
+                      </p>
+                    )}
                     <p className="mt-2 text-base font-semibold text-slate-800">
                       {[group.color ?? group.mapping?.color, group.size].filter(Boolean).join(" / ") || "Color or size unknown"}
                     </p>
@@ -192,6 +250,17 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
           })}
         </section>
       )}
+
+      {pagedGroups.hasMore ? (
+        <div className="mt-5 flex justify-center">
+          <Link
+            href={`/picker?${loadMoreParams}`}
+            className="inline-flex min-h-12 items-center justify-center rounded-md bg-slate-950 px-6 py-3 text-base font-bold text-white shadow-sm"
+          >
+            Load more
+          </Link>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

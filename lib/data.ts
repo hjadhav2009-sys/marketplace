@@ -1,6 +1,7 @@
 import type { Account } from "@prisma/client";
 import { findAwbSearchMatches } from "./operations/awb-search";
-import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups } from "./operations/picking";
+import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups, paginatePickerSkuGroups } from "./operations/picking";
+import { withDevTiming } from "./perf";
 import { prisma } from "./prisma";
 import { normalizeSkuMappingImageFilter } from "./product-image";
 import { normalizeSkuForMatching } from "./sku";
@@ -77,31 +78,60 @@ export async function searchSkuMappings(accountId: string, query?: string, activ
   });
 }
 
-export async function getSkuGroups(accountId: string, options: { query?: string; filter?: string } = {}) {
-  const orders = await prisma.order.findMany({
-    where: {
-      accountId,
-      packStatus: {
-        not: "PACKED"
+export async function getSkuGroups(
+  accountId: string,
+  options: { query?: string; filter?: string; page?: string; limit?: string } = {}
+) {
+  const orders = await withDevTiming("picker orders", () =>
+    prisma.order.findMany({
+      where: {
+        accountId,
+        packStatus: {
+          not: "PACKED"
+        }
+      },
+      select: {
+        id: true,
+        awb: true,
+        sku: true,
+        qty: true,
+        color: true,
+        size: true,
+        courier: true,
+        orderNo: true,
+        productDescription: true,
+        imageUrl: true,
+        pickStatus: true,
+        packStatus: true
+      },
+      orderBy: {
+        sku: "asc"
       }
-    },
-    orderBy: {
-      sku: "asc"
-    }
-  });
+    })
+  );
   const orderSkus = Array.from(new Set(orders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
 
-  const mappings = await prisma.skuImageMapping.findMany({
-    where: {
-      accountId,
-      sku: {
-        in: orderSkus
+  const mappings = await withDevTiming("picker image mappings", () =>
+    prisma.skuImageMapping.findMany({
+      where: {
+        accountId,
+        sku: {
+          in: orderSkus
+        },
+        active: true
       },
-      active: true
-    }
-  });
+      select: {
+        id: true,
+        sku: true,
+        imageUrl: true,
+        productName: true,
+        color: true,
+        imageHealth: true
+      }
+    })
+  );
 
-  return filterPickerSkuGroups(buildPickerSkuGroups(orders, mappings), options);
+  return paginatePickerSkuGroups(filterPickerSkuGroups(buildPickerSkuGroups(orders, mappings), options), options);
 }
 
 export async function getSkuDetail(
@@ -156,7 +186,7 @@ export async function getPackingDashboard(accountId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  const [pendingCount, packedTodayCount, recentScans] = await Promise.all([
+  const [pendingCount, packedTodayCount, recentScans] = await withDevTiming("packing dashboard", () => Promise.all([
     prisma.order.count({
       where: {
         accountId,
@@ -181,7 +211,7 @@ export async function getPackingDashboard(accountId: string) {
       orderBy: { createdAt: "desc" },
       take: 10
     })
-  ]);
+  ]));
 
   return {
     pendingCount,

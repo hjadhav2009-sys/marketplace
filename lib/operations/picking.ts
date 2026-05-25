@@ -41,6 +41,9 @@ export type PickerSkuGroup = {
   mapping: PickerMappingInput | null;
 };
 
+export const DEFAULT_PICKER_GROUP_LIMIT = 24;
+export const MAX_PICKER_GROUP_LIMIT = 96;
+
 function cleanDimension(value: string | null | undefined) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -154,4 +157,43 @@ export function filterPickerSkuGroups(
       return group.status === "READY";
     })
     .sort((a, b) => a.sku.localeCompare(b.sku));
+}
+
+export function normalizePickerLimit(value: string | number | null | undefined) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_PICKER_GROUP_LIMIT;
+  }
+
+  return Math.min(Math.max(Math.floor(parsed), 1), MAX_PICKER_GROUP_LIMIT);
+}
+
+export function normalizePickerPage(value: string | number | null | undefined) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  return Math.max(Math.floor(parsed), 1);
+}
+
+export function paginatePickerSkuGroups(
+  groups: PickerSkuGroup[],
+  options: { page?: string | number | null; limit?: string | number | null } = {}
+) {
+  const page = normalizePickerPage(options.page);
+  const limit = normalizePickerLimit(options.limit);
+  const visibleCount = page * limit;
+
+  return {
+    groups: groups.slice(0, visibleCount),
+    page,
+    limit,
+    total: groups.length,
+    visibleCount: Math.min(visibleCount, groups.length),
+    hasMore: visibleCount < groups.length,
+    nextPage: page + 1
+  };
 }

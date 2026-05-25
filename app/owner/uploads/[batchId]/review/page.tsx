@@ -479,10 +479,11 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         </form>
       </section>
 
-      <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-semibold text-slate-950">Problem rows needing review</h2>
-        </div>
+      <details className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">
+          Problem rows needing review
+          <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{problemRows.length}</span>
+        </summary>
         {problemRows.length === 0 ? (
           <div className="px-4 py-8">
             <EmptyState title="No problem rows match" description="Missing AWB, missing SKU, unknown layout, and low confidence rows will appear here." />
@@ -520,12 +521,13 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             </table>
           </div>
         )}
-      </section>
+      </details>
 
-      <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="font-semibold text-slate-950">Parsed order rows</h2>
-        </div>
+      <details className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">
+          Parsed order rows
+          <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{filteredOrderRows.length}</span>
+        </summary>
         {filteredOrderRows.length === 0 ? (
           <div className="px-4 py-8">
             <EmptyState title="No order rows match" description="Label and courier manifest order rows will appear here." />
@@ -603,7 +605,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             </table>
           </div>
         )}
-      </section>
+      </details>
 
       <details className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
         <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">
@@ -665,10 +667,11 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       </details>
 
       {batch.issues.length > 0 ? (
-        <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="font-semibold text-slate-950">Review issues</h2>
-          </div>
+        <details className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+          <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">
+            Review issues
+            <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{batch.issues.length}</span>
+          </summary>
           <div className="divide-y divide-slate-100">
             {batch.issues.map((issue) => (
               <div key={issue.id} className="px-4 py-3 text-sm">
@@ -679,14 +682,15 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
               </div>
             ))}
           </div>
-        </section>
+        </details>
       ) : null}
 
       {batch.orders.length > 0 ? (
-        <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="font-semibold text-slate-950">Imported orders</h2>
-          </div>
+        <details className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
+          <summary className="cursor-pointer border-b border-slate-200 px-4 py-3 font-semibold text-slate-950">
+            Imported orders
+            <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{batch.orders.length}</span>
+          </summary>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -717,7 +721,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
               </tbody>
             </table>
           </div>
-        </section>
+        </details>
       ) : null}
 
       <div className="mt-5 flex flex-wrap gap-4">

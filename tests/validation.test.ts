@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AwbBarcodeScanner } from "../components/AwbBarcodeScanner";
 import { isValidAwb, normalizeAwb } from "../lib/awb";
+import { authRedirectForSessionStatus, evaluateLoginCredentials, loginRedirectForResult, normalizeUsername } from "../lib/auth-helpers";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
 import { formatCsvValue, rowsToCsv } from "../lib/csv";
 import { planOrderImport } from "../lib/import/orders";
@@ -12,7 +13,7 @@ import { planAccountSkuMappingImport, planSkuMappingImport, type RawImportRow } 
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
 import { findAwbSearchMatches } from "../lib/operations/awb-search";
 import { canConfirmPacked } from "../lib/operations/packing";
-import { buildPickerSkuGroups } from "../lib/operations/picking";
+import { buildPickerSkuGroups, normalizePickerLimit, paginatePickerSkuGroups } from "../lib/operations/picking";
 import { hashPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
 import {
@@ -49,6 +50,31 @@ const sampleOrder = {
   city: undefined,
   state: undefined
 };
+
+const authPasswordHash = hashPassword("correct-password");
+assert.equal(normalizeUsername("  PICKER "), "picker", "Username normalization trims and lowercases");
+assert.equal(
+  evaluateLoginCredentials({ active: true, lockedUntil: null, mustChangePassword: false, passwordHash: authPasswordHash }, "correct-password"),
+  "allowed",
+  "Correct password login is allowed"
+);
+assert.equal(
+  evaluateLoginCredentials({ active: true, lockedUntil: null, mustChangePassword: false, passwordHash: authPasswordHash }, "wrong-password"),
+  "invalid_credentials",
+  "Wrong password login is blocked"
+);
+assert.equal(
+  evaluateLoginCredentials({ active: false, lockedUntil: null, mustChangePassword: false, passwordHash: authPasswordHash }, "correct-password"),
+  "inactive",
+  "Inactive user login is blocked"
+);
+assert.equal(
+  evaluateLoginCredentials({ active: true, lockedUntil: null, mustChangePassword: true, passwordHash: authPasswordHash }, "correct-password"),
+  "must_change_password",
+  "Users marked must-change-password are sent to password change"
+);
+assert.equal(loginRedirectForResult("must_change_password"), "/change-password?required=1", "Must-change-password login redirects to password change");
+assert.equal(authRedirectForSessionStatus("invalid"), "/auth/session-ended?reason=expired", "Invalid sessions redirect through safe session cleanup");
 
 assert.equal(parsedOrderSchema.safeParse(sampleOrder).success, true, "seed order should validate");
 assert.equal(awbSearchSchema.safeParse({ awb: sampleOrder.awb }).success, true, "seed AWB should validate");
@@ -117,6 +143,7 @@ assert.equal(
   "SKU image mapping should validate"
 );
 assert.equal(loginSchema.safeParse({ username: "owner", password: "demo1234" }).success, true, "seed login should validate");
+assert.equal(loginSchema.parse({ username: " OWNER ", password: "demo1234" }).username, "owner", "login schema normalizes username");
 assert.equal(loginSchema.safeParse({ username: "", password: "short" }).success, false, "bad login should fail");
 
 const skuImportRows: RawImportRow[] = [
@@ -342,6 +369,10 @@ assert.equal(pickerGroups.length, 2, "Picker grouping separates SKU by color and
 assert.equal(pickerGroups.find((group) => group.color === "Silver")?.totalQuantity, 1, "Picker group sums quantity");
 assert.equal(pickerGroups.find((group) => group.color === "Gold")?.status, "PICKED", "Picked group status is derived");
 assert.equal(pickerGroups[0]?.imageUrl, "https://example.com/image.jpg", "Picker group uses mapping image when order image is null");
+assert.equal(paginatePickerSkuGroups(pickerGroups, { limit: 1 }).groups.length, 1, "Picker pagination limits first render");
+assert.equal(paginatePickerSkuGroups(pickerGroups, { limit: 1 }).hasMore, true, "Picker pagination exposes load-more state");
+assert.equal(paginatePickerSkuGroups(pickerGroups, { limit: 1, page: 2 }).groups.length, 2, "Picker load-more keeps previous groups visible");
+assert.equal(normalizePickerLimit("999"), 96, "Picker compact mode caps very large limits");
 
 const pickerGroupsWithOrderImage = buildPickerSkuGroups(
   [
@@ -388,7 +419,7 @@ assert.equal(getInitialProductImageState("not-a-url"), "broken", "Product image 
 assert.equal(productImageStateText("missing", false), "Missing mapping", "Product image state labels missing mapping clearly");
 assert.equal(productImageStateText("loading", true, true), "Still loading image", "Product image state labels slow image loads clearly");
 assert.equal(productImageStateText("broken", true), "Image URL failed", "Product image state labels failed image loads clearly");
-assert.equal(picklistSummaryProductNameLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "MAPPED", productName: null }), "Mapped, no product name", "Picklist summary shows mapped SKU without product name");
+assert.equal(picklistSummaryProductNameLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "MAPPED", productName: null }), "Mapped image, no product name", "Picklist summary shows mapped SKU without product name");
 assert.equal(picklistSummaryProductNameLabel(null), "No mapping", "Picklist summary shows no mapping separately");
 assert.equal(imageHealthLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "BROKEN" }), "Broken image URL", "Broken image health label is clear");
 assert.equal(normalizeSkuMappingImageFilter("broken"), "broken", "SKU mapping image filter accepts broken");
@@ -444,6 +475,7 @@ assert.equal(
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 const buildScript = readFileSync(join(repoRoot, "scripts", "build.mjs"), "utf8");
 const pdfExtractor = readFileSync(join(repoRoot, "lib", "pdf", "extract-pages.ts"), "utf8");
+const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
 const pickerPage = readFileSync(join(repoRoot, "app", "picker", "page.tsx"), "utf8");
 const pickerDetailPage = readFileSync(join(repoRoot, "app", "picker", "[sku]", "page.tsx"), "utf8");
 const packingPage = readFileSync(join(repoRoot, "app", "packing", "page.tsx"), "utf8");
@@ -466,12 +498,16 @@ assert.equal(pdfExtractor.includes(".next/server/chunks/pdf.worker.mjs"), false,
 assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF extraction preloads the PDF.js worker module explicitly");
 assert.match(pdfExtractor, /PDF text extraction failed before pages could be read\./, "PDF extraction reports startup failures before page reads");
 assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");
+assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination");
+assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
 assert.match(pickerPage, /sticky top-\[88px\]/, "Picker filters stay reachable on mobile");
 assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
 assert.match(packingPage, /<AwbBarcodeScanner[\s\S]*Selected account/, "Packing page places the scanner before lower-priority dashboard details");
 assert.match(packingResultPage, /Quantity to pack/, "Packing result makes quantity prominent on mobile");
 assert.match(packingResultPage, /fixed inset-x-0 bottom-0/, "Packing result has mobile sticky confirm actions");
 assert.match(reviewPage, /<details[\s\S]*Picklist SKU summary rows/, "Upload review makes picklist summary rows collapsible");
+assert.match(productImageComponent, /decoding="async"/, "Product images decode asynchronously");
+assert.match(productImageComponent, /imageHealth === "BROKEN"/, "Successful image loads only update health when repairing a broken mapping");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(gitignore, /\*\.pdf/, "Git ignores real PDF files");

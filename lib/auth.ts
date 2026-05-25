@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Account, Role, User } from "@prisma/client";
+import { authRedirectForSessionStatus, type AuthSessionStatus } from "./auth-helpers";
 import type { RequestMeta } from "./network";
 import { prisma } from "./prisma";
 
@@ -13,6 +14,10 @@ type SessionPayload = {
   userId: string;
   sessionId: string;
 };
+
+type SessionState =
+  | { status: "authenticated"; user: User }
+  | { status: Exclude<AuthSessionStatus, "authenticated"> };
 
 function getSecret() {
   return process.env.SESSION_SECRET ?? "dev-only-change-me";
@@ -99,51 +104,79 @@ export async function clearSession() {
   cookieStore.delete(ACCOUNT_COOKIE);
 }
 
-export async function getCurrentUser() {
+export async function getCurrentSessionState(): Promise<SessionState> {
   const cookieStore = await cookies();
-  const payload = verifySignedCookie(cookieStore.get(SESSION_COOKIE)?.value);
+  const rawCookie = cookieStore.get(SESSION_COOKIE)?.value;
+
+  if (!rawCookie) {
+    return { status: "missing" };
+  }
+
+  const payload = verifySignedCookie(rawCookie);
 
   if (!payload?.userId || !payload.sessionId) {
-    return null;
+    return { status: "invalid" };
   }
 
-  const user = await prisma.user.findFirst({
-    where: {
-      id: payload.userId,
-      active: true,
-      sessions: {
-        some: {
-          id: payload.sessionId,
-          active: true
-        }
+  const [user, session] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: payload.userId }
+    }),
+    prisma.userDeviceSession.findFirst({
+      where: {
+        id: payload.sessionId,
+        userId: payload.userId
       }
-    }
-  });
+    })
+  ]);
 
   if (!user) {
+    return { status: "expired" };
+  }
+
+  if (!user.active) {
+    return { status: "inactive" };
+  }
+
+  if (!session?.active) {
+    return { status: "expired" };
+  }
+
+  const lastSeenAt = session.lastSeenAt?.getTime() ?? 0;
+  if (Date.now() - lastSeenAt > 5 * 60 * 1000) {
+    await prisma.userDeviceSession.updateMany({
+      where: {
+        id: payload.sessionId,
+        userId: user.id,
+        active: true
+      },
+      data: {
+        lastSeenAt: new Date()
+      }
+    });
+  }
+
+  return { status: "authenticated", user };
+}
+
+export async function getCurrentUser() {
+  const session = await getCurrentSessionState();
+
+  if (session.status !== "authenticated") {
     return null;
   }
 
-  await prisma.userDeviceSession.updateMany({
-    where: {
-      id: payload.sessionId,
-      userId: user.id,
-      active: true
-    },
-    data: {
-      lastSeenAt: new Date()
-    }
-  });
-
-  return user;
+  return session.user;
 }
 
 export async function requireUser(roles?: Role[], options?: { allowPasswordChangeRequired?: boolean }) {
-  const user = await getCurrentUser();
+  const session = await getCurrentSessionState();
 
-  if (!user) {
-    redirect("/login");
+  if (session.status !== "authenticated") {
+    redirect(authRedirectForSessionStatus(session.status));
   }
+
+  const user = session.user;
 
   if (user.mustChangePassword && !options?.allowPasswordChangeRequired) {
     redirect("/change-password?required=1");

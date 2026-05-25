@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedLocalNetworkIp, normalizeIp } from "./lib/network";
 
-const PUBLIC_PATHS = ["/login", "/network-blocked", "/setup"];
+const PUBLIC_PATHS = ["/auth/session-ended", "/login", "/network-blocked", "/setup"];
 const STATIC_FILE = /\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest)$/;
 
 function isPublicPath(pathname: string) {
@@ -41,6 +41,7 @@ export function middleware(request: NextRequest) {
   if (!isPublicPath(pathname) && !request.cookies.get("mpp_session")) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("expired", "1");
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }

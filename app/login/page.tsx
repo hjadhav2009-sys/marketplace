@@ -6,6 +6,9 @@ import { loginAction } from "./actions";
 type LoginPageProps = {
   searchParams?: Promise<{
     error?: string;
+    expired?: string;
+    inactive?: string;
+    passwordChanged?: string;
     setup?: string;
   }>;
 };
@@ -20,6 +23,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const hasInvalidError = params?.error === "invalid";
   const hasLockedError = params?.error === "locked";
+  const hasSessionError = params?.error === "session";
+  const hasExpiredMessage = params?.expired === "1";
+  const hasInactiveMessage = params?.inactive === "1";
+  const hasPasswordChangedMessage = params?.passwordChanged === "1";
   const hasSetupComplete = params?.setup === "1";
 
   return (
@@ -28,9 +35,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="mb-7">
           <p className="text-sm font-semibold uppercase tracking-wide text-berry">Meesho Pick & Pack</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Sign in</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Local username and password login for the sprint-0 warehouse workflow.
-          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Fast login for daily picking and packing work.</p>
         </div>
 
         {hasSetupComplete ? (
@@ -39,11 +44,29 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         ) : null}
 
-        {hasInvalidError || hasLockedError ? (
+        {hasPasswordChangedMessage ? (
+          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+            Password changed, login again.
+          </div>
+        ) : null}
+
+        {hasExpiredMessage ? (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            Session expired. Login again.
+          </div>
+        ) : null}
+
+        {hasInactiveMessage ? (
           <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-            {hasLockedError
-              ? "Too many failed attempts. Try again later or ask the owner."
-              : "Could not sign in. Check your credentials and account status."}
+            Account inactive. Ask the owner to reactivate this user.
+          </div>
+        ) : null}
+
+        {hasInvalidError || hasLockedError || hasSessionError ? (
+          <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {hasLockedError ? "Too many failed attempts. Try again later or ask the owner." : null}
+            {hasInvalidError ? "Invalid username or password." : null}
+            {hasSessionError ? "Session creation failed. Try again." : null}
           </div>
         ) : null}
 

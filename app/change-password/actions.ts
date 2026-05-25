@@ -53,7 +53,8 @@ export async function changeOwnPasswordAction(formData: FormData) {
     request
   });
 
-  redirect("/accounts");
+  await clearSession();
+  redirect("/login?passwordChanged=1");
 }
 
 export async function logoutFromPasswordChangeAction() {

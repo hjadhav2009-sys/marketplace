@@ -89,5 +89,5 @@ export function picklistSummaryProductNameLabel(mapping: ImageMappingLike | null
     return "Broken image URL";
   }
 
-  return mapping.productName ?? "Mapped, no product name";
+  return mapping.productName ?? "Mapped image, no product name";
 }

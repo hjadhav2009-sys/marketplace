@@ -30,16 +30,32 @@ if not exist "node_modules" (
   )
 )
 
+set "DATABASE_URL_VALUE="
+for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+  if /i "%%A"=="DATABASE_URL" set "DATABASE_URL_VALUE=%%B"
+)
+set "DATABASE_URL_VALUE=%DATABASE_URL_VALUE:"=%"
+set "BUILD_SCRIPT=build"
+set "SCHEMA_NAME=prisma/schema.prisma"
+echo %DATABASE_URL_VALUE% | findstr /i /b /c:"postgresql://" /c:"postgres://" >nul 2>nul
+if not errorlevel 1 (
+  set "BUILD_SCRIPT=build:prod"
+  set "SCHEMA_NAME=prisma/schema.postgres.prisma"
+)
+if not defined SKIP_PRISMA_MIGRATE set "SKIP_PRISMA_MIGRATE=true"
+
 echo.
 echo Local URL: http://localhost:3000
 echo Tunnel target: http://localhost:3000
 echo Worker URL: https://pack.personalizedgiftday.com
-echo Build config: npm run build reads .env and chooses the matching Prisma schema.
+echo Build config: .env DATABASE_URL selects %SCHEMA_NAME%.
+echo Build command: npm run %BUILD_SCRIPT%
+echo SKIP_PRISMA_MIGRATE=%SKIP_PRISMA_MIGRATE%
 echo.
 
-call npm run build
+call npm run %BUILD_SCRIPT%
 if errorlevel 1 (
-  echo npm run build failed.
+  echo npm run %BUILD_SCRIPT% failed.
   pause
   exit /b 1
 )

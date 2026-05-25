@@ -21,12 +21,28 @@ if (-not (Test-Path -LiteralPath "node_modules")) {
   npm.cmd install
 }
 
+$databaseUrl = ""
+$databaseLine = Get-Content -LiteralPath ".env" | Where-Object { $_ -match "^\s*DATABASE_URL\s*=" } | Select-Object -First 1
+if ($databaseLine) {
+  $databaseUrl = ($databaseLine -replace "^\s*DATABASE_URL\s*=\s*", "").Trim().Trim('"').Trim("'")
+}
+
+$isPostgres = $databaseUrl -match "^(postgresql|postgres)://"
+$buildScript = if ($isPostgres) { "build:prod" } else { "build" }
+$schemaName = if ($isPostgres) { "prisma/schema.postgres.prisma" } else { "prisma/schema.prisma" }
+
+if (-not $env:SKIP_PRISMA_MIGRATE) {
+  $env:SKIP_PRISMA_MIGRATE = "true"
+}
+
 Write-Host ""
 Write-Host "Local URL: http://localhost:3000"
 Write-Host "Tunnel target: http://localhost:3000"
 Write-Host "Worker URL: https://pack.personalizedgiftday.com"
-Write-Host "Build config: npm run build reads .env and chooses the matching Prisma schema."
+Write-Host "Build config: .env DATABASE_URL selects $schemaName."
+Write-Host "Build command: npm run $buildScript"
+Write-Host "SKIP_PRISMA_MIGRATE=$env:SKIP_PRISMA_MIGRATE"
 Write-Host ""
 
-npm.cmd run build
+npm.cmd run $buildScript
 npm.cmd start

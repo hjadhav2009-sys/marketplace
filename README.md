@@ -245,8 +245,17 @@ temporary rows or logs, and every cleanup action is audited.
 
 - Prisma connection failed: confirm `DATABASE_URL`, database password, Supabase project status, and whether the pooled
   connection string is required.
+- Build says `schema.prisma` when using Supabase PostgreSQL: run `npm run build:prod`, or use
+  `scripts/windows/start-local-prod.ps1` / `.bat` after confirming `.env` starts `DATABASE_URL` with `postgresql://` or
+  `postgres://`.
+- `DATABASE_URL` format errors: remove accidental spaces and quotes, confirm it is a full Supabase PostgreSQL URL, and
+  keep SQLite development URLs as `file:./...`.
 - Prisma says SQLite requires a `file:` URL but `.env` has a PostgreSQL `DATABASE_URL`: pull the latest build script fix
   and run `npm run build` again so Prisma Client is regenerated with `prisma/schema.postgres.prisma`.
+- Login fails: read the login page message first. `Invalid username or password`, `Account inactive`, `Session expired`,
+  and `Password changed, login again` each point to a different fix. Then confirm the user is active in **Owner -> Users**
+  and that the worker is using the latest password.
+- Images slow on picker: use compact mode and **Load more** so the browser does not request every product image at once.
 - HTTPS domain not active: confirm Cloudflare Tunnel is running and the DNS route points to
   `pack.personalizedgiftday.com`.
 - Local app not starting: check Node.js version, `.env`, `node_modules`, build output, and whether another process is

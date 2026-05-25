@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createSession } from "@/lib/auth";
+import { evaluateLoginCredentials, loginRedirectForResult } from "@/lib/auth-helpers";
 import { recordAuditLog } from "@/lib/audit";
-import { verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { loginSchema } from "@/lib/validators";
@@ -26,20 +26,32 @@ export async function loginAction(formData: FormData) {
     where: { username: parsed.data.username }
   });
 
-  if (!user || !user.active) {
+  if (!user) {
     await recordAuditLog({
-      userId: user?.id,
-      accountId: user?.accountId,
       action: "LOGIN_FAILURE",
       entityType: "User",
-      entityId: user?.id,
-      metadata: { reason: "invalid_credentials_or_inactive", username: parsed.data.username },
+      metadata: { reason: "bad_password", failedLoginCount: 0, username: parsed.data.username },
       request
     });
     redirect("/login?error=invalid");
   }
 
-  if (user.lockedUntil && user.lockedUntil > new Date()) {
+  const loginCheck = evaluateLoginCredentials(user, parsed.data.password);
+
+  if (loginCheck === "inactive") {
+    await recordAuditLog({
+      userId: user.id,
+      accountId: user.accountId,
+      action: "LOGIN_FAILURE",
+      entityType: "User",
+      entityId: user.id,
+      metadata: { reason: "inactive", username: parsed.data.username },
+      request
+    });
+    redirect(loginRedirectForResult(loginCheck));
+  }
+
+  if (loginCheck === "locked") {
     await recordAuditLog({
       userId: user.id,
       accountId: user.accountId,
@@ -49,10 +61,10 @@ export async function loginAction(formData: FormData) {
       metadata: { reason: "locked" },
       request
     });
-    redirect("/login?error=locked");
+    redirect(loginRedirectForResult(loginCheck));
   }
 
-  if (!verifyPassword(parsed.data.password, user.passwordHash)) {
+  if (loginCheck === "invalid_credentials") {
     const failedLoginCount = user.failedLoginCount + 1;
     const lockedUntil = failedLoginCount >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCK_MINUTES * 60 * 1000) : null;
 
@@ -70,7 +82,7 @@ export async function loginAction(formData: FormData) {
       action: "LOGIN_FAILURE",
       entityType: "User",
       entityId: user.id,
-      metadata: { reason: lockedUntil ? "locked_after_failures" : "bad_password", failedLoginCount },
+      metadata: { reason: lockedUntil ? "locked_after_failures" : "bad_password", failedLoginCount, username: parsed.data.username },
       request
     });
     redirect(lockedUntil ? "/login?error=locked" : "/login?error=invalid");
@@ -86,7 +98,22 @@ export async function loginAction(formData: FormData) {
       lastUserAgent: request.userAgent
     }
   });
-  const session = await createSession(user.id, request);
+  let session;
+
+  try {
+    session = await createSession(user.id, request);
+  } catch {
+    await recordAuditLog({
+      userId: user.id,
+      accountId: user.accountId,
+      action: "LOGIN_FAILURE",
+      entityType: "User",
+      entityId: user.id,
+      metadata: { reason: "session_creation_failed" },
+      request
+    });
+    redirect("/login?error=session");
+  }
 
   await recordAuditLog({
     userId: user.id,
@@ -97,8 +124,8 @@ export async function loginAction(formData: FormData) {
     request
   });
 
-  if (user.mustChangePassword) {
-    redirect("/change-password?required=1");
+  if (loginCheck === "must_change_password") {
+    redirect(loginRedirectForResult(loginCheck));
   }
 
   redirect("/accounts");

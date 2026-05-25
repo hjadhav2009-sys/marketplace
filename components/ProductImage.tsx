@@ -94,11 +94,12 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
           src={validSrc}
           alt={alt}
           className={`h-full w-full object-cover transition-opacity ${state === "loaded" ? "opacity-100" : "opacity-0"}`}
+          decoding="async"
           loading="lazy"
           onLoad={() => {
             setState("loaded");
             setSlowLoading(false);
-            if (mappingId) {
+            if (mappingId && imageHealth === "BROKEN") {
               void markProductImageMappedAction(mappingId);
             }
           }}

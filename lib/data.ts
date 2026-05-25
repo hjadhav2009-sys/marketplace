@@ -153,6 +153,20 @@ export async function getSkuDetail(
           not: "PACKED"
         }
       },
+      select: {
+        id: true,
+        awb: true,
+        sku: true,
+        qty: true,
+        color: true,
+        size: true,
+        courier: true,
+        orderNo: true,
+        productDescription: true,
+        imageUrl: true,
+        pickStatus: true,
+        packStatus: true
+      },
       orderBy: { createdAt: "asc" }
     }),
     prisma.skuImageMapping.findFirst({
@@ -160,6 +174,14 @@ export async function getSkuDetail(
         accountId,
         active: true,
         sku: { in: Array.from(new Set([sku, normalizedSku].filter(Boolean))) }
+      },
+      select: {
+        id: true,
+        sku: true,
+        imageUrl: true,
+        productName: true,
+        color: true,
+        imageHealth: true
       },
       orderBy: { updatedAt: "desc" }
     })
@@ -204,9 +226,21 @@ export async function getPackingDashboard(accountId: string) {
     }),
     prisma.scanLog.findMany({
       where: { accountId },
-      include: {
-        order: true,
-        scannedBy: true
+      select: {
+        id: true,
+        awb: true,
+        outcome: true,
+        createdAt: true,
+        order: {
+          select: {
+            awb: true
+          }
+        },
+        scannedBy: {
+          select: {
+            name: true
+          }
+        }
       },
       orderBy: { createdAt: "desc" },
       take: 10
@@ -315,26 +349,63 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
 }
 
 export async function getOrderWithImage(accountId: string, awb: string) {
-  const order = await prisma.order.findFirst({
+  const order = await withDevTiming("packing order result", () => prisma.order.findFirst({
     where: {
       accountId,
       awb
     },
-    include: {
-      account: true,
+    select: {
+      id: true,
+      awb: true,
+      accountId: true,
+      sku: true,
+      qty: true,
+      color: true,
+      size: true,
+      courier: true,
+      orderNo: true,
+      productDescription: true,
+      imageUrl: true,
+      paymentType: true,
+      city: true,
+      state: true,
+      packStatus: true,
+      packedAt: true,
+      account: {
+        select: {
+          name: true
+        }
+      },
       problemOrders: {
         where: { status: "OPEN" },
         orderBy: { createdAt: "desc" },
         take: 1,
-        include: { reportedBy: true }
+        select: {
+          reason: true,
+          createdAt: true,
+          reportedBy: {
+            select: {
+              name: true
+            }
+          }
+        }
       },
       scanLogs: {
         orderBy: { createdAt: "desc" },
         take: 5,
-        include: { scannedBy: true }
+        select: {
+          id: true,
+          outcome: true,
+          createdAt: true,
+          scannedBy: {
+            select: {
+              name: true
+            }
+          }
+        }
       }
     }
-  });
+  }));
 
   if (!order) {
     return null;

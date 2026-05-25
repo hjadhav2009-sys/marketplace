@@ -34,14 +34,14 @@ export function productImageStateText(state: ProductImageState, hasSource: boole
   }
 
   if (state === "missing") {
-    return "Missing mapping";
+    return "No image URL";
   }
 
   if (state === "broken") {
     return hasSource ? "Image URL failed" : "Broken URL";
   }
 
-  return slowLoading ? "Still loading image" : "Loading image";
+  return slowLoading ? "External image slow" : "Loading image";
 }
 
 export function normalizeSkuMappingImageFilter(value: string | null | undefined): SkuMappingImageFilter {

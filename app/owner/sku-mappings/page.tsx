@@ -216,6 +216,7 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                     <th className="px-4 py-3">Product name</th>
                     <th className="px-4 py-3">Image URL</th>
                     <th className="px-4 py-3">Image health</th>
+                    <th className="px-4 py-3">Actions</th>
                     <th className="px-4 py-3">Last imported</th>
                     <th className="px-4 py-3">Updated at</th>
                   </tr>
@@ -242,6 +243,29 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
                         <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
                           {imageHealthLabel(mapping)}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-2">
+                          {mapping.imageUrl ? (
+                            <a
+                              href={mapping.imageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-semibold text-berry hover:text-pink-800"
+                            >
+                              Open image URL
+                            </a>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-500">No URL</span>
+                          )}
+                          <form action={recheckVisibleSkuImagesAction}>
+                            <input type="hidden" name="returnTo" value={`${returnTo}${returnTo.includes("?") ? "&" : "?"}recheck=1`} />
+                            <input type="hidden" name="mappingId" value={mapping.id} />
+                            <button className="text-xs font-semibold text-slate-700 underline">
+                              Recheck/reset status
+                            </button>
+                          </form>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{mapping.lastImportedAt ? formatDateTime(mapping.lastImportedAt) : "-"}</td>
                       <td className="px-4 py-3 text-slate-600">{formatDateTime(mapping.updatedAt)}</td>

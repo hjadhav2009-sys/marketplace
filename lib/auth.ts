@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Account, Role, User } from "@prisma/client";
-import { authRedirectForSessionStatus, type AuthSessionStatus } from "./auth-helpers";
+import { authRedirectForSessionStatus, shouldUseSecureSessionCookie, type AuthSessionStatus } from "./auth-helpers";
 import type { RequestMeta } from "./network";
 import { prisma } from "./prisma";
 
@@ -75,7 +75,7 @@ export async function createSession(userId: string, request?: RequestMeta) {
   cookieStore.set(SESSION_COOKIE, `${payload}.${sign(payload)}`, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureSessionCookie(),
     path: "/",
     maxAge: SESSION_MAX_AGE
   });
@@ -194,7 +194,7 @@ export async function setSelectedAccount(accountId: string) {
   cookieStore.set(ACCOUNT_COOKIE, accountId, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureSessionCookie(),
     path: "/",
     maxAge: SESSION_MAX_AGE
   });

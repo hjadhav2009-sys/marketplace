@@ -27,6 +27,7 @@ function initialState(src: string | null | undefined, imageHealth: string | null
 export function ProductImage({ src, alt, size = "md", showBadge = true, mappingId, showDebug = false, imageHealth }: ProductImageProps) {
   const [state, setState] = useState<ProductImageState>(initialState(src, imageHealth));
   const [slowLoading, setSlowLoading] = useState(false);
+  const [manualCheck, setManualCheck] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
   const validSrc = isLoadableImageUrl(src) ? src : null;
   const hasSource = Boolean(validSrc);
@@ -35,6 +36,7 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
   useEffect(() => {
     setState(initialState(src, imageHealth));
     setSlowLoading(false);
+    setManualCheck(false);
     if (src && !validSrc && mappingId) {
       void markProductImageBrokenAction(mappingId);
     }
@@ -61,6 +63,7 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
   function retryImage(event: MouseEvent<HTMLButtonElement>) {
     stopParentNavigation(event);
     setSlowLoading(false);
+    setManualCheck(true);
     setState(validSrc ? "loading" : getInitialProductImageState(src));
     setRetryVersion((version) => version + 1);
   }
@@ -99,13 +102,15 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
           onLoad={() => {
             setState("loaded");
             setSlowLoading(false);
-            if (mappingId && imageHealth === "BROKEN") {
+            if (mappingId && (imageHealth === "BROKEN" || manualCheck)) {
               void markProductImageMappedAction(mappingId);
             }
+            setManualCheck(false);
           }}
           onError={() => {
             setState("broken");
             setSlowLoading(false);
+            setManualCheck(false);
             if (mappingId) {
               void markProductImageBrokenAction(mappingId);
             }
@@ -117,20 +122,20 @@ export function ProductImage({ src, alt, size = "md", showBadge = true, mappingI
             {state === "broken" ? "Check URL" : "No image"}
           </span>
           <span className="mt-1 text-xs text-slate-500">{stateText}</span>
-          {state === "broken" && validSrc ? (
+          {showDebug && state === "broken" && validSrc ? (
             <button
               type="button"
               onClick={retryImage}
               className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
             >
-              Retry image
+              Check this image
             </button>
           ) : null}
         </div>
       )}
       {state === "loading" && slowLoading ? (
         <div className="absolute inset-x-2 bottom-2 rounded bg-white/90 px-2 py-1 text-center text-xs font-semibold text-amber-800">
-          Still loading image
+          External image slow
         </div>
       ) : null}
       {showBadge ? (

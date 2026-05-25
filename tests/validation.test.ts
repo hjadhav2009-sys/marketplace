@@ -4,7 +4,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AwbBarcodeScanner } from "../components/AwbBarcodeScanner";
 import { isValidAwb, normalizeAwb } from "../lib/awb";
-import { authRedirectForSessionStatus, evaluateLoginCredentials, loginRedirectForResult, normalizeUsername } from "../lib/auth-helpers";
+import {
+  authRedirectForSessionStatus,
+  evaluateLoginCredentials,
+  loginRedirectForResult,
+  normalizeUsername,
+  sessionCookieSecurityDiagnostics,
+  shouldUseSecureSessionCookie
+} from "../lib/auth-helpers";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
 import { formatCsvValue, rowsToCsv } from "../lib/csv";
 import { planOrderImport } from "../lib/import/orders";
@@ -75,6 +82,15 @@ assert.equal(
 );
 assert.equal(loginRedirectForResult("must_change_password"), "/change-password?required=1", "Must-change-password login redirects to password change");
 assert.equal(authRedirectForSessionStatus("invalid"), "/auth/session-ended?reason=expired", "Invalid sessions redirect through safe session cleanup");
+assert.equal(shouldUseSecureSessionCookie({ SESSION_COOKIE_SECURE: "false", NEXT_PUBLIC_APP_URL: "https://pack.personalizedgiftday.com" }), false, "Secure cookie can be disabled for local HTTP");
+assert.equal(shouldUseSecureSessionCookie({ SESSION_COOKIE_SECURE: "true", NEXT_PUBLIC_APP_URL: "http://localhost:3000" }), true, "Secure cookie can be forced for HTTPS-only deployments");
+assert.equal(shouldUseSecureSessionCookie({ SESSION_COOKIE_SECURE: "auto", NEXT_PUBLIC_APP_URL: "https://pack.personalizedgiftday.com" }), true, "Auto cookie mode is secure for HTTPS app URL");
+assert.equal(shouldUseSecureSessionCookie({ SESSION_COOKIE_SECURE: "auto", NEXT_PUBLIC_APP_URL: "http://192.168.1.10:3000" }), false, "Auto cookie mode is not secure for local HTTP IP");
+assert.equal(
+  sessionCookieSecurityDiagnostics({ SESSION_COOKIE_SECURE: "true", NEXT_PUBLIC_APP_URL: "http://192.168.1.10:3000", NODE_ENV: "production" }).warning,
+  "Local HTTP is using secure cookies. Mobile local-IP login may fail.",
+  "System diagnostics warn when local HTTP is configured with secure cookies"
+);
 
 assert.equal(parsedOrderSchema.safeParse(sampleOrder).success, true, "seed order should validate");
 assert.equal(awbSearchSchema.safeParse({ awb: sampleOrder.awb }).success, true, "seed AWB should validate");
@@ -416,8 +432,8 @@ assert.equal(isAllowedLocalNetworkIp("127.0.0.1", "192.168.0.0/16"), true, "Loca
 assert.equal(getInitialProductImageState(null), "missing", "Product image fallback handles missing URL");
 assert.equal(getInitialProductImageState("https://example.com/image.jpg"), "loading", "Product image starts loading for valid URL");
 assert.equal(getInitialProductImageState("not-a-url"), "broken", "Product image state separates invalid URLs from missing mappings");
-assert.equal(productImageStateText("missing", false), "Missing mapping", "Product image state labels missing mapping clearly");
-assert.equal(productImageStateText("loading", true, true), "Still loading image", "Product image state labels slow image loads clearly");
+assert.equal(productImageStateText("missing", false), "No image URL", "Product image state labels missing URLs clearly");
+assert.equal(productImageStateText("loading", true, true), "External image slow", "Product image state labels slow external images clearly");
 assert.equal(productImageStateText("broken", true), "Image URL failed", "Product image state labels failed image loads clearly");
 assert.equal(picklistSummaryProductNameLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "MAPPED", productName: null }), "Mapped image, no product name", "Picklist summary shows mapped SKU without product name");
 assert.equal(picklistSummaryProductNameLabel(null), "No mapping", "Picklist summary shows no mapping separately");
@@ -481,6 +497,11 @@ const pickerDetailPage = readFileSync(join(repoRoot, "app", "picker", "[sku]", "
 const packingPage = readFileSync(join(repoRoot, "app", "packing", "page.tsx"), "utf8");
 const packingResultPage = readFileSync(join(repoRoot, "app", "packing", "[awb]", "page.tsx"), "utf8");
 const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
+const changePasswordAction = readFileSync(join(repoRoot, "app", "change-password", "actions.ts"), "utf8");
+const ownerSystemPage = readFileSync(join(repoRoot, "app", "owner", "system", "page.tsx"), "utf8");
+const windowsProdPs1 = readFileSync(join(repoRoot, "scripts", "windows", "start-local-prod.ps1"), "utf8");
+const localProdEnvExample = readFileSync(join(repoRoot, ".env.local.production.example"), "utf8");
+const prodEnvExample = readFileSync(join(repoRoot, ".env.production.example"), "utf8");
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
 const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.prisma"), "utf8");
 const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
@@ -493,6 +514,8 @@ assert.match(readme, /Account-wise SKU image database/, "README documents accoun
 assert.match(readme, /Do not commit real Meesho PDFs/, "README warns against committing real PDFs");
 assert.match(readme, /Vercel is [\s\S]*not recommended here for heavy PDF parsing/, "README marks Vercel as not recommended for heavy PDF parsing");
 assert.match(readme, /SQLite requires a `file:` URL/, "README documents the Prisma provider mismatch rebuild fix");
+assert.match(readme, /SESSION_COOKIE_SECURE=false/, "README documents local HTTP cookie mode");
+assert.match(readme, /Meesho image URLs are external/, "README documents external image URL reliability");
 assert.equal(buildScript.indexOf('import "dotenv/config";') < buildScript.indexOf("process.env.DATABASE_URL"), true, "Build loads .env before choosing Prisma schema");
 assert.equal(pdfExtractor.includes(".next/server/chunks/pdf.worker.mjs"), false, "PDF extraction does not reference Next server worker chunks");
 assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF extraction preloads the PDF.js worker module explicitly");
@@ -507,7 +530,14 @@ assert.match(packingResultPage, /Quantity to pack/, "Packing result makes quanti
 assert.match(packingResultPage, /fixed inset-x-0 bottom-0/, "Packing result has mobile sticky confirm actions");
 assert.match(reviewPage, /<details[\s\S]*Picklist SKU summary rows/, "Upload review makes picklist summary rows collapsible");
 assert.match(productImageComponent, /decoding="async"/, "Product images decode asynchronously");
-assert.match(productImageComponent, /imageHealth === "BROKEN"/, "Successful image loads only update health when repairing a broken mapping");
+assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
+assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
+assert.match(changePasswordAction, /await clearSession\(\);\s*redirect\("\/login\?passwordChanged=1"\)/, "Password changes clear session and redirect to login");
+assert.match(ownerSystemPage, /Cookie secure mode/, "Owner system page shows auth cookie diagnostics");
+assert.match(ownerSystemPage, /Database ping/, "Owner system page shows database latency");
+assert.match(windowsProdPs1, /SESSION_COOKIE_SECURE = "false"|SESSION_COOKIE_SECURE=false/, "Windows local production script defaults local HTTP cookie mode to false");
+assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local production env example supports local Wi-Fi HTTP cookies");
+assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(gitignore, /\*\.pdf/, "Git ignores real PDF files");

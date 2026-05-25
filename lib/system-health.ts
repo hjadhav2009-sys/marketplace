@@ -1,4 +1,5 @@
 import packageJson from "../package.json";
+import { sessionCookieSecurityDiagnostics } from "./auth-helpers";
 import { prisma } from "./prisma";
 import { runProductionChecks, summarizeProductionChecks } from "./production-checks";
 import { cleanupCutoffs } from "./cleanup";
@@ -14,11 +15,15 @@ function startOfToday() {
 export async function getSystemHealth() {
   const today = startOfToday();
   const cutoffs = cleanupCutoffs();
+  const authCookie = sessionCookieSecurityDiagnostics();
 
   let databaseConnected = true;
+  let databasePingMs: number | null = null;
 
   try {
+    const pingStartedAt = Date.now();
     await prisma.$queryRaw`SELECT 1`;
+    databasePingMs = Date.now() - pingStartedAt;
   } catch {
     databaseConnected = false;
   }
@@ -36,6 +41,9 @@ export async function getSystemHealth() {
       appName: "Meesho Pick & Pack",
       version: packageJson.version,
       nodeEnv: process.env.NODE_ENV ?? "unknown",
+      nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL ?? "",
+      authCookie,
+      databasePingMs,
       databaseConnected,
       activeAccountCount: 0,
       activeUserCount: 0,
@@ -151,6 +159,9 @@ export async function getSystemHealth() {
     appName: "Meesho Pick & Pack",
     version: packageJson.version,
     nodeEnv: process.env.NODE_ENV ?? "unknown",
+    nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL ?? "",
+    authCookie,
+    databasePingMs,
     databaseConnected,
     activeAccountCount,
     activeUserCount,

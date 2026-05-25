@@ -104,9 +104,26 @@ DATABASE_URL=<supabase postgres url>
 SESSION_SECRET=<long secret>
 NEXT_PUBLIC_APP_URL=https://pack.personalizedgiftday.com
 NEXT_PUBLIC_APP_NAME=Meesho Pick & Pack
+SESSION_COOKIE_SECURE=true
 LOCAL_NETWORK_ONLY=false
 NODE_ENV=production
 ```
+
+For direct local Wi-Fi testing on `http://localhost:3000` or `http://192.168.x.x:3000`, use:
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+SESSION_COOKIE_SECURE=false
+```
+
+For Cloudflare Tunnel HTTPS, use:
+
+```env
+NEXT_PUBLIC_APP_URL=https://pack.personalizedgiftday.com
+SESSION_COOKIE_SECURE=true
+```
+
+If login works on the owner PC but not on a mobile local IP, check **Owner -> System** and make sure local HTTP is not using secure cookies.
 
 Do not expose the Supabase database password in GitHub, browser code, screenshots, or worker devices.
 
@@ -255,7 +272,11 @@ temporary rows or logs, and every cleanup action is audited.
 - Login fails: read the login page message first. `Invalid username or password`, `Account inactive`, `Session expired`,
   and `Password changed, login again` each point to a different fix. Then confirm the user is active in **Owner -> Users**
   and that the worker is using the latest password.
+- Login works on desktop but fails on mobile local IP: set `SESSION_COOKIE_SECURE=false` for local HTTP. Use
+  `SESSION_COOKIE_SECURE=true` only for HTTPS, such as Cloudflare Tunnel.
 - Images slow on picker: use compact mode and **Load more** so the browser does not request every product image at once.
+- Meesho image URLs are external and can be slow, expired, or blocked. Product image files are not stored by this app.
+  Export broken mapping CSV from **Owner -> SKU Images**, refresh URLs from Meesho, and import the updated sheet.
 - HTTPS domain not active: confirm Cloudflare Tunnel is running and the DNS route points to
   `pack.personalizedgiftday.com`.
 - Local app not starting: check Node.js version, `.env`, `node_modules`, build output, and whether another process is

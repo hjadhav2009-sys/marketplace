@@ -49,6 +49,33 @@ export default async function OwnerSystemPage() {
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 lg:grid-cols-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cookie secure mode</p>
+            <p className="mt-1 text-lg font-bold text-slate-950">
+              {health.authCookie.mode} / secure={String(health.authCookie.secure)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">App URL</p>
+            <p className="mt-1 break-all text-sm font-semibold text-slate-950">{health.nextPublicAppUrl || "Not set"}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Database ping</p>
+            <p className="mt-1 text-lg font-bold text-slate-950">
+              {health.databasePingMs === null ? "Failed" : `${health.databasePingMs}ms`}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Local auth warning</p>
+            <p className={`mt-1 text-sm font-semibold ${health.authCookie.warning ? "text-rose-700" : "text-teal-700"}`}>
+              {health.authCookie.warning ?? "Cookie mode matches the configured app URL."}
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Database connected" value={health.databaseConnected ? "Yes" : "No"} tone={health.databaseConnected ? "mint" : "clay"} />
         <StatCard label="Active accounts" value={compactNumber(health.activeAccountCount)} />

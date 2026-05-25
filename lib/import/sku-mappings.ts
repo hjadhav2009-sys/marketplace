@@ -11,9 +11,21 @@ export type NormalizedSkuImageRow = {
   sku: string;
   imageUrl: string;
   productName?: string;
+  color?: string;
   notes?: string;
   active: boolean;
+  productNameProvided: boolean;
+  colorProvided: boolean;
+  notesProvided: boolean;
+  activeProvided: boolean;
   rawData: RawImportRow;
+};
+
+export type SkuMappingAccountRef = Pick<Account, "id" | "name" | "code">;
+
+export type ResolvedSkuImageRow = NormalizedSkuImageRow & {
+  accountId: string;
+  resolvedAccountName: string;
 };
 
 export type ImportIssue = {
@@ -30,23 +42,41 @@ export type SkuMappingImportPlan = {
   errors: ImportIssue[];
 };
 
+export type AccountSkuMappingImportPlan = {
+  created: ResolvedSkuImageRow[];
+  updated: ResolvedSkuImageRow[];
+  unchanged: ResolvedSkuImageRow[];
+  errors: ImportIssue[];
+};
+
 const skuAliases = ["sku", "skucode", "suppliersku"];
 const imageAliases = ["image", "imageurl", "image_url", "meeshoimageurl", "productimageurl"];
 const nameAliases = ["name", "productname", "producttitle"];
-const accountAliases = ["account", "accountname"];
+const accountAliases = ["account", "accountname", "accountcode"];
+const colorAliases = ["color", "colour"];
 
 function normalizeHeader(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function getAliasedValue(row: RawImportRow, aliases: string[]) {
+  return getAliasedField(row, aliases).value;
+}
+
+function getAliasedField(row: RawImportRow, aliases: string[]) {
   for (const [key, value] of Object.entries(row)) {
     if (aliases.includes(normalizeHeader(key))) {
-      return value.trim();
+      return {
+        value: value.trim(),
+        found: true
+      };
     }
   }
 
-  return "";
+  return {
+    value: "",
+    found: false
+  };
 }
 
 export function isValidImportImageUrl(value: string) {
@@ -80,6 +110,10 @@ export function normalizeSkuImageRows(rows: RawImportRow[]) {
     const rowNumber = index + 2;
     const sku = getAliasedValue(row, skuAliases);
     const imageUrl = getAliasedValue(row, imageAliases);
+    const productName = getAliasedField(row, nameAliases);
+    const color = getAliasedField(row, colorAliases);
+    const notes = getAliasedField(row, ["notes"]);
+    const active = getAliasedField(row, ["active"]);
 
     if (!sku) {
       errors.push({
@@ -116,9 +150,14 @@ export function normalizeSkuImageRows(rows: RawImportRow[]) {
       accountName: getAliasedValue(row, accountAliases) || undefined,
       sku,
       imageUrl,
-      productName: getAliasedValue(row, nameAliases) || undefined,
-      notes: getAliasedValue(row, ["notes"]) || undefined,
-      active: parseActive(getAliasedValue(row, ["active"])),
+      productName: productName.value || undefined,
+      color: color.value || undefined,
+      notes: notes.value || undefined,
+      active: active.found ? parseActive(active.value) : true,
+      productNameProvided: productName.found,
+      colorProvided: color.found,
+      notesProvided: notes.found,
+      activeProvided: active.found,
       rawData: row
     });
   });
@@ -126,17 +165,18 @@ export function normalizeSkuImageRows(rows: RawImportRow[]) {
   return { normalized, errors };
 }
 
-function sameMapping(mapping: Pick<SkuImageMapping, "imageUrl" | "productName" | "notes" | "active">, row: NormalizedSkuImageRow) {
+function sameMapping(mapping: Pick<SkuImageMapping, "imageUrl" | "productName" | "color" | "notes" | "active">, row: NormalizedSkuImageRow) {
   return (
     mapping.imageUrl === row.imageUrl &&
-    (mapping.productName ?? "") === (row.productName ?? "") &&
-    (mapping.notes ?? "") === (row.notes ?? "") &&
-    mapping.active === row.active
+    (!row.productNameProvided || (mapping.productName ?? "") === (row.productName ?? "")) &&
+    (!row.colorProvided || (mapping.color ?? "") === (row.color ?? "")) &&
+    (!row.notesProvided || (mapping.notes ?? "") === (row.notes ?? "")) &&
+    (!row.activeProvided || mapping.active === row.active)
   );
 }
 
 export function planSkuMappingImport(
-  existingMappings: Array<Pick<SkuImageMapping, "sku" | "imageUrl" | "productName" | "notes" | "active">>,
+  existingMappings: Array<Pick<SkuImageMapping, "sku" | "imageUrl" | "productName" | "color" | "notes" | "active">>,
   rows: RawImportRow[]
 ): SkuMappingImportPlan {
   const { normalized, errors } = normalizeSkuImageRows(rows);
@@ -160,7 +200,11 @@ export function planSkuMappingImport(
   );
 }
 
-function findAccountForRow(accounts: Account[], selectedAccount: Account, row: NormalizedSkuImageRow) {
+function findAccountForRow(accounts: SkuMappingAccountRef[], selectedAccount: SkuMappingAccountRef, row: NormalizedSkuImageRow, importAllAccounts: boolean) {
+  if (!importAllAccounts) {
+    return selectedAccount;
+  }
+
   if (!row.accountName) {
     return selectedAccount;
   }
@@ -169,13 +213,60 @@ function findAccountForRow(accounts: Account[], selectedAccount: Account, row: N
   return accounts.find((account) => account.name.toLowerCase() === requested || account.code.toLowerCase() === requested) ?? null;
 }
 
+export function planAccountSkuMappingImport(
+  existingMappings: Array<Pick<SkuImageMapping, "accountId" | "sku" | "imageUrl" | "productName" | "color" | "notes" | "active">>,
+  rows: RawImportRow[],
+  accounts: SkuMappingAccountRef[],
+  selectedAccount: SkuMappingAccountRef,
+  importAllAccounts: boolean
+): AccountSkuMappingImportPlan {
+  const { normalized, errors } = normalizeSkuImageRows(rows);
+  const existingByKey = new Map(existingMappings.map((mapping) => [`${mapping.accountId}:${mapping.sku}`, mapping]));
+
+  return normalized.reduce<AccountSkuMappingImportPlan>(
+    (plan, row) => {
+      const account = findAccountForRow(accounts, selectedAccount, row, importAllAccounts);
+
+      if (!account) {
+        plan.errors.push({
+          rowNumber: row.rowNumber,
+          issueType: "UNKNOWN_ACCOUNT",
+          message: `No account matched "${row.accountName}".`,
+          rawData: row.rawData
+        });
+        return plan;
+      }
+
+      const resolvedRow: ResolvedSkuImageRow = {
+        ...row,
+        accountId: account.id,
+        resolvedAccountName: account.name
+      };
+      const existing = existingByKey.get(`${account.id}:${row.sku}`);
+
+      if (!existing) {
+        plan.created.push(resolvedRow);
+      } else if (sameMapping(existing, resolvedRow)) {
+        plan.unchanged.push(resolvedRow);
+      } else {
+        plan.updated.push(resolvedRow);
+      }
+
+      return plan;
+    },
+    { created: [], updated: [], unchanged: [], errors }
+  );
+}
+
 export async function importSkuMappingsFromRows(input: {
   rows: RawImportRow[];
   fileName: string;
   selectedAccount: Account;
+  importAllAccounts?: boolean;
   user: User;
   request?: RequestMeta;
 }) {
+  const importAllAccounts = input.importAllAccounts === true;
   const batch = await prisma.uploadBatch.create({
     data: {
       accountId: input.selectedAccount.id,
@@ -183,17 +274,28 @@ export async function importSkuMappingsFromRows(input: {
       fileName: input.fileName,
       importType: "SKU_IMAGE",
       status: "UPLOADED",
-      totalRows: input.rows.length
+      totalRows: input.rows.length,
+      notes: JSON.stringify({
+        selectedAccount: {
+          id: input.selectedAccount.id,
+          name: input.selectedAccount.name,
+          code: input.selectedAccount.code
+        },
+        importAllAccounts
+      })
     }
   });
 
   const accounts = await prisma.account.findMany();
-  const { normalized, errors } = normalizeSkuImageRows(input.rows);
-  let createdRows = 0;
-  let updatedRows = 0;
-  let skippedRows = 0;
+  const accountIds = importAllAccounts ? accounts.map((account) => account.id) : [input.selectedAccount.id];
+  const existingMappings = await prisma.skuImageMapping.findMany({
+    where: {
+      accountId: { in: accountIds }
+    }
+  });
+  const plan = planAccountSkuMappingImport(existingMappings, input.rows, accounts, input.selectedAccount, importAllAccounts);
 
-  for (const issue of errors) {
+  for (const issue of plan.errors) {
     await prisma.importRowIssue.create({
       data: {
         batchId: batch.id,
@@ -205,78 +307,53 @@ export async function importSkuMappingsFromRows(input: {
     });
   }
 
-  for (const row of normalized) {
-    const account = findAccountForRow(accounts, input.selectedAccount, row);
-
-    if (!account) {
-      await prisma.importRowIssue.create({
-        data: {
-          batchId: batch.id,
-          rowNumber: row.rowNumber,
-          issueType: "UNKNOWN_ACCOUNT",
-          message: `No account matched "${row.accountName}".`,
-          rawData: JSON.stringify(row.rawData)
-        }
-      });
-      continue;
-    }
-
-    const existing = await prisma.skuImageMapping.findUnique({
-      where: {
-        accountId_sku: {
-          accountId: account.id,
-          sku: row.sku
-        }
-      }
-    });
-
-    if (!existing) {
-      await prisma.skuImageMapping.create({
-        data: {
-          accountId: account.id,
-          sku: row.sku,
-          imageUrl: row.imageUrl,
-          productName: row.productName,
-          active: row.active,
-          notes: row.notes,
-          source: input.fileName,
-          lastImportedAt: new Date(),
-          imageHealth: "MAPPED"
-        }
-      });
-      createdRows += 1;
-      continue;
-    }
-
-    if (sameMapping(existing, row)) {
-      skippedRows += 1;
-      continue;
-    }
-
-    await prisma.skuImageMapping.update({
-      where: { id: existing.id },
+  for (const row of plan.created) {
+    await prisma.skuImageMapping.create({
       data: {
+        accountId: row.accountId,
+        sku: row.sku,
         imageUrl: row.imageUrl,
-        productName: row.productName,
+        productName: row.productNameProvided ? row.productName : null,
+        color: row.colorProvided ? row.color : null,
         active: row.active,
-        notes: row.notes,
+        notes: row.notesProvided ? row.notes : null,
         source: input.fileName,
         lastImportedAt: new Date(),
         imageHealth: "MAPPED"
       }
     });
-    updatedRows += 1;
   }
 
-  const errorRows = errors.length + (await prisma.importRowIssue.count({ where: { batchId: batch.id, issueType: "UNKNOWN_ACCOUNT" } }));
+  for (const row of plan.updated) {
+    await prisma.skuImageMapping.update({
+      where: {
+        accountId_sku: {
+          accountId: row.accountId,
+          sku: row.sku
+        }
+      },
+      data: {
+        imageUrl: row.imageUrl,
+        productName: row.productNameProvided ? row.productName : undefined,
+        color: row.colorProvided ? row.color : undefined,
+        active: row.activeProvided ? row.active : undefined,
+        notes: row.notesProvided ? row.notes : undefined,
+        source: input.fileName,
+        lastImportedAt: new Date(),
+        imageHealth: "MAPPED"
+      }
+    });
+  }
+
+  const errorRows = plan.errors.length;
 
   const updatedBatch = await prisma.uploadBatch.update({
     where: { id: batch.id },
     data: {
       status: errorRows > 0 ? "REVIEWED" : "IMPORTED",
-      createdRows,
-      updatedRows,
-      skippedRows,
+      createdRows: plan.created.length,
+      updatedRows: plan.updated.length,
+      skippedRows: plan.unchanged.length,
       errorRows
     }
   });
@@ -289,9 +366,11 @@ export async function importSkuMappingsFromRows(input: {
     entityId: batch.id,
     metadata: {
       fileName: input.fileName,
-      createdRows,
-      updatedRows,
-      skippedRows,
+      selectedAccount: input.selectedAccount.name,
+      importAllAccounts,
+      createdRows: plan.created.length,
+      updatedRows: plan.updated.length,
+      skippedRows: plan.unchanged.length,
       errorRows
     },
     request: input.request

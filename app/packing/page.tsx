@@ -12,6 +12,8 @@ type PackingPageProps = {
   searchParams?: Promise<{
     error?: string;
     notFound?: string;
+    multiple?: string;
+    q?: string;
   }>;
 };
 
@@ -62,13 +64,19 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
         </div>
       ) : null}
 
+      {params?.multiple ? (
+        <div className="mb-5 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          Multiple orders matched {params.q}. Choose the correct AWB from the live suggestions.
+        </div>
+      ) : null}
+
       {dashboard.pendingCount === 0 ? (
         <div className="mb-5 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-700">
           No pending packing orders for this account.
         </div>
       ) : null}
 
-      <AwbBarcodeScanner action={searchAwbAction} />
+      <AwbBarcodeScanner action={searchAwbAction} defaultAwb={params?.q} />
 
       <section className="mt-6 rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-3">

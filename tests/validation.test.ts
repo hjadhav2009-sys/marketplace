@@ -8,8 +8,9 @@ import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
 import { formatCsvValue, rowsToCsv } from "../lib/csv";
 import { planOrderImport } from "../lib/import/orders";
 import { canImportPreviewIssues } from "../lib/import/preview";
-import { planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
+import { planAccountSkuMappingImport, planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
+import { findAwbSearchMatches } from "../lib/operations/awb-search";
 import { canConfirmPacked } from "../lib/operations/packing";
 import { buildPickerSkuGroups } from "../lib/operations/picking";
 import { hashPassword } from "../lib/password";
@@ -46,6 +47,54 @@ assert.equal(awbSearchSchema.safeParse({ awb: sampleOrder.awb }).success, true, 
 assert.equal(normalizeAwb(" 1490 8349 1549 3571 "), "1490834915493571", "numeric AWB normalizes");
 assert.equal(normalizeAwb("sf3423949467fpl"), "SF3423949467FPL", "Shadowfax AWB normalizes");
 assert.equal(isValidAwb("bad"), false, "bad AWB is rejected");
+const awbCandidates = [
+  {
+    id: "o1",
+    accountId: "a1",
+    awb: "1490834915493571",
+    sku: "SKU1",
+    qty: 1,
+    color: "Silver",
+    courier: "Delhivery",
+    packStatus: "READY" as const
+  },
+  {
+    id: "o2",
+    accountId: "a1",
+    awb: "9999999915493571",
+    sku: "SKU2",
+    qty: 1,
+    color: "Gold",
+    courier: "Shadowfax",
+    packStatus: "READY" as const
+  },
+  {
+    id: "o3",
+    accountId: "a2",
+    awb: "8888888815493571",
+    sku: "SKU3",
+    qty: 1,
+    color: "Black",
+    courier: "Xpress Bees",
+    packStatus: "READY" as const
+  },
+  ...Array.from({ length: 12 }, (_, index) => ({
+    id: `m${index}`,
+    accountId: "a1",
+    awb: `ABC15493${String(index).padStart(4, "0")}`,
+    sku: `SKU${index}`,
+    qty: 1,
+    color: null,
+    courier: null,
+    packStatus: "READY" as const
+  }))
+];
+assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a1", query: "1490834915493571" })[0]?.matchType, "EXACT", "AWB search ranks exact match first");
+assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a1", query: "93571" }).length, 2, "AWB search supports last 5 suffix match");
+assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a1", query: "15493571" }).length, 2, "AWB search supports last 8 suffix match");
+assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a2", query: "93571" }).length, 1, "AWB search is account scoped");
+assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a1", query: "15493" }).length, 10, "AWB search limits multiple matches");
+assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a1", query: "00000" }).length, 0, "AWB search returns no results cleanly");
 assert.equal(uploadBatchSchema.safeParse({ filename: "labels.pdf" }).success, true, "PDF upload should validate");
 assert.equal(uploadBatchSchema.safeParse({ filename: "labels.xlsx" }).success, false, "non-PDF upload should fail");
 assert.equal(
@@ -88,6 +137,7 @@ const skuPlan = planSkuMappingImport(
       sku: "EXISTING_CHANGED",
       imageUrl: "https://images-r.meesho.com/images/products/2/old.avif",
       productName: null,
+      color: null,
       notes: null,
       active: true
     },
@@ -95,6 +145,7 @@ const skuPlan = planSkuMappingImport(
       sku: "EXISTING_SAME",
       imageUrl: "https://images-r.meesho.com/images/products/3/same.avif",
       productName: null,
+      color: null,
       notes: null,
       active: true
     }
@@ -106,6 +157,86 @@ assert.equal(skuPlan.created.length, 1, "SKU import creates new mapping");
 assert.equal(skuPlan.updated.length, 1, "SKU import updates changed mapping");
 assert.equal(skuPlan.unchanged.length, 1, "SKU import skips unchanged mapping");
 assert.equal(skuPlan.errors[0]?.issueType, "INVALID_IMAGE_URL", "SKU import rejects invalid URL");
+
+const minimalSkuPlan = planSkuMappingImport(
+  [
+    {
+      sku: "KEEP_METADATA",
+      imageUrl: "https://images-r.meesho.com/images/products/4/same.avif",
+      productName: "Existing name",
+      color: "Blue",
+      notes: "Existing note",
+      active: false
+    }
+  ],
+  [{ sku: "KEEP_METADATA", image_url: "https://images-r.meesho.com/images/products/4/same.avif" }]
+);
+assert.equal(minimalSkuPlan.unchanged.length, 1, "Same URL without optional metadata columns is unchanged");
+
+const accountWisePlan = planAccountSkuMappingImport(
+  [
+    {
+      accountId: "a1",
+      sku: "SHARED_SKU",
+      imageUrl: "https://images-r.meesho.com/images/products/a1/old.avif",
+      productName: "Old A1",
+      color: "Silver",
+      notes: null,
+      active: true
+    },
+    {
+      accountId: "a2",
+      sku: "SHARED_SKU",
+      imageUrl: "https://images-r.meesho.com/images/products/a2/same.avif",
+      productName: "Same A2",
+      color: "Gold",
+      notes: "keep",
+      active: true
+    }
+  ],
+  [
+    {
+      account: "Sullery",
+      sku: "SHARED_SKU",
+      image_url: "https://images-r.meesho.com/images/products/a1/new.avif",
+      product_name: "New A1",
+      color: "Silver"
+    },
+    {
+      account_code: "ME2",
+      sku: "SHARED_SKU",
+      image_url: "https://images-r.meesho.com/images/products/a2/same.avif",
+      product_name: "Same A2",
+      color: "Gold",
+      notes: "keep"
+    },
+    {
+      sku: "NEW_SELECTED",
+      image_url: "https://images-r.meesho.com/images/products/a1/new-selected.avif"
+    }
+  ],
+  [
+    { id: "a1", name: "Sullery", code: "ME1" },
+    { id: "a2", name: "Second", code: "ME2" }
+  ],
+  { id: "a1", name: "Sullery", code: "ME1" },
+  true
+);
+assert.equal(accountWisePlan.updated[0]?.accountId, "a1", "Account-wise import matches account by name");
+assert.equal(accountWisePlan.unchanged[0]?.accountId, "a2", "Account-wise import matches account by code");
+assert.equal(accountWisePlan.created[0]?.accountId, "a1", "Empty account cells use selected account");
+
+const selectedOnlyPlan = planAccountSkuMappingImport(
+  [],
+  [{ account: "Second", sku: "SELECTED_ONLY", image_url: "https://images-r.meesho.com/images/products/a1/selected.avif" }],
+  [
+    { id: "a1", name: "Sullery", code: "ME1" },
+    { id: "a2", name: "Second", code: "ME2" }
+  ],
+  { id: "a1", name: "Sullery", code: "ME1" },
+  false
+);
+assert.equal(selectedOnlyPlan.created[0]?.accountId, "a1", "Selected-account import ignores account column unless all-account mode is enabled");
 
 const orderPlan = planOrderImport(
   [
@@ -265,12 +396,20 @@ assert.equal(
 );
 
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
+const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.prisma"), "utf8");
+const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
 assert.match(
   readme,
   /Free-first daily setup: Windows PC \+ Supabase \+ Cloudflare Tunnel/,
   "README documents the recommended free-first setup"
 );
+assert.match(readme, /Account-wise SKU image database/, "README documents account-wise SKU image mappings");
+assert.match(readme, /Do not commit real Meesho PDFs/, "README warns against committing real PDFs");
 assert.match(readme, /Vercel is [\s\S]*not recommended here for heavy PDF parsing/, "README marks Vercel as not recommended for heavy PDF parsing");
+assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
+assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
+assert.match(gitignore, /\*\.pdf/, "Git ignores real PDF files");
 assert.equal(existsSync(join(repoRoot, "scripts", "windows", "start-local-prod.ps1")), true, "Windows production PowerShell script exists");
 assert.equal(existsSync(join(repoRoot, "scripts", "windows", "start-local-prod.bat")), true, "Windows production batch script exists");
 assert.equal(existsSync(join(repoRoot, "docs", "cloudflare-tunnel", "config.yml.example")), true, "Cloudflare Tunnel config example exists");

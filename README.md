@@ -310,9 +310,19 @@ Seed account and order:
 | Product | Sports Jersey Number Personalized Pendant |
 | Image URL | https://images-r.meesho.com/images/products/576264463/z71on.avif |
 
-## SKU Image Import
+## Account-wise SKU image database
 
-Owners can import persistent SKU-to-image mappings from:
+SKU image mappings are account-specific. Six Meesho accounts can use the same SKU text with different product image URLs,
+so the database keeps a unique mapping by `accountId + sku`.
+
+Owners can export the current mapping database from:
+
+```text
+/owner/sku-mappings
+```
+
+Export the selected account by default, or use **Export all accounts** when preparing a full owner workbook. Add new SKUs
+or update image URLs in Excel, then import again from:
 
 ```text
 /owner/sku-mappings/import
@@ -321,8 +331,8 @@ Owners can import persistent SKU-to-image mappings from:
 CSV or `.xlsx` columns:
 
 ```csv
-sku,image_url,product_name,notes
-1202919298_6,https://images-r.meesho.com/images/products/576264463/z71on.avif,Sports Jersey Number Personalized Pendant,Seed mapping
+account,sku,image_url,product_name,color,notes,active
+Sullery,1202919298_6,https://images-r.meesho.com/images/products/576264463/z71on.avif,Sports Jersey Number Personalized Pendant,Silver,Seed mapping,true
 ```
 
 Required columns:
@@ -334,14 +344,21 @@ Optional columns:
 
 - `account`
 - `product_name`
+- `color`
 - `notes`
 - `active`
 
 Common alternate names are accepted, including `SKU`, `sku_code`, `supplier_sku`, `image`, `imageUrl`,
-`meesho_image_url`, `product_image_url`, `name`, `product_title`, and `account_name`.
+`meesho_image_url`, `product_image_url`, `name`, `product_title`, `account_name`, and `account_code`.
 
-Existing mappings are upserted by `accountId + sku`. Same URL/data is counted as unchanged; changed rows update the
-stored URL and metadata. Product image files are never stored.
+When importing for the selected account, empty or present account cells import into that selected account. When importing
+for all accounts, account cells match by account name or account code; empty account cells still use the selected account.
+
+Existing mappings are remembered and upserted by `accountId + sku`. Same URL/data is counted as unchanged. Changed
+URL/name/color/notes/active fields update the old mapping. New SKUs are created. Invalid image URLs become row errors and
+can be downloaded as an error CSV. Product image files are never stored.
+
+Do not commit real Meesho PDFs. Use sanitized text fixtures only.
 
 ## Supported Meesho PDFs
 
@@ -370,9 +387,10 @@ Sprint 6 uses local server-side text extraction, page diagnostics, and layout-to
 - Rows with missing AWB or SKU are held for review and are not imported as normal orders.
 - Uploading both labels and manifest enables cross-checks for missing AWBs, SKU mismatches, quantity mismatches, courier warnings, and picklist total mismatches.
 
-If text extraction is empty or almost empty, the review screen shows: `This looks like a scanned/image PDF. OCR is required.`
-The OCR-ready interface lives in `lib/parsers/ocr`, but heavy OCR is not implemented yet. If parser confidence is low,
-the owner should review the row before confirming import.
+If pages have almost no text, the review screen shows: `Scanned/image PDF; OCR required.` If pages have text but no
+orders are parsed, it shows: `Unknown layout or unsupported Meesho format.` The OCR-ready interface lives in
+`lib/parsers/ocr`, but heavy OCR is not implemented yet. If parser confidence is low, the owner should review the row
+before confirming import.
 
 ## Daily Workflow
 
@@ -397,7 +415,7 @@ the owner should review the row before confirming import.
 
 1. Log in as a packer and choose the assigned seller account.
 2. Open **Pack**.
-3. Scan the AWB barcode from the shipping label with the browser camera, or type the AWB manually.
+3. Scan the AWB barcode from the shipping label with the browser camera, or type the full AWB/last 5 to 8 AWB characters manually.
 4. Verify the product image, SKU, quantity, color, courier, account, order number, and AWB.
 5. Confirm packed. Repeating the same confirmation is safe and will not duplicate updates.
 6. Mark problem if the item is missing, wrong, or unclear.
@@ -410,6 +428,8 @@ The AWB scanner runs in the browser with an open-source barcode reader. No APK i
 - Camera permission is requested by the packing page.
 - Rear/environment camera is preferred on phones.
 - Manual AWB entry is always visible and should be used if camera access fails.
+- Manual AWB entry shows live account-scoped suggestions after 5 characters. Exact matches rank first, suffix matches
+  next, and contains matches last.
 - Camera scanning usually requires HTTPS on phones. Localhost works for PC testing, but phone access over plain HTTP may be blocked by the browser.
 - Production should use `https://pack.personalizedgiftday.com` before relying on camera scanning.
 

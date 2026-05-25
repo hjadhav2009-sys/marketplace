@@ -30,6 +30,35 @@ export default async function SkuMappingsPage({ searchParams }: SkuMappingsPageP
         action={{ href: "/owner/sku-mappings/import", label: "Import CSV/XLSX" }}
       />
 
+      <section className="mb-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected account</p>
+            <p className="mt-1 text-lg font-bold text-slate-950">{account.name}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/owner/sku-mappings/export?format=csv"
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-berry hover:text-berry"
+            >
+              Export selected CSV
+            </a>
+            <a
+              href="/owner/sku-mappings/export?format=xlsx"
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-berry hover:text-berry"
+            >
+              Export selected XLSX
+            </a>
+            <a
+              href="/owner/sku-mappings/export?scope=all&format=csv"
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-berry hover:text-berry"
+            >
+              Export all accounts
+            </a>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <form action={upsertSkuImageMappingAction} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-950">Add or update mapping</h2>

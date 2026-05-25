@@ -43,6 +43,7 @@ export async function importSkuMappingFileAction(formData: FormData) {
       rows,
       fileName: file.name,
       selectedAccount,
+      importAllAccounts: formData.get("importAllAccounts") === "on",
       user,
       request
     });

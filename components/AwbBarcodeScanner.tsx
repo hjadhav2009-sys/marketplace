@@ -3,6 +3,7 @@
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeAwb, isValidAwb } from "@/lib/awb";
+import { ProductImage } from "./ProductImage";
 import { SubmitButton } from "./SubmitButton";
 
 type AwbBarcodeScannerProps = {
@@ -12,6 +13,17 @@ type AwbBarcodeScannerProps = {
 
 type BarcodeResult = {
   getText: () => string;
+};
+
+type AwbSuggestion = {
+  awb: string;
+  sku: string;
+  imageUrl?: string | null;
+  color?: string | null;
+  qty: number;
+  courier?: string | null;
+  packStatus: string;
+  matchType: "EXACT" | "SUFFIX" | "CONTAINS";
 };
 
 function isLocalhost(hostname: string) {
@@ -28,6 +40,9 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
   const [error, setError] = useState<string | null>(null);
   const [httpsWarning, setHttpsWarning] = useState(false);
   const [detectedAwb, setDetectedAwb] = useState<string | null>(null);
+  const [manualAwb, setManualAwb] = useState(defaultAwb ?? "");
+  const [suggestions, setSuggestions] = useState<AwbSuggestion[]>([]);
+  const [suggestionState, setSuggestionState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   const stopVideoTracks = useCallback(() => {
     const stream = videoRef.current?.srcObject;
@@ -59,6 +74,51 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
       stopVideoTracks();
     };
   }, [stopVideoTracks]);
+
+  useEffect(() => {
+    const query = normalizeAwb(manualAwb);
+
+    if (query.length < 5) {
+      setSuggestions([]);
+      setSuggestionState("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      setSuggestionState("loading");
+      fetch(`/packing/search?q=${encodeURIComponent(query)}`, {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json"
+        }
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Search failed");
+          }
+
+          return response.json() as Promise<{ results?: AwbSuggestion[] }>;
+        })
+        .then((payload) => {
+          setSuggestions(payload.results ?? []);
+          setSuggestionState("ready");
+        })
+        .catch((caughtError) => {
+          if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
+            return;
+          }
+
+          setSuggestionState("error");
+          setSuggestions([]);
+        });
+    }, 150);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [manualAwb]);
 
   function submitDetectedAwb(awb: string) {
     setDetectedAwb(awb);
@@ -207,12 +267,59 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
               name="awb"
               inputMode="text"
               autoComplete="off"
-              defaultValue={defaultAwb}
+              value={manualAwb}
+              onChange={(event) => setManualAwb(event.target.value)}
               placeholder="1490834915493571"
               className="mt-1 min-h-14 w-full rounded-md border border-slate-300 px-3 py-2 text-xl font-semibold uppercase outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
               required
             />
           </label>
+          <div className="min-h-20">
+            {normalizeAwb(manualAwb).length > 0 && normalizeAwb(manualAwb).length < 5 ? (
+              <p className="text-sm text-slate-500">Type at least last 5 AWB characters for live suggestions.</p>
+            ) : null}
+            {suggestionState === "loading" ? (
+              <p className="text-sm font-medium text-slate-500">Searching...</p>
+            ) : null}
+            {suggestionState === "error" ? (
+              <p className="text-sm font-medium text-rose-700">Live suggestions failed. Manual submit still works.</p>
+            ) : null}
+            {suggestionState === "ready" && suggestions.length === 0 ? (
+              <p className="text-sm font-medium text-amber-800">No matching AWB found for this account.</p>
+            ) : null}
+            {suggestions.length > 0 ? (
+              <div className="space-y-2">
+                {suggestions.length === 1 ? (
+                  <p className="text-sm font-medium text-teal-700">One match found. Open it or submit the search.</p>
+                ) : (
+                  <p className="text-sm font-medium text-slate-600">{suggestions.length} matches found. Choose the correct AWB.</p>
+                )}
+                <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">
+                  {suggestions.map((suggestion) => (
+                    <a
+                      key={suggestion.awb}
+                      href={`/packing/${encodeURIComponent(suggestion.awb)}`}
+                      className="grid grid-cols-[auto_1fr_auto] gap-3 p-3 transition hover:bg-slate-50"
+                    >
+                      <ProductImage src={suggestion.imageUrl} alt={`${suggestion.sku} ${suggestion.awb}`} size="sm" showBadge={false} />
+                      <span className="min-w-0">
+                        <span className="block break-all text-sm font-bold text-slate-950">{suggestion.awb}</span>
+                        <span className="mt-1 block text-sm text-slate-600">
+                          {suggestion.sku} / {suggestion.color ?? "Color unknown"} / Qty {suggestion.qty}
+                        </span>
+                        <span className="mt-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                          {suggestion.courier ?? "Courier pending"} / {suggestion.packStatus}
+                        </span>
+                      </span>
+                      <span className="self-center rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                        {suggestion.matchType}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <SubmitButton pendingText="Searching...">Find order</SubmitButton>
         </form>
       </section>

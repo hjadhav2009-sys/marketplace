@@ -1,4 +1,5 @@
 import type { Account } from "@prisma/client";
+import { findAwbSearchMatches } from "./operations/awb-search";
 import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups } from "./operations/picking";
 import { prisma } from "./prisma";
 
@@ -191,6 +192,87 @@ export async function getOrderByAwb(account: Account, awb: string) {
       uploadBatch: true
     }
   });
+}
+
+export async function searchOrdersByAwbFragment(accountId: string, query: string, limit = 10) {
+  const select = {
+    id: true,
+    accountId: true,
+    awb: true,
+    sku: true,
+    qty: true,
+    color: true,
+    courier: true,
+    packStatus: true,
+    imageUrl: true,
+    createdAt: true
+  } as const;
+  const exact = await prisma.order.findMany({
+    where: { accountId, awb: query },
+    select,
+    orderBy: { createdAt: "desc" },
+    take: limit
+  });
+  const exactAwbs = exact.map((order) => order.awb);
+  const suffix =
+    exact.length < limit
+      ? await prisma.order.findMany({
+          where: {
+            accountId,
+            awb: {
+              endsWith: query,
+              notIn: exactAwbs
+            }
+          },
+          select,
+          orderBy: { createdAt: "desc" },
+          take: limit - exact.length
+        })
+      : [];
+  const exactAndSuffixAwbs = [...exactAwbs, ...suffix.map((order) => order.awb)];
+  const contains =
+    exact.length + suffix.length < limit
+      ? await prisma.order.findMany({
+          where: {
+            accountId,
+            awb: {
+              contains: query,
+              notIn: exactAndSuffixAwbs
+            }
+          },
+          select,
+          orderBy: { createdAt: "desc" },
+          take: limit - exact.length - suffix.length
+        })
+      : [];
+  const candidates = [...exact, ...suffix, ...contains];
+  const matches = findAwbSearchMatches({
+    candidates,
+    accountId,
+    query,
+    limit
+  });
+  const skusMissingImages = Array.from(new Set(matches.filter((order) => !order.imageUrl).map((order) => order.sku)));
+  const mappings =
+    skusMissingImages.length > 0
+      ? await prisma.skuImageMapping.findMany({
+          where: {
+            accountId,
+            sku: { in: skusMissingImages },
+            active: true
+          },
+          select: {
+            sku: true,
+            imageUrl: true
+          }
+        })
+      : [];
+  const imageBySku = new Map(mappings.map((mapping) => [mapping.sku, mapping.imageUrl]));
+
+  return matches.map((order) => ({
+    ...order,
+    imageUrl: order.imageUrl ?? imageBySku.get(order.sku) ?? null
+  }));
 }
 
 export async function getOrderWithImage(accountId: string, awb: string) {

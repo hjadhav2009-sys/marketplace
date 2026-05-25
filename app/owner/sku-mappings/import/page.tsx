@@ -3,7 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
-import { getAvailableAccounts, requireUser } from "@/lib/auth";
+import { getAvailableAccounts, requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { importSkuMappingFileAction } from "./actions";
@@ -15,8 +15,30 @@ type ImportPageProps = {
   }>;
 };
 
+type ImportNotes = {
+  selectedAccount?: {
+    name?: string;
+    code?: string;
+  };
+  importAllAccounts?: boolean;
+};
+
+function parseImportNotes(value: string | null): ImportNotes {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed ? (parsed as ImportNotes) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default async function SkuMappingImportPage({ searchParams }: ImportPageProps) {
   const user = await requireUser(["OWNER"]);
+  const selectedAccount = await requireAccount(user);
   const params = await searchParams;
   const accounts = await getAvailableAccounts(user);
   const batch = params?.batchId
@@ -28,6 +50,7 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
         }
       })
     : null;
+  const importNotes = parseImportNotes(batch?.notes ?? null);
 
   return (
     <AppShell>
@@ -52,6 +75,7 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
               <select
                 name="accountId"
                 required
+                defaultValue={selectedAccount.id}
                 className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
               >
                 {accounts.map((account) => (
@@ -71,9 +95,18 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
                 className="mt-2 block w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
               />
             </label>
+            <label className="flex items-start gap-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+              <input name="importAllAccounts" type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300" />
+              <span>
+                <span className="block font-semibold text-slate-900">Use account column for all accounts</span>
+                <span className="mt-1 block text-slate-600">
+                  Empty account cells still import into the selected account. Account values match by account name or code.
+                </span>
+              </span>
+            </label>
             <div className="rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
               Required columns: <span className="font-semibold">sku</span>,{" "}
-              <span className="font-semibold">image_url</span>. Optional columns: account, product_name, notes,
+              <span className="font-semibold">image_url</span>. Optional columns: account, product_name, color, notes,
               active.
             </div>
             <SubmitButton pendingText="Importing...">Import mappings</SubmitButton>
@@ -88,9 +121,12 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
             <div className="p-4">
               <p className="font-semibold text-slate-950">{batch.fileName}</p>
               <p className="mt-1 text-sm text-slate-600">
-                {batch.account.name} · {formatDateTime(batch.createdAt)}
+                Selected account: {importNotes.selectedAccount?.name ?? batch.account.name} / {formatDateTime(batch.createdAt)}
               </p>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {importNotes.importAllAccounts ? (
+                <p className="mt-1 text-sm font-medium text-blue-700">Rows with an account column were imported account-wise.</p>
+              ) : null}
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {[
                   ["Created", batch.createdRows],
                   ["Updated", batch.updatedRows],

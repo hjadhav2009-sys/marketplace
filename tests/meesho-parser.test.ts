@@ -118,7 +118,7 @@ assert.equal(scannedLikeResult.diagnostics.pagesWithText, 0, "Empty scanned-like
 assert.equal(scannedLikeResult.diagnostics.pagesWithoutText, 3, "Empty scanned-like pages are counted");
 assert.equal(scannedLikeResult.diagnostics.scannedPdfLikely, true, "Scanned-like PDFs are detected");
 assert.equal(
-  scannedLikeResult.diagnostics.parserWarnings.includes("This looks like a scanned/image PDF. OCR is required."),
+  scannedLikeResult.diagnostics.parserWarnings.includes("Scanned/image PDF; OCR required."),
   true,
   "Scanned-like PDFs show the OCR-required warning"
 );
@@ -142,6 +142,11 @@ assert.equal(
   unknownLayoutResult.issues.some((issue) => issue.issueType === "UNKNOWN_LAYOUT_PAGE"),
   true,
   "Unknown layout pages are flagged"
+);
+assert.equal(
+  unknownLayoutResult.diagnostics.parserWarnings.includes("Unknown layout or unsupported Meesho format."),
+  true,
+  "Unknown text layouts show a clear unsupported-format warning"
 );
 
 const orderNumberOnlyLabel = parseText("Sub_Order_Labels_order_number_only.pdf", [

@@ -17,7 +17,8 @@ import type {
 } from "./types";
 
 const almostEmptyTextLength = 20;
-const scannedPdfMessage = "This looks like a scanned/image PDF. OCR is required.";
+const scannedPdfMessage = "Scanned/image PDF; OCR required.";
+const unknownLayoutMessage = "Unknown layout or unsupported Meesho format.";
 
 function countMissing<T extends { issues: ParseIssue[] }>(rows: T[], issueType: string) {
   return rows.reduce((count, row) => count + (row.issues.some((issue) => issue.issueType === issueType) ? 1 : 0), 0);
@@ -348,8 +349,8 @@ export function parseMeeshoTextPages(fileName: string, pages: MeeshoTextPage[]):
     parserWarnings.push(`${unknownLayoutPages} page${unknownLayoutPages === 1 ? "" : "s"} did not match a supported Meesho layout.`);
   }
 
-  if (allOrders.length === 0 && manifest.picklistSummaryRows.length === 0) {
-    parserWarnings.push("No label, manifest, or picklist rows were parsed from this file.");
+  if (allOrders.length === 0 && manifest.picklistSummaryRows.length === 0 && pagesWithText > 0) {
+    parserWarnings.push(unknownLayoutMessage);
   }
 
   if (detectedType === "UNKNOWN") {

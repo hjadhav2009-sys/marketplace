@@ -14,6 +14,10 @@ prisma/dev.db-journal
 *.db
 *.db-journal
 
+# real warehouse documents
+*.pdf
+!tests/fixtures/**/*.txt
+
 # env
 .env
 .env*.local

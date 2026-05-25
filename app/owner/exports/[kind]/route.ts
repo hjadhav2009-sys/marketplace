@@ -239,13 +239,14 @@ async function skuMappingsCsv(searchParams: URLSearchParams) {
   });
 
   return rowsToCsv(
-    ["account", "sku", "productName", "imageUrl", "color", "active", "imageHealth", "updatedAt"],
+    ["account", "sku", "image_url", "product_name", "color", "notes", "active", "image_health", "updated_at"],
     rows.map((mapping) => [
       mapping.account.name,
       mapping.sku,
-      mapping.productName,
       mapping.imageUrl,
+      mapping.productName,
       mapping.color,
+      mapping.notes,
       mapping.active,
       mapping.imageHealth,
       mapping.updatedAt

@@ -14,7 +14,7 @@ import type { MeeshoParserDiagnostics, ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
 import { picklistSummaryProductNameLabel } from "@/lib/product-image";
 import { normalizeSkuForMatching } from "@/lib/sku";
-import { confirmParsedBatchAction, prepareBatchProductImagesAction } from "../../actions";
+import { confirmParsedBatchAction, prepareBatchProductImagesAction, repairMissingSkuImageMappingAction } from "../../actions";
 
 type ReviewPageProps = {
   params: Promise<{
@@ -32,6 +32,12 @@ type ReviewPageProps = {
     failed?: string;
     noMapping?: string;
     noImageUrl?: string;
+    imageRepair?: string;
+    mappingsCreated?: string;
+    mappingsUpdated?: string;
+    cached?: string;
+    failedCache?: string;
+    imageRepairError?: string;
     error?: string;
   }>;
 };
@@ -241,6 +247,32 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
     cachedImageUrl: cachedProductImageUrl(mapping)
   }));
   const mappingBySku = new Map(mappingsWithCachedUrls.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
+  const missingImageRepairs = Array.from(
+    previewRows
+      .reduce(
+        (repairs, row) => {
+          const sku = normalizeSkuForMatching(row.sku);
+
+          if (!sku || !row.parsedIssues.some((issue) => issue.issueType === "MISSING_IMAGE_MAPPING") || mappingBySku.get(sku)?.imageUrl) {
+            return repairs;
+          }
+
+          const existing = repairs.get(sku);
+
+          repairs.set(sku, {
+            sku,
+            productName: existing?.productName ?? row.productDescription ?? null,
+            color: existing?.color ?? row.color ?? null,
+            size: existing?.size ?? row.size ?? null,
+            rowCount: (existing?.rowCount ?? 0) + 1
+          });
+
+          return repairs;
+        },
+        new Map<string, { sku: string; productName: string | null; color: string | null; size: string | null; rowCount: number }>()
+      )
+      .values()
+  );
   const issueTypes = Array.from(new Set(previewRows.flatMap((row) => row.parsedIssues.map((issue) => issue.issueType)))).sort();
   const query = filters?.q?.trim().toLowerCase() ?? "";
   const selectedIssue = filters?.issue ?? "";
@@ -287,6 +319,12 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         : filters?.error
           ? "Import could not be completed. Review the issue list and try again."
           : null;
+  const imageRepairErrorMessage =
+    filters?.imageRepairError === "invalid"
+      ? "Enter a valid SKU and http/https image URL."
+      : filters?.imageRepairError === "save-failed"
+        ? "Image mapping could not be saved. Check the URL and try again."
+        : null;
 
   return (
     <AppShell>
@@ -308,6 +346,17 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           Prepared today&apos;s images. Total SKUs: {filters.totalSkus ?? 0}; already cached: {filters.alreadyCached ?? 0};
           newly cached: {filters.newlyCached ?? 0}; failed: {filters.failed ?? 0}; no mapping: {filters.noMapping ?? 0};
           no image URL: {filters.noImageUrl ?? 0}.
+        </div>
+      ) : null}
+      {filters?.imageRepair ? (
+        <div className="mb-4 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800">
+          Image mapping saved. Created: {filters.mappingsCreated ?? 0}; updated: {filters.mappingsUpdated ?? 0};
+          cached: {filters.cached ?? 0}; failed cache: {filters.failedCache ?? 0}.
+        </div>
+      ) : null}
+      {imageRepairErrorMessage ? (
+        <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {imageRepairErrorMessage}
         </div>
       ) : null}
       {exactErrorMessage ? (
@@ -446,11 +495,11 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {[
               ["Attempted", importStats.attemptedRows ?? 0],
-              ["Created", importStats.createdRows ?? batch.createdRows],
-              ["Updated", importStats.updatedRows ?? batch.updatedRows],
-              ["Duplicate skipped", importStats.duplicateRows ?? batch.duplicateRows],
+              ["New orders created", importStats.createdRows ?? batch.createdRows],
+              ["Existing updated safely", importStats.updatedRows ?? batch.updatedRows],
+              ["Existing duplicates skipped", importStats.duplicateRows ?? batch.duplicateRows],
               ["Held for review", importStats.skippedRows ?? batch.skippedRows],
-              ["Missing images", importStats.missingImageRows ?? 0],
+              ["Missing image SKUs", missingImageRepairs.length],
               ["Metadata filled", importStats.metadataAutoFilled ?? 0],
               ["Errors", importStats.errorRows ?? 0]
             ].map(([label, value]) => (
@@ -458,6 +507,61 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
                 <p className="mt-1 text-xl font-bold text-slate-950">{value}</p>
               </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {missingImageRepairs.length > 0 ? (
+        <section className="mt-4 rounded-md border border-amber-200 bg-white shadow-sm">
+          <div className="border-b border-amber-100 px-4 py-3">
+            <h2 className="font-semibold text-slate-950">Missing image mappings</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Paste SKU image URLs here. Product name, color, and size are filled from the parsed order when those fields are empty.
+            </p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {missingImageRepairs.map((repair) => (
+              <form key={repair.sku} action={repairMissingSkuImageMappingAction} className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-end">
+                <input type="hidden" name="batchId" value={batch.id} />
+                <input type="hidden" name="sku" value={repair.sku} />
+                <input type="hidden" name="productName" value={repair.productName ?? ""} />
+                <input type="hidden" name="color" value={repair.color ?? ""} />
+                <input type="hidden" name="size" value={repair.size ?? ""} />
+                <div>
+                  <p className="break-words text-lg font-black text-slate-950">{repair.sku}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-slate-600">{repair.productName ?? "Product name will fill from future orders"}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">
+                      {repair.color ?? "Color unknown"}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">
+                      {repair.size ?? "Size unknown"}
+                    </span>
+                    <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
+                      {repair.rowCount} row{repair.rowCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">image_url</span>
+                  <input
+                    name="imageUrl"
+                    type="url"
+                    required
+                    placeholder="https://images.meesho.com/..."
+                    className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+                  />
+                </label>
+                <div className="grid gap-2 sm:grid-cols-2 lg:min-w-64">
+                  <button name="cache" value="0" className="min-h-12 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800">
+                    Save mapping
+                  </button>
+                  <button name="cache" value="1" className="min-h-12 rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white">
+                    Save + cache
+                  </button>
+                </div>
+              </form>
             ))}
           </div>
         </section>
@@ -471,6 +575,11 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
               <p className="mt-1 text-sm text-slate-600">
                 Caches only missing or stale local card images for SKUs in this imported batch.
               </p>
+              {missingImageRepairs.length > 0 ? (
+                <p className="mt-2 text-sm font-semibold text-amber-800">Fix missing image URLs first.</p>
+              ) : (
+                <p className="mt-2 text-sm font-semibold text-teal-700">Ready to prepare images.</p>
+              )}
             </div>
             <form action={prepareBatchProductImagesAction}>
               <input type="hidden" name="batchId" value={batch.id} />

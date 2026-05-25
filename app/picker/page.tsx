@@ -5,8 +5,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import { StatusBadge } from "@/components/StatusBadge";
 import { requireAccount, requireUser } from "@/lib/auth";
-import { getSkuGroups } from "@/lib/data";
+import { getLatestImportedBatch, getSkuGroups } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
+import { normalizeWorkQueueFilter } from "@/lib/operations/work-queue";
 import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { markSkuGroupPickedAction } from "./[sku]/actions";
 
@@ -20,6 +21,8 @@ type PickerSkuGroupsPageProps = {
     limit?: string;
     page?: string;
     view?: string;
+    work?: string;
+    batchId?: string;
   }>;
 };
 
@@ -30,6 +33,14 @@ const filters = [
   { value: "missing-image", label: "Missing image" }
 ];
 
+const workFilters = [
+  { value: "today", label: "Today" },
+  { value: "current-batch", label: "Current batch" },
+  { value: "all-pending", label: "All pending" },
+  { value: "old-pending", label: "Old pending" },
+  { value: "problems", label: "Problems" }
+];
+
 function pickerDetailHref(sku: string, color: string | null, size: string | null) {
   return `/picker/${encodeURIComponent(sku)}?color=${encodePickerDimension(color)}&size=${encodePickerDimension(size)}`;
 }
@@ -38,14 +49,19 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
   const user = await requireUser(["OWNER", "PICKER"]);
   const account = await requireAccount(user);
   const params = await searchParams;
-  const activeFilter = params?.filter ?? "pending";
+  const activeWork = normalizeWorkQueueFilter(params?.work);
+  const activeFilter = params?.filter ?? (activeWork === "problems" ? "problem" : "pending");
   const largeImageMode = params?.large === "1";
   const compactMode = params?.view !== "cards" && !largeImageMode;
+  const latestBatch = await getLatestImportedBatch(account.id);
+  const activeBatchId = params?.batchId ?? (activeWork === "current-batch" ? latestBatch?.id : undefined);
   const pagedGroups = await getSkuGroups(account.id, {
     query: params?.q,
     filter: activeFilter,
     page: params?.page,
-    limit: params?.limit
+    limit: params?.limit,
+    work: activeWork,
+    batchId: activeBatchId
   });
   const groups = pagedGroups.groups;
   const loadMoreParams = new URLSearchParams();
@@ -56,7 +72,9 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
     q: params?.q,
     filter: activeFilter,
     large: params?.large,
-    limit: params?.limit
+    limit: params?.limit,
+    work: activeWork,
+    batchId: activeBatchId
   })) {
     if (value) {
       loadMoreParams.set(key, value);
@@ -103,6 +121,23 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
           />
         </label>
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {workFilters.map((filter) => (
+            <label
+              key={filter.value}
+              className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
+                activeWork === filter.value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              <input
+                type="radio"
+                name="work"
+                value={filter.value}
+                defaultChecked={activeWork === filter.value}
+                className="accent-slate-950"
+              />
+              {filter.label}
+            </label>
+          ))}
           {filters.map((filter) => (
             <label
               key={filter.value}
@@ -125,6 +160,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             Large images
           </label>
           <input type="hidden" name="view" value={compactMode ? "compact" : "cards"} />
+          {activeWork === "current-batch" && activeBatchId ? <input type="hidden" name="batchId" value={activeBatchId} /> : null}
           <button className="min-h-10 shrink-0 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm">
             Apply
           </button>
@@ -134,6 +170,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
         <p className="font-semibold text-slate-700">
           Showing {pagedGroups.visibleCount} of {pagedGroups.total} SKU groups
+          {activeWork === "today" ? " from today" : activeWork === "current-batch" && latestBatch ? ` from ${latestBatch.fileName}` : null}
         </p>
         <div className="flex gap-2">
           <Link
@@ -156,7 +193,9 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
           title={activeFilter === "missing-image" ? "No missing image SKUs" : "No orders"}
           description={
             activeFilter === "pending"
-              ? "No pending picking groups for this account."
+              ? activeWork === "today"
+                ? "No pending picking groups from today's imports. Use All pending to see older carry-forward orders."
+                : "No pending picking groups for this account."
               : "No SKU groups match the current search and filter."
           }
           action={user.role === "OWNER" ? { href: "/owner/uploads/new", label: "Upload labels" } : undefined}

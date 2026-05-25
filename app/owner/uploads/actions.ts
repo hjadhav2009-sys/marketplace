@@ -19,7 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { PDF_UPLOAD_MAX_BYTES } from "@/lib/upload-limits";
-import { uploadBatchSchema } from "@/lib/validators";
+import { skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 
 type PreviewRowDraft = {
   sourceFileName: string;
@@ -288,6 +288,281 @@ async function cacheQueueMapping(mapping: CacheQueueMapping) {
   });
 
   return meta.status;
+}
+
+function optionalText(value: FormDataEntryValue | null) {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || undefined;
+}
+
+function reviewRedirectUrl(
+  batchId: string,
+  params: Record<string, string | number | boolean | undefined>
+) {
+  const query = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      query.set(key, String(value));
+    }
+  }
+
+  const suffix = query.toString();
+  return `/owner/uploads/${batchId}/review${suffix ? `?${suffix}` : ""}`;
+}
+
+async function updateBatchMissingImageRows(batchId: string) {
+  const [rows, batch] = await Promise.all([
+    prisma.uploadPreviewRow.findMany({
+      where: { batchId },
+      select: { issues: true }
+    }),
+    prisma.uploadBatch.findUnique({
+      where: { id: batchId },
+      select: { notes: true }
+    })
+  ]);
+  const missingImageRows = rows.filter((row) =>
+    parseStoredIssues(row.issues).some((issue) => issue.issueType === "MISSING_IMAGE_MAPPING")
+  ).length;
+  let notes = batch?.notes ?? null;
+
+  if (notes) {
+    try {
+      const parsed = JSON.parse(notes) as { stats?: Record<string, unknown> };
+      notes = JSON.stringify({
+        ...parsed,
+        stats: {
+          ...(parsed.stats ?? {}),
+          missingImageRows
+        }
+      });
+    } catch {
+      notes = batch?.notes ?? null;
+    }
+  }
+
+  await prisma.uploadBatch.update({
+    where: { id: batchId },
+    data: {
+      missingImageRows,
+      notes
+    }
+  });
+
+  return missingImageRows;
+}
+
+async function clearMissingImageIssuesForSku(batchId: string, sku: string) {
+  const normalizedSku = normalizeSkuForMatching(sku);
+  const rows = await prisma.uploadPreviewRow.findMany({
+    where: { batchId },
+    select: {
+      id: true,
+      sku: true,
+      issues: true
+    }
+  });
+  const updates = rows
+    .filter((row) => normalizeSkuForMatching(row.sku) === normalizedSku)
+    .map((row) => {
+      const issues = parseStoredIssues(row.issues);
+      const nextIssues = issues.filter((issue) => issue.issueType !== "MISSING_IMAGE_MAPPING");
+
+      return nextIssues.length === issues.length
+        ? null
+        : prisma.uploadPreviewRow.update({
+            where: { id: row.id },
+            data: { issues: JSON.stringify(nextIssues) }
+          });
+    })
+    .filter((update): update is NonNullable<typeof update> => Boolean(update));
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+
+  await updateBatchMissingImageRows(batchId);
+  return updates.length;
+}
+
+export async function repairMissingSkuImageMappingAction(formData: FormData) {
+  const user = await requireUser(["OWNER"]);
+  const account = await requireAccount(user);
+  const request = await getRequestMeta();
+  const batchId = String(formData.get("batchId") ?? "");
+  const cacheNow = formData.get("cache") === "1";
+  const parsed = skuImageMappingSchema.safeParse({
+    sku: formData.get("sku"),
+    imageUrl: formData.get("imageUrl"),
+    productName: optionalText(formData.get("productName")),
+    color: optionalText(formData.get("color")),
+    size: optionalText(formData.get("size")),
+    active: true
+  });
+
+  if (!batchId || !parsed.success) {
+    redirect(reviewRedirectUrl(batchId || "missing", { imageRepairError: "invalid" }));
+  }
+
+  const batch = await prisma.uploadBatch.findFirst({
+    where: {
+      id: batchId,
+      accountId: account.id
+    },
+    select: { id: true }
+  });
+
+  if (!batch) {
+    redirect("/owner/uploads/new?error=invalid-batch");
+  }
+
+  let created = 0;
+  let updated = 0;
+  let cached = 0;
+  let failedCache = 0;
+
+  try {
+    const existing = await prisma.skuImageMapping.findUnique({
+      where: {
+        accountId_sku: {
+          accountId: account.id,
+          sku: parsed.data.sku
+        }
+      },
+      select: {
+        id: true,
+        accountId: true,
+        sku: true,
+        imageUrl: true,
+        productName: true,
+        color: true,
+        size: true,
+        cacheStatus: true,
+        cacheFilePath: true,
+        cacheOriginalImageUrl: true,
+        cacheCachedAt: true
+      }
+    });
+    const imageUrlChanged = Boolean(existing && existing.imageUrl !== parsed.data.imageUrl);
+    const metadata = {
+      productName: existing?.productName ? undefined : parsed.data.productName,
+      color: existing?.color ? undefined : parsed.data.color,
+      size: existing?.size ? undefined : parsed.data.size
+    };
+    const mapping = existing
+      ? await prisma.skuImageMapping.update({
+          where: { id: existing.id },
+          data: {
+            imageUrl: parsed.data.imageUrl,
+            active: true,
+            lastImportedAt: new Date(),
+            source: "upload-review",
+            productName: metadata.productName,
+            color: metadata.color,
+            size: metadata.size,
+            imageHealth: imageUrlChanged ? "UNKNOWN" : undefined,
+            cacheStatus: imageUrlChanged ? "RECHECK_NEEDED" : undefined,
+            cacheOriginalImageUrl: imageUrlChanged ? null : undefined,
+            cacheError: imageUrlChanged ? null : undefined
+          },
+          select: {
+            id: true,
+            accountId: true,
+            sku: true,
+            imageUrl: true,
+            cacheStatus: true,
+            cacheFilePath: true,
+            cacheOriginalImageUrl: true,
+            cacheCachedAt: true
+          }
+        })
+      : await prisma.skuImageMapping.create({
+          data: {
+            accountId: account.id,
+            sku: parsed.data.sku,
+            imageUrl: parsed.data.imageUrl,
+            productName: parsed.data.productName,
+            color: parsed.data.color,
+            size: parsed.data.size,
+            active: true,
+            lastImportedAt: new Date(),
+            source: "upload-review",
+            imageHealth: "UNKNOWN",
+            cacheStatus: "NOT_CACHED"
+          },
+          select: {
+            id: true,
+            accountId: true,
+            sku: true,
+            imageUrl: true,
+            cacheStatus: true,
+            cacheFilePath: true,
+            cacheOriginalImageUrl: true,
+            cacheCachedAt: true
+          }
+        });
+
+    created = existing ? 0 : 1;
+    updated = existing ? 1 : 0;
+    await clearMissingImageIssuesForSku(batch.id, parsed.data.sku);
+
+    if (cacheNow) {
+      const status = await cacheQueueMapping(mapping);
+
+      if (status === "CACHED") {
+        cached = 1;
+      } else {
+        failedCache = 1;
+      }
+    }
+
+    await recordAuditLog({
+      userId: user.id,
+      accountId: account.id,
+      action: "UPLOAD_REVIEW_IMAGE_MAPPING_REPAIR",
+      entityType: "SkuImageMapping",
+      entityId: mapping.id,
+      metadata: {
+        batchId: batch.id,
+        sku: parsed.data.sku,
+        created,
+        updated,
+        cacheNow,
+        cached,
+        failedCache
+      },
+      request
+    });
+  } catch (error) {
+    await recordAuditLog({
+      userId: user.id,
+      accountId: account.id,
+      action: "UPLOAD_REVIEW_IMAGE_MAPPING_REPAIR_FAILED",
+      entityType: "SkuImageMapping",
+      metadata: {
+        batchId: batch.id,
+        sku: parsed.data.sku,
+        message: error instanceof Error ? error.message : "Unknown repair error"
+      },
+      request
+    });
+    redirect(reviewRedirectUrl(batch.id, { imageRepairError: "save-failed" }));
+  }
+
+  revalidatePath(`/owner/uploads/${batch.id}/review`);
+  revalidatePath("/owner/sku-mappings");
+  revalidatePath("/picker");
+  revalidatePath("/packing");
+  redirect(
+    reviewRedirectUrl(batch.id, {
+      imageRepair: 1,
+      mappingsCreated: created,
+      mappingsUpdated: updated,
+      cached,
+      failedCache
+    })
+  );
 }
 
 export async function createUploadBatchAction(formData: FormData) {

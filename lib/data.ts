@@ -2,6 +2,7 @@ import type { Account } from "@prisma/client";
 import { cachedProductImageUrl } from "./image-cache";
 import { findAwbSearchMatches } from "./operations/awb-search";
 import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups, paginatePickerSkuGroups } from "./operations/picking";
+import { buildWorkQueueOrderWhere, startOfWorkDay } from "./operations/work-queue";
 import { withDevTiming } from "./perf";
 import { prisma } from "./prisma";
 import { normalizeSkuMappingImageFilter } from "./product-image";
@@ -58,6 +59,24 @@ export async function getSkuMappings(accountId: string) {
   });
 }
 
+export async function getLatestImportedBatch(accountId: string) {
+  return prisma.uploadBatch.findFirst({
+    where: {
+      accountId,
+      orders: {
+        some: {}
+      }
+    },
+    select: {
+      id: true,
+      fileName: true,
+      status: true,
+      createdAt: true
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
 export async function searchSkuMappings(accountId: string, query?: string, active?: string, image?: string) {
   const imageFilter = normalizeSkuMappingImageFilter(image);
   const imageWhere =
@@ -92,16 +111,14 @@ export async function searchSkuMappings(accountId: string, query?: string, activ
 
 export async function getSkuGroups(
   accountId: string,
-  options: { query?: string; filter?: string; page?: string; limit?: string } = {}
+  options: { query?: string; filter?: string; page?: string; limit?: string; work?: string; batchId?: string } = {}
 ) {
   const orders = await withDevTiming("picker orders", () =>
     prisma.order.findMany({
-      where: {
-        accountId,
-        packStatus: {
-          not: "PACKED"
-        }
-      },
+      where: buildWorkQueueOrderWhere(accountId, {
+        work: options.work,
+        batchId: options.batchId
+      }),
       select: {
         id: true,
         awb: true,
@@ -246,14 +263,25 @@ export async function getSkuDetail(
 }
 
 export async function getPackingDashboard(accountId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = startOfWorkDay();
 
-  const [pendingCount, packedTodayCount] = await withDevTiming("packing dashboard", () => Promise.all([
+  const [todayReadyCount, oldPendingCount, packedTodayCount, problemCount] = await withDevTiming("packing dashboard", () => Promise.all([
     prisma.order.count({
       where: {
         accountId,
-        packStatus: "READY"
+        packStatus: "READY",
+        importedAt: {
+          gte: startOfDay
+        }
+      }
+    }),
+    prisma.order.count({
+      where: {
+        accountId,
+        packStatus: "READY",
+        importedAt: {
+          lt: startOfDay
+        }
       }
     }),
     prisma.order.count({
@@ -264,12 +292,21 @@ export async function getPackingDashboard(accountId: string) {
           gte: startOfDay
         }
       }
+    }),
+    prisma.order.count({
+      where: {
+        accountId,
+        OR: [{ pickStatus: "PROBLEM" }, { packStatus: "PROBLEM" }, { status: "PROBLEM" }]
+      }
     })
   ]), 500);
 
   return {
-    pendingCount,
-    packedTodayCount
+    todayReadyCount,
+    oldPendingCount,
+    pendingCount: todayReadyCount + oldPendingCount,
+    packedTodayCount,
+    problemCount
   };
 }
 
@@ -300,7 +337,7 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
       createdAt: true
     } as const;
     const exact = await prisma.order.findMany({
-      where: { accountId, awb: query },
+      where: { accountId, awb: query, packStatus: "READY" },
       select,
       orderBy: { createdAt: "desc" },
       take: limit
@@ -311,6 +348,7 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
         ? await prisma.order.findMany({
             where: {
               accountId,
+              packStatus: "READY",
               awb: {
                 endsWith: query,
                 notIn: exactAwbs
@@ -327,6 +365,7 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
         ? await prisma.order.findMany({
             where: {
               accountId,
+              packStatus: "READY",
               awb: {
                 contains: query,
                 notIn: exactAndSuffixAwbs

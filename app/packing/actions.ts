@@ -1,10 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { normalizeAwb } from "@/lib/awb";
 import { searchOrdersByAwbFragment } from "@/lib/data";
+import { buildWorkQueueOrderWhere } from "@/lib/operations/work-queue";
 import { prisma } from "@/lib/prisma";
+import { getRequestMeta } from "@/lib/request-context";
 
 function writeScanLogLater(input: {
   accountId: string;
@@ -60,4 +63,27 @@ export async function searchAwbAction(formData: FormData) {
   });
 
   redirect(`/packing/${encodeURIComponent(matchedOrder.awb)}`);
+}
+
+export async function moveOldPendingToReviewAction() {
+  const user = await requireUser(["OWNER"]);
+  const account = await requireAccount(user);
+  const request = await getRequestMeta();
+  const oldPendingCount = await prisma.order.count({
+    where: buildWorkQueueOrderWhere(account.id, { work: "old-pending" })
+  });
+
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "OLD_PENDING_REVIEW_REPORTED",
+    entityType: "Order",
+    metadata: {
+      oldPendingCount,
+      mode: "filter-only"
+    },
+    request
+  });
+
+  redirect(`/packing?oldPendingReviewed=${oldPendingCount}`);
 }

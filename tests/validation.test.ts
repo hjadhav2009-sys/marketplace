@@ -39,6 +39,7 @@ import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network
 import { findAwbSearchMatches } from "../lib/operations/awb-search";
 import { canConfirmPacked } from "../lib/operations/packing";
 import { buildPickerSkuGroups, normalizePickerLimit, paginatePickerSkuGroups } from "../lib/operations/picking";
+import { buildWorkQueueOrderWhere, normalizeWorkQueueFilter, orderMatchesWorkQueue, startOfWorkDay } from "../lib/operations/work-queue";
 import { hashPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
 import {
@@ -402,6 +403,77 @@ assert.equal(canRoleAccessPath("PICKER", "/change-password"), true, "Workers can
 assert.equal(canConfirmPacked({ packStatus: "READY" }), true, "Ready order can be packed");
 assert.equal(canConfirmPacked({ packStatus: "PACKED" }), false, "Packed order is idempotently skipped");
 assert.equal(canConfirmPacked({ packStatus: "PROBLEM" }), false, "Problem order cannot be packed accidentally");
+const workQueueNow = new Date("2026-05-26T10:30:00.000Z");
+const workQueueStart = startOfWorkDay(workQueueNow);
+assert.equal(workQueueStart.getHours(), 0, "Work queue day starts at local midnight");
+assert.equal(workQueueStart.getMinutes(), 0, "Work queue day clears minutes");
+assert.equal(normalizeWorkQueueFilter("old-pending"), "old-pending", "Work queue accepts old pending filter");
+assert.equal(normalizeWorkQueueFilter("surprise"), "today", "Work queue defaults to today");
+assert.equal(
+  orderMatchesWorkQueue(
+    {
+      accountId: "a1",
+      batchId: "b1",
+      packStatus: "READY",
+      pickStatus: "READY",
+      status: "READY",
+      importedAt: new Date("2026-05-26T08:00:00.000Z")
+    },
+    { accountId: "a1", work: "today", now: workQueueNow }
+  ),
+  true,
+  "Default today picker includes today's active imported orders"
+);
+assert.equal(
+  orderMatchesWorkQueue(
+    {
+      accountId: "a1",
+      batchId: "b1",
+      packStatus: "READY",
+      pickStatus: "READY",
+      status: "READY",
+      importedAt: new Date("2026-05-25T08:00:00.000Z")
+    },
+    { accountId: "a1", work: "today", now: workQueueNow }
+  ),
+  false,
+  "Default today picker excludes yesterday's old pending orders"
+);
+assert.equal(
+  orderMatchesWorkQueue(
+    {
+      accountId: "a1",
+      batchId: "b1",
+      packStatus: "READY",
+      pickStatus: "READY",
+      status: "READY",
+      importedAt: new Date("2026-05-25T08:00:00.000Z")
+    },
+    { accountId: "a1", work: "old-pending", now: workQueueNow }
+  ),
+  true,
+  "Old pending filter keeps older READY orders visible"
+);
+assert.equal(
+  orderMatchesWorkQueue(
+    {
+      accountId: "a1",
+      batchId: "b1",
+      packStatus: "READY",
+      pickStatus: "READY",
+      status: "READY",
+      importedAt: new Date("2026-05-26T08:00:00.000Z")
+    },
+    { accountId: "a1", work: "current-batch", batchId: "b2", now: workQueueNow }
+  ),
+  false,
+  "Current batch filter does not mix orders from another batch"
+);
+assert.deepEqual(
+  buildWorkQueueOrderWhere("a1", { work: "old-pending", now: workQueueNow }),
+  { accountId: "a1", packStatus: "READY", importedAt: { lt: workQueueStart } },
+  "Old pending query is account scoped and date scoped"
+);
 
 const pickerGroups = buildPickerSkuGroups(
   [
@@ -787,6 +859,7 @@ const packingActions = readFileSync(join(repoRoot, "app", "packing", "actions.ts
 const packingSearchRoute = readFileSync(join(repoRoot, "app", "packing", "search", "route.ts"), "utf8");
 const packingResultPage = readFileSync(join(repoRoot, "app", "packing", "[awb]", "page.tsx"), "utf8");
 const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
+const workQueueSource = readFileSync(join(repoRoot, "lib", "operations", "work-queue.ts"), "utf8");
 const ownerAccountsPage = readFileSync(join(repoRoot, "app", "owner", "accounts", "page.tsx"), "utf8");
 const ownerAccountsActions = readFileSync(join(repoRoot, "app", "owner", "accounts", "actions.ts"), "utf8");
 const skuExportRoute = readFileSync(join(repoRoot, "app", "owner", "sku-mappings", "export", "route.ts"), "utf8");
@@ -862,14 +935,30 @@ assert.match(packingResultPage, /fixed inset-x-0 bottom-0/, "Packing result has 
 assert.match(packingResultPage, /mapping\?\.cachedImageUrl/, "Packing card uses cached image URL first");
 assert.match(reviewPage, /<details[\s\S]*Picklist SKU summary rows/, "Upload review makes picklist summary rows collapsible");
 assert.match(reviewPage, /Prepare today&apos;s product images/, "Upload review exposes daily image cache preparation");
+assert.match(reviewPage, /Missing image mappings/, "Upload review shows inline missing image mapping repair");
+assert.match(reviewPage, /Save \+ cache/, "Upload review can save and immediately cache a missing SKU image");
+assert.match(reviewPage, /Fix missing image URLs first/, "Upload review tells the owner to fix missing image URLs before image prep");
+assert.match(uploadActions, /repairMissingSkuImageMappingAction/, "Upload review has a dedicated missing SKU image repair action");
+assert.match(uploadActions, /accountId_sku[\s\S]*accountId: account\.id/, "Missing image repair creates or updates mappings in the selected account only");
+assert.match(uploadActions, /cacheQueueMapping\(mapping\)/, "Save and cache calls the image cache pipeline");
+assert.match(uploadActions, /clearMissingImageIssuesForSku/, "Missing image repair clears the batch preview missing-image status");
 assert.match(awbScannerComponent, /src={suggestion.cachedImageUrl}/, "Manual AWB suggestions use cached signed image URL first");
 assert.match(awbScannerComponent, /cacheStatus={suggestion.cacheStatus}/, "Manual AWB suggestions pass cached image status");
 assert.match(packingSearchRoute, /cachedImageUrl/, "AWB suggestion API returns cachedImageUrl only for product images");
 assert.doesNotMatch(packingSearchRoute, /imageUrl: order\.imageUrl/, "AWB suggestion API does not return slow external image URLs");
 assert.match(dataHelpers, /awb: query[\s\S]*endsWith: query[\s\S]*contains: query/, "AWB search queries exact, suffix, then contains");
+assert.match(dataHelpers, /awb: query, packStatus: "READY"/, "Packing AWB search defaults to active READY orders");
 assert.match(dataHelpers, /withDevTiming\("packing awb search"[\s\S]*500\)/, "AWB search has 500ms dev timing logs");
 assert.match(dataHelpers, /withDevTiming\("picker orders"[\s\S]*800[\s\S]*\);/, "Picker order query has 800ms dev timing logs");
+assert.match(dataHelpers, /buildWorkQueueOrderWhere/, "Picker queries are scoped through the daily active work queue");
+assert.match(workQueueSource, /importedAt: \{ gte: startOfToday \}/, "Today work queue filters by today's imported orders");
+assert.match(workQueueSource, /importedAt: \{ lt: startOfToday \}/, "Old pending work queue separates older READY orders");
+assert.match(pickerPage, /Current batch/, "Picker exposes a current-batch work queue chip");
+assert.match(pickerPage, /All pending/, "Picker exposes all-pending work queue chip");
+assert.match(packingPage, /Today ready[\s\S]*Old pending[\s\S]*Problems/, "Packing dashboard separates today, old pending, and problem counts");
+assert.match(packingPage, /Move old pending to review/, "Owner can move old pending work into a review-only flow");
 assert.match(packingActions, /writeScanLogLater[\s\S]*redirect\(`\/packing\/\$\{encodeURIComponent\(matchedOrder\.awb\)\}`\)/, "Packing search redirects before scan logging can block order opening");
+assert.match(packingActions, /OLD_PENDING_REVIEW_REPORTED/, "Old pending review action is audited without deleting orders");
 assert.match(productImageRoute, /getCurrentUser/, "Cached image route checks session without login redirect");
 assert.match(productImageRoute, /verifySignedCachedImageUrl/, "Cached image route verifies signed image URLs");
 assert.equal(productImageRoute.indexOf("verifySignedCachedImageUrl") < productImageRoute.indexOf("const user = await getCurrentUser"), true, "Signed cached image route avoids database auth before serving normal image requests");

@@ -33,7 +33,13 @@ import {
   verifySignedCachedImageUrl,
   writeImageCacheMeta
 } from "../lib/image-cache";
-import { canImportPreviewIssues, isOrderPreviewSourceType, reviewProblemIssues } from "../lib/import/preview";
+import {
+  buildPreviewImportStats,
+  canImportPreviewIssues,
+  isOrderPreviewSourceType,
+  reviewProblemIssues,
+  selectPreviewRowsForImport
+} from "../lib/import/preview";
 import { planAccountSkuMappingImport, planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
 import { findAwbSearchMatches } from "../lib/operations/awb-search";
@@ -389,6 +395,64 @@ assert.equal(canImportPreviewIssues([{ issueType: "MISSING_IMAGE_MAPPING" }]), t
 assert.equal(isOrderPreviewSourceType("PICKLIST_SUMMARY"), false, "Picklist summary rows are not order preview rows");
 assert.equal(reviewProblemIssues([]).length, 0, "Picklist summary rows without AWB do not create missing-AWB problems by default");
 assert.equal(reviewProblemIssues([{ issueType: "UNKNOWN_LAYOUT_ROW" }]).length, 1, "Unknown layout rows show in review problems");
+const labelManifestPreviewRows = [
+  ...Array.from({ length: 95 }, (_, index) => ({
+    id: `label-${index}`,
+    sourceType: "LABEL",
+    awb: `LBL${String(index).padStart(10, "0")}`,
+    sku: "SUL-BR-PB-GR & WH-CR03",
+    imported: false,
+    issues: [] as Array<{ issueType: string }>
+  })),
+  ...Array.from({ length: 103 }, (_, index) => ({
+    id: `manifest-${index}`,
+    sourceType: "MANIFEST_ORDER",
+    awb: `LBL${String(index % 95).padStart(10, "0")}`,
+    sku: "SUL-BR-PB-GR & WH-CR03",
+    imported: false,
+    issues: [{ issueType: "DUPLICATE_EXISTING_AWB" }]
+  })),
+  { id: "summary-1", sourceType: "PICKLIST_SUMMARY", awb: null, sku: "SUL-BR-PB-GR & WH-CR03", imported: false, issues: [] }
+];
+const labelManifestStats = buildPreviewImportStats(labelManifestPreviewRows, "LABEL");
+assert.equal(labelManifestStats.labelOrderRows, 95, "Preview counts label rows separately");
+assert.equal(labelManifestStats.manifestOrderRows, 103, "Preview counts manifest rows separately");
+assert.equal(labelManifestStats.picklistSummaryRows, 1, "Preview counts picklist summary rows separately");
+assert.equal(labelManifestStats.importSourceRows, 95, "Label plus manifest preview keeps only labels as import source");
+assert.equal(labelManifestStats.existingDuplicateRows, 0, "Manifest duplicate AWBs are not counted against label import rows");
+const selectedLabelRows = selectPreviewRowsForImport(labelManifestPreviewRows, "LABEL");
+assert.equal(selectedLabelRows.rows.length, 95, "Label 95 plus manifest rows does not create 198 import rows");
+assert.equal(selectedLabelRows.rows.some((row) => row.sourceType === "MANIFEST_ORDER"), false, "Manifest rows do not duplicate label AWBs on import");
+const picklistOnlySelection = selectPreviewRowsForImport([
+  { id: "picklist-only", sourceType: "PICKLIST_SUMMARY", sku: "SKU1", qty: 10, imported: false, issues: [] }
+]);
+assert.equal(picklistOnlySelection.rows.length, 0, "Picklist summary rows do not create orders");
+const repeatedLabelPlan = planOrderImport(
+  selectedLabelRows.rows.map((row) => ({
+    awb: row.awb ?? "",
+    courier: "Delhivery",
+    sku: row.sku ?? "",
+    qty: 1,
+    color: "Green",
+    size: "Free Size",
+    orderNo: row.awb ?? "",
+    productDescription: "Bracelet",
+    paymentType: "UNKNOWN" as const
+  })),
+  selectedLabelRows.rows.map((row) => ({
+    awb: row.awb,
+    courier: "Delhivery",
+    sku: row.sku,
+    qty: 1,
+    color: "Green",
+    size: "Free Size",
+    orderNo: row.awb,
+    productDescription: "Bracelet",
+    paymentType: "UNKNOWN" as const
+  })),
+  new Set(["SUL-BR-PB-GR & WH-CR03"])
+);
+assert.equal(repeatedLabelPlan.created.length, 0, "Re-uploading same label plus manifest does not increase order count");
 
 assert.equal(canRoleAccessPath("OWNER", "/reports"), true, "Owner can access reports");
 assert.equal(canRoleAccessPath("OWNER", "/owner/system"), true, "Owner can access system health");
@@ -552,7 +616,9 @@ const pickerGroupsWithOrderImage = buildPickerSkuGroups(
   ]
 );
 assert.equal(pickerGroupsWithOrderImage[0]?.imageUrl, "/product-images/meesho/a1/SKU2/card.webp", "Picker group does not fall back to slow order image when cached image exists");
-assert.equal(normalizeSkuForMatching("SUL - PN - BC _ SS"), "SUL-PN-BC_SS", "SKU normalization removes spaces around hyphen and underscore");
+assert.equal(normalizeSkuForMatching("SUL-BR-PB-GR & WH-CR03"), "SUL-BR-PB-GR & WH-CR03", "SKU normalization preserves ampersand SKUs");
+assert.equal(normalizeSkuForMatching("Sullery Earing - 29"), "Sullery Earing - 29", "SKU normalization preserves meaningful spaces");
+assert.equal(normalizeSkuForMatching("Sullery-BR-ME-BL Allah34"), "Sullery-BR-ME-BL-Allah34", "SKU normalization rejoins wrapped code-like SKUs");
 
 assert.equal(validateWorkerPassword("demo1234").valid, false, "Demo password is rejected");
 assert.equal(validateWorkerPassword("better123").valid, true, "Usable worker password passes");
@@ -847,6 +913,7 @@ const startScript = readFileSync(join(repoRoot, "scripts", "start.mjs"), "utf8")
 const readinessScript = readFileSync(join(repoRoot, "scripts", "check-production-readiness.mjs"), "utf8");
 const pdfExtractor = readFileSync(join(repoRoot, "lib", "pdf", "extract-pages.ts"), "utf8");
 const importOrders = readFileSync(join(repoRoot, "lib", "import", "orders.ts"), "utf8");
+const importPreview = readFileSync(join(repoRoot, "lib", "import", "preview.ts"), "utf8");
 const uploadLimits = readFileSync(join(repoRoot, "lib", "upload-limits.ts"), "utf8");
 const uploadActions = readFileSync(join(repoRoot, "app", "owner", "uploads", "actions.ts"), "utf8");
 const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
@@ -917,8 +984,9 @@ assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF e
 assert.match(pdfExtractor, /PDF text extraction failed before pages could be read\./, "PDF extraction reports startup failures before page reads");
 assert.match(uploadLimits, /PDF_UPLOAD_MAX_BYTES\s*=\s*100 \* 1024 \* 1024/, "Upload action has a 100 MB friendly file-size guard");
 assert.match(uploadActions, /error=too-large/, "Upload action redirects to friendly too-large PDF error");
-assert.match(uploadActions, /const hasLabels[\s\S]*LABEL[\s\S]*MANIFEST_ORDER/, "Confirm import prefers label rows over manifest rows");
-assert.match(uploadActions, /seenAwbs\.has/, "Confirm import skips duplicate AWB rows inside one preview batch");
+assert.match(uploadActions, /selectPreviewRowsForImport/, "Confirm import uses centralized label-over-manifest source selection");
+assert.match(importPreview, /rows\.some\(\(row\) => row\.sourceType === "LABEL"\)[\s\S]*"MANIFEST_ORDER"/, "Preview import source prefers labels over manifest rows");
+assert.match(importPreview, /seenAwbs\.has/, "Confirm import skips duplicate AWB rows inside one preview batch");
 assert.match(importOrders, /heldRows/, "Order import stats include held-for-review rows");
 assert.match(reviewPage, /Held for review/, "Import result shows held-for-review count");
 assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");

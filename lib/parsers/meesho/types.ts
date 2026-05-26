@@ -70,6 +70,8 @@ export type MeeshoParseStats = {
   pagesWithText: number;
   pagesWithoutText: number;
   parsedOrders: number;
+  parsedLabelOrders: number;
+  parsedManifestOrders: number;
   parsedSummaryRows: number;
   missingAwb: number;
   missingSku: number;
@@ -98,6 +100,8 @@ export type MeeshoParserDiagnostics = {
   pagesWithText: number;
   pagesWithoutText: number;
   parsedOrders: number;
+  parsedLabelOrders: number;
+  parsedManifestOrders: number;
   parsedSummaryRows: number;
   missingAwb: number;
   missingSku: number;

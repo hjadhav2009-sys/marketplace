@@ -2,10 +2,11 @@ import { normalizeSkuForMatching } from "@/lib/sku";
 import type { MeeshoPaymentType, ParseIssue } from "./types";
 
 const hiddenSeparatorPattern = /[\uFFFE\uFFFD\u200B-\u200F\u202A-\u202E]/g;
+const mojibakeHiddenSeparatorPattern = /\u00EF\u00BF[\u00BD\u00BE]/g;
 const controlPattern = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 export function removeControlChars(value: string) {
-  return value.replace(hiddenSeparatorPattern, "-").replace(controlPattern, " ").replace(/\r/g, "\n");
+  return value.replace(mojibakeHiddenSeparatorPattern, "-").replace(hiddenSeparatorPattern, "-").replace(controlPattern, " ").replace(/\r/g, "\n");
 }
 
 export function normalizeWhitespace(value: string) {

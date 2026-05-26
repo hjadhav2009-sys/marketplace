@@ -7,7 +7,12 @@ import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { cacheProductCardImage, imageCacheNeedsRefresh } from "@/lib/image-cache";
 import { importParsedOrderRows, type ParsedOrderImportRow } from "@/lib/import/orders";
-import { hasBlockingPreviewIssue, isOrderPreviewSourceType } from "@/lib/import/preview";
+import {
+  buildPreviewImportStats,
+  getPreviewImportSourceType,
+  selectPreviewRowsForImport,
+  type ImportPreviewSourceType
+} from "@/lib/import/preview";
 import {
   crossCheckMeeshoParsedRows,
   parseMeeshoPdfBuffer,
@@ -68,6 +73,19 @@ function parseStoredIssues(value: string | null) {
     return Array.isArray(parsed) ? (parsed as ParseIssue[]) : [];
   } catch {
     return [] as ParseIssue[];
+  }
+}
+
+function parsePreferredImportSourceType(notes: string | null) {
+  if (!notes) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(notes) as { stats?: { importSourceType?: string } };
+    return parsed.stats?.importSourceType;
+  } catch {
+    return undefined;
   }
 }
 
@@ -184,6 +202,8 @@ function buildFailedDiagnostic(fileName: string, message: string): MeeshoParserD
     pagesWithText: 0,
     pagesWithoutText: 0,
     parsedOrders: 0,
+    parsedLabelOrders: 0,
+    parsedManifestOrders: 0,
     parsedSummaryRows: 0,
     missingAwb: 0,
     missingSku: 0,
@@ -199,10 +219,15 @@ function buildFailedDiagnostic(fileName: string, message: string): MeeshoParserD
 function buildNotes(input: {
   results: MeeshoParseResult[];
   failedDiagnostics?: MeeshoParserDiagnostics[];
-  parsedOrders: number;
-  parsedSummaryRows: number;
+  importSourceType: ImportPreviewSourceType;
+  labelOrderRows: number;
+  manifestOrderRows: number;
+  picklistSummaryRows: number;
+  importableOrderRows: number;
+  importSourceRows: number;
   existingDuplicateRows: number;
   missingImageRows: number;
+  missingImageSkus: number;
   blockingRows: number;
   failureReason?: string;
 }) {
@@ -212,6 +237,8 @@ function buildNotes(input: {
       totalPages: acc.totalPages + result.pageCount,
       pagesWithText: acc.pagesWithText + result.pagesWithText,
       pagesWithoutText: acc.pagesWithoutText + result.pagesWithoutText,
+      parsedLabelOrders: acc.parsedLabelOrders + result.parsedLabelOrders,
+      parsedManifestOrders: acc.parsedManifestOrders + result.parsedManifestOrders,
       missingAwb: acc.missingAwb + result.missingAwb,
       missingSku: acc.missingSku + result.missingSku,
       lowConfidenceRows: acc.lowConfidenceRows + result.lowConfidenceRows,
@@ -223,6 +250,8 @@ function buildNotes(input: {
       totalPages: 0,
       pagesWithText: 0,
       pagesWithoutText: 0,
+      parsedLabelOrders: 0,
+      parsedManifestOrders: 0,
       missingAwb: 0,
       missingSku: 0,
       lowConfidenceRows: 0,
@@ -241,10 +270,19 @@ function buildNotes(input: {
     failureReason,
     stats: {
       ...stats,
-      parsedOrders: input.parsedOrders,
-      parsedSummaryRows: input.parsedSummaryRows,
+      parsedOrders: input.importSourceRows,
+      parsedLabelOrders: input.labelOrderRows,
+      parsedManifestOrders: input.manifestOrderRows,
+      parsedSummaryRows: input.picklistSummaryRows,
+      labelOrderRows: input.labelOrderRows,
+      manifestOrderRows: input.manifestOrderRows,
+      picklistSummaryRows: input.picklistSummaryRows,
+      importSourceType: input.importSourceType,
+      importSourceRows: input.importSourceRows,
+      importableOrderRows: input.importableOrderRows,
       existingDuplicateRows: input.existingDuplicateRows,
       missingImageRows: input.missingImageRows,
+      missingImageSkus: input.missingImageSkus,
       blockingRows: input.blockingRows
     }
   });
@@ -569,7 +607,10 @@ export async function createUploadBatchAction(formData: FormData) {
   const user = await requireUser(["OWNER"]);
   const account = await requireAccount(user);
   const request = await getRequestMeta();
-  const files = [formData.get("labelPdf"), formData.get("manifestPdf")].filter(isUploadFile);
+  const labelFile = formData.get("labelPdf");
+  const manifestFile = formData.get("manifestPdf");
+  const labelFileUploaded = isUploadFile(labelFile);
+  const files = [labelFile, manifestFile].filter(isUploadFile);
 
   if (files.length === 0) {
     redirect("/owner/uploads/new?error=missing-file");
@@ -628,8 +669,13 @@ export async function createUploadBatchAction(formData: FormData) {
       }
     }
 
-    const awbs = drafts.map((row) => row.awb).filter((awb): awb is string => Boolean(awb));
-    const skus = drafts.map((row) => row.sku).filter((sku): sku is string => Boolean(sku));
+    const preferredImportSourceType = labelFileUploaded || results.some((result) => result.labelOrders.length > 0) ? "LABEL" : undefined;
+    const importSourceType = getPreviewImportSourceType(drafts, preferredImportSourceType);
+    const importSourceDrafts = drafts.filter((row) => row.sourceType === importSourceType);
+    const awbs = importSourceDrafts.map((row) => row.awb).filter((awb): awb is string => Boolean(awb));
+    const skus = Array.from(
+      new Set(importSourceDrafts.flatMap((row) => [row.sku, normalizeSkuForMatching(row.sku)].filter((sku): sku is string => Boolean(sku))))
+    );
     const [existingOrders, mappings] = await Promise.all([
       prisma.order.findMany({
         where: {
@@ -648,9 +694,9 @@ export async function createUploadBatchAction(formData: FormData) {
       })
     ]);
     const existingAwbs = new Set(existingOrders.map((order) => order.awb));
-    const mappedSkus = new Set(mappings.map((mapping) => mapping.sku));
+    const mappedSkus = new Set(mappings.map((mapping) => normalizeSkuForMatching(mapping.sku)));
 
-    for (const draft of drafts) {
+    for (const draft of importSourceDrafts) {
       if (draft.awb && existingAwbs.has(draft.awb)) {
         appendIssue(draft, {
           issueType: "DUPLICATE_EXISTING_AWB",
@@ -662,7 +708,7 @@ export async function createUploadBatchAction(formData: FormData) {
         });
       }
 
-      if (draft.sku && !mappedSkus.has(draft.sku)) {
+      if (draft.sku && !mappedSkus.has(normalizeSkuForMatching(draft.sku))) {
         appendIssue(draft, {
           issueType: "MISSING_IMAGE_MAPPING",
           message: `No active image mapping found for SKU ${draft.sku}.`,
@@ -674,17 +720,16 @@ export async function createUploadBatchAction(formData: FormData) {
       }
     }
 
-    const orderDrafts = drafts.filter((row) => isOrderPreviewSourceType(row.sourceType));
-    const missingImageRows = drafts.filter((row) => hasIssue(row, "MISSING_IMAGE_MAPPING")).length;
-    const duplicateRows = orderDrafts.filter((row) => hasIssue(row, "DUPLICATE_EXISTING_AWB") || hasIssue(row, "DUPLICATE_AWB_INSIDE_FILE")).length;
-    const blockingRows = orderDrafts.filter((row) => hasBlockingPreviewIssue(row.issues)).length;
-    const errorRows = orderDrafts.filter((row) => row.issues.some((issue) => issue.severity === "ERROR")).length;
-    const lowConfidenceRows = orderDrafts.filter((row) => hasIssue(row, "LOW_CONFIDENCE")).length;
+    const importReviewStats = buildPreviewImportStats(drafts, importSourceType);
+    const duplicateRows =
+      importReviewStats.existingDuplicateRows + importSourceDrafts.filter((row) => hasIssue(row, "DUPLICATE_AWB_INSIDE_FILE")).length;
+    const errorRows = importSourceDrafts.filter((row) => row.issues.some((issue) => issue.severity === "ERROR")).length;
+    const lowConfidenceRows = importSourceDrafts.filter((row) => hasIssue(row, "LOW_CONFIDENCE")).length;
     const fileName = files.map((file) => file.name).join(" + ");
     const hasParserDiagnosticsWarning =
       failedDiagnostics.length > 0 ||
       results.some((result) => result.diagnostics.scannedPdfLikely || result.diagnostics.unknownLayoutPages > 0);
-    const status = orderDrafts.length === 0 ? "FAILED" : hasParserDiagnosticsWarning ? "REVIEWED" : "PARSED";
+    const status = importReviewStats.importSourceRows === 0 ? "FAILED" : hasParserDiagnosticsWarning ? "REVIEWED" : "PARSED";
 
     const batch = await prisma.uploadBatch.create({
       data: {
@@ -693,19 +738,24 @@ export async function createUploadBatchAction(formData: FormData) {
         fileName,
         importType: "ORDER_LABEL",
         status,
-        totalRows: orderDrafts.length,
+        totalRows: importReviewStats.importSourceRows,
         duplicateRows,
-        missingImageRows,
-        skippedRows: blockingRows,
+        missingImageRows: importReviewStats.missingImageRows,
+        skippedRows: importReviewStats.blockingRows,
         errorRows: errorRows + parseFailureIssues.length,
         notes: buildNotes({
           results,
           failedDiagnostics,
-          parsedOrders: orderDrafts.length,
-          parsedSummaryRows: drafts.length - orderDrafts.length,
-          existingDuplicateRows: orderDrafts.filter((row) => hasIssue(row, "DUPLICATE_EXISTING_AWB")).length,
-          missingImageRows,
-          blockingRows,
+          importSourceType: importReviewStats.importSourceType,
+          labelOrderRows: importReviewStats.labelOrderRows,
+          manifestOrderRows: importReviewStats.manifestOrderRows,
+          picklistSummaryRows: importReviewStats.picklistSummaryRows,
+          importableOrderRows: importReviewStats.importableOrderRows,
+          importSourceRows: importReviewStats.importSourceRows,
+          existingDuplicateRows: importReviewStats.existingDuplicateRows,
+          missingImageRows: importReviewStats.missingImageRows,
+          missingImageSkus: importReviewStats.missingImageSkus,
+          blockingRows: importReviewStats.blockingRows,
           failureReason: parseFailureIssues[0]?.message
         })
       }
@@ -774,11 +824,15 @@ export async function createUploadBatchAction(formData: FormData) {
       metadata: {
         phase: "parse-preview",
         fileName,
-        parsedOrders: orderDrafts.length,
-        parsedSummaryRows: drafts.length - orderDrafts.length,
+        importSourceType: importReviewStats.importSourceType,
+        labelOrderRows: importReviewStats.labelOrderRows,
+        manifestOrderRows: importReviewStats.manifestOrderRows,
+        picklistSummaryRows: importReviewStats.picklistSummaryRows,
+        importableOrderRows: importReviewStats.importableOrderRows,
         lowConfidenceRows,
         duplicateRows,
-        missingImageRows,
+        missingImageRows: importReviewStats.missingImageRows,
+        missingImageSkus: importReviewStats.missingImageSkus,
         errorRows
       },
       request
@@ -805,10 +859,15 @@ export async function createUploadBatchAction(formData: FormData) {
             notes: buildNotes({
               results: [],
               failedDiagnostics,
-              parsedOrders: 0,
-              parsedSummaryRows: 0,
+              importSourceType: labelFileUploaded ? "LABEL" : "MANIFEST_ORDER",
+              labelOrderRows: 0,
+              manifestOrderRows: 0,
+              picklistSummaryRows: 0,
+              importableOrderRows: 0,
+              importSourceRows: 0,
               existingDuplicateRows: 0,
               missingImageRows: 0,
+              missingImageSkus: 0,
               blockingRows: 0,
               failureReason: message
             })
@@ -877,31 +936,18 @@ export async function confirmParsedBatchAction(formData: FormData) {
     if (!batch) {
       redirectTo = "/owner/uploads/new?error=invalid-batch";
     } else {
-      const hasLabels = batch.previewRows.some((row) => row.sourceType === "LABEL");
-      const importSourceType = hasLabels ? "LABEL" : "MANIFEST_ORDER";
-      const seenAwbs = new Set<string>();
-      const importedPreviewIds: string[] = [];
+      const preferredImportSourceType = parsePreferredImportSourceType(batch.notes);
+      const selected = selectPreviewRowsForImport(
+        batch.previewRows.map((row) => ({
+          ...row,
+          parsedIssues: parseStoredIssues(row.issues)
+        })),
+        preferredImportSourceType
+      );
+      const importedPreviewIds: string[] = selected.rows.map((row) => row.id);
       const rows: ParsedOrderImportRow[] = [];
-      let heldBlockingRows = 0;
 
-      for (const preview of batch.previewRows) {
-        if (preview.sourceType !== importSourceType || preview.imported) {
-          continue;
-        }
-
-        const issues = parseStoredIssues(preview.issues);
-
-        if (hasBlockingPreviewIssue(issues) || !preview.awb || !preview.sku) {
-          heldBlockingRows += 1;
-          continue;
-        }
-
-        if (seenAwbs.has(preview.awb)) {
-          continue;
-        }
-
-        seenAwbs.add(preview.awb);
-        importedPreviewIds.push(preview.id);
+      for (const preview of selected.rows) {
         rows.push({
           rowNumber: preview.pageNumber ?? undefined,
           awb: preview.awb,
@@ -934,7 +980,7 @@ export async function confirmParsedBatchAction(formData: FormData) {
           account,
           user,
           request,
-          heldRows: heldBlockingRows
+          heldRows: selected.heldBlockingRows
         });
 
         await prisma.uploadPreviewRow.updateMany({
@@ -947,7 +993,7 @@ export async function confirmParsedBatchAction(formData: FormData) {
           }
         });
 
-        if (heldBlockingRows > 0) {
+        if (selected.heldBlockingRows > 0) {
           await prisma.uploadBatch.update({
             where: { id: batch.id },
             data: {

@@ -28,6 +28,53 @@ assert.equal(labelOrder?.color, "Silver", "Label extracts color");
 assert.equal(labelOrder?.size, "Free Size", "Label extracts size");
 assert.equal(labelOrder?.orderNo, "290010756104090432_1", "Label extracts order number");
 
+function labelText(productRow: string) {
+  return `TAX INVOICE
+Supplier Name : Sullery
+Customer Address
+Name Example
+Return Code
+Delhivery
+1490834915493571
+Product Details
+SKU Size Qty Color Order No.
+${productRow}
+Purchase Order No.
+290424589610289984`;
+}
+
+const ampersandSkuLabel = parseText("Sub_Order_Labels_ampersand_sku.pdf", [
+  { pageNumber: 1, text: labelText("SUL-BR-PB-GR & WH-CR03 Free Size 1 Green 290424589610289984_1") }
+]).labelOrders[0];
+assert.equal(ampersandSkuLabel?.sku, "SUL-BR-PB-GR & WH-CR03", "Label preserves SKU with spaces and ampersand");
+assert.equal(ampersandSkuLabel?.size, "Free Size", "Label parses Free Size as one value for ampersand SKU");
+assert.equal(ampersandSkuLabel?.qty, 1, "Label parses quantity before color for ampersand SKU");
+assert.equal(ampersandSkuLabel?.color, "Green", "Label parses color before order number for ampersand SKU");
+
+const spacedHyphenSkuLabel = parseText("Sub_Order_Labels_spaced_hyphen_sku.pdf", [
+  { pageNumber: 1, text: labelText("Sullery Earing - 29 Free Size 1 Silver 290172654185515840_1") }
+]).labelOrders[0];
+assert.equal(spacedHyphenSkuLabel?.sku, "Sullery Earing - 29", "Label preserves SKU with spaces and hyphen");
+assert.equal(spacedHyphenSkuLabel?.size, "Free Size", "Label parses Free Size for spaced hyphen SKU");
+assert.equal(spacedHyphenSkuLabel?.qty, 1, "Label parses quantity for spaced hyphen SKU");
+assert.equal(spacedHyphenSkuLabel?.color, "Silver", "Label parses color for spaced hyphen SKU");
+
+const simpleHyphenSkuLabel = parseText("Sub_Order_Labels_simple_hyphen_sku.pdf", [
+  { pageNumber: 1, text: labelText("Sullery-BR-SS-BL-Radhe25 Free Size 1 Gold 290462311420818241_2") }
+]).labelOrders[0];
+assert.equal(simpleHyphenSkuLabel?.sku, "Sullery-BR-SS-BL-Radhe25", "Label preserves compact hyphen SKU");
+assert.equal(simpleHyphenSkuLabel?.orderNo, "290462311420818241_2", "Label accepts _2 order numbers");
+
+const wrappedAllahSkuLabel = parseText("Sub_Order_Labels_wrapped_allah_sku.pdf", [
+  { pageNumber: 1, text: labelText("Sullery-BR-ME-BL\nAllah34 Free Size 1 Gold 290462311420818241_2") }
+]).labelOrders[0];
+assert.equal(wrappedAllahSkuLabel?.sku, "Sullery-BR-ME-BL-Allah34", "Label rejoins wrapped Allah SKU with a hyphen");
+
+const wrappedBalajiSkuLabel = parseText("Sub_Order_Labels_wrapped_balaji_sku.pdf", [
+  { pageNumber: 1, text: labelText("Sullery-BR-SS-BL\nBalaji27 Free Size 1 Gold 290462311420818241_2") }
+]).labelOrders[0];
+assert.equal(wrappedBalajiSkuLabel?.sku, "Sullery-BR-SS-BL-Balaji27", "Label rejoins wrapped Balaji SKU with a hyphen");
+
 const orderNumberBeforeAwb = parseText("Sub_Order_Labels_order_before_awb.pdf", [
   {
     pageNumber: 1,
@@ -73,6 +120,8 @@ assert.equal(shadowfaxManifest.manifestOrders[0]?.awb, "SF3423949467FPL", "Manif
 const xpressBeesManifest = parseText("Supplier_Manifest_xpressbees.pdf", [{ pageNumber: 1, text: fixture("manifest-xpressbees-page-1.txt") }]);
 assert.equal(xpressBeesManifest.manifestOrders[0]?.awb, "13409696927756", "Manifest extracts Xpress Bees numeric AWB");
 
+assert.equal(normalizeSku("SUL-BR-PB-GR & WH-CR03"), "SUL-BR-PB-GR & WH-CR03", "SKU normalization preserves ampersands");
+assert.equal(normalizeSku("Sullery Earing - 29"), "Sullery Earing - 29", "SKU normalization preserves spaces inside SKU names");
 assert.equal(normalizeSku("SUL-PN-BC-SS-BL￾Allah40"), "SUL-PN-BC-SS-BL-Allah40", "Hidden SKU separator normalizes to hyphen");
 assert.equal(normalizeSku("SUL-BR-SS-BL￾Shyam44"), "SUL-BR-SS-BL-Shyam44", "Second hidden SKU separator normalizes to hyphen");
 assert.equal(delhiveryManifest.manifestOrders[1]?.sku, "SUL-PN-BC-SS-BL-Allah40", "Manifest normalizes hidden SKU separator");
@@ -186,6 +235,20 @@ assert.equal(
   true,
   "Manifest warns when a parsed SKU is normalized"
 );
+
+const wrappedSulleryManifest = parseText("Supplier_Manifest_wrapped_sullery_sku.pdf", [
+  {
+    pageNumber: 1,
+    text: `Courier : Delhivery
+Supplier Name : Sullery
+S. No. Sub Order No. AWB SKU Qty. Size Packed
+1 290462311420818241_2 1490834915493571 Sullery-BR-ME-BL
+Allah34 1 Free Size No
+2 290462311420818242_1 1490834915493572 SUL-BR-PB-GR & WH-CR03 1 Free Size No`
+  }
+]);
+assert.equal(wrappedSulleryManifest.manifestOrders[0]?.sku, "Sullery-BR-ME-BL-Allah34", "Manifest rejoins wrapped Sullery SKU");
+assert.equal(wrappedSulleryManifest.manifestOrders[1]?.sku, "SUL-BR-PB-GR & WH-CR03", "Manifest preserves SKU spaces and ampersand");
 
 const unknownManifestRow = parseText("Supplier_Manifest_unknown_row.pdf", [
   {

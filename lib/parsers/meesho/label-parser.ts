@@ -13,6 +13,9 @@ import {
 } from "./normalize";
 import type { MeeshoTextPage, ParsedMeeshoLabelOrder, ParseIssue } from "./types";
 
+const sizePattern = "(?:Free\\s+Size|XS|S|M|L|XL|XXL|XXXL|\\d+[A-Za-z]*)";
+const orderNoPattern = /\b(\d[\d\s]{10,30}_\d+)\b/g;
+
 function linesFromText(text: string) {
   return normalizeWhitespace(text)
     .split("\n")
@@ -144,21 +147,25 @@ function extractProductRow(text: string) {
   }
 
   const row = compactWhitespace(segment.replace(/Purchase\s+Order\s+No[\s\S]+$/i, ""));
-  const orderMatch = row.match(/(\d[\d\s]{10,}_\d)/);
+  const orderMatch = Array.from(row.matchAll(orderNoPattern)).at(-1);
   const orderNo = normalizeOrderNo(orderMatch?.[1]);
 
   if (!orderMatch) {
     return {};
   }
 
-  const beforeOrder = row.slice(0, orderMatch.index).trim();
-  const tokens = beforeOrder.split(/\s+/).filter(Boolean);
-  const rawSku = tokens[0];
+  const beforeOrder = row.slice(0, orderMatch.index ?? 0).trim();
+  const detailsMatch = beforeOrder.match(new RegExp(`^(.+)\\s+(${sizePattern})\\s+(\\d{1,4})\\s+([A-Za-z][A-Za-z ]*)$`, "i"));
+
+  if (!detailsMatch) {
+    return { orderNo };
+  }
+
+  const rawSku = detailsMatch[1];
   const sku = normalizeSku(rawSku);
-  const qtyIndex = tokens.findLastIndex((token) => /^\d+$/.test(token));
-  const qty = normalizeQty(qtyIndex >= 0 ? tokens[qtyIndex] : undefined);
-  const size = qtyIndex > 1 ? tokens.slice(1, qtyIndex).join(" ") : undefined;
-  const color = qtyIndex >= 0 ? tokens.slice(qtyIndex + 1).join(" ") || undefined : undefined;
+  const size = compactWhitespace(detailsMatch[2]);
+  const qty = normalizeQty(detailsMatch[3]);
+  const color = compactWhitespace(detailsMatch[4]);
 
   return { sku, rawSku, qty, size, color, orderNo };
 }

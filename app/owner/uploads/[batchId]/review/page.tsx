@@ -9,7 +9,13 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { cachedProductImageUrl } from "@/lib/image-cache";
-import { hasBlockingPreviewIssue, isOrderPreviewSourceType, reviewProblemIssues } from "@/lib/import/preview";
+import {
+  buildPreviewImportStats,
+  isOrderPreviewSourceType,
+  previewImportSourceLabel,
+  reviewProblemIssues,
+  type ImportPreviewSourceType
+} from "@/lib/import/preview";
 import type { MeeshoParserDiagnostics, ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
 import { picklistSummaryProductNameLabel } from "@/lib/product-image";
@@ -47,7 +53,15 @@ type BatchStats = {
   pagesWithText?: number;
   pagesWithoutText?: number;
   parsedOrders?: number;
+  parsedLabelOrders?: number;
+  parsedManifestOrders?: number;
   parsedSummaryRows?: number;
+  labelOrderRows?: number;
+  manifestOrderRows?: number;
+  picklistSummaryRows?: number;
+  importSourceType?: ImportPreviewSourceType;
+  importSourceRows?: number;
+  importableOrderRows?: number;
   missingAwb?: number;
   missingSku?: number;
   lowConfidenceRows?: number;
@@ -57,6 +71,7 @@ type BatchStats = {
   scannedPdfLikely?: boolean;
   existingDuplicateRows?: number;
   missingImageRows?: number;
+  missingImageSkus?: number;
   blockingRows?: number;
 };
 
@@ -114,23 +129,29 @@ function diagnosticsFromNotes(notes: BatchNotes): MeeshoParserDiagnostics[] {
     return [];
   }
 
-  return notes.files.map((file) => ({
-    fileName: file.fileName ?? "Unknown file",
-    detectedType: file.detectedType ?? "UNKNOWN",
-    pageCount: file.pageCount ?? file.stats?.totalPages ?? 0,
-    pagesWithText: file.pagesWithText ?? file.stats?.pagesWithText ?? 0,
-    pagesWithoutText: file.pagesWithoutText ?? file.stats?.pagesWithoutText ?? 0,
-    parsedOrders: file.parsedOrders ?? file.stats?.parsedOrders ?? 0,
-    parsedSummaryRows: file.parsedSummaryRows ?? file.stats?.parsedSummaryRows ?? 0,
-    missingAwb: file.missingAwb ?? file.stats?.missingAwb ?? 0,
-    missingSku: file.missingSku ?? file.stats?.missingSku ?? 0,
-    lowConfidenceRows: file.lowConfidenceRows ?? file.stats?.lowConfidenceRows ?? 0,
-    duplicateAwbInsideFile: file.duplicateAwbInsideFile ?? file.stats?.duplicateAwbInsideFile ?? 0,
-    unknownLayoutPages: file.unknownLayoutPages ?? file.stats?.unknownLayoutPages ?? 0,
-    scannedPdfLikely: file.scannedPdfLikely ?? file.stats?.scannedPdfLikely ?? false,
-    parserWarnings: file.parserWarnings ?? [],
-    pageDiagnostics: file.pageDiagnostics ?? []
-  }));
+  return notes.files.map((file) => {
+    const parsedOrders = file.parsedOrders ?? file.stats?.parsedOrders ?? 0;
+
+    return {
+      fileName: file.fileName ?? "Unknown file",
+      detectedType: file.detectedType ?? "UNKNOWN",
+      pageCount: file.pageCount ?? file.stats?.totalPages ?? 0,
+      pagesWithText: file.pagesWithText ?? file.stats?.pagesWithText ?? 0,
+      pagesWithoutText: file.pagesWithoutText ?? file.stats?.pagesWithoutText ?? 0,
+      parsedOrders,
+      parsedLabelOrders: file.parsedLabelOrders ?? file.stats?.parsedLabelOrders ?? (file.detectedType === "LABEL_PDF" ? parsedOrders : 0),
+      parsedManifestOrders: file.parsedManifestOrders ?? file.stats?.parsedManifestOrders ?? (file.detectedType === "MANIFEST_PDF" ? parsedOrders : 0),
+      parsedSummaryRows: file.parsedSummaryRows ?? file.stats?.parsedSummaryRows ?? 0,
+      missingAwb: file.missingAwb ?? file.stats?.missingAwb ?? 0,
+      missingSku: file.missingSku ?? file.stats?.missingSku ?? 0,
+      lowConfidenceRows: file.lowConfidenceRows ?? file.stats?.lowConfidenceRows ?? 0,
+      duplicateAwbInsideFile: file.duplicateAwbInsideFile ?? file.stats?.duplicateAwbInsideFile ?? 0,
+      unknownLayoutPages: file.unknownLayoutPages ?? file.stats?.unknownLayoutPages ?? 0,
+      scannedPdfLikely: file.scannedPdfLikely ?? file.stats?.scannedPdfLikely ?? false,
+      parserWarnings: file.parserWarnings ?? [],
+      pageDiagnostics: file.pageDiagnostics ?? []
+    };
+  });
 }
 
 function issueTone(issueType: string) {
@@ -221,6 +242,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
     ...row,
     parsedIssues: parseIssues(row.issues)
   }));
+  const importReviewStats = buildPreviewImportStats(previewRows, notes.stats?.importSourceType);
+  const importSourceLabel = previewImportSourceLabel(importReviewStats.importSourceType);
+  const importSourceRows = previewRows.filter((row) => row.sourceType === importReviewStats.importSourceType);
   const skus = Array.from(new Set(previewRows.flatMap((row) => [row.sku, normalizeSkuForMatching(row.sku)].filter((sku): sku is string => Boolean(sku)))));
   const mappings = await prisma.skuImageMapping.findMany({
     where: {
@@ -248,7 +272,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
   }));
   const mappingBySku = new Map(mappingsWithCachedUrls.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
   const missingImageRepairs = Array.from(
-    previewRows
+    importSourceRows
       .reduce(
         (repairs, row) => {
           const sku = normalizeSkuForMatching(row.sku);
@@ -307,9 +331,8 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
     }))
   );
   const crossCheckIssueCount = batch.issues.filter((issue) => /MISMATCH|NOT_IN/i.test(issue.issueType)).length;
-  const importableRows = previewRows.filter((row) => {
-    return !row.imported && isOrderPreviewSourceType(row.sourceType) && row.awb && row.sku && !hasBlockingPreviewIssue(row.parsedIssues);
-  }).length;
+  const importableRows = importReviewStats.importableOrderRows;
+  const confirmImportButtonText = `${importableRows} ${importSourceLabel} row${importableRows === 1 ? "" : "s"} will import`;
   const importStats = notes.importStats;
   const exactErrorMessage =
     filters?.error === "parse-failed"
@@ -382,19 +405,37 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         </div>
       </section>
 
+      <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-3">
+          <p className="text-sm text-slate-700">
+            <span className="font-black text-slate-950">{importReviewStats.labelOrderRows}</span> label orders found
+          </p>
+          <p className="text-sm text-slate-700">
+            <span className="font-black text-slate-950">{importReviewStats.manifestOrderRows}</span> manifest rows{" "}
+            {importReviewStats.importSourceType === "LABEL" ? "used for cross-check" : "available for import"}
+          </p>
+          <p className="text-sm text-slate-700">
+            <span className="font-black text-slate-950">{importableRows}</span> importable {importSourceLabel} rows
+          </p>
+        </div>
+      </section>
+
       <section className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
           ["Pages", notes.stats?.totalPages ?? "-"],
           ["Pages with text", notes.stats?.pagesWithText ?? "-"],
           ["No text pages", notes.stats?.pagesWithoutText ?? 0],
-          ["Parsed orders", notes.stats?.parsedOrders ?? batch.totalRows],
-          ["Summary rows", notes.stats?.parsedSummaryRows ?? 0],
+          ["Label orders", importReviewStats.labelOrderRows],
+          [importReviewStats.importSourceType === "LABEL" ? "Manifest cross-check rows" : "Manifest order rows", importReviewStats.manifestOrderRows],
+          ["Picklist summary rows", importReviewStats.picklistSummaryRows],
+          [`Importable ${importSourceLabel} rows`, importableRows],
           ["Missing AWB", notes.stats?.missingAwb ?? 0],
           ["Missing SKU", notes.stats?.missingSku ?? 0],
           ["Low confidence", notes.stats?.lowConfidenceRows ?? 0],
           ["Unknown pages", notes.stats?.unknownLayoutPages ?? 0],
-          ["Existing AWB", notes.stats?.existingDuplicateRows ?? batch.duplicateRows],
-          ["Missing images", notes.stats?.missingImageRows ?? batch.missingImageRows],
+          ["Existing duplicate AWBs", importReviewStats.existingDuplicateRows],
+          ["Blocking rows", importReviewStats.blockingRows],
+          ["Missing image SKUs", missingImageRepairs.length || importReviewStats.missingImageSkus],
           ["Cross-checks", crossCheckIssueCount]
         ].map(([label, value]) => (
           <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
@@ -426,6 +467,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                     <p className="font-semibold text-slate-950">{diagnostic.fileName}</p>
                     <p className="mt-1 text-sm text-slate-600">
                       {diagnostic.detectedType} / {diagnostic.pageCount} page{diagnostic.pageCount === 1 ? "" : "s"} / {diagnostic.pagesWithText} with text / {diagnostic.pagesWithoutText} without text
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {diagnostic.parsedLabelOrders} label orders / {diagnostic.parsedManifestOrders} manifest rows / {diagnostic.parsedSummaryRows} picklist rows
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -595,7 +639,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             <div>
               <h2 className="font-semibold text-slate-950">Confirm import</h2>
               <p className="mt-1 text-sm text-slate-600">
-                {importableRows} ready row{importableRows === 1 ? "" : "s"} will import through the duplicate-safe AWB workflow.
+                {importableRows} {importSourceLabel} row{importableRows === 1 ? "" : "s"} will import through the duplicate-safe AWB workflow.
               </p>
               <p className="mt-1 text-sm font-medium text-amber-800">
                 Low confidence rows are not imported until fixed/reviewed.
@@ -604,7 +648,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             {importableRows > 0 ? (
               <form action={confirmParsedBatchAction}>
                 <input type="hidden" name="batchId" value={batch.id} />
-                <SubmitButton pendingText="Importing...">Confirm import</SubmitButton>
+                <SubmitButton pendingText="Importing...">{confirmImportButtonText}</SubmitButton>
               </form>
             ) : null}
           </div>

@@ -17,6 +17,9 @@ type ImportPageProps = {
 };
 
 type ImportNotes = {
+  marketplace?: string;
+  listingMaster?: boolean;
+  inactiveListings?: number;
   selectedAccount?: {
     name?: string;
     code?: string;
@@ -55,6 +58,22 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
   const selectedAccount = await requireAccount(user);
   const params = await searchParams;
   const accounts = await getAvailableAccounts(user);
+  const [totalFlipkartListings, activeFlipkartListings, missingFlipkartImages, latestFlipkartListing] = await Promise.all([
+    prisma.marketplaceListing.count({
+      where: { accountId: selectedAccount.id, marketplace: "FLIPKART" }
+    }),
+    prisma.marketplaceListing.count({
+      where: { accountId: selectedAccount.id, marketplace: "FLIPKART", listingStatus: "Active" }
+    }),
+    prisma.marketplaceListing.count({
+      where: { accountId: selectedAccount.id, marketplace: "FLIPKART", mainImageUrl: null }
+    }),
+    prisma.marketplaceListing.findFirst({
+      where: { accountId: selectedAccount.id, marketplace: "FLIPKART", lastImportedAt: { not: null } },
+      select: { lastImportedAt: true },
+      orderBy: { lastImportedAt: "desc" }
+    })
+  ]);
   const batch = params?.batchId
     ? await prisma.uploadBatch.findFirst({
         where: { id: params.batchId, importType: "SKU_IMAGE" },
@@ -85,6 +104,31 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
           Could not import that file. Check the account, file type, and required columns.
         </div>
       ) : null}
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-950">Flipkart Listing Master</h2>
+            <p className="mt-1 text-sm text-slate-600">Import this only when listings, prices, statuses, images, or scraped product details change.</p>
+          </div>
+          <Link href="/owner/uploads/new" className="text-sm font-semibold text-berry hover:text-pink-800">
+            Daily workers upload orders only
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Total listings", totalFlipkartListings],
+            ["Active listings", activeFlipkartListings],
+            ["Missing images", missingFlipkartImages],
+            ["Last import", latestFlipkartListing?.lastImportedAt ? formatDateTime(latestFlipkartListing.lastImportedAt) : "Never"]
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-md bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+              <p className="mt-1 break-words text-2xl font-bold text-slate-950">{value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <form action={importSkuMappingFileAction} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
@@ -196,6 +240,7 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
                   ["Updated", batch.updatedRows],
                   ["Unchanged", batch.skippedRows],
                   ["Missing images", batch.missingImageRows],
+                  ["Inactive", importNotes.inactiveListings ?? 0],
                   ["Errors", batch.errorRows],
                   ["Total", batch.totalRows]
                 ].map(([label, value]) => (

@@ -25,6 +25,9 @@ type AwbSuggestion = {
   qty: number;
   courier?: string | null;
   packStatus: string;
+  listingTitle?: string | null;
+  listingId?: string | null;
+  listingCategory?: string | null;
   matchType: "EXACT" | "SUFFIX" | "CONTAINS";
   matchedField: "AWB" | "TRACKING_ID";
 };
@@ -319,6 +322,12 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
                           <span className="mt-1 block text-base font-semibold text-slate-800 sm:text-sm sm:font-normal sm:text-slate-600">
                             {suggestion.sku}
                           </span>
+                          {suggestion.listingTitle ? (
+                            <span className="mt-1 block line-clamp-1 text-sm font-medium text-slate-700">
+                              {suggestion.listingTitle}
+                              {suggestion.listingCategory ? ` / ${suggestion.listingCategory}` : ""}
+                            </span>
+                          ) : null}
                           <span className="mt-1 block text-sm font-medium text-slate-600">
                             Qty {suggestion.qty} / {suggestion.color ?? "Color unknown"} / {suggestion.courier ?? "Courier pending"}
                           </span>

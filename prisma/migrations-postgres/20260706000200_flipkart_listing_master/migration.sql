@@ -1,0 +1,61 @@
+CREATE TABLE "MarketplaceListing" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "marketplace" TEXT NOT NULL,
+    "sellerSkuId" TEXT NOT NULL,
+    "sku" TEXT NOT NULL,
+    "productTitle" TEXT,
+    "subCategory" TEXT,
+    "fsn" TEXT,
+    "listingId" TEXT,
+    "listingStatus" TEXT,
+    "mrp" DOUBLE PRECISION,
+    "sellingPrice" DOUBLE PRECISION,
+    "liveTitle" TEXT,
+    "liveBrand" TEXT,
+    "liveCategory" TEXT,
+    "livePrice" DOUBLE PRECISION,
+    "liveMrp" DOUBLE PRECISION,
+    "rating" DOUBLE PRECISION,
+    "reviewCount" INTEGER,
+    "productHighlights" TEXT,
+    "description" TEXT,
+    "allSpecifications" TEXT,
+    "generatedDirectProductUrl" TEXT,
+    "canonicalProductUrl" TEXT,
+    "scrapeStatus" TEXT,
+    "scrapeError" TEXT,
+    "imageUrl1" TEXT,
+    "imageUrl2" TEXT,
+    "imageUrl3" TEXT,
+    "imageUrl4" TEXT,
+    "imageUrl5" TEXT,
+    "imageUrl6" TEXT,
+    "imageUrl7" TEXT,
+    "imageUrl8" TEXT,
+    "imageUrl9" TEXT,
+    "imageUrl10" TEXT,
+    "image1366Url1" TEXT,
+    "image1366Url2" TEXT,
+    "image1366Url3" TEXT,
+    "image1366Url4" TEXT,
+    "image1366Url5" TEXT,
+    "image1366Url6" TEXT,
+    "image1366Url7" TEXT,
+    "image1366Url8" TEXT,
+    "image1366Url9" TEXT,
+    "image1366Url10" TEXT,
+    "mainImageUrl" TEXT,
+    "lastImportedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "MarketplaceListing_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX "MarketplaceListing_accountId_marketplace_sellerSkuId_key" ON "MarketplaceListing"("accountId", "marketplace", "sellerSkuId");
+CREATE INDEX "MarketplaceListing_accountId_marketplace_idx" ON "MarketplaceListing"("accountId", "marketplace");
+CREATE INDEX "MarketplaceListing_accountId_marketplace_sku_idx" ON "MarketplaceListing"("accountId", "marketplace", "sku");
+CREATE INDEX "MarketplaceListing_accountId_marketplace_listingStatus_idx" ON "MarketplaceListing"("accountId", "marketplace", "listingStatus");
+CREATE INDEX "MarketplaceListing_accountId_marketplace_mainImageUrl_idx" ON "MarketplaceListing"("accountId", "marketplace", "mainImageUrl");
+CREATE INDEX "MarketplaceListing_lastImportedAt_idx" ON "MarketplaceListing"("lastImportedAt");
+ALTER TABLE "MarketplaceListing" ADD CONSTRAINT "MarketplaceListing_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE CASCADE ON UPDATE CASCADE;

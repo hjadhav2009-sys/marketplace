@@ -82,11 +82,16 @@ export function dedupeFlipkartOrderRows(orders: FlipkartOrderLine[]): FlipkartOr
 export function flipkartOrderMappingIssue(
   order: FlipkartOrderLine,
   mapping: {
-    hasActiveImageMapping: boolean;
-    listingFoundWithMissingImage: boolean;
+    listingFound?: boolean;
+    hasMainImage?: boolean;
+    hasActiveImageMapping?: boolean;
+    listingFoundWithMissingImage?: boolean;
   }
 ): FlipkartParseIssue | null {
-  if (mapping.hasActiveImageMapping) {
+  const hasImage = mapping.hasMainImage ?? mapping.hasActiveImageMapping;
+  const listingFound = mapping.listingFound ?? (hasImage || Boolean(mapping.listingFoundWithMissingImage));
+
+  if (hasImage) {
     return null;
   }
 
@@ -96,7 +101,7 @@ export function flipkartOrderMappingIssue(
     return null;
   }
 
-  if (mapping.listingFoundWithMissingImage) {
+  if (listingFound) {
     return {
       rowNumber: order.rowNumber,
       issueType: FLIPKART_LISTING_IMAGE_MISSING,

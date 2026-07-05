@@ -34,7 +34,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
     notFound();
   }
 
-  const { order, mapping } = result;
+  const { order, mapping, listing } = result;
   const shipmentItems = result.shipmentItems;
   const displayScanId = order.trackingId ?? order.awb;
   const scanLabel = order.trackingId ? "Tracking ID" : "AWB";
@@ -42,6 +42,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   const canReportProblem = order.packStatus === "READY";
   const openProblem = order.problemOrders[0];
   const imageUrl = mapping?.cachedImageUrl ?? null;
+  const listingTitle = mapping?.productName ?? listing?.productTitle ?? listing?.liveTitle ?? order.productDescription ?? "Product details not mapped";
   const canCacheImage = user.role === "OWNER" && mapping?.id && mapping.imageUrl && mapping.cacheStatus !== "CACHED";
 
   return (
@@ -86,7 +87,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
         <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
           <ProductImage
             src={imageUrl}
-            alt={`${mapping?.productName ?? order.productDescription ?? "Product"} ${order.sku}`}
+            alt={`${listingTitle} ${order.sku}`}
             size="lg"
             mappingId={mapping?.id}
             showDebug={user.role === "OWNER"}
@@ -96,7 +97,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
           />
           <div className="p-4">
             <p className="line-clamp-2 text-base font-semibold text-slate-700">
-              {mapping?.productName ?? order.productDescription ?? "Product details not mapped"}
+              {listingTitle}
             </p>
             {!imageUrl && user.role !== "OWNER" ? (
               <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">Image not prepared.</p>
@@ -140,7 +141,19 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-sm font-medium text-slate-500">FSN</dt>
-                <dd className="mt-1 break-words font-semibold text-slate-950">{order.fsn ?? "Not mapped"}</dd>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{order.fsn ?? listing?.fsn ?? "Not mapped"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">Listing ID</dt>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{listing?.listingId ?? "Not mapped"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">Category</dt>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{listing?.liveCategory ?? listing?.subCategory ?? "Not mapped"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">Brand</dt>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{listing?.liveBrand ?? "Not mapped"}</dd>
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-sm font-medium text-slate-500">Tracking ID</dt>
@@ -189,6 +202,14 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
                 </dd>
               </div>
             </dl>
+            {listing?.productHighlights || listing?.allSpecifications || listing?.description ? (
+              <div className="mt-4 rounded-md bg-slate-50 p-3">
+                <p className="text-sm font-semibold text-slate-500">Listing details</p>
+                <p className="mt-1 line-clamp-4 text-sm leading-6 text-slate-700">
+                  {listing.productHighlights ?? listing.allSpecifications ?? listing.description}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {shipmentItems.length > 1 ? (

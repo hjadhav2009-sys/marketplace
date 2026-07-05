@@ -141,6 +141,7 @@ model Account {
   active           Boolean           @default(true)
   users            User[]
   skuImageMappings SkuImageMapping[]
+  marketplaceListings MarketplaceListing[]
   uploadBatches    UploadBatch[]
   orders           Order[]
   scanLogs         ScanLog[]
@@ -150,6 +151,67 @@ model Account {
   updatedAt        DateTime          @updatedAt
 
   @@index([active])
+}
+
+model MarketplaceListing {
+  id                        String   @id @default(cuid())
+  accountId                 String
+  account                   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  marketplace               String
+  sellerSkuId               String
+  sku                       String
+  productTitle              String?
+  subCategory               String?
+  fsn                       String?
+  listingId                 String?
+  listingStatus             String?
+  mrp                       Float?
+  sellingPrice              Float?
+  liveTitle                 String?
+  liveBrand                 String?
+  liveCategory              String?
+  livePrice                 Float?
+  liveMrp                   Float?
+  rating                    Float?
+  reviewCount               Int?
+  productHighlights         String?
+  description               String?
+  allSpecifications         String?
+  generatedDirectProductUrl String?
+  canonicalProductUrl       String?
+  scrapeStatus              String?
+  scrapeError               String?
+  imageUrl1                 String?
+  imageUrl2                 String?
+  imageUrl3                 String?
+  imageUrl4                 String?
+  imageUrl5                 String?
+  imageUrl6                 String?
+  imageUrl7                 String?
+  imageUrl8                 String?
+  imageUrl9                 String?
+  imageUrl10                String?
+  image1366Url1             String?
+  image1366Url2             String?
+  image1366Url3             String?
+  image1366Url4             String?
+  image1366Url5             String?
+  image1366Url6             String?
+  image1366Url7             String?
+  image1366Url8             String?
+  image1366Url9             String?
+  image1366Url10            String?
+  mainImageUrl              String?
+  lastImportedAt            DateTime?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@unique([accountId, marketplace, sellerSkuId])
+  @@index([accountId, marketplace])
+  @@index([accountId, marketplace, sku])
+  @@index([accountId, marketplace, listingStatus])
+  @@index([accountId, marketplace, mainImageUrl])
+  @@index([lastImportedAt])
 }
 
 model SkuImageMapping {

@@ -262,6 +262,21 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         !heldRows.some((row) => row.id === issue.id) &&
         !missingMappingRows.some((row) => row.id === issue.id)
     );
+    const orderSkus = Array.from(new Set(batch.orders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
+    const reviewListings = await prisma.marketplaceListing.findMany({
+      where: {
+        accountId: account.id,
+        marketplace: "FLIPKART",
+        sku: { in: orderSkus }
+      },
+      select: {
+        sku: true,
+        productTitle: true,
+        liveTitle: true,
+        mainImageUrl: true
+      }
+    });
+    const reviewListingBySku = new Map(reviewListings.map((listing) => [normalizeSkuForMatching(listing.sku), listing]));
     const validRows = notes.importableRows ?? batch.createdRows + batch.updatedRows + batch.duplicateRows;
     const issueTable = (rows: typeof issueRows, emptyTitle: string, emptyDescription: string) =>
       rows.length > 0 ? (
@@ -357,7 +372,12 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             <div className="divide-y divide-slate-100">
               {batch.orders.map((order) => (
                 <div key={order.id} className="grid gap-3 px-4 py-4 md:grid-cols-[auto_1fr] md:items-center">
-                  <ProductImage src={order.imageUrl} alt={`${order.sku} product image`} size="sm" showBadge={false} />
+                  <ProductImage
+                    src={reviewListingBySku.get(normalizeSkuForMatching(order.sku))?.mainImageUrl ?? order.imageUrl}
+                    alt={`${order.sku} product image`}
+                    size="sm"
+                    showBadge={false}
+                  />
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">SKU</p>
@@ -365,7 +385,12 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product</p>
-                      <p className="break-words text-sm text-slate-700">{order.productDescription ?? "-"}</p>
+                      <p className="break-words text-sm text-slate-700">
+                        {reviewListingBySku.get(normalizeSkuForMatching(order.sku))?.productTitle ??
+                          reviewListingBySku.get(normalizeSkuForMatching(order.sku))?.liveTitle ??
+                          order.productDescription ??
+                          "-"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tracking ID</p>

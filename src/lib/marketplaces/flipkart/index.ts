@@ -13,6 +13,8 @@ export {
   chooseFlipkartListingImageUrl,
   flipkartInternalOrderKey,
   flipkartOrderDuplicateKey,
+  getFlipkartListing1366ImageUrls,
+  getFlipkartListingImageUrls,
   parseFlipkartCsvText,
   parseFlipkartFile,
   parseFlipkartListingRows,
@@ -31,3 +33,13 @@ export {
   type FlipkartIssueRawContext,
   type FlipkartOrderDedupeResult
 } from "./review";
+export {
+  flipkartListingIsInactive,
+  flipkartListingMasterData,
+  planFlipkartListingMasterImport,
+  sameFlipkartListingMaster,
+  selectFlipkartListingImagesForOrderSkus,
+  type FlipkartListingMasterComparable,
+  type FlipkartListingMasterData,
+  type FlipkartListingMasterImportPlan
+} from "./listing-master";

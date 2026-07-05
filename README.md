@@ -74,19 +74,25 @@ MEESHO
 
 ## Flipkart Importer
 
-`src/lib/marketplaces/flipkart/parser.ts` parses sanitized Flipkart Order Excel and Listing Excel rows into the shared marketplace model. Owner uploads now include Flipkart Orders, and SKU image/listing imports include Flipkart Listings. Tracking ID is stored separately from the internal unique key so packing can search the scanned Flipkart label barcode.
+`src/lib/marketplaces/flipkart/parser.ts` parses sanitized Flipkart Order Excel and Listing Excel rows into the shared marketplace model. Owner uploads include daily Flipkart Orders, and SKU image/listing imports update the permanent Flipkart Listing Master. Tracking ID is stored separately from the internal unique key so packing can search the scanned Flipkart label barcode.
+
+Flipkart Listing Excel can contain 30,000+ products. Do not import it every day. Import/update it only when new listings are added or product title, image, price, listing status, or scraped product data changes.
 
 ### Import Flipkart Listings
 
 Open `Owner -> SKU Images / Listings -> Flipkart Listings` and upload a sanitized Flipkart Listing `.xlsx` export.
 
-The importer matches `Seller SKU Id` to order `SKU`. Product images use this priority: `Image 1 1366 URL`, `Image URL 1`, `Image 2 1366 URL`, `Image URL 2`, and so on. `Generated Direct Product URL` is stored as a product page URL only; it is not treated as an image.
+The importer upserts `MarketplaceListing` rows by `accountId + marketplace + Seller SKU Id`. Product images use this priority: `Image 1 1366 URL`, `Image URL 1`, `Image 2 1366 URL`, `Image URL 2`, and so on. `Generated Direct Product URL` is stored as a product page URL only; it is not treated as an image.
+
+Listing Master stores product/listing fields such as title, FSN, listing ID, status, prices, category, scraped title/brand/category, highlights, description, specifications, all image URLs, selected main image URL, scrape status, and scrape error. It reports created, updated, unchanged, missing image, and inactive listing counts.
 
 ### Import Flipkart Orders
 
 Open `Owner -> Upload -> Flipkart Orders` and upload a sanitized Flipkart Order `.xlsx` export.
 
-Duplicate safety uses `ORDER ITEM ID` first. If it is missing, the importer falls back to `Shipment ID + SKU`. Rows missing both `ORDER ITEM ID` and `Shipment ID` are held for review and are not imported automatically.
+Daily workers should upload only the Flipkart Order Excel. Order SKU matches Listing Master `Seller SKU Id`. Duplicate safety uses `ORDER ITEM ID` first. If it is missing, the importer falls back to `Shipment ID + SKU`. Rows missing both `ORDER ITEM ID` and `Shipment ID` are held for review and are not imported automatically.
+
+Orders store order-specific fields only: marketplace, shipment/order item/tracking IDs, SKU, FSN, order product title when present, quantity, city/state when present, and pick/pack/problem state. Full listing descriptions, specifications, and all image URLs stay in Listing Master.
 
 ### Review Missing Mappings
 
@@ -101,11 +107,17 @@ Listing found but image missing for SKU: <sku>
 
 The review page can download CSVs for missing listing mappings and missing image mappings.
 
+### Image Cache Scope
+
+Do not cache all Listing Master images. When preparing product images for a daily Flipkart order batch, the app collects unique SKUs from that order batch, finds matching Listing Master rows, creates/updates small `SkuImageMapping` cache records only for those SKUs, and caches only those needed images.
+
 ### Tracking ID Scan
 
 Packing scans use Flipkart `Tracking ID` / AWB from the label barcode, for example fake fixture values like `FMPC0000000001`.
 
 If multiple ready SKUs share one Tracking ID, the packing result page shows the ready shipment items together. Confirm packed marks ready items for that Tracking ID as packed. Already packed items are skipped, and problem items stay in problem status.
+
+Picker and packer screens join order SKU to Listing Master so workers see the listing image, title, SKU, quantity, FSN, listing ID, category, brand, and useful listing details when available.
 
 ### Fake Fixtures
 

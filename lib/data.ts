@@ -8,6 +8,78 @@ import { prisma } from "./prisma";
 import { normalizeSkuMappingImageFilter } from "./product-image";
 import { normalizeSkuForMatching } from "./sku";
 
+type DisplayListing = {
+  sku: string;
+  sellerSkuId: string;
+  productTitle: string | null;
+  liveTitle: string | null;
+  liveBrand: string | null;
+  liveCategory: string | null;
+  subCategory: string | null;
+  fsn: string | null;
+  listingId: string | null;
+  productHighlights: string | null;
+  description: string | null;
+  allSpecifications: string | null;
+  mainImageUrl: string | null;
+};
+
+type DisplayImageMapping = {
+  id?: string;
+  accountId?: string;
+  sku: string;
+  imageUrl: string | null;
+  productName?: string | null;
+  color?: string | null;
+  size?: string | null;
+  imageHealth?: string | null;
+  cacheStatus?: string | null;
+  cacheFilePath?: string | null;
+  cacheOriginalImageUrl?: string | null;
+  cacheCachedAt?: Date | null;
+};
+
+function listingDisplayName(listing: DisplayListing | null | undefined) {
+  return listing?.productTitle ?? listing?.liveTitle ?? null;
+}
+
+function listingDisplayCategory(listing: DisplayListing | null | undefined) {
+  return listing?.liveCategory ?? listing?.subCategory ?? null;
+}
+
+function displayImageUrl(mapping: DisplayImageMapping | null | undefined, listing: DisplayListing | null | undefined) {
+  return (mapping ? cachedProductImageUrl(mapping) : null) ?? listing?.mainImageUrl ?? mapping?.imageUrl ?? null;
+}
+
+function mergeDisplayMappings(input: {
+  skus: string[];
+  mappings: DisplayImageMapping[];
+  listings: DisplayListing[];
+}) {
+  const mappingBySku = new Map(input.mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
+  const listingBySku = new Map(input.listings.map((listing) => [normalizeSkuForMatching(listing.sku), listing]));
+
+  return input.skus.map((sku) => {
+    const normalizedSku = normalizeSkuForMatching(sku);
+    const mapping = mappingBySku.get(normalizedSku) ?? null;
+    const listing = listingBySku.get(normalizedSku) ?? null;
+    const imageUrl = displayImageUrl(mapping, listing);
+
+    return {
+      id: mapping?.id,
+      sku,
+      imageUrl: listing?.mainImageUrl ?? mapping?.imageUrl ?? null,
+      cachedImageUrl: imageUrl,
+      productName: listingDisplayName(listing) ?? mapping?.productName ?? null,
+      color: mapping?.color ?? null,
+      size: mapping?.size ?? null,
+      imageHealth: mapping?.imageHealth ?? null,
+      cacheStatus: mapping?.cacheStatus ?? (listing?.mainImageUrl ? "NOT_CACHED" : null),
+      listing
+    };
+  });
+}
+
 export async function getDashboardStats(accountId: string) {
   const [readyOrders, packedOrders, problemOrders, skuMappings, batches] = await Promise.all([
     prisma.order.count({ where: { accountId, packStatus: "READY" } }),
@@ -146,41 +218,66 @@ export async function getSkuGroups(
   );
   const orderSkus = Array.from(new Set(orders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
 
-  const mappings = await withDevTiming("picker image mappings", () =>
-    prisma.skuImageMapping.findMany({
-      where: {
-        accountId,
-        sku: {
-          in: orderSkus
+  const [mappings, listings] = await Promise.all([
+    withDevTiming("picker image mappings", () =>
+      prisma.skuImageMapping.findMany({
+        where: {
+          accountId,
+          sku: {
+            in: orderSkus
+          },
+          active: true
         },
-        active: true
-      },
-      select: {
-        id: true,
-        sku: true,
-        imageUrl: true,
-        productName: true,
-        color: true,
-        size: true,
-        imageHealth: true,
-        cacheStatus: true,
-        cacheFilePath: true,
-        cacheOriginalImageUrl: true,
-        cacheCachedAt: true
-      }
-    }),
-    800
-  );
+        select: {
+          id: true,
+          accountId: true,
+          sku: true,
+          imageUrl: true,
+          productName: true,
+          color: true,
+          size: true,
+          imageHealth: true,
+          cacheStatus: true,
+          cacheFilePath: true,
+          cacheOriginalImageUrl: true,
+          cacheCachedAt: true
+        }
+      }),
+      800
+    ),
+    withDevTiming("picker listing master", () =>
+      prisma.marketplaceListing.findMany({
+        where: {
+          accountId,
+          marketplace: "FLIPKART",
+          sku: {
+            in: orderSkus
+          }
+        },
+        select: {
+          sku: true,
+          sellerSkuId: true,
+          productTitle: true,
+          liveTitle: true,
+          liveBrand: true,
+          liveCategory: true,
+          subCategory: true,
+          fsn: true,
+          listingId: true,
+          productHighlights: true,
+          description: true,
+          allSpecifications: true,
+          mainImageUrl: true
+        }
+      }),
+      800
+    )
+  ]);
+  const displayMappings = mergeDisplayMappings({ skus: orderSkus, mappings, listings });
 
   return paginatePickerSkuGroups(
     filterPickerSkuGroups(
-      buildPickerSkuGroups(
-        orders,
-        mappings.map((mapping) => ({
-          ...mapping,
-          cachedImageUrl: cachedProductImageUrl(mapping)
-        }))
-      ),
+      buildPickerSkuGroups(orders, displayMappings),
       options
     ),
     options
@@ -195,7 +292,7 @@ export async function getSkuDetail(
   const color = decodePickerDimension(options.color);
   const size = decodePickerDimension(options.size);
   const normalizedSku = normalizeSkuForMatching(sku);
-  const [orders, mapping] = await Promise.all([
+  const [orders, mapping, listing] = await Promise.all([
     prisma.order.findMany({
       where: {
         accountId,
@@ -235,6 +332,7 @@ export async function getSkuDetail(
       },
       select: {
         id: true,
+        accountId: true,
         sku: true,
         imageUrl: true,
         productName: true,
@@ -247,6 +345,28 @@ export async function getSkuDetail(
         cacheCachedAt: true
       },
       orderBy: { updatedAt: "desc" }
+    }),
+    prisma.marketplaceListing.findFirst({
+      where: {
+        accountId,
+        marketplace: "FLIPKART",
+        sku: { in: Array.from(new Set([sku, normalizedSku].filter(Boolean))) }
+      },
+      select: {
+        sku: true,
+        sellerSkuId: true,
+        productTitle: true,
+        liveTitle: true,
+        liveBrand: true,
+        liveCategory: true,
+        subCategory: true,
+        fsn: true,
+        listingId: true,
+        productHighlights: true,
+        description: true,
+        allSpecifications: true,
+        mainImageUrl: true
+      }
     })
   ]);
 
@@ -258,12 +378,12 @@ export async function getSkuDetail(
 
   return {
     orders,
-    mapping: mapping
-      ? {
-          ...mapping,
-          cachedImageUrl: cachedProductImageUrl(mapping)
-        }
-      : null,
+    mapping: mergeDisplayMappings({
+      skus: [sku],
+      mappings: mapping ? [mapping] : [],
+      listings: listing ? [listing] : []
+    })[0] ?? null,
+    listing,
     totalQuantity: orders.reduce((sum, order) => sum + order.qty, 0),
     pickedCount: orders.filter((order) => order.pickStatus === "PICKED").length,
     pendingCount: orders.filter((order) => order.pickStatus === "READY").length,
@@ -417,32 +537,65 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
       limit
     });
     const matchSkus = Array.from(new Set(matches.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
-    const mappings =
+    const [mappings, listings] =
       matchSkus.length > 0
-        ? await prisma.skuImageMapping.findMany({
-            where: {
-              accountId,
-              sku: { in: matchSkus },
-              active: true
-            },
-            select: {
-              accountId: true,
-              sku: true,
-              imageUrl: true,
-              cacheStatus: true,
-              cacheFilePath: true,
-              cacheOriginalImageUrl: true,
-              cacheCachedAt: true
-            }
-          })
-        : [];
-    const imageBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), cachedProductImageUrl(mapping)]));
+        ? await Promise.all([
+            prisma.skuImageMapping.findMany({
+              where: {
+                accountId,
+                sku: { in: matchSkus },
+                active: true
+              },
+              select: {
+                accountId: true,
+                sku: true,
+                imageUrl: true,
+                cacheStatus: true,
+                cacheFilePath: true,
+                cacheOriginalImageUrl: true,
+                cacheCachedAt: true
+              }
+            }),
+            prisma.marketplaceListing.findMany({
+              where: {
+                accountId,
+                marketplace: "FLIPKART",
+                sku: { in: matchSkus }
+              },
+              select: {
+                sku: true,
+                sellerSkuId: true,
+                productTitle: true,
+                liveTitle: true,
+                liveBrand: true,
+                liveCategory: true,
+                subCategory: true,
+                fsn: true,
+                listingId: true,
+                productHighlights: true,
+                description: true,
+                allSpecifications: true,
+                mainImageUrl: true
+              }
+            })
+          ])
+        : [[], []];
+    const listingBySku = new Map(listings.map((listing) => [normalizeSkuForMatching(listing.sku), listing]));
+    const imageBySku = new Map(
+      mappings.map((mapping) => {
+        const listing = listingBySku.get(normalizeSkuForMatching(mapping.sku));
+        return [normalizeSkuForMatching(mapping.sku), displayImageUrl(mapping, listing)];
+      })
+    );
     const cacheStatusBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping.cacheStatus]));
 
     return matches.map((order) => ({
       ...order,
-      cachedImageUrl: imageBySku.get(normalizeSkuForMatching(order.sku)) ?? null,
-      cacheStatus: cacheStatusBySku.get(normalizeSkuForMatching(order.sku)) ?? null
+      cachedImageUrl: imageBySku.get(normalizeSkuForMatching(order.sku)) ?? listingBySku.get(normalizeSkuForMatching(order.sku))?.mainImageUrl ?? null,
+      cacheStatus: cacheStatusBySku.get(normalizeSkuForMatching(order.sku)) ?? null,
+      listingTitle: listingDisplayName(listingBySku.get(normalizeSkuForMatching(order.sku))) ?? null,
+      listingId: listingBySku.get(normalizeSkuForMatching(order.sku))?.listingId ?? null,
+      listingCategory: listingDisplayCategory(listingBySku.get(normalizeSkuForMatching(order.sku))) ?? null
     }));
   }, 500);
 }
@@ -515,28 +668,53 @@ export async function getOrderWithImage(accountId: string, awb: string) {
     return null;
   }
 
-  const mapping = await prisma.skuImageMapping.findFirst({
-    where: {
-      accountId,
-      active: true,
-      sku: { in: Array.from(new Set([order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))) }
-    },
-    select: {
-      id: true,
-      accountId: true,
-      sku: true,
-      imageUrl: true,
-      productName: true,
-      color: true,
-      size: true,
-      imageHealth: true,
-      cacheStatus: true,
-      cacheFilePath: true,
-      cacheOriginalImageUrl: true,
-      cacheCachedAt: true
-    },
-    orderBy: { updatedAt: "desc" }
-  });
+  const skuValues = Array.from(new Set([order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean)));
+  const [mapping, listing] = await Promise.all([
+    prisma.skuImageMapping.findFirst({
+      where: {
+        accountId,
+        active: true,
+        sku: { in: skuValues }
+      },
+      select: {
+        id: true,
+        accountId: true,
+        sku: true,
+        imageUrl: true,
+        productName: true,
+        color: true,
+        size: true,
+        imageHealth: true,
+        cacheStatus: true,
+        cacheFilePath: true,
+        cacheOriginalImageUrl: true,
+        cacheCachedAt: true
+      },
+      orderBy: { updatedAt: "desc" }
+    }),
+    prisma.marketplaceListing.findFirst({
+      where: {
+        accountId,
+        marketplace: "FLIPKART",
+        sku: { in: skuValues }
+      },
+      select: {
+        sku: true,
+        sellerSkuId: true,
+        productTitle: true,
+        liveTitle: true,
+        liveBrand: true,
+        liveCategory: true,
+        subCategory: true,
+        fsn: true,
+        listingId: true,
+        productHighlights: true,
+        description: true,
+        allSpecifications: true,
+        mainImageUrl: true
+      }
+    })
+  ]);
 
   return {
     order,
@@ -563,12 +741,12 @@ export async function getOrderWithImage(accountId: string, awb: string) {
             orderBy: { sku: "asc" }
           })
         : [],
-    mapping: mapping
-      ? {
-          ...mapping,
-          cachedImageUrl: cachedProductImageUrl(mapping)
-        }
-      : null
+    mapping: mergeDisplayMappings({
+      skus: [order.sku],
+      mappings: mapping ? [mapping] : [],
+      listings: listing ? [listing] : []
+    })[0] ?? null,
+    listing
   };
 }
 

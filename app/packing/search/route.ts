@@ -27,6 +27,9 @@ export async function GET(request: Request) {
       qty: order.qty,
       courier: order.courier,
       packStatus: order.packStatus,
+      listingTitle: order.listingTitle,
+      listingId: order.listingId,
+      listingCategory: order.listingCategory,
       matchType: order.matchType,
       matchedField: order.matchedField
     }))

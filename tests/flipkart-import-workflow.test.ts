@@ -8,9 +8,12 @@ import { normalizeSkuForMatching } from "../lib/sku";
 import {
   dedupeFlipkartOrderRows,
   flipkartInternalOrderKey,
+  flipkartListingMasterData,
   flipkartOrderMappingIssue,
   parseFlipkartListingRows,
-  parseFlipkartOrderRows
+  parseFlipkartOrderRows,
+  planFlipkartListingMasterImport,
+  selectFlipkartListingImagesForOrderSkus
 } from "../src/lib/marketplaces/flipkart";
 
 const fixtureDir = join(process.cwd(), "tests", "fixtures", "flipkart");
@@ -37,6 +40,11 @@ assert.equal(orderResult.issues.length, 1, "Fake order XLSX holds the row missin
 assert.equal(orderResult.issues[0]?.issueType, "MISSING_FLIPKART_DUPLICATE_KEY", "Missing required key creates held issue");
 assert.equal(listingResult.listings.length, 4, "Fake listing XLSX parses listing rows");
 assert.equal(listingResult.issues.length, 0, "Fake listing XLSX has no missing Seller SKU rows");
+assert.equal(
+  parseFlipkartListingRows([{ "Product Title": "No Seller SKU", "Image URL 1": "https://example.invalid/no-sku.jpg" }]).issues[0]?.issueType,
+  "MISSING_SELLER_SKU_ID",
+  "Missing Seller SKU Id creates issue"
+);
 
 assert.equal(deduped.importableOrders.length, 4, "Duplicate ORDER ITEM ID row is skipped from importable rows");
 assert.equal(deduped.duplicateIssues.length, 1, "Duplicate ORDER ITEM ID is detected");
@@ -54,23 +62,48 @@ const listingBySku = new Map(listingResult.listings.map((listing) => [normalizeS
 const sku1Listing = listingBySku.get("FK-SKU-1");
 const sku4Listing = listingBySku.get("FK-SKU-4");
 assert.equal(sku1Listing?.sellerSkuId, "FK-SKU-1", "SKU joins to listing Seller SKU Id");
-assert.equal(sku1Listing?.imageUrl, "https://example.invalid/images/fk-sku-1-large.jpg", "Listing image priority uses Image 1 1366 URL first");
+assert.equal(sku1Listing?.mainImageUrl, "https://example.invalid/images/fk-sku-1-large.jpg", "Listing mainImageUrl follows image priority");
 assert.equal(sku4Listing?.imageUrl, undefined, "Fixture includes a listing row with no image URL");
+const sku1Master = sku1Listing ? flipkartListingMasterData(sku1Listing) : null;
+assert.equal(sku1Master?.mainImageUrl, "https://example.invalid/images/fk-sku-1-large.jpg", "Listing master stores selected main image URL");
+assert.equal(sku1Master?.image1366Url1, "https://example.invalid/images/fk-sku-1-large.jpg", "Listing master stores 1366 image columns");
+assert.equal(sku1Master?.imageUrl1, "https://example.invalid/images/fk-sku-1-small.jpg", "Listing master stores normal image columns");
+
+if (!sku1Master) {
+  throw new Error("Expected FK-SKU-1 listing master data");
+}
+
+const listingPlanCreate = planFlipkartListingMasterImport([], [{ sellerSkuId: sku1Master.sellerSkuId, sku: sku1Master.sku, data: sku1Master }]);
+assert.equal(listingPlanCreate.created.length, 1, "Listing import creates new SKU");
+const listingPlanUnchanged = planFlipkartListingMasterImport([sku1Master], [{ sellerSkuId: sku1Master.sellerSkuId, sku: sku1Master.sku, data: sku1Master }]);
+assert.equal(listingPlanUnchanged.unchanged.length, 1, "Listing import counts unchanged row");
+const oldSku1Master = { ...sku1Master, productTitle: "Old Fake Title" };
+const listingPlanUpdate = planFlipkartListingMasterImport([oldSku1Master], [{ sellerSkuId: sku1Master.sellerSkuId, sku: sku1Master.sku, data: sku1Master }]);
+assert.equal(listingPlanUpdate.updated.length, 1, "Listing import updates existing SKU");
+
+const selectedCacheListings = selectFlipkartListingImagesForOrderSkus(
+  listingResult.listings.map((listing) => flipkartListingMasterData(listing)),
+  ["FK-SKU-1", "FK-SKU-2", "FK-SKU-4"]
+);
+assert.deepEqual(
+  selectedCacheListings.map((listing) => listing.sku).sort(),
+  ["FK-SKU-1", "FK-SKU-2"],
+  "Only today's order SKUs with images are selected for image cache"
+);
 
 const activeImageMappingSkus = new Set(listingResult.listings.filter((listing) => listing.imageUrl).map((listing) => normalizeSkuForMatching(listing.sku)));
-const listingMissingImageSkus = new Set(listingResult.listings.filter((listing) => !listing.imageUrl).map((listing) => normalizeSkuForMatching(listing.sku)));
 const sku3Order = deduped.importableOrders.find((order) => order.sku === "FK-SKU-3");
 const sku4Order = deduped.importableOrders.find((order) => order.sku === "FK-SKU-4");
 const missingListingIssue = sku3Order
   ? flipkartOrderMappingIssue(sku3Order, {
-      hasActiveImageMapping: activeImageMappingSkus.has(normalizeSkuForMatching(sku3Order.sku)),
-      listingFoundWithMissingImage: listingMissingImageSkus.has(normalizeSkuForMatching(sku3Order.sku))
+      listingFound: listingBySku.has(normalizeSkuForMatching(sku3Order.sku)),
+      hasMainImage: activeImageMappingSkus.has(normalizeSkuForMatching(sku3Order.sku))
     })
   : null;
 const missingImageIssue = sku4Order
   ? flipkartOrderMappingIssue(sku4Order, {
-      hasActiveImageMapping: activeImageMappingSkus.has(normalizeSkuForMatching(sku4Order.sku)),
-      listingFoundWithMissingImage: listingMissingImageSkus.has(normalizeSkuForMatching(sku4Order.sku))
+      listingFound: listingBySku.has(normalizeSkuForMatching(sku4Order.sku)),
+      hasMainImage: activeImageMappingSkus.has(normalizeSkuForMatching(sku4Order.sku))
     })
   : null;
 
@@ -103,6 +136,11 @@ assert.deepEqual(
   ["TRACKING_ID", "TRACKING_ID"],
   "Tracking ID search marks the matched field"
 );
+const trackingMatchesWithListings = trackingMatches.map((match) => ({
+  ...match,
+  listing: listingBySku.get(normalizeSkuForMatching(match.sku))
+}));
+assert.equal(trackingMatchesWithListings[0]?.listing?.productTitle?.startsWith("Fake Flipkart Product"), true, "Tracking ID scan returns order data plus listing data");
 
 const packingTarget: ConfirmPackedScopeOrder = {
   id: "ready-1",

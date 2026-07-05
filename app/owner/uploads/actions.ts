@@ -1082,7 +1082,8 @@ export async function prepareBatchProductImagesAction(formData: FormData) {
     include: {
       orders: {
         select: {
-          sku: true
+          sku: true,
+          marketplace: true
         }
       }
     }
@@ -1093,6 +1094,85 @@ export async function prepareBatchProductImagesAction(formData: FormData) {
   }
 
   const batchSkus = Array.from(new Set(batch.orders.map((order) => normalizeSkuForMatching(order.sku)).filter(Boolean)));
+  const hasFlipkartOrders = batch.orders.some((order) => order.marketplace === "FLIPKART");
+  const now = new Date();
+
+  if (hasFlipkartOrders && batchSkus.length > 0) {
+    const [listingImages, existingMappings] = await Promise.all([
+      prisma.marketplaceListing.findMany({
+        where: {
+          accountId: account.id,
+          marketplace: "FLIPKART",
+          sku: { in: batchSkus }
+        },
+        select: {
+          sku: true,
+          productTitle: true,
+          liveTitle: true,
+          mainImageUrl: true
+        }
+      }),
+      prisma.skuImageMapping.findMany({
+        where: {
+          accountId: account.id,
+          sku: { in: batchSkus }
+        },
+        select: {
+          id: true,
+          sku: true,
+          imageUrl: true,
+          productName: true,
+          cacheStatus: true
+        }
+      })
+    ]);
+    const existingMappingBySku = new Map(existingMappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
+
+    for (const listing of listingImages) {
+      const sku = normalizeSkuForMatching(listing.sku);
+
+      if (!sku || !listing.mainImageUrl) {
+        continue;
+      }
+
+      const existing = existingMappingBySku.get(sku);
+      const productName = listing.productTitle ?? listing.liveTitle ?? null;
+
+      if (!existing) {
+        await prisma.skuImageMapping.create({
+          data: {
+            accountId: account.id,
+            sku,
+            imageUrl: listing.mainImageUrl,
+            productName,
+            active: true,
+            source: "Flipkart Listing Master",
+            notes: JSON.stringify({ marketplace: "FLIPKART", listingMaster: true }),
+            lastImportedAt: now,
+            imageHealth: "UNKNOWN",
+            cacheStatus: "NOT_CACHED"
+          }
+        });
+      } else if (existing.imageUrl !== listing.mainImageUrl || existing.productName !== productName) {
+        await prisma.skuImageMapping.update({
+          where: { id: existing.id },
+          data: {
+            imageUrl: listing.mainImageUrl,
+            productName,
+            active: true,
+            source: "Flipkart Listing Master",
+            notes: JSON.stringify({ marketplace: "FLIPKART", listingMaster: true }),
+            lastImportedAt: now,
+            imageHealth: "UNKNOWN",
+            cacheStatus: "RECHECK_NEEDED",
+            cacheOriginalImageUrl: null,
+            cacheError: null
+          }
+        });
+      }
+    }
+  }
+
   const mappings =
     batchSkus.length > 0
       ? await prisma.skuImageMapping.findMany({
@@ -1114,7 +1194,6 @@ export async function prepareBatchProductImagesAction(formData: FormData) {
         })
       : [];
   const mappingBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping]));
-  const now = new Date();
   const queue: CacheQueueMapping[] = [];
   let alreadyCached = 0;
   let noMapping = 0;

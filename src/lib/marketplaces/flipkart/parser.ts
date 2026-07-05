@@ -73,11 +73,20 @@ export type FlipkartListingLine = {
   liveBrand?: string;
   liveCategory?: string;
   livePrice?: number;
+  liveMrp?: number;
   rating?: number;
   reviewCount?: number;
+  productHighlights?: string;
+  description?: string;
+  allSpecifications?: string;
   productUrl?: string;
+  generatedDirectProductUrl?: string;
   canonicalProductUrl?: string;
   scrapeStatus?: string;
+  scrapeError?: string;
+  imageUrls: Array<string | undefined>;
+  image1366Urls: Array<string | undefined>;
+  mainImageUrl?: string;
   imageUrl?: string;
   rawData: FlipkartRawRow;
 };
@@ -160,11 +169,16 @@ const listingColumns = {
   liveBrand: "Live Brand",
   liveCategory: "Live Category",
   livePrice: "Live Price",
+  liveMrp: "Live MRP",
   rating: "Rating",
   reviewCount: "Review Count",
+  productHighlights: "Product Highlights",
+  description: "Description",
+  allSpecifications: "All Specifications",
   productUrl: "Generated Direct Product URL",
   canonicalProductUrl: "Canonical Product URL",
-  scrapeStatus: "Scrape Status"
+  scrapeStatus: "Scrape Status",
+  scrapeError: "Scrape Error"
 } as const;
 
 function normalizeHeader(value: string) {
@@ -263,6 +277,14 @@ export function chooseFlipkartListingImageUrl(row: FlipkartRawRow) {
   }
 
   return undefined;
+}
+
+export function getFlipkartListingImageUrls(row: FlipkartRawRow) {
+  return Array.from({ length: 10 }, (_, index) => text(row, `Image URL ${index + 1}`));
+}
+
+export function getFlipkartListing1366ImageUrls(row: FlipkartRawRow) {
+  return Array.from({ length: 10 }, (_, index) => text(row, `Image ${index + 1} 1366 URL`));
 }
 
 export function parseFlipkartOrderRows(rows: FlipkartRawRow[], fileName = "flipkart-orders.xlsx"): FlipkartOrderParseResult {
@@ -364,6 +386,8 @@ export function parseFlipkartListingRows(rows: FlipkartRawRow[], fileName = "fli
       return;
     }
 
+    const mainImageUrl = chooseFlipkartListingImageUrl(row);
+
     listings.push({
       marketplace: "FLIPKART",
       rowNumber,
@@ -380,12 +404,21 @@ export function parseFlipkartListingRows(rows: FlipkartRawRow[], fileName = "fli
       liveBrand: text(row, listingColumns.liveBrand),
       liveCategory: text(row, listingColumns.liveCategory),
       livePrice: numberValue(row, listingColumns.livePrice),
+      liveMrp: numberValue(row, listingColumns.liveMrp),
       rating: numberValue(row, listingColumns.rating),
       reviewCount: integerValue(row, listingColumns.reviewCount),
+      productHighlights: text(row, listingColumns.productHighlights),
+      description: text(row, listingColumns.description),
+      allSpecifications: text(row, listingColumns.allSpecifications),
       productUrl: text(row, listingColumns.productUrl),
+      generatedDirectProductUrl: text(row, listingColumns.productUrl),
       canonicalProductUrl: text(row, listingColumns.canonicalProductUrl),
       scrapeStatus: text(row, listingColumns.scrapeStatus),
-      imageUrl: chooseFlipkartListingImageUrl(row),
+      scrapeError: text(row, listingColumns.scrapeError),
+      imageUrls: getFlipkartListingImageUrls(row),
+      image1366Urls: getFlipkartListing1366ImageUrls(row),
+      mainImageUrl,
+      imageUrl: mainImageUrl,
       rawData: row
     });
   });

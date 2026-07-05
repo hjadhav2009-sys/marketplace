@@ -78,6 +78,8 @@ MEESHO
 
 Flipkart Listing Excel can contain 30,000+ products. Do not import it every day. Import/update it only when new listings are added or product title, image, price, listing status, or scraped product data changes.
 
+For sanitized real-export testing, keep files local under `private-test-data/` or `local-test-data/`. These folders and `*.real.xlsx`, `*.real.csv`, `*.seller.xlsx`, and `*.seller.csv` are ignored by Git. Never commit private Flipkart files, customer names, addresses, phone numbers, invoices, labels, Tracking IDs, `.env`, Supabase URLs, passwords, or secrets.
+
 ### Import Flipkart Listings
 
 Open `Owner -> SKU Images / Listings -> Flipkart Listings` and upload a sanitized Flipkart Listing `.xlsx` export.
@@ -130,6 +132,18 @@ tests/fixtures/flipkart/
 They are safe for tests only and contain masked names, masked addresses, PIN `000000`, and fake `FMPC0000000000` style Tracking IDs. Never upload real Flipkart exports, order files, customer data, invoices, labels, phone numbers, addresses, Tracking IDs, passwords, Supabase URLs, or `.env` files to GitHub.
 
 The next development step is to run a manual import using a sanitized copy of a real Flipkart export and refine any column edge cases found in that masked file.
+
+### Real Export Dry Run
+
+Follow [docs/flipkart-real-test-guide.md](docs/flipkart-real-test-guide.md) before using real-like data.
+
+Run the database-free dry run before importing through the browser:
+
+```bash
+npm.cmd run flipkart:dry-run -- private-test-data/flipkart-order.real.xlsx private-test-data/flipkart-listing.real.xlsx
+```
+
+The dry run reports listing/order row counts, duplicate rows, held rows, missing SKU/listing/image counts, unique order SKUs, unique Tracking IDs, multi-item Tracking IDs, unknown headers, and missing expected headers.
 
 ## Preserved Foundation Notes
 

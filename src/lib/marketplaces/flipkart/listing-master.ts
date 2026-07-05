@@ -1,5 +1,8 @@
 import { normalizeSkuForMatching } from "@/lib/sku";
-import type { FlipkartListingLine } from "./parser";
+import type { FlipkartListingLine, FlipkartParseIssue } from "./parser";
+
+export const FLIPKART_LISTING_IMPORT_BATCH_SIZE = 500;
+export const FLIPKART_DUPLICATE_SELLER_SKU_ID = "DUPLICATE_SELLER_SKU_ID";
 
 export type FlipkartListingMasterData = {
   marketplace: string;
@@ -57,6 +60,11 @@ export type FlipkartListingMasterImportPlan<T extends { sellerSkuId: string; sku
   unchanged: T[];
 };
 
+export type FlipkartListingDedupeResult = {
+  importableListings: FlipkartListingLine[];
+  duplicateIssues: FlipkartParseIssue[];
+};
+
 function optionalText(value: string | null | undefined) {
   return value === undefined ? null : value;
 }
@@ -72,6 +80,47 @@ function imageValue(values: Array<string | undefined>, index: number) {
 export function flipkartListingIsInactive(listing: Pick<FlipkartListingLine, "listingStatus">) {
   const status = listing.listingStatus?.trim().toLowerCase();
   return Boolean(status && status !== "active");
+}
+
+export function chunkFlipkartListingRows<T>(rows: T[], batchSize = FLIPKART_LISTING_IMPORT_BATCH_SIZE) {
+  const safeBatchSize = Math.max(1, Math.floor(batchSize));
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < rows.length; index += safeBatchSize) {
+    chunks.push(rows.slice(index, index + safeBatchSize));
+  }
+
+  return chunks;
+}
+
+export function dedupeFlipkartListingRows(listings: FlipkartListingLine[]): FlipkartListingDedupeResult {
+  const seenSkus = new Set<string>();
+  const duplicateIssues: FlipkartParseIssue[] = [];
+  const importableListings = listings.filter((listing) => {
+    const sku = normalizeSkuForMatching(listing.sellerSkuId ?? listing.sku);
+
+    if (!sku) {
+      return false;
+    }
+
+    if (seenSkus.has(sku)) {
+      duplicateIssues.push({
+        rowNumber: listing.rowNumber,
+        issueType: FLIPKART_DUPLICATE_SELLER_SKU_ID,
+        message: `Duplicate Flipkart Seller SKU Id skipped for ${sku}.`,
+        rawData: listing.rawData
+      });
+      return false;
+    }
+
+    seenSkus.add(sku);
+    return true;
+  });
+
+  return {
+    importableListings,
+    duplicateIssues
+  };
 }
 
 export function flipkartListingMasterData(listing: FlipkartListingLine): FlipkartListingMasterData {

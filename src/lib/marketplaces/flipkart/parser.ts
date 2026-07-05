@@ -116,6 +116,12 @@ export type FlipkartParseResult = MarketplaceParseResult & {
   source: FlipkartParseInput["source"];
 };
 
+export type FlipkartHeaderDiagnostics = {
+  presentHeaders: string[];
+  missingExpectedHeaders: string[];
+  unknownHeaders: string[];
+};
+
 const placeholderWarning: MarketplaceParseWarning = {
   code: "FLIPKART_PARSER_PLACEHOLDER",
   message: "Flipkart PDF text extraction is not implemented yet. Use Flipkart .xlsx exports for imports."
@@ -181,15 +187,160 @@ const listingColumns = {
   scrapeError: "Scrape Error"
 } as const;
 
+export const flipkartOrderExpectedHeaders = [
+  "Ordered On",
+  "Shipment ID",
+  "ORDER ITEM ID",
+  "Order Id",
+  "FSN",
+  "SKU",
+  "Product",
+  "Quantity",
+  "Tracking ID"
+] as const;
+
+export const flipkartListingExpectedHeaders = [
+  "Product Title",
+  "Seller SKU Id",
+  "Flipkart Serial Number",
+  "Listing ID",
+  "Listing Status",
+  "Your Selling Price",
+  "Image URL 1",
+  "Image 1 1366 URL"
+] as const;
+
+const flipkartOrderKnownHeaders = [
+  "Ordered On",
+  "Shipment ID",
+  "ORDER ITEM ID",
+  "Order Id",
+  "HSN CODE",
+  "Order State",
+  "Order Type",
+  "FSN",
+  "SKU",
+  "Product",
+  "Invoice No.",
+  "CGST",
+  "IGST",
+  "SGST",
+  "Invoice Date (mm/dd/yy)",
+  "Invoice Amount",
+  "Selling Price Per Item",
+  "Shipping and Handling Charges",
+  "Quantity",
+  "Price inc. FKMP Contribution & Subsidy",
+  "Buyer name",
+  "Ship to name",
+  "Address Line 1",
+  "Address Line 2",
+  "City",
+  "State",
+  "PIN Code",
+  "Dispatch After date",
+  "Dispatch by date",
+  "Form requirement",
+  "Tracking ID",
+  "Package Length (cm)",
+  "Package Breadth (cm)",
+  "Package Height (cm)",
+  "Package Weight (kg)",
+  "Ready to Make",
+  "With Attachment"
+] as const;
+
+const flipkartListingKnownHeaders = [
+  "Product Title",
+  "Seller SKU Id",
+  "Processing errors (if any)",
+  "Sub-category",
+  "Flipkart Serial Number",
+  "Listing ID",
+  "Listing Status",
+  "Inactive Reason",
+  "MRP",
+  "Bank Settlement",
+  "Your Selling Price",
+  "Minimum Order Quantity",
+  "Benchmark Price",
+  "Fulfillment By",
+  "System Stock count",
+  "Your Stock Count",
+  "Recommended Stock",
+  "Procurement SLA",
+  "Procurement Type",
+  "Package Length - Length of the package in cms",
+  "Package Breadth - Breadth of the package in cms",
+  "Package Height - Height of the package in cms",
+  "Package Weight - Weight of the package in Kgs",
+  "Local Delivery Charge to Customer (per qty)",
+  "Zonal Delivery Charge to Customer (per qty)",
+  "National Delivery Charge to Customer (per qty)",
+  "Harmonized System Nomenclature - HSN",
+  "Tax Code",
+  "Luxury Cess Tax Rate",
+  "Country of Origin ISO code",
+  "Manufacturer Details",
+  "Importer Details",
+  "Packer Details",
+  "Date of Manufacture in dd/MM/yyyy",
+  "Shelf Life in Months",
+  "Ignore warnings",
+  "Listing Archival",
+  "SEO Slug",
+  "Generated Direct Product URL",
+  "Generated SEO Approx URL",
+  "Source Link Method",
+  "Live Title",
+  "Live Brand",
+  "Live Category",
+  "Live Price",
+  "Live MRP",
+  "Live Seller",
+  "Rating",
+  "Review Count",
+  "Product Highlights",
+  "Description",
+  "All Specifications",
+  "Canonical Product URL",
+  "Scrape Status",
+  "Scrape Error",
+  ...Array.from({ length: 10 }, (_, index) => `Image URL ${index + 1}`),
+  ...Array.from({ length: 10 }, (_, index) => `Image ${index + 1} 1366 URL`)
+] as const;
+
+const explicitHeaderAliases: Record<string, string[]> = {
+  orderitemid: ["Order Item ID", "ORDER ITEM ID"],
+  sellerskuid: ["Seller SKU ID", "Seller SKU Id"],
+  trackingid: ["Tracking Id", "Tracking ID"],
+  image11366url: ["Image 1 1366 Url", "Image 1 1366 URL"],
+  invoicedatemmddyy: ["Invoice Date (MM/DD/YY)", "Invoice Date (mm/dd/yy)"]
+};
+
+export function normalizeFlipkartHeader(value: string) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/^\uFEFF/, "")
+    .replace(/[\uFEFF\u200B-\u200F\u202A-\u202E]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function normalizeHeader(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalizeFlipkartHeader(value);
+}
+
+function headerAliases(header: string) {
+  const aliases = explicitHeaderAliases[normalizeHeader(header)] ?? [];
+  return Array.from(new Set([header, ...aliases]));
 }
 
 function rowValue(row: FlipkartRawRow, header: string) {
-  const wanted = normalizeHeader(header);
+  const wanted = new Set(headerAliases(header).map(normalizeHeader));
 
   for (const [key, value] of Object.entries(row)) {
-    if (normalizeHeader(key) === wanted) {
+    if (wanted.has(normalizeHeader(key))) {
       return value;
     }
   }
@@ -229,6 +380,47 @@ function isHttpUrl(value: string | undefined) {
   } catch {
     return false;
   }
+}
+
+function presentHeaderSet(rows: FlipkartRawRow[]) {
+  return new Map(
+    Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
+      .filter((header) => header.trim().length > 0)
+      .map((header) => [normalizeHeader(header), header])
+  );
+}
+
+function knownHeaderSet(kind: "orders" | "listings") {
+  const knownHeaders = kind === "orders" ? flipkartOrderKnownHeaders : flipkartListingKnownHeaders;
+  const known = new Set<string>();
+
+  for (const header of knownHeaders) {
+    for (const alias of headerAliases(header)) {
+      known.add(normalizeHeader(alias));
+    }
+  }
+
+  return known;
+}
+
+function expectedHeaders(kind: "orders" | "listings") {
+  return kind === "orders" ? [...flipkartOrderExpectedHeaders] : [...flipkartListingExpectedHeaders];
+}
+
+export function analyzeFlipkartHeaders(rows: FlipkartRawRow[], kind: "orders" | "listings"): FlipkartHeaderDiagnostics {
+  const present = presentHeaderSet(rows);
+  const known = knownHeaderSet(kind);
+  const missingExpectedHeaders = expectedHeaders(kind).filter((header) => !headerAliases(header).some((alias) => present.has(normalizeHeader(alias))));
+  const unknownHeaders = Array.from(present.entries())
+    .filter(([normalized]) => normalized && !known.has(normalized))
+    .map(([, original]) => original)
+    .sort((left, right) => left.localeCompare(right));
+
+  return {
+    presentHeaders: Array.from(present.values()).sort((left, right) => left.localeCompare(right)),
+    missingExpectedHeaders,
+    unknownHeaders
+  };
 }
 
 export function flipkartOrderDuplicateKey(order: Pick<FlipkartOrderLine, "orderItemId" | "shipmentId" | "sku">): FlipkartDuplicateKey | null {

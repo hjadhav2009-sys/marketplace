@@ -3,7 +3,13 @@ import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { normalizeSkuForMatching } from "@/lib/sku";
-import { flipkartListingIsInactive, flipkartListingMasterData, sameFlipkartListingMaster } from "./listing-master";
+import {
+  chunkFlipkartListingRows,
+  dedupeFlipkartListingRows,
+  flipkartListingIsInactive,
+  flipkartListingMasterData,
+  sameFlipkartListingMaster
+} from "./listing-master";
 import {
   flipkartInternalOrderKey,
   parseFlipkartListingRows,
@@ -295,75 +301,79 @@ export async function importFlipkartListingRows(input: {
   let skippedRows = 0;
   let missingImageRows = 0;
   let inactiveListings = 0;
-  const issues = [...parsed.issues];
+  const deduped = dedupeFlipkartListingRows(parsed.listings);
+  const issues = [...parsed.issues, ...deduped.duplicateIssues];
   const importedAt = new Date();
-  const listingDrafts = parsed.listings.map((listing) => ({
+  const listingDrafts = deduped.importableListings.map((listing) => ({
     listing,
     data: flipkartListingMasterData(listing)
   }));
-  const listingSkus = Array.from(new Set(listingDrafts.map((draft) => draft.data.sku).filter(Boolean)));
-  const existingListings = await prisma.marketplaceListing.findMany({
-    where: {
-      accountId: input.account.id,
-      marketplace: "FLIPKART",
-      sku: { in: listingSkus }
-    }
-  });
-  const existingBySku = new Map(existingListings.map((listing) => [normalizeSkuForMatching(listing.sku), listing]));
 
   await writeIssues(batch.id, issues);
 
-  for (const { listing, data } of listingDrafts) {
-    const sku = data.sku;
+  for (const chunk of chunkFlipkartListingRows(listingDrafts)) {
+    const listingSkus = Array.from(new Set(chunk.map((draft) => draft.data.sku).filter(Boolean)));
+    const existingListings = await prisma.marketplaceListing.findMany({
+      where: {
+        accountId: input.account.id,
+        marketplace: "FLIPKART",
+        sku: { in: listingSkus }
+      }
+    });
+    const existingBySku = new Map(existingListings.map((existingListing) => [normalizeSkuForMatching(existingListing.sku), existingListing]));
 
-    if (flipkartListingIsInactive(listing)) {
-      inactiveListings += 1;
-    }
+    for (const { listing, data } of chunk) {
+      const sku = data.sku;
 
-    if (!data.mainImageUrl) {
-      missingImageRows += 1;
-      issues.push({
-        rowNumber: listing.rowNumber,
-        issueType: "MISSING_IMAGE_URL",
-        message: `No valid image URL found for Flipkart SKU ${sku}.`,
-        rawData: listing.rawData
-      });
-      await prisma.importRowIssue.create({
-        data: {
-          batchId: batch.id,
+      if (flipkartListingIsInactive(listing)) {
+        inactiveListings += 1;
+      }
+
+      if (!data.mainImageUrl) {
+        missingImageRows += 1;
+        issues.push({
           rowNumber: listing.rowNumber,
           issueType: "MISSING_IMAGE_URL",
           message: `No valid image URL found for Flipkart SKU ${sku}.`,
-          rawData: JSON.stringify(listing.rawData)
-        }
-      });
-    }
+          rawData: listing.rawData
+        });
+        await prisma.importRowIssue.create({
+          data: {
+            batchId: batch.id,
+            rowNumber: listing.rowNumber,
+            issueType: "MISSING_IMAGE_URL",
+            message: `No valid image URL found for Flipkart SKU ${sku}.`,
+            rawData: JSON.stringify(listing.rawData)
+          }
+        });
+      }
 
-    const existing = existingBySku.get(sku);
-    const listingData = {
-      ...data,
-      accountId: input.account.id,
-      lastImportedAt: importedAt
-    };
+      const existing = existingBySku.get(sku);
+      const listingData = {
+        ...data,
+        accountId: input.account.id,
+        lastImportedAt: importedAt
+      };
 
-    if (!existing) {
-      const created = await prisma.marketplaceListing.create({ data: listingData });
-      existingBySku.set(sku, created);
-      createdRows += 1;
-    } else if (sameFlipkartListingMaster(existing, data)) {
-      const unchanged = await prisma.marketplaceListing.update({
-        where: { id: existing.id },
-        data: { lastImportedAt: importedAt }
-      });
-      existingBySku.set(sku, unchanged);
-      skippedRows += 1;
-    } else {
-      const updated = await prisma.marketplaceListing.update({
-        where: { id: existing.id },
-        data: listingData
-      });
-      existingBySku.set(sku, updated);
-      updatedRows += 1;
+      if (!existing) {
+        const created = await prisma.marketplaceListing.create({ data: listingData });
+        existingBySku.set(sku, created);
+        createdRows += 1;
+      } else if (sameFlipkartListingMaster(existing, data)) {
+        const unchanged = await prisma.marketplaceListing.update({
+          where: { id: existing.id },
+          data: { lastImportedAt: importedAt }
+        });
+        existingBySku.set(sku, unchanged);
+        skippedRows += 1;
+      } else {
+        const updated = await prisma.marketplaceListing.update({
+          where: { id: existing.id },
+          data: listingData
+        });
+        existingBySku.set(sku, updated);
+        updatedRows += 1;
+      }
     }
   }
 
@@ -373,6 +383,7 @@ export async function importFlipkartListingRows(input: {
       status: issues.length > 0 ? "REVIEWED" : "IMPORTED",
       createdRows,
       updatedRows,
+      duplicateRows: deduped.duplicateIssues.length,
       skippedRows,
       missingImageRows,
       errorRows: issues.length,

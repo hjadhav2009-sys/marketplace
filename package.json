@@ -11,6 +11,7 @@
     "start:prod": "node scripts/start.mjs",
     "check:env": "node scripts/windows/check-env.mjs",
     "check:production-readiness": "node scripts/check-production-readiness.mjs",
+    "flipkart:dry-run": "tsx scripts/flipkart-dry-run.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run lint && npm run test:validators",

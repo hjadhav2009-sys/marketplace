@@ -6,7 +6,10 @@ import { findAwbSearchMatches } from "../lib/operations/awb-search";
 import { selectConfirmPackedOrderIds, type ConfirmPackedScopeOrder } from "../lib/operations/packing";
 import { normalizeSkuForMatching } from "../lib/sku";
 import {
+  buildFlipkartDryRunSummary,
+  chunkFlipkartListingRows,
   dedupeFlipkartOrderRows,
+  dedupeFlipkartListingRows,
   flipkartInternalOrderKey,
   flipkartListingMasterData,
   flipkartOrderMappingIssue,
@@ -17,6 +20,7 @@ import {
 } from "../src/lib/marketplaces/flipkart";
 
 const fixtureDir = join(process.cwd(), "tests", "fixtures", "flipkart");
+const flipkartImportSource = readFileSync(join(process.cwd(), "src", "lib", "marketplaces", "flipkart", "import.ts"), "utf8");
 
 async function readXlsxFixture(fileName: string) {
   const buffer = readFileSync(join(fixtureDir, fileName));
@@ -46,9 +50,53 @@ assert.equal(
   "Missing Seller SKU Id creates issue"
 );
 
+const aliasOrderResult = parseFlipkartOrderRows([
+  {
+    " Order Item ID\n": "TESTITEMALIAS0001",
+    "Shipment ID ": "TESTSHIPALIAS0001",
+    "Sku": "FK-SKU-ALIAS",
+    "Product": "Alias Product",
+    "Quantity": "1",
+    "Tracking Id": "FMPC0000000099",
+    "invoice date (MM/DD/YY)": "07/05/26"
+  }
+]);
+assert.equal(aliasOrderResult.orders[0]?.orderItemId, "TESTITEMALIAS0001", "Order Item ID alias with spaces/newline is parsed");
+assert.equal(aliasOrderResult.orders[0]?.trackingId, "FMPC0000000099", "Tracking Id alias is parsed");
+assert.equal(aliasOrderResult.orders[0]?.invoiceDate, "07/05/26", "Invoice Date case variation is parsed");
+
+const aliasListingResult = parseFlipkartListingRows([
+  {
+    "\uFEFFSeller SKU ID": "FK-SKU-ALIAS",
+    "Product Title": "Alias Listing",
+    "Image 1 1366 Url": "https://example.invalid/images/alias-large.jpg",
+    "Image URL 1": "https://example.invalid/images/alias-small.jpg"
+  }
+]);
+assert.equal(aliasListingResult.listings[0]?.sellerSkuId, "FK-SKU-ALIAS", "Seller SKU ID alias with BOM is parsed");
+assert.equal(aliasListingResult.listings[0]?.mainImageUrl, "https://example.invalid/images/alias-large.jpg", "Image 1 1366 Url alias is parsed with priority");
+
 assert.equal(deduped.importableOrders.length, 4, "Duplicate ORDER ITEM ID row is skipped from importable rows");
 assert.equal(deduped.duplicateIssues.length, 1, "Duplicate ORDER ITEM ID is detected");
 assert.equal(deduped.duplicateIssues[0]?.rowNumber, 5, "Duplicate issue keeps the original Excel row number");
+
+const aliasListing = aliasListingResult.listings[0];
+
+if (!aliasListing) {
+  throw new Error("Expected alias listing row");
+}
+
+const duplicateListingResult = dedupeFlipkartListingRows([
+  aliasListing,
+  {
+    ...aliasListing,
+    rowNumber: 3,
+    rawData: { "Seller SKU ID": "FK-SKU-ALIAS", "Product Title": "Duplicate Alias Listing" }
+  }
+]);
+assert.equal(duplicateListingResult.importableListings.length, 1, "Duplicate Seller SKU Id keeps the first listing row");
+assert.equal(duplicateListingResult.duplicateIssues[0]?.issueType, "DUPLICATE_SELLER_SKU_ID", "Duplicate Seller SKU Id creates issue");
+assert.deepEqual(chunkFlipkartListingRows([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]], "Listing import batching helper chunks rows safely");
 
 const fallbackOrder = deduped.importableOrders.find((order) => order.sku === "FK-SKU-4");
 assert.equal(fallbackOrder?.duplicateKey?.strategy, "SHIPMENT_ID_SKU", "Fallback duplicate key uses Shipment ID + SKU");
@@ -90,6 +138,24 @@ assert.deepEqual(
   ["FK-SKU-1", "FK-SKU-2"],
   "Only today's order SKUs with images are selected for image cache"
 );
+assert.match(
+  flipkartImportSource,
+  /marketplaceListing\.findMany\(\{[\s\S]*sku: \{ in: orderSkus \}/,
+  "Order import queries Listing Master only for order SKUs"
+);
+
+const dryRunSummary = buildFlipkartDryRunSummary({
+  orderRows,
+  listingRows
+});
+assert.equal(dryRunSummary.listingRowsTotal, 4, "Dry-run counts listing rows");
+assert.equal(dryRunSummary.orderRowsTotal, 6, "Dry-run counts order rows");
+assert.equal(dryRunSummary.orderRowsValid, 4, "Dry-run counts valid deduped order rows");
+assert.equal(dryRunSummary.heldRows, 1, "Dry-run counts held order rows");
+assert.equal(dryRunSummary.duplicateRows, 1, "Dry-run counts duplicate order rows");
+assert.equal(dryRunSummary.missingListingCount, 1, "Dry-run counts missing listing SKUs");
+assert.equal(dryRunSummary.missingImageCount, 1, "Dry-run counts listing rows with missing image for ordered SKUs");
+assert.equal(dryRunSummary.multiItemTrackingIds[0]?.trackingId, "FMPC0000000001", "Dry-run reports multi-item Tracking IDs");
 
 const activeImageMappingSkus = new Set(listingResult.listings.filter((listing) => listing.imageUrl).map((listing) => normalizeSkuForMatching(listing.sku)));
 const sku3Order = deduped.importableOrders.find((order) => order.sku === "FK-SKU-3");

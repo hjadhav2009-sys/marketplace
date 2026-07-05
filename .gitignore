@@ -18,6 +18,12 @@ prisma/dev.db-journal
 *.pdf
 !tests/fixtures/**/*.txt
 storage/product-images/
+private-test-data/
+local-test-data/
+*.real.xlsx
+*.real.csv
+*.seller.xlsx
+*.seller.csv
 
 # env
 .env

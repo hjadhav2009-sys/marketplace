@@ -35,6 +35,9 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   }
 
   const { order, mapping } = result;
+  const shipmentItems = result.shipmentItems;
+  const displayScanId = order.trackingId ?? order.awb;
+  const scanLabel = order.trackingId ? "Tracking ID" : "AWB";
   const canPack = order.packStatus === "READY";
   const canReportProblem = order.packStatus === "READY";
   const openProblem = order.problemOrders[0];
@@ -45,7 +48,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
     <AppShell>
       <PageHeader
         eyebrow="Scan result"
-        title={`AWB ${order.awb}`}
+        title={`${scanLabel} ${displayScanId}`}
         description="Verify the product image, SKU, quantity, color, courier, and order number before confirming packed."
       >
         <div className="flex flex-wrap gap-2">
@@ -124,6 +127,26 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             </div>
             <dl className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">Marketplace</dt>
+                <dd className="mt-1 font-semibold text-slate-950">{order.marketplace}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">Shipment ID</dt>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{order.shipmentId ?? "Not mapped"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">Order item ID</dt>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{order.orderItemId ?? "Not mapped"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">FSN</dt>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{order.fsn ?? "Not mapped"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="text-sm font-medium text-slate-500">Tracking ID</dt>
+                <dd className="mt-1 break-words font-semibold text-slate-950">{order.trackingId ?? "Not mapped"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-sm font-medium text-slate-500">SKU</dt>
                 <dd className="mt-1 break-words text-2xl font-bold text-slate-950">{order.sku}</dd>
               </div>
@@ -167,6 +190,24 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
               </div>
             </dl>
           </div>
+
+          {shipmentItems.length > 1 ? (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-4 shadow-sm">
+              <h3 className="font-semibold text-blue-950">Ready items under this Tracking ID</h3>
+              <p className="mt-1 text-sm text-blue-800">Confirm packed will mark all ready items in this Flipkart shipment as packed.</p>
+              <div className="mt-3 divide-y divide-blue-100 rounded-md bg-white">
+                {shipmentItems.map((item) => (
+                  <div key={item.id} className="grid gap-1 px-3 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div>
+                      <p className="break-words font-bold text-slate-950">{item.sku}</p>
+                      <p className="text-sm text-slate-600">{item.productDescription ?? item.orderItemId ?? item.awb}</p>
+                    </div>
+                    <p className="text-sm font-bold text-berry">Qty {item.qty}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-5 md:grid-cols-2">
             {canPack ? (

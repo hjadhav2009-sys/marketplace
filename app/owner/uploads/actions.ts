@@ -6,6 +6,7 @@ import type { PaymentType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { cacheProductCardImage, imageCacheNeedsRefresh } from "@/lib/image-cache";
+import { parseSpreadsheetRows } from "@/lib/import/files";
 import { importParsedOrderRows, type ParsedOrderImportRow } from "@/lib/import/orders";
 import {
   buildPreviewImportStats,
@@ -23,8 +24,9 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
+import { importFlipkartOrderRows } from "@/src/lib/marketplaces/flipkart";
 import { PDF_UPLOAD_MAX_BYTES } from "@/lib/upload-limits";
-import { skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
+import { flipkartExcelImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 
 type PreviewRowDraft = {
   sourceFileName: string;
@@ -906,6 +908,41 @@ export async function createUploadBatchAction(formData: FormData) {
   }
 
   redirect(redirectTo);
+}
+
+export async function createFlipkartOrderImportAction(formData: FormData) {
+  const user = await requireUser(["OWNER"]);
+  const account = await requireAccount(user);
+  const request = await getRequestMeta();
+  const file = formData.get("flipkartOrderExcel");
+
+  if (!(file instanceof File) || file.size === 0) {
+    redirect("/owner/uploads/new?error=missing-flipkart-orders");
+  }
+
+  const parsed = flipkartExcelImportFileSchema.safeParse({ filename: file.name });
+
+  if (!parsed.success) {
+    redirect("/owner/uploads/new?error=invalid-flipkart-orders");
+  }
+
+  try {
+    const rows = await parseSpreadsheetRows(file);
+    const batch = await importFlipkartOrderRows({
+      rows,
+      fileName: file.name,
+      account,
+      user,
+      request
+    });
+
+    revalidatePath("/owner");
+    revalidatePath("/packing");
+    revalidatePath("/picker");
+    redirect(`/owner/uploads/new?flipkartBatchId=${batch.id}`);
+  } catch {
+    redirect("/owner/uploads/new?error=flipkart-order-import-failed");
+  }
 }
 
 export async function confirmParsedBatchAction(formData: FormData) {

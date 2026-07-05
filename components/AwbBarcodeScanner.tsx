@@ -17,6 +17,7 @@ type BarcodeResult = {
 
 type AwbSuggestion = {
   awb: string;
+  trackingId?: string | null;
   sku: string;
   cachedImageUrl?: string | null;
   cacheStatus?: string | null;
@@ -25,6 +26,7 @@ type AwbSuggestion = {
   courier?: string | null;
   packStatus: string;
   matchType: "EXACT" | "SUFFIX" | "CONTAINS";
+  matchedField: "AWB" | "TRACKING_ID";
 };
 
 function isLocalhost(hostname: string) {
@@ -137,7 +139,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState("error");
-      setError("Camera scanner is not supported in this browser. Use manual AWB entry.");
+      setError("Camera scanner is not supported in this browser. Use manual Tracking ID / AWB entry.");
       return;
     }
 
@@ -162,7 +164,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
         const awb = normalizeAwb(result.getText());
 
         if (!isValidAwb(awb)) {
-          setError("Barcode scanned, but it did not look like a valid AWB. Try again or enter it manually.");
+          setError("Barcode scanned, but it did not look like a valid Tracking ID / AWB. Try again or enter it manually.");
           lastScanAtRef.current = now;
           return;
         }
@@ -190,11 +192,11 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
       setCameraState("error");
 
       if (caughtError instanceof DOMException && caughtError.name === "NotAllowedError") {
-        setError("Camera permission was denied. Allow camera access or use manual AWB entry.");
+        setError("Camera permission was denied. Allow camera access or use manual Tracking ID / AWB entry.");
       } else if (caughtError instanceof DOMException && caughtError.name === "NotFoundError") {
-        setError("No camera was found on this device. Use manual AWB entry.");
+        setError("No camera was found on this device. Use manual Tracking ID / AWB entry.");
       } else {
-        setError("Camera could not start. Use manual AWB entry.");
+        setError("Camera could not start. Use manual Tracking ID / AWB entry.");
       }
     }
   }
@@ -205,7 +207,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold sm:text-lg">Camera scanner</h2>
-            <p className="mt-1 text-base leading-6 text-slate-300 sm:text-sm">Point the frame at the AWB barcode on the shipping label.</p>
+            <p className="mt-1 text-base leading-6 text-slate-300 sm:text-sm">Point the frame at the Tracking ID / AWB barcode on the shipping label.</p>
           </div>
           <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
             {cameraState === "scanning" ? "Scanning" : cameraState === "starting" ? "Starting" : "Ready"}
@@ -214,7 +216,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
 
         {httpsWarning ? (
           <div className="mt-4 rounded-md border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-sm font-medium text-amber-100">
-            Camera scanner may not work on insecure HTTP. Use HTTPS domain or manual AWB entry.
+            Camera scanner may not work on insecure HTTP. Use HTTPS domain or manual Tracking ID / AWB entry.
           </div>
         ) : null}
 
@@ -235,7 +237,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
 
         {detectedAwb ? (
           <p className="mt-3 rounded-md bg-teal-400/10 px-3 py-2 text-sm font-semibold text-teal-100">
-            Scanned AWB {detectedAwb}. Opening order...
+            Scanned {detectedAwb}. Opening order...
           </p>
         ) : null}
 
@@ -259,25 +261,25 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
       </section>
 
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <h2 className="text-xl font-bold text-slate-950 sm:text-lg sm:font-semibold">Manual AWB entry</h2>
+        <h2 className="text-xl font-bold text-slate-950 sm:text-lg sm:font-semibold">Manual Tracking ID / AWB entry</h2>
         <p className="mt-1 text-base leading-6 text-slate-600 sm:text-sm">Manual search is always available if camera scanning fails.</p>
         <form action={action} className="mt-5 space-y-4">
           <label className="block">
-            <span className="text-base font-semibold text-slate-700 sm:text-sm sm:font-medium">AWB</span>
+            <span className="text-base font-semibold text-slate-700 sm:text-sm sm:font-medium">Tracking ID / AWB</span>
             <input
               name="awb"
               inputMode="text"
               autoComplete="off"
               value={manualAwb}
               onChange={(event) => setManualAwb(event.target.value)}
-              placeholder="1490834915493571"
+              placeholder="FMPC0000000000"
               className="mt-2 min-h-16 w-full rounded-md border border-slate-300 px-4 py-3 text-2xl font-black uppercase outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100 sm:min-h-14 sm:text-xl"
               required
             />
           </label>
           <div className="min-h-20">
             {normalizeAwb(manualAwb).length > 0 && normalizeAwb(manualAwb).length < 5 ? (
-              <p className="text-base text-slate-500 sm:text-sm">Type at least last 5 AWB characters for live suggestions.</p>
+              <p className="text-base text-slate-500 sm:text-sm">Type at least last 5 Tracking ID / AWB characters for live suggestions.</p>
             ) : null}
             {suggestionState === "loading" ? (
               <p className="text-base font-medium text-slate-500 sm:text-sm">Searching...</p>
@@ -286,44 +288,50 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
               <p className="text-base font-medium text-rose-700 sm:text-sm">Live suggestions failed. Manual submit still works.</p>
             ) : null}
             {suggestionState === "ready" && suggestions.length === 0 ? (
-              <p className="text-base font-medium text-amber-800 sm:text-sm">No matching AWB found for this account.</p>
+              <p className="text-base font-medium text-amber-800 sm:text-sm">No matching Tracking ID / AWB found for this account.</p>
             ) : null}
             {suggestions.length > 0 ? (
               <div className="space-y-2">
                 {suggestions.length === 1 ? (
                   <p className="text-base font-medium text-teal-700 sm:text-sm">One match found. Open it or submit the search.</p>
                 ) : (
-                  <p className="text-base font-medium text-slate-600 sm:text-sm">{suggestions.length} matches found. Choose the correct AWB.</p>
+                  <p className="text-base font-medium text-slate-600 sm:text-sm">{suggestions.length} matches found. Choose the correct Tracking ID / AWB.</p>
                 )}
                 <div className="max-h-[28rem] space-y-2 overflow-y-auto">
-                  {suggestions.map((suggestion) => (
-                    <a
-                      key={suggestion.awb}
-                      href={`/packing/${encodeURIComponent(suggestion.awb)}`}
-                      className="grid grid-cols-[4rem_1fr] gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm transition hover:border-berry hover:bg-slate-50 sm:grid-cols-[auto_1fr_auto]"
-                    >
-                      <ProductImage
-                        src={suggestion.cachedImageUrl}
-                        alt={`${suggestion.sku} ${suggestion.awb}`}
-                        size="sm"
-                        showBadge={false}
-                        cacheStatus={suggestion.cacheStatus}
-                      />
-                      <span className="min-w-0">
-                        <span className="block break-all text-lg font-black text-slate-950 sm:text-sm sm:font-bold">{suggestion.awb}</span>
-                        <span className="mt-1 block text-base font-semibold text-slate-800 sm:text-sm sm:font-normal sm:text-slate-600">
-                          {suggestion.sku}
+                  {suggestions.map((suggestion) => {
+                    const displayId = suggestion.trackingId ?? suggestion.awb;
+
+                    return (
+                      <a
+                        key={suggestion.awb}
+                        href={`/packing/${encodeURIComponent(suggestion.awb)}`}
+                        className="grid grid-cols-[4rem_1fr] gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm transition hover:border-berry hover:bg-slate-50 sm:grid-cols-[auto_1fr_auto]"
+                      >
+                        <ProductImage
+                          src={suggestion.cachedImageUrl}
+                          alt={`${suggestion.sku} ${displayId}`}
+                          size="sm"
+                          showBadge={false}
+                          cacheStatus={suggestion.cacheStatus}
+                        />
+                        <span className="min-w-0">
+                          <span className="block break-all text-lg font-black text-slate-950 sm:text-sm sm:font-bold">{displayId}</span>
+                          <span className="mt-1 block text-base font-semibold text-slate-800 sm:text-sm sm:font-normal sm:text-slate-600">
+                            {suggestion.sku}
+                          </span>
+                          <span className="mt-1 block text-sm font-medium text-slate-600">
+                            Qty {suggestion.qty} / {suggestion.color ?? "Color unknown"} / {suggestion.courier ?? "Courier pending"}
+                          </span>
+                          <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">
+                            {suggestion.packStatus}
+                          </span>
                         </span>
-                        <span className="mt-1 block text-sm font-medium text-slate-600">
-                          Qty {suggestion.qty} / {suggestion.color ?? "Color unknown"} / {suggestion.courier ?? "Courier pending"}
+                        <span className="col-span-2 justify-self-start rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 sm:col-span-1 sm:self-center sm:justify-self-auto">
+                          {suggestion.matchedField} {suggestion.matchType}
                         </span>
-                        <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{suggestion.packStatus}</span>
-                      </span>
-                      <span className="col-span-2 justify-self-start rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 sm:col-span-1 sm:self-center sm:justify-self-auto">
-                        {suggestion.matchType}
-                      </span>
-                    </a>
-                  ))}
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}

@@ -1015,7 +1015,7 @@ assert.match(awbScannerComponent, /cacheStatus={suggestion.cacheStatus}/, "Manua
 assert.match(packingSearchRoute, /cachedImageUrl/, "AWB suggestion API returns cachedImageUrl only for product images");
 assert.doesNotMatch(packingSearchRoute, /imageUrl: order\.imageUrl/, "AWB suggestion API does not return slow external image URLs");
 assert.match(dataHelpers, /awb: query[\s\S]*endsWith: query[\s\S]*contains: query/, "AWB search queries exact, suffix, then contains");
-assert.match(dataHelpers, /awb: query, packStatus: "READY"/, "Packing AWB search defaults to active READY orders");
+assert.match(dataHelpers, /packStatus: "READY"[\s\S]*OR: \[\{ awb: query \}, \{ trackingId: query \}\]/, "Packing AWB search defaults to active READY orders and checks Tracking ID");
 assert.match(dataHelpers, /withDevTiming\("packing awb search"[\s\S]*500\)/, "AWB search has 500ms dev timing logs");
 assert.match(dataHelpers, /withDevTiming\("picker orders"[\s\S]*800[\s\S]*\);/, "Picker order query has 800ms dev timing logs");
 assert.match(dataHelpers, /buildWorkQueueOrderWhere/, "Picker queries are scoped through the daily active work queue");

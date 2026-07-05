@@ -60,6 +60,14 @@ export const skuImageImportFileSchema = z.object({
     )
 });
 
+export const flipkartExcelImportFileSchema = z.object({
+  filename: z
+    .string()
+    .trim()
+    .min(1, "Choose a Flipkart Excel file")
+    .refine((value) => value.toLowerCase().endsWith(".xlsx"), "Upload a Flipkart .xlsx Excel file")
+});
+
 export const awbSearchSchema = z.object({
   awb: z.preprocess(
     normalizeAwb,

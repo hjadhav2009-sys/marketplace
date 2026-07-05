@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run lint && npm run test:validators",
-    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts",
+    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts && tsx tests/flipkart-parser.test.ts",
     "db:seed": "prisma db seed",
     "db:migrate:prod": "prisma migrate deploy --schema prisma/schema.postgres.prisma"
   },

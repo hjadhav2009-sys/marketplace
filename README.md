@@ -29,6 +29,7 @@ Useful validation commands:
 ```bash
 npm run typecheck
 npm run lint
+npm run test:validators
 npm run build
 ```
 
@@ -71,9 +72,11 @@ Prepared for later:
 MEESHO
 ```
 
-## Flipkart Parser Next Step
+## Flipkart Importer
 
-`src/lib/marketplaces/flipkart/parser.ts` is a placeholder. The next development step is to collect sanitized Flipkart CSV headers and sample PDF text, then map them into the shared `MarketplaceOrderLine` type. Start with CSV because Flipkart exports usually have more reliable columns than PDFs.
+`src/lib/marketplaces/flipkart/parser.ts` parses sanitized Flipkart Order Excel and Listing Excel rows into the shared marketplace model. Owner uploads now include Flipkart Orders, and SKU image/listing imports include Flipkart Listings. Tracking ID is stored separately from the internal unique key so packing can search the scanned Flipkart label barcode.
+
+The next development step is to test the importer with a sanitized Flipkart export, review any held rows, and then add a small review screen for rows missing `ORDER ITEM ID` plus `Shipment ID`/`SKU`.
 
 ## Preserved Foundation Notes
 
@@ -95,7 +98,7 @@ For local HTTP testing, use:
 SESSION_COOKIE_SECURE=false
 ```
 
-SQLite development databases must use a `file:` URL:
+SQLite requires a `file:` URL for development databases:
 
 ```env
 DATABASE_URL="file:./dev.db"

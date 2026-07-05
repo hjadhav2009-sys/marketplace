@@ -220,6 +220,11 @@ model Order {
   account            Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
   batchId            String?        @map("uploadBatchId")
   uploadBatch        UploadBatch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  marketplace        String         @default("MEESHO")
+  shipmentId         String?
+  orderItemId        String?
+  fsn                String?
+  trackingId         String?
   awb                String
   courier            String?
   sku                String
@@ -243,6 +248,10 @@ model Order {
   updatedAt          DateTime       @updatedAt
 
   @@unique([accountId, awb])
+  @@index([accountId, marketplace])
+  @@index([accountId, marketplace, orderItemId])
+  @@index([accountId, marketplace, shipmentId])
+  @@index([accountId, marketplace, trackingId])
   @@index([accountId, sku])
   @@index([accountId, orderNo])
   @@index([accountId, packStatus])

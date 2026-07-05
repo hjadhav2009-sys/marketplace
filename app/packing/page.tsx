@@ -28,8 +28,8 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
     <AppShell>
       <PageHeader
         eyebrow="Packer"
-        title="Scan or search AWB"
-        description="Scan the label or type the last 5 to 8 AWB characters."
+        title="Scan or search Tracking ID / AWB"
+        description="Scan the label or type the last 5 to 8 Tracking ID / AWB characters."
       />
 
       <AwbBarcodeScanner action={searchAwbAction} defaultAwb={params?.q} />
@@ -82,19 +82,19 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
 
       {params?.error ? (
         <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-          Enter a valid AWB.
+          Enter a valid Tracking ID / AWB.
         </div>
       ) : null}
 
       {params?.notFound ? (
         <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          No order matched AWB {params.notFound}.
+          No order matched Tracking ID / AWB {params.notFound}.
         </div>
       ) : null}
 
       {params?.multiple ? (
         <div className="mb-5 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
-          Multiple orders matched {params.q}. Choose the correct AWB from the live suggestions.
+          Multiple orders matched {params.q}. Choose the correct Tracking ID / AWB from the live suggestions.
         </div>
       ) : null}
 

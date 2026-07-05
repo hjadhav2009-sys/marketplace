@@ -120,9 +120,14 @@ export async function getSkuGroups(
         batchId: options.batchId
       }),
       select: {
-        id: true,
-        awb: true,
-        sku: true,
+      id: true,
+      awb: true,
+      marketplace: true,
+      shipmentId: true,
+      orderItemId: true,
+      fsn: true,
+      trackingId: true,
+      sku: true,
         qty: true,
         color: true,
         size: true,
@@ -204,6 +209,11 @@ export async function getSkuDetail(
       select: {
         id: true,
         awb: true,
+        marketplace: true,
+        shipmentId: true,
+        orderItemId: true,
+        fsn: true,
+        trackingId: true,
         sku: true,
         qty: true,
         color: true,
@@ -329,6 +339,7 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
       id: true,
       accountId: true,
       awb: true,
+      trackingId: true,
       sku: true,
       qty: true,
       color: true,
@@ -337,39 +348,61 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
       createdAt: true
     } as const;
     const exact = await prisma.order.findMany({
-      where: { accountId, awb: query, packStatus: "READY" },
+      where: {
+        accountId,
+        packStatus: "READY",
+        OR: [{ awb: query }, { trackingId: query }]
+      },
       select,
       orderBy: { createdAt: "desc" },
       take: limit
     });
-    const exactAwbs = exact.map((order) => order.awb);
+    const exactIds = exact.map((order) => order.id);
     const suffix =
       exact.length < limit
         ? await prisma.order.findMany({
             where: {
               accountId,
               packStatus: "READY",
-              awb: {
-                endsWith: query,
-                notIn: exactAwbs
-              }
+              id: { notIn: exactIds },
+              OR: [
+                {
+                  awb: {
+                    endsWith: query
+                  }
+                },
+                {
+                  trackingId: {
+                    endsWith: query
+                  }
+                }
+              ]
             },
             select,
             orderBy: { createdAt: "desc" },
             take: limit - exact.length
           })
         : [];
-    const exactAndSuffixAwbs = [...exactAwbs, ...suffix.map((order) => order.awb)];
+    const exactAndSuffixIds = [...exactIds, ...suffix.map((order) => order.id)];
     const contains =
       exact.length + suffix.length < limit
         ? await prisma.order.findMany({
             where: {
               accountId,
               packStatus: "READY",
-              awb: {
-                contains: query,
-                notIn: exactAndSuffixAwbs
-              }
+              id: { notIn: exactAndSuffixIds },
+              OR: [
+                {
+                  awb: {
+                    contains: query
+                  }
+                },
+                {
+                  trackingId: {
+                    contains: query
+                  }
+                }
+              ]
             },
             select,
             orderBy: { createdAt: "desc" },
@@ -423,6 +456,11 @@ export async function getOrderWithImage(accountId: string, awb: string) {
     select: {
       id: true,
       awb: true,
+      marketplace: true,
+      shipmentId: true,
+      orderItemId: true,
+      fsn: true,
+      trackingId: true,
       accountId: true,
       sku: true,
       qty: true,
@@ -502,6 +540,29 @@ export async function getOrderWithImage(accountId: string, awb: string) {
 
   return {
     order,
+    shipmentItems:
+      order.marketplace === "FLIPKART" && order.trackingId
+        ? await prisma.order.findMany({
+            where: {
+              accountId,
+              marketplace: "FLIPKART",
+              trackingId: order.trackingId,
+              packStatus: "READY"
+            },
+            select: {
+              id: true,
+              awb: true,
+              trackingId: true,
+              shipmentId: true,
+              orderItemId: true,
+              sku: true,
+              qty: true,
+              productDescription: true,
+              packStatus: true
+            },
+            orderBy: { sku: "asc" }
+          })
+        : [],
     mapping: mapping
       ? {
           ...mapping,

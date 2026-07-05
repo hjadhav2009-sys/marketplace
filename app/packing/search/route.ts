@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     query,
     results: results.map((order) => ({
       awb: order.awb,
+      trackingId: order.trackingId,
       sku: order.sku,
       cachedImageUrl: order.cachedImageUrl,
       cacheStatus: order.cacheStatus,
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
       qty: order.qty,
       courier: order.courier,
       packStatus: order.packStatus,
-      matchType: order.matchType
+      matchType: order.matchType,
+      matchedField: order.matchedField
     }))
   });
 }

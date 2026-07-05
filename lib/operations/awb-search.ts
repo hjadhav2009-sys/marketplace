@@ -5,6 +5,7 @@ export type AwbSearchCandidate = {
   id: string;
   accountId: string;
   awb: string;
+  trackingId?: string | null;
   sku: string;
   qty: number;
   color?: string | null;
@@ -16,18 +17,19 @@ export type AwbSearchCandidate = {
 
 export type AwbSearchSuggestion = AwbSearchCandidate & {
   matchType: "EXACT" | "SUFFIX" | "CONTAINS";
+  matchedField: "AWB" | "TRACKING_ID";
 };
 
-function matchType(awb: string, query: string): AwbSearchSuggestion["matchType"] | null {
-  if (awb === query) {
+function matchType(value: string, query: string): AwbSearchSuggestion["matchType"] | null {
+  if (value === query) {
     return "EXACT";
   }
 
-  if (awb.endsWith(query)) {
+  if (value.endsWith(query)) {
     return "SUFFIX";
   }
 
-  if (awb.includes(query)) {
+  if (value.includes(query)) {
     return "CONTAINS";
   }
 
@@ -61,8 +63,14 @@ export function findAwbSearchMatches(input: {
   return input.candidates
     .filter((candidate) => candidate.accountId === input.accountId)
     .map((candidate) => {
-      const type = matchType(normalizeAwb(candidate.awb), query);
-      return type ? ({ ...candidate, matchType: type } satisfies AwbSearchSuggestion) : null;
+      const trackingType = candidate.trackingId ? matchType(normalizeAwb(candidate.trackingId), query) : null;
+      const awbType = matchType(normalizeAwb(candidate.awb), query);
+
+      if (trackingType) {
+        return { ...candidate, matchType: trackingType, matchedField: "TRACKING_ID" } satisfies AwbSearchSuggestion;
+      }
+
+      return awbType ? ({ ...candidate, matchType: awbType, matchedField: "AWB" } satisfies AwbSearchSuggestion) : null;
     })
     .filter((candidate): candidate is AwbSearchSuggestion => Boolean(candidate))
     .sort((left, right) => rank(left.matchType) - rank(right.matchType) || left.awb.localeCompare(right.awb))

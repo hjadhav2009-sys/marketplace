@@ -31,12 +31,29 @@ export async function confirmPackedAction(formData: FormData) {
   }
 
   const packed = await prisma.$transaction(async (tx) => {
+    const shipmentWhere =
+      order.marketplace === "FLIPKART" && order.trackingId
+        ? {
+            accountId: account.id,
+            marketplace: "FLIPKART",
+            trackingId: order.trackingId,
+            packStatus: "READY" as const
+          }
+        : {
+            id: order.id,
+            accountId: account.id,
+            packStatus: "READY" as const
+          };
+    const shipmentOrders = await tx.order.findMany({
+      where: shipmentWhere,
+      select: {
+        id: true,
+        awb: true,
+        trackingId: true
+      }
+    });
     const update = await tx.order.updateMany({
-      where: {
-        id: order.id,
-        accountId: account.id,
-        packStatus: "READY"
-      },
+      where: shipmentWhere,
       data: {
         status: "PACKED",
         packStatus: "PACKED",
@@ -48,15 +65,15 @@ export async function confirmPackedAction(formData: FormData) {
       return false;
     }
 
-    await tx.scanLog.create({
-      data: {
+    await tx.scanLog.createMany({
+      data: shipmentOrders.map((shipmentOrder) => ({
         accountId: account.id,
-        orderId: order.id,
-        awb: order.awb,
+        orderId: shipmentOrder.id,
+        awb: shipmentOrder.trackingId ?? shipmentOrder.awb,
         outcome: "PACKED",
         scannedById: user.id,
-        note: "Packer confirmed order as packed."
-      }
+        note: shipmentOrders.length > 1 ? "Packer confirmed Flipkart shipment as packed." : "Packer confirmed order as packed."
+      }))
     });
 
     return true;
@@ -72,7 +89,7 @@ export async function confirmPackedAction(formData: FormData) {
     action: "ORDER_PACKED",
     entityType: "Order",
     entityId: order.id,
-    metadata: { awb: order.awb },
+    metadata: { awb: order.awb, trackingId: order.trackingId },
     request
   });
 

@@ -33,6 +33,24 @@ export async function searchAwbAction(formData: FormData) {
 
   if (matches.length !== 1) {
     if (matches.length > 1) {
+      const sameTrackingMatches = matches.filter((match) => match.trackingId && normalizeAwb(match.trackingId) === query);
+
+      if (sameTrackingMatches.length === matches.length) {
+        const firstMatch = sameTrackingMatches[0];
+
+        if (firstMatch) {
+          writeScanLogLater({
+            accountId: account.id,
+            orderId: firstMatch.id,
+            awb: firstMatch.trackingId ?? firstMatch.awb,
+            outcome: "FOUND",
+            scannedById: user.id,
+            note: `Tracking ID lookup "${query}" matched ${sameTrackingMatches.length} ready shipment item(s).`
+          });
+          redirect(`/packing/${encodeURIComponent(firstMatch.awb)}`);
+        }
+      }
+
       redirect(`/packing?q=${encodeURIComponent(query)}&multiple=1`);
     }
 
@@ -56,10 +74,13 @@ export async function searchAwbAction(formData: FormData) {
   writeScanLogLater({
     accountId: account.id,
     orderId: matchedOrder.id,
-    awb: matchedOrder.awb,
+    awb: matchedOrder.trackingId ?? matchedOrder.awb,
     outcome: "FOUND",
     scannedById: user.id,
-    note: query === matchedOrder.awb ? "AWB lookup matched an order." : `Partial AWB lookup "${query}" matched an order.`
+    note:
+      query === normalizeAwb(matchedOrder.trackingId ?? matchedOrder.awb)
+        ? `${matchedOrder.trackingId ? "Tracking ID" : "AWB"} lookup matched an order.`
+        : `Partial AWB lookup "${query}" matched an order.`
   });
 
   redirect(`/packing/${encodeURIComponent(matchedOrder.awb)}`);

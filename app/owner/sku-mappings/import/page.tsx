@@ -56,8 +56,8 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
     <AppShell>
       <PageHeader
         eyebrow="SKU Import"
-        title="Import SKU image mappings"
-        description="Upload only SKU and image URL. Product name, color, and size will be filled from parsed orders automatically."
+        title="Import SKU images / listings"
+        description="Upload Flipkart listings or simple SKU image mappings for the selected account."
       />
 
       {params?.error ? (
@@ -68,8 +68,45 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
 
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <form action={importSkuMappingFileAction} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-950">Upload file</h2>
+          <h2 className="text-lg font-semibold text-slate-950">Flipkart Listings</h2>
           <div className="mt-5 space-y-4">
+            <input type="hidden" name="importKind" value="flipkart-listing" />
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Account</span>
+              <select
+                name="accountId"
+                required
+                defaultValue={selectedAccount.id}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              >
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Flipkart Listing Excel</span>
+              <input
+                name="mappingFile"
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                required
+                className="mt-2 block w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </label>
+            <div className="rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              Required column: <span className="font-semibold">Seller SKU Id</span>. Image priority uses Image 1 1366 URL, then Image URL 1.
+            </div>
+            <SubmitButton pendingText="Importing...">Import Flipkart listings</SubmitButton>
+          </div>
+        </form>
+
+        <form action={importSkuMappingFileAction} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-950">Simple SKU image mappings</h2>
+          <div className="mt-5 space-y-4">
+            <input type="hidden" name="importKind" value="sku-image" />
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Account</span>
               <select

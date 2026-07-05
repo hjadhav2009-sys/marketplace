@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Meesho Pick & Pack",
+    name: "Marketplace Pick & Pack",
     short_name: "Pick & Pack",
-    description: "Warehouse picking and packing workflow for Meesho seller label batches.",
+    description: "Warehouse picking and packing workflow for marketplace order batches.",
     start_url: "/",
     display: "standalone",
     background_color: "#fafaf9",

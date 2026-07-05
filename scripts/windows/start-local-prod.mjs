@@ -40,7 +40,7 @@ try {
   const summary = validateEnvironment();
 
   if (!summary.ok) {
-    console.error("Cannot start Meesho Pick & Pack:");
+    console.error("Cannot start Marketplace Pick & Pack:");
     for (const error of summary.errors) {
       console.error(`- ${error}`);
     }
@@ -63,7 +63,7 @@ try {
   }
 
   console.log("");
-  console.log("Starting Meesho Pick & Pack local production server...");
+  console.log("Starting Marketplace Pick & Pack local production server...");
   printEnvironmentSummary(summary);
   console.log(`SKIP_PRISMA_MIGRATE=${process.env.SKIP_PRISMA_MIGRATE ?? "false"}`);
   console.log("");
@@ -76,6 +76,6 @@ try {
   run(npmCommand, ["run", summary.buildScript]);
   run(npmCommand, ["start"]);
 } catch (error) {
-  console.error(error instanceof Error ? error.message : "Failed to start Meesho Pick & Pack.");
+  console.error(error instanceof Error ? error.message : "Failed to start Marketplace Pick & Pack.");
   process.exit(1);
 }

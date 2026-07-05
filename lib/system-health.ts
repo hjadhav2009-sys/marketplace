@@ -97,7 +97,7 @@ export async function getSystemHealth() {
     });
 
     return {
-      appName: "Meesho Pick & Pack",
+      appName: "Marketplace Pick & Pack",
       version: packageJson.version,
       nodeEnv: process.env.NODE_ENV ?? "unknown",
       nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL ?? "",
@@ -232,7 +232,7 @@ export async function getSystemHealth() {
   });
 
   return {
-    appName: "Meesho Pick & Pack",
+    appName: "Marketplace Pick & Pack",
     version: packageJson.version,
     nodeEnv: process.env.NODE_ENV ?? "unknown",
     nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL ?? "",

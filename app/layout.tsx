@@ -3,16 +3,16 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "Meesho Pick & Pack",
+  applicationName: "Marketplace Pick & Pack",
   title: {
-    default: "Meesho Pick & Pack",
-    template: "%s | Meesho Pick & Pack"
+    default: "Marketplace Pick & Pack",
+    template: "%s | Marketplace Pick & Pack"
   },
-  description: "Small seller warehouse pick and pack workflow for Meesho label batches.",
+  description: "Multi-marketplace warehouse pick and pack workflow, starting with Flipkart.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Pick & Pack",
+    title: "Marketplace Pick & Pack",
     statusBarStyle: "default"
   }
 };

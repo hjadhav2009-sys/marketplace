@@ -21,6 +21,7 @@ export type FlipkartDuplicateKey =
 
 export type FlipkartOrderLine = MarketplaceOrderLine & {
   marketplace: "FLIPKART";
+  rowNumber: number;
   orderedOn?: string;
   shipmentId?: string;
   orderItemId?: string;
@@ -58,6 +59,7 @@ export type FlipkartOrderLine = MarketplaceOrderLine & {
 
 export type FlipkartListingLine = {
   marketplace: "FLIPKART";
+  rowNumber: number;
   sellerSkuId?: string;
   sku?: string;
   productTitle?: string;
@@ -271,6 +273,7 @@ export function parseFlipkartOrderRows(rows: FlipkartRawRow[], fileName = "flipk
     const rowNumber = index + 2;
     const order: FlipkartOrderLine = {
       marketplace: "FLIPKART",
+      rowNumber,
       orderedOn: text(row, orderColumns.orderedOn),
       shipmentId: text(row, orderColumns.shipmentId),
       orderItemId: text(row, orderColumns.orderItemId),
@@ -363,6 +366,7 @@ export function parseFlipkartListingRows(rows: FlipkartRawRow[], fileName = "fli
 
     listings.push({
       marketplace: "FLIPKART",
+      rowNumber,
       sellerSkuId,
       sku: sellerSkuId,
       productTitle: text(row, listingColumns.productTitle),

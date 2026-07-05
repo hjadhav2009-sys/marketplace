@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
-import { canConfirmPacked } from "@/lib/operations/packing";
+import { buildConfirmPackedOrderWhere, canConfirmPacked } from "@/lib/operations/packing";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { problemOrderSchema } from "@/lib/validators";
@@ -31,19 +31,7 @@ export async function confirmPackedAction(formData: FormData) {
   }
 
   const packed = await prisma.$transaction(async (tx) => {
-    const shipmentWhere =
-      order.marketplace === "FLIPKART" && order.trackingId
-        ? {
-            accountId: account.id,
-            marketplace: "FLIPKART",
-            trackingId: order.trackingId,
-            packStatus: "READY" as const
-          }
-        : {
-            id: order.id,
-            accountId: account.id,
-            packStatus: "READY" as const
-          };
+    const shipmentWhere = buildConfirmPackedOrderWhere(order, account.id);
     const shipmentOrders = await tx.order.findMany({
       where: shipmentWhere,
       select: {

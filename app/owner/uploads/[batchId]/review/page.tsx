@@ -20,6 +20,7 @@ import type { MeeshoParserDiagnostics, ParseIssue } from "@/lib/parsers/meesho";
 import { prisma } from "@/lib/prisma";
 import { picklistSummaryProductNameLabel } from "@/lib/product-image";
 import { normalizeSkuForMatching } from "@/lib/sku";
+import { flipkartIssueRawContext } from "@/src/lib/marketplaces/flipkart";
 import { confirmParsedBatchAction, prepareBatchProductImagesAction, repairMissingSkuImageMappingAction } from "../../actions";
 
 type ReviewPageProps = {
@@ -76,6 +77,11 @@ type BatchStats = {
 };
 
 type BatchNotes = {
+  marketplace?: string;
+  parser?: string;
+  parsedRows?: number;
+  importableRows?: number;
+  heldRows?: number;
   parserVersion?: string;
   diagnostics?: MeeshoParserDiagnostics[];
   files?: Array<Partial<MeeshoParserDiagnostics> & { stats?: BatchStats }>;
@@ -117,6 +123,19 @@ function parseIssues(value: string | null) {
     return Array.isArray(parsed) ? (parsed as ParseIssue[]) : [];
   } catch {
     return [] as ParseIssue[];
+  }
+}
+
+function parseIssueRawData(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -227,6 +246,194 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
   }
 
   const notes = parseNotes(batch.notes);
+  if (notes.marketplace === "FLIPKART" && notes.parser === "flipkart-orders-xlsx") {
+    const issueRows = batch.issues.map((issue) => ({
+      ...issue,
+      context: flipkartIssueRawContext(parseIssueRawData(issue.rawData))
+    }));
+    const duplicateRows = issueRows.filter((issue) => issue.issueType.includes("DUPLICATE"));
+    const heldRows = issueRows.filter((issue) => issue.issueType === "MISSING_FLIPKART_DUPLICATE_KEY" || issue.issueType === "MISSING_SKU");
+    const missingListingRows = issueRows.filter((issue) => issue.issueType === "MISSING_FLIPKART_LISTING_MAPPING");
+    const listingImageMissingRows = issueRows.filter((issue) => issue.issueType === "FLIPKART_LISTING_IMAGE_MISSING");
+    const missingMappingRows = [...missingListingRows, ...listingImageMissingRows];
+    const otherIssueRows = issueRows.filter(
+      (issue) =>
+        !duplicateRows.some((row) => row.id === issue.id) &&
+        !heldRows.some((row) => row.id === issue.id) &&
+        !missingMappingRows.some((row) => row.id === issue.id)
+    );
+    const validRows = notes.importableRows ?? batch.createdRows + batch.updatedRows + batch.duplicateRows;
+    const issueTable = (rows: typeof issueRows, emptyTitle: string, emptyDescription: string) =>
+      rows.length > 0 ? (
+        <div className="overflow-x-auto rounded-md border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Row</th>
+                <th className="px-3 py-2">Issue</th>
+                <th className="px-3 py-2">Message</th>
+                <th className="px-3 py-2">SKU</th>
+                <th className="px-3 py-2">Shipment ID</th>
+                <th className="px-3 py-2">ORDER ITEM ID</th>
+                <th className="px-3 py-2">Tracking ID</th>
+                <th className="px-3 py-2">Product</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((issue) => (
+                <tr key={issue.id}>
+                  <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-950">{issue.rowNumber ?? "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ${issueTone(issue.issueType)}`}>
+                      {issueLabel(issue.issueType)}
+                    </span>
+                  </td>
+                  <td className="min-w-64 px-3 py-2 text-slate-700">{issue.message}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-950">{issue.context.sku ?? "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">{issue.context.shipmentId ?? "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">{issue.context.orderItemId ?? "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">{issue.context.trackingId ?? "-"}</td>
+                  <td className="min-w-56 px-3 py-2 text-slate-700">{issue.context.product ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState title={emptyTitle} description={emptyDescription} />
+      );
+
+    return (
+      <AppShell>
+        <PageHeader
+          eyebrow="Review"
+          title="Flipkart import review"
+          description="Review imported rows, duplicate rows, held bad rows, and missing listing or image mappings for this Flipkart Order Excel batch."
+        >
+          <StatusBadge value={batch.status} />
+        </PageHeader>
+
+        <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <p className="text-sm text-slate-500">File</p>
+              <p className="font-semibold text-slate-950">{batch.fileName}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Uploaded</p>
+              <p className="font-semibold text-slate-950">{formatDateTime(batch.createdAt)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Uploaded by</p>
+              <p className="font-semibold text-slate-950">{batch.createdBy?.name ?? "Unknown"}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          {[
+            ["Total rows", batch.totalRows],
+            ["Valid rows", validRows],
+            ["Created", batch.createdRows],
+            ["Updated", batch.updatedRows],
+            ["Duplicate rows", duplicateRows.length || batch.duplicateRows],
+            ["Held rows", heldRows.length || notes.heldRows || 0],
+            ["Missing listings", missingListingRows.length],
+            ["Listing image missing", listingImageMissingRows.length]
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+              <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="mt-4 rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <h2 className="font-semibold text-slate-950">Valid rows imported</h2>
+            <p className="mt-1 text-sm text-slate-600">Bad rows are held by issue records and are not auto-imported.</p>
+          </div>
+          {batch.orders.length > 0 ? (
+            <div className="divide-y divide-slate-100">
+              {batch.orders.map((order) => (
+                <div key={order.id} className="grid gap-3 px-4 py-4 md:grid-cols-[auto_1fr] md:items-center">
+                  <ProductImage src={order.imageUrl} alt={`${order.sku} product image`} size="sm" showBadge={false} />
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">SKU</p>
+                      <p className="break-words font-bold text-slate-950">{order.sku}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product</p>
+                      <p className="break-words text-sm text-slate-700">{order.productDescription ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tracking ID</p>
+                      <p className="break-words text-sm font-semibold text-slate-950">{order.trackingId ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">IDs</p>
+                      <p className="break-words text-sm text-slate-700">
+                        Shipment {order.shipmentId ?? "-"} / Item {order.orderItemId ?? "-"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4">
+              <EmptyState title="No valid rows imported" description="All rows in this Flipkart file were held or skipped. Check the issue sections below." />
+            </div>
+          )}
+        </section>
+
+        <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-slate-950">Missing listing / image mapping review</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Import Flipkart Listings first so order SKU matches Seller SKU Id. Orders still import when images are missing.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm font-semibold">
+              {missingListingRows.length > 0 ? (
+                <Link href={`/owner/uploads/${batch.id}/review/missing-mappings?kind=listing`} className="text-berry hover:text-pink-800">
+                  Download missing listing mappings CSV
+                </Link>
+              ) : null}
+              {listingImageMissingRows.length > 0 ? (
+                <Link href={`/owner/uploads/${batch.id}/review/missing-mappings?kind=image`} className="text-berry hover:text-pink-800">
+                  Download missing image mappings CSV
+                </Link>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-4">{issueTable(missingMappingRows, "No missing mappings", "All imported Flipkart order SKUs have usable listing image mappings.")}</div>
+        </section>
+
+        <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold text-slate-950">Duplicate rows</h2>
+          <div className="mt-4">{issueTable(duplicateRows, "No duplicate rows", "No duplicate ORDER ITEM ID rows were detected inside this upload.")}</div>
+        </section>
+
+        <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold text-slate-950">Held rows and missing required fields</h2>
+          <div className="mt-4">
+            {issueTable(heldRows, "No held rows", "Every row had SKU plus ORDER ITEM ID or Shipment ID + SKU.")}
+          </div>
+        </section>
+
+        {otherIssueRows.length > 0 ? (
+          <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="font-semibold text-slate-950">Other import issues</h2>
+            <div className="mt-4">{issueTable(otherIssueRows, "No other issues", "No other Flipkart import issues were found.")}</div>
+          </section>
+        ) : null}
+      </AppShell>
+    );
+  }
+
   const diagnostics = diagnosticsFromNotes(notes);
   const needsOcr = diagnostics.some((diagnostic) => diagnostic.scannedPdfLikely);
   const parserWarnings = Array.from(new Set(diagnostics.flatMap((diagnostic) => diagnostic.parserWarnings)));

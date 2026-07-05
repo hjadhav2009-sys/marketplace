@@ -939,7 +939,7 @@ export async function createFlipkartOrderImportAction(formData: FormData) {
     revalidatePath("/owner");
     revalidatePath("/packing");
     revalidatePath("/picker");
-    redirect(`/owner/uploads/new?flipkartBatchId=${batch.id}`);
+    redirect(`/owner/uploads/${batch.id}/review`);
   } catch {
     redirect("/owner/uploads/new?error=flipkart-order-import-failed");
   }

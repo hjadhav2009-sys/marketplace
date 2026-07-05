@@ -76,7 +76,48 @@ MEESHO
 
 `src/lib/marketplaces/flipkart/parser.ts` parses sanitized Flipkart Order Excel and Listing Excel rows into the shared marketplace model. Owner uploads now include Flipkart Orders, and SKU image/listing imports include Flipkart Listings. Tracking ID is stored separately from the internal unique key so packing can search the scanned Flipkart label barcode.
 
-The next development step is to test the importer with a sanitized Flipkart export, review any held rows, and then add a small review screen for rows missing `ORDER ITEM ID` plus `Shipment ID`/`SKU`.
+### Import Flipkart Listings
+
+Open `Owner -> SKU Images / Listings -> Flipkart Listings` and upload a sanitized Flipkart Listing `.xlsx` export.
+
+The importer matches `Seller SKU Id` to order `SKU`. Product images use this priority: `Image 1 1366 URL`, `Image URL 1`, `Image 2 1366 URL`, `Image URL 2`, and so on. `Generated Direct Product URL` is stored as a product page URL only; it is not treated as an image.
+
+### Import Flipkart Orders
+
+Open `Owner -> Upload -> Flipkart Orders` and upload a sanitized Flipkart Order `.xlsx` export.
+
+Duplicate safety uses `ORDER ITEM ID` first. If it is missing, the importer falls back to `Shipment ID + SKU`. Rows missing both `ORDER ITEM ID` and `Shipment ID` are held for review and are not imported automatically.
+
+### Review Missing Mappings
+
+After a Flipkart Order import, open the batch review page. It shows valid imported rows, duplicate rows, held rows, rows missing required fields, and missing listing/image warnings.
+
+Warnings use clear messages:
+
+```text
+Missing Flipkart listing mapping for SKU: <sku>
+Listing found but image missing for SKU: <sku>
+```
+
+The review page can download CSVs for missing listing mappings and missing image mappings.
+
+### Tracking ID Scan
+
+Packing scans use Flipkart `Tracking ID` / AWB from the label barcode, for example fake fixture values like `FMPC0000000001`.
+
+If multiple ready SKUs share one Tracking ID, the packing result page shows the ready shipment items together. Confirm packed marks ready items for that Tracking ID as packed. Already packed items are skipped, and problem items stay in problem status.
+
+### Fake Fixtures
+
+Sanitized fake Flipkart Excel fixtures live in:
+
+```text
+tests/fixtures/flipkart/
+```
+
+They are safe for tests only and contain masked names, masked addresses, PIN `000000`, and fake `FMPC0000000000` style Tracking IDs. Never upload real Flipkart exports, order files, customer data, invoices, labels, phone numbers, addresses, Tracking IDs, passwords, Supabase URLs, or `.env` files to GitHub.
+
+The next development step is to run a manual import using a sanitized copy of a real Flipkart export and refine any column edge cases found in that masked file.
 
 ## Preserved Foundation Notes
 

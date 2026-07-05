@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { getAvailableAccounts, requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { flipkartIssueRawContext } from "@/src/lib/marketplaces/flipkart";
 import { importSkuMappingFileAction } from "./actions";
 
 type ImportPageProps = {
@@ -36,6 +37,19 @@ function parseImportNotes(value: string | null): ImportNotes {
   }
 }
 
+function parseIssueRawData(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function SkuMappingImportPage({ searchParams }: ImportPageProps) {
   const user = await requireUser(["OWNER"]);
   const selectedAccount = await requireAccount(user);
@@ -51,6 +65,12 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
       })
     : null;
   const importNotes = parseImportNotes(batch?.notes ?? null);
+  const issueRows =
+    batch?.issues.map((issue) => ({
+      ...issue,
+      context: flipkartIssueRawContext(parseIssueRawData(issue.rawData))
+    })) ?? [];
+  const hasFlipkartMissingImageIssues = issueRows.some((issue) => issue.issueType === "MISSING_IMAGE_URL" && issue.context.sku);
 
   return (
     <AppShell>
@@ -195,7 +215,7 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
                     href={`/owner/sku-mappings/import/${batch.id}/errors`}
                     className="text-sm font-semibold text-berry hover:text-pink-800"
                   >
-                    Download error CSV
+                    {hasFlipkartMissingImageIssues ? "Download missing image CSV" : "Download error CSV"}
                   </Link>
                 ) : null}
               </div>
@@ -207,14 +227,18 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
                       <tr>
                         <th className="px-3 py-2">Row</th>
                         <th className="px-3 py-2">Issue</th>
+                        <th className="px-3 py-2">SKU</th>
+                        <th className="px-3 py-2">Product</th>
                         <th className="px-3 py-2">Message</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {batch.issues.map((issue) => (
+                      {issueRows.map((issue) => (
                         <tr key={issue.id}>
                           <td className="px-3 py-2">{issue.rowNumber ?? "-"}</td>
                           <td className="px-3 py-2 font-semibold text-slate-950">{issue.issueType}</td>
+                          <td className="px-3 py-2 font-semibold text-slate-950">{issue.context.sku ?? "-"}</td>
+                          <td className="px-3 py-2 text-slate-600">{issue.context.product ?? "-"}</td>
                           <td className="px-3 py-2 text-slate-600">{issue.message}</td>
                         </tr>
                       ))}

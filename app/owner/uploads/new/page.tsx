@@ -46,13 +46,16 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
       <PageHeader
         eyebrow="Upload"
         title="Upload marketplace files"
-        description="Flipkart parser support starts here. The inherited PDF review pipeline stays in place while Flipkart CSV/PDF extraction is built."
+        description="Upload Flipkart Order Excel files or use the inherited PDF review pipeline for the existing foundation."
       />
 
       {flipkartBatch ? (
         <div className="mb-5 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-700">
           Flipkart order import finished: {flipkartBatch.createdRows} created, {flipkartBatch.updatedRows} updated,{" "}
-          {flipkartBatch.duplicateRows} duplicate, {flipkartBatch.missingImageRows} missing image mapping, {flipkartBatch.errorRows} held for review.
+          {flipkartBatch.duplicateRows} duplicate, {flipkartBatch.missingImageRows} missing image mapping, {flipkartBatch.errorRows} held for review.{" "}
+          <a href={`/owner/uploads/${flipkartBatch.id}/review`} className="underline">
+            Open review
+          </a>
         </div>
       ) : null}
 

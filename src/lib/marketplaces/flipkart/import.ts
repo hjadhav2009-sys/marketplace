@@ -13,6 +13,7 @@ import {
   type FlipkartParseIssue,
   type FlipkartRawRow
 } from "./parser";
+import { dedupeFlipkartOrderRows, flipkartOrderMappingIssue, flipkartRawText } from "./review";
 
 type ExistingFlipkartOrder = {
   id: string;
@@ -81,6 +82,43 @@ function sameOrder(existing: ExistingFlipkartOrder, order: FlipkartOrderLine, im
   );
 }
 
+function parseIssueRawData(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function findFlipkartListingMissingImageSkus(accountId: string) {
+  const issues = await prisma.importRowIssue.findMany({
+    where: {
+      issueType: "MISSING_IMAGE_URL",
+      batch: {
+        accountId,
+        importType: "SKU_IMAGE"
+      }
+    },
+    select: {
+      rawData: true
+    }
+  });
+
+  return new Set(
+    issues
+      .map((issue) => {
+        const rawData = parseIssueRawData(issue.rawData);
+        return normalizeSkuForMatching(flipkartRawText(rawData, "Seller SKU Id") ?? flipkartRawText(rawData, "SKU"));
+      })
+      .filter((sku): sku is string => Boolean(sku))
+  );
+}
+
 async function writeIssues(batchId: string, issues: FlipkartParseIssue[]) {
   if (issues.length === 0) {
     return;
@@ -123,32 +161,14 @@ export async function importFlipkartOrderRows(input: {
     }
   });
   const duplicateIssues: FlipkartParseIssue[] = [];
-  const seenKeys = new Set<string>();
-  const importableOrders = parsed.orders.filter((order, index) => {
-    const key = flipkartInternalOrderKey(order);
-
-    if (!key) {
-      return false;
-    }
-
-    if (seenKeys.has(key)) {
-      duplicateIssues.push({
-        rowNumber: index + 2,
-        issueType: "DUPLICATE_FLIPKART_ROW",
-        message: `Duplicate Flipkart row skipped for ${key}.`,
-        rawData: order.rawData ?? {}
-      });
-      return false;
-    }
-
-    seenKeys.add(key);
-    return true;
-  });
+  const deduped = dedupeFlipkartOrderRows(parsed.orders);
+  duplicateIssues.push(...deduped.duplicateIssues);
+  const importableOrders = deduped.importableOrders;
   const internalKeys = importableOrders.map((order) => flipkartInternalOrderKey(order)).filter((key): key is string => Boolean(key));
   const orderSkus = Array.from(
     new Set(importableOrders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter((sku): sku is string => Boolean(sku))))
   );
-  const [existingOrders, mappings] = await Promise.all([
+  const [existingOrders, mappings, listingMissingImageSkus] = await Promise.all([
     prisma.order.findMany({
       where: {
         accountId: input.account.id,
@@ -180,7 +200,8 @@ export async function importFlipkartOrderRows(input: {
         sku: true,
         imageUrl: true
       }
-    })
+    }),
+    findFlipkartListingMissingImageSkus(input.account.id)
   ]);
   const existingByKey = new Map(existingOrders.map((order) => [order.awb, order]));
   const imageBySku = new Map(mappings.map((mapping) => [normalizeSkuForMatching(mapping.sku), mapping.imageUrl]));
@@ -201,14 +222,20 @@ export async function importFlipkartOrderRows(input: {
     const sku = normalizeSkuForMatching(order.sku);
     const imageUrl = imageBySku.get(sku) ?? null;
 
-    if (!imageUrl) {
+    const mappingIssue = flipkartOrderMappingIssue(order, {
+      hasActiveImageMapping: Boolean(imageUrl),
+      listingFoundWithMissingImage: listingMissingImageSkus.has(sku)
+    });
+
+    if (mappingIssue) {
       missingImageRows += 1;
       await prisma.importRowIssue.create({
         data: {
           batchId: batch.id,
-          issueType: "MISSING_IMAGE_MAPPING",
-          message: `No active Flipkart listing image mapping found for SKU ${sku}.`,
-          rawData: JSON.stringify(order.rawData ?? {})
+          rowNumber: mappingIssue.rowNumber,
+          issueType: mappingIssue.issueType,
+          message: mappingIssue.message,
+          rawData: JSON.stringify(mappingIssue.rawData)
         }
       });
     }
@@ -259,13 +286,14 @@ export async function importFlipkartOrderRows(input: {
   }
 
   const errorRows = parsed.issues.length;
+  const reviewRows = parsed.issues.length + duplicateIssues.length + missingImageRows;
   const updatedBatch = await prisma.uploadBatch.update({
     where: { id: batch.id },
     data: {
-      status: errorRows > 0 ? "REVIEWED" : "IMPORTED",
+      status: reviewRows > 0 ? "REVIEWED" : "IMPORTED",
       createdRows,
       updatedRows,
-      duplicateRows,
+      duplicateRows: duplicateRows + duplicateIssues.length,
       missingImageRows,
       skippedRows: duplicateRows + duplicateIssues.length + parsed.issues.length,
       errorRows,
@@ -324,6 +352,7 @@ export async function importFlipkartListingRows(input: {
   let createdRows = 0;
   let updatedRows = 0;
   let skippedRows = 0;
+  let missingImageRows = 0;
   const issues = [...parsed.issues];
 
   await writeIssues(batch.id, issues);
@@ -332,8 +361,9 @@ export async function importFlipkartListingRows(input: {
     const sku = normalizeSkuForMatching(listing.sku);
 
     if (!listing.imageUrl || !isValidImportImageUrl(listing.imageUrl)) {
+      missingImageRows += 1;
       issues.push({
-        rowNumber: 0,
+        rowNumber: listing.rowNumber,
         issueType: "MISSING_IMAGE_URL",
         message: `No valid image URL found for Flipkart SKU ${sku}.`,
         rawData: listing.rawData
@@ -341,6 +371,7 @@ export async function importFlipkartListingRows(input: {
       await prisma.importRowIssue.create({
         data: {
           batchId: batch.id,
+          rowNumber: listing.rowNumber,
           issueType: "MISSING_IMAGE_URL",
           message: `No valid image URL found for Flipkart SKU ${sku}.`,
           rawData: JSON.stringify(listing.rawData)
@@ -403,6 +434,7 @@ export async function importFlipkartListingRows(input: {
       createdRows,
       updatedRows,
       skippedRows,
+      missingImageRows,
       errorRows: issues.length
     }
   });

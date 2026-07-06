@@ -168,6 +168,16 @@ assert.match(
   /marketplaceListing\.findMany\(\{[\s\S]*sku: \{ in: orderSkus \}/,
   "Order import queries Listing Master only for order SKUs"
 );
+assert.match(
+  flipkartImportSource,
+  /marketplaceListing\.createMany\(\{/,
+  "Flipkart Listing Master import bulk-creates new listings"
+);
+assert.match(
+  flipkartImportSource,
+  /marketplaceListing\.updateMany\(\{/,
+  "Flipkart Listing Master import bulk-updates unchanged listing timestamps"
+);
 
 const dryRunSummary = buildFlipkartDryRunSummary({
   orderRows,

@@ -1,4 +1,4 @@
-import type { Account, User } from "@prisma/client";
+import type { Account, Prisma, User } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
@@ -19,6 +19,9 @@ import {
   type FlipkartRawRow
 } from "./parser";
 import { dedupeFlipkartOrderRows, flipkartOrderMappingIssue } from "./review";
+
+const FLIPKART_LISTING_CREATE_BATCH_SIZE = 100;
+const FLIPKART_LISTING_UPDATE_BATCH_SIZE = 50;
 
 type ExistingFlipkartOrder = {
   id: string;
@@ -308,6 +311,7 @@ export async function importFlipkartListingRows(input: {
     listing,
     data: flipkartListingMasterData(listing)
   }));
+  const missingImageIssues: FlipkartParseIssue[] = [];
 
   await writeIssues(batch.id, issues);
 
@@ -321,6 +325,9 @@ export async function importFlipkartListingRows(input: {
       }
     });
     const existingBySku = new Map(existingListings.map((existingListing) => [normalizeSkuForMatching(existingListing.sku), existingListing]));
+    const createRows: Prisma.MarketplaceListingCreateManyInput[] = [];
+    const updateOperations: Prisma.PrismaPromise<unknown>[] = [];
+    const unchangedListingIds: string[] = [];
 
     for (const { listing, data } of chunk) {
       const sku = data.sku;
@@ -331,20 +338,11 @@ export async function importFlipkartListingRows(input: {
 
       if (!data.mainImageUrl) {
         missingImageRows += 1;
-        issues.push({
+        missingImageIssues.push({
           rowNumber: listing.rowNumber,
           issueType: "MISSING_IMAGE_URL",
           message: `No valid image URL found for Flipkart SKU ${sku}.`,
           rawData: listing.rawData
-        });
-        await prisma.importRowIssue.create({
-          data: {
-            batchId: batch.id,
-            rowNumber: listing.rowNumber,
-            issueType: "MISSING_IMAGE_URL",
-            message: `No valid image URL found for Flipkart SKU ${sku}.`,
-            rawData: JSON.stringify(listing.rawData)
-          }
         });
       }
 
@@ -356,37 +354,51 @@ export async function importFlipkartListingRows(input: {
       };
 
       if (!existing) {
-        const created = await prisma.marketplaceListing.create({ data: listingData });
-        existingBySku.set(sku, created);
-        createdRows += 1;
+        createRows.push(listingData);
       } else if (sameFlipkartListingMaster(existing, data)) {
-        const unchanged = await prisma.marketplaceListing.update({
-          where: { id: existing.id },
-          data: { lastImportedAt: importedAt }
-        });
-        existingBySku.set(sku, unchanged);
-        skippedRows += 1;
+        unchangedListingIds.push(existing.id);
       } else {
-        const updated = await prisma.marketplaceListing.update({
+        updateOperations.push(prisma.marketplaceListing.update({
           where: { id: existing.id },
           data: listingData
-        });
-        existingBySku.set(sku, updated);
-        updatedRows += 1;
+        }));
       }
+    }
+
+    for (const createChunk of chunkFlipkartListingRows(createRows, FLIPKART_LISTING_CREATE_BATCH_SIZE)) {
+      const result = await prisma.marketplaceListing.createMany({
+        data: createChunk
+      });
+      createdRows += result.count;
+    }
+
+    for (const unchangedChunk of chunkFlipkartListingRows(unchangedListingIds, FLIPKART_LISTING_CREATE_BATCH_SIZE)) {
+      const result = await prisma.marketplaceListing.updateMany({
+        where: { id: { in: unchangedChunk } },
+        data: { lastImportedAt: importedAt }
+      });
+      skippedRows += result.count;
+    }
+
+    for (const updateChunk of chunkFlipkartListingRows(updateOperations, FLIPKART_LISTING_UPDATE_BATCH_SIZE)) {
+      const result = await prisma.$transaction(updateChunk);
+      updatedRows += result.length;
     }
   }
 
+  await writeIssues(batch.id, missingImageIssues);
+
+  const allIssues = [...issues, ...missingImageIssues];
   const updatedBatch = await prisma.uploadBatch.update({
     where: { id: batch.id },
     data: {
-      status: issues.length > 0 ? "REVIEWED" : "IMPORTED",
+      status: allIssues.length > 0 ? "REVIEWED" : "IMPORTED",
       createdRows,
       updatedRows,
       duplicateRows: deduped.duplicateIssues.length,
       skippedRows,
       missingImageRows,
-      errorRows: issues.length,
+      errorRows: allIssues.length,
       notes: JSON.stringify({
         marketplace: "FLIPKART",
         parser: "flipkart-listings-xlsx",
@@ -409,7 +421,7 @@ export async function importFlipkartListingRows(input: {
       skippedRows,
       missingImageRows,
       inactiveListings,
-      errorRows: issues.length
+      errorRows: allIssues.length
     },
     request: input.request
   });

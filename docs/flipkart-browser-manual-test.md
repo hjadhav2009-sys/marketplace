@@ -77,6 +77,7 @@ Confirm the listing import summary:
 Expected behavior:
 
 - A live import bar appears after submitting the file. It shows that upload/import is running, but it does not show exact percent complete.
+- Listing Master rows are bulk-inserted where possible. Very large files still depend on browser upload time, Excel parsing time, and database write speed.
 - Listing rows with duplicate Seller SKU are reviewed or skipped according to the import summary.
 - Product image data is imported from Listing Master.
 - No real URL values need to be copied into notes or screenshots.

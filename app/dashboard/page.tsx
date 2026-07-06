@@ -6,15 +6,32 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { compactNumber, formatDateTime } from "@/lib/format";
 import { getDashboardStats, getRecentBatches, getRecentOrders } from "@/lib/data";
 import { requireAccount, requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage() {
   const user = await requireUser(["OWNER"]);
   const account = await requireAccount(user);
-  const [stats, orders, batches] = await Promise.all([
+  const [stats, orders, batches, latestListingImport, latestOrderImport] = await Promise.all([
     getDashboardStats(account.id),
     getRecentOrders(account.id),
-    getRecentBatches(account.id)
+    getRecentBatches(account.id),
+    prisma.importJob.findFirst({
+      where: {
+        accountId: account.id,
+        marketplace: account.marketplace,
+        importType: "FLIPKART_LISTING_MASTER"
+      },
+      select: { createdAt: true, status: true },
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.uploadBatch.findFirst({
+      where: { accountId: account.id },
+      select: { createdAt: true, status: true },
+      orderBy: { createdAt: "desc" }
+    })
   ]);
+  const accountName = account.accountDisplayName ?? account.name;
+  const accountCode = account.accountCode ?? account.code;
 
   return (
     <AppShell>
@@ -25,12 +42,42 @@ export default async function DashboardPage() {
         action={{ href: "/owner/uploads/new", label: "Import files" }}
       />
 
+      <section className="mb-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected company / seller account</p>
+            <h2 className="mt-1 text-xl font-black text-slate-950">{account.companyName} / {accountName}</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{account.marketplace}</span>{" "}
+              <span className="font-medium">{accountCode}</span>
+            </p>
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-md bg-slate-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest listing master</p>
+              <p className="mt-1 font-bold text-slate-950">{formatDateTime(latestListingImport?.createdAt)}</p>
+            </div>
+            <div className="rounded-md bg-slate-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest order import</p>
+              <p className="mt-1 font-bold text-slate-950">{formatDateTime(latestOrderImport?.createdAt)}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Ready orders" value={compactNumber(stats.readyOrders)} tone="berry" />
-        <StatCard label="Packed" value={compactNumber(stats.packedOrders)} tone="mint" />
-        <StatCard label="Problems" value={compactNumber(stats.problemOrders)} tone="clay" />
+        <StatCard label="Today ready" value={compactNumber(stats.readyOrders)} tone="berry" />
+        <StatCard label="Packed today" value={compactNumber(stats.packedOrders)} tone="mint" />
+        <StatCard label="Problems today" value={compactNumber(stats.problemOrders)} tone="clay" />
         <StatCard label="SKU images" value={compactNumber(stats.skuMappings)} />
         <StatCard label="Batches" value={compactNumber(stats.batches)} />
+      </section>
+
+      <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <QuickAction href="/owner/uploads/new" label="Import orders" />
+        <QuickAction href="/owner/uploads/new" label="Import listing master" />
+        <QuickAction href="/picker" label="Open picker" />
+        <QuickAction href="/packing" label="Open packer" />
       </section>
 
       <section className="mt-6 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
@@ -94,5 +141,17 @@ export default async function DashboardPage() {
         </div>
       </section>
     </AppShell>
+  );
+}
+
+function QuickAction({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      prefetch
+      className="inline-flex min-h-12 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:border-berry hover:bg-pink-50"
+    >
+      {label}
+    </Link>
   );
 }

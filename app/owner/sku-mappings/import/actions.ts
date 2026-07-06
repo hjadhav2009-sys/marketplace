@@ -31,8 +31,8 @@ export async function importSkuMappingFileAction(formData: FormData) {
     redirect("/owner/sku-mappings/import?error=file");
   }
 
-  const selectedAccount = await prisma.account.findUnique({
-    where: { id: accountParsed.data.accountId }
+  const selectedAccount = await prisma.account.findFirst({
+    where: { id: accountParsed.data.accountId, active: true }
   });
 
   if (!selectedAccount) {

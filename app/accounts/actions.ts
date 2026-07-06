@@ -18,7 +18,7 @@ export async function selectAccountAction(formData: FormData) {
   const account = await prisma.account.findFirst({
     where: {
       id: parsed.data.accountId,
-      active: user.role === "OWNER" ? undefined : true,
+      active: true,
       users: user.role === "OWNER" ? undefined : { some: { id: user.id } }
     }
   });

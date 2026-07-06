@@ -109,10 +109,11 @@ function mergeDisplayMappings(input: {
 }
 
 export async function getDashboardStats(accountId: string) {
+  const startOfDay = startOfWorkDay();
   const [readyOrders, packedOrders, problemOrders, skuMappings, batches] = await Promise.all([
-    prisma.order.count({ where: { accountId, packStatus: "READY" } }),
-    prisma.order.count({ where: { accountId, packStatus: "PACKED" } }),
-    prisma.problemOrder.count({ where: { accountId, status: "OPEN" } }),
+    prisma.order.count({ where: { accountId, packStatus: "READY", importedAt: { gte: startOfDay } } }),
+    prisma.order.count({ where: { accountId, packStatus: "PACKED", packedAt: { gte: startOfDay } } }),
+    prisma.problemOrder.count({ where: { accountId, status: "OPEN", createdAt: { gte: startOfDay } } }),
     prisma.skuImageMapping.count({ where: { accountId } }),
     prisma.uploadBatch.count({ where: { accountId } })
   ]);

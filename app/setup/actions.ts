@@ -74,7 +74,11 @@ export async function createFirstOwnerAction(formData: FormData) {
       const account = await tx.account.create({
         data: {
           name: parsed.accountName,
-          code: parsed.accountCode
+          code: parsed.accountCode,
+          companyName: "Sullery",
+          marketplace: "FLIPKART",
+          accountDisplayName: parsed.accountName,
+          accountCode: parsed.accountCode
         }
       });
 

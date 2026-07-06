@@ -12,16 +12,21 @@ export const accountSelectionSchema = z.object({
   accountId: z.string().min(1, "Choose an account")
 });
 
+export const marketplaceSchema = z.enum(["FLIPKART", "MEESHO", "AMAZON", "MYNTRA", "SHOPIFY", "WOOCOMMERCE", "OTHER"]);
+
 export const ownerAccountSchema = z.object({
   accountId: z.string().optional(),
-  name: z.string().trim().min(2, "Account name is required").max(80),
-  code: z
+  companyName: z.string().trim().min(2, "Company name is required").max(80).default("Sullery"),
+  marketplace: marketplaceSchema,
+  accountDisplayName: z.string().trim().min(2, "Account name is required").max(80),
+  accountCode: z
     .string()
     .trim()
     .min(2, "Account code is required")
     .max(40)
     .transform((value) => value.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "")),
-  active: z.coerce.boolean().default(true)
+  active: z.coerce.boolean().default(true),
+  notes: z.string().trim().max(500).optional()
 });
 
 export const uploadBatchSchema = z.object({

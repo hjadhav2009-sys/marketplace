@@ -6,10 +6,22 @@ const prisma = new PrismaClient();
 async function main() {
   const account = await prisma.account.upsert({
     where: { code: "sullery" },
-    update: { name: "Sullery", active: true },
+    update: {
+      name: "Sullery",
+      code: "sullery",
+      companyName: "Sullery",
+      marketplace: "FLIPKART",
+      accountDisplayName: "Sullery",
+      accountCode: "sullery",
+      active: true
+    },
     create: {
       name: "Sullery",
       code: "sullery",
+      companyName: "Sullery",
+      marketplace: "FLIPKART",
+      accountDisplayName: "Sullery",
+      accountCode: "sullery",
       active: true
     }
   });

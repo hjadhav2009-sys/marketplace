@@ -643,7 +643,22 @@ assert.equal(canUseFirstRunSetup(1), false, "First-run setup is blocked after an
 assert.equal(validateFirstRunSetupPassword("demo1234", "demo1234").valid, false, "Setup reuses demo password rejection");
 assert.equal(validateFirstRunSetupPassword("better123", "different123").valid, false, "Setup rejects mismatched passwords");
 assert.equal(validateFirstRunSetupPassword("better123", "better123").valid, true, "Setup accepts valid matching password");
-assert.equal(ownerAccountSchema.parse({ name: "Second Account", code: "Second Account", active: true }).code, "second-account", "Owner account code is normalized");
+assert.equal(
+  ownerAccountSchema.parse({
+    companyName: "Sullery",
+    marketplace: "FLIPKART",
+    accountDisplayName: "Second Account",
+    accountCode: "Second Account",
+    active: true
+  }).accountCode,
+  "second-account",
+  "Owner account code is normalized"
+);
+assert.equal(
+  ownerAccountSchema.safeParse({ companyName: "Sullery", accountDisplayName: "Missing Marketplace", accountCode: "missing-marketplace", active: true }).success,
+  false,
+  "Create account requires marketplace"
+);
 
 assert.equal(normalizeIp("::ffff:192.168.1.10"), "192.168.1.10", "IPv4-mapped IPs normalize");
 assert.equal(isIpInCidr("192.168.1.10", "192.168.0.0/16"), true, "Local CIDR allows Wi-Fi IP");
@@ -962,6 +977,8 @@ const productImageGalleryComponent = readFileSync(join(repoRoot, "components", "
 const pickerProductCardComponent = readFileSync(join(repoRoot, "components", "PickerProductCard.tsx"), "utf8");
 const productDetailsDrawerComponent = readFileSync(join(repoRoot, "components", "ProductDetailsDrawer.tsx"), "utf8");
 const appNavComponent = readFileSync(join(repoRoot, "components", "AppNav.tsx"), "utf8");
+const accountSwitcherComponent = readFileSync(join(repoRoot, "components", "AccountSwitcherForm.tsx"), "utf8");
+const marketplaceImportWizardComponent = readFileSync(join(repoRoot, "components", "MarketplaceImportWizard.tsx"), "utf8");
 const awbScannerComponent = readFileSync(join(repoRoot, "components", "AwbBarcodeScanner.tsx"), "utf8");
 const productImageRoute = readFileSync(join(repoRoot, "app", "product-images", "[...path]", "route.ts"), "utf8");
 const pickerPage = readFileSync(join(repoRoot, "app", "picker", "page.tsx"), "utf8");
@@ -974,6 +991,8 @@ const pickerActions = readFileSync(join(repoRoot, "app", "picker", "[sku]", "act
 const pickerDetailsRoute = readFileSync(join(repoRoot, "app", "picker", "details", "route.ts"), "utf8");
 const dashboardPage = readFileSync(join(repoRoot, "app", "dashboard", "page.tsx"), "utf8");
 const ownerPage = readFileSync(join(repoRoot, "app", "owner", "page.tsx"), "utf8");
+const accountsPage = readFileSync(join(repoRoot, "app", "accounts", "page.tsx"), "utf8");
+const accountActions = readFileSync(join(repoRoot, "app", "accounts", "actions.ts"), "utf8");
 const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
 const workQueueSource = readFileSync(join(repoRoot, "lib", "operations", "work-queue.ts"), "utf8");
 const ownerAccountsPage = readFileSync(join(repoRoot, "app", "owner", "accounts", "page.tsx"), "utf8");
@@ -983,6 +1002,7 @@ const ownerUsersPage = readFileSync(join(repoRoot, "app", "owner", "users", "pag
 const ownerUsersActions = readFileSync(join(repoRoot, "app", "owner", "users", "actions.ts"), "utf8");
 const appShell = readFileSync(join(repoRoot, "components", "AppShell.tsx"), "utf8");
 const dataHelpers = readFileSync(join(repoRoot, "lib", "data.ts"), "utf8");
+const authHelpers = readFileSync(join(repoRoot, "lib", "auth.ts"), "utf8");
 const changePasswordAction = readFileSync(join(repoRoot, "app", "change-password", "actions.ts"), "utf8");
 const ownerSystemPage = readFileSync(join(repoRoot, "app", "owner", "system", "page.tsx"), "utf8");
 const systemHealth = readFileSync(join(repoRoot, "lib", "system-health.ts"), "utf8");
@@ -1057,13 +1077,20 @@ assert.match(importOrders, /heldRows/, "Order import stats include held-for-revi
 assert.match(reviewPage, /Held for review/, "Import result shows held-for-review count");
 assert.match(dashboardPage, /requireUser\(\["OWNER"\]\)/, "Dashboard route remains owner-only");
 assert.match(dashboardPage, /getDashboardStats/, "Dashboard route exists and uses lightweight dashboard data");
+assert.match(dashboardPage, /Selected company \/ seller account/, "Dashboard shows selected company and account context");
+assert.match(dashboardPage, /account\.marketplace/, "Dashboard shows selected marketplace context");
+assert.match(dashboardPage, /Import orders[\s\S]*Import listing master[\s\S]*Open picker[\s\S]*Open packer/, "Dashboard exposes fast account-scoped quick actions");
 assert.match(ownerPage, /redirect\("\/dashboard"\)/, "Legacy /owner route redirects to /dashboard");
-assert.match(uploadPage, /Flipkart Listing Master/, "Upload page offers Flipkart Listing Master import");
-assert.match(uploadPage, /Flipkart Daily Orders/, "Upload page offers Flipkart Daily Orders import");
-assert.match(uploadPage, /Upload this only when new products are listed or title, price, image, or listing status changes/, "Upload page explains Listing Master timing");
-assert.match(uploadPage, /Daily workers upload this order file/, "Upload page explains daily order import workflow");
-assert.match(uploadPage, /<details[\s\S]*Advanced \/ Legacy imports[\s\S]*Legacy PDF parser for old Meesho label\/manifest workflow/, "Legacy PDF parser is hidden under Advanced / Legacy imports");
-assert.match(uploadPage, /name="accountId"[\s\S]*accounts\.map/, "Upload page exposes seller account selection");
+assert.match(uploadPage, /MarketplaceImportWizard/, "Upload page delegates marketplace/account filtering to the import wizard");
+assert.match(marketplaceImportWizardComponent, /Choose marketplace and seller account first\. Imports are saved under that account\./, "Upload wizard explains marketplace/account scoping");
+assert.match(marketplaceImportWizardComponent, /Flipkart Listing Master/, "Upload wizard offers Flipkart Listing Master import");
+assert.match(marketplaceImportWizardComponent, /Flipkart Daily Orders/, "Upload wizard offers Flipkart Daily Orders import");
+assert.match(marketplaceImportWizardComponent, /Upload this only when new products are listed or title, price, image, or listing status changes/, "Upload wizard explains Listing Master timing");
+assert.match(marketplaceImportWizardComponent, /Daily workers upload this order file/, "Upload wizard explains daily order import workflow");
+assert.match(marketplaceImportWizardComponent, /accounts\.filter\(\(account\) => account\.active && account\.marketplace === marketplace\)/, "Upload wizard filters accounts by selected marketplace");
+assert.match(marketplaceImportWizardComponent, /marketplace === "FLIPKART"[\s\S]*Flipkart Listing Master[\s\S]*Flipkart Daily Orders/, "Flipkart import types appear only under Flipkart");
+assert.match(marketplaceImportWizardComponent, /marketplace === "MEESHO"[\s\S]*Advanced \/ Legacy imports[\s\S]*Legacy PDF parser for old Meesho label\/manifest workflow/, "Meesho legacy PDF import appears only under Meesho legacy");
+assert.match(marketplaceImportWizardComponent, /Amazon coming soon/, "Amazon import option is disabled for now");
 assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");
 assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination");
 assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
@@ -1135,9 +1162,25 @@ assert.doesNotMatch(sourceBetween(appShell, "const packerLinks", "async function
 assert.match(appNavComponent, /usePathname/, "Top navigation can style the active route");
 assert.match(appNavComponent, /prefetch/, "Top navigation prefetches common route links");
 assert.match(appShell, /\/owner\/accounts/, "Owner navigation includes account management");
-assert.match(ownerAccountsPage, /Create account/, "Owner accounts page supports account creation");
+assert.match(appShell, /account\.companyName[\s\S]*account\.marketplace/, "App shell shows selected company and marketplace context");
+assert.match(accountsPage, /AccountSwitcherForm/, "Account switch page uses the grouped marketplace switcher");
+assert.match(accountSwitcherComponent, /Search accounts/, "Switch account UX is searchable");
+assert.match(accountSwitcherComponent, /marketplaceLabels/, "Switch account UX groups accounts by marketplace");
+assert.match(accountActions, /active: true/, "Switch account action only selects active accounts");
+assert.match(authHelpers, /where: \{\s*active: true\s*\}/, "Owner account switcher lists active accounts only");
+assert.match(ownerAccountsPage, /Company \/ Organization/, "Owner accounts page shows company summary");
+assert.match(ownerAccountsPage, /Marketplace accounts/, "Owner accounts page uses marketplace account language");
+assert.match(ownerAccountsPage, /Flipkart[\s\S]*Amazon[\s\S]*Meesho legacy[\s\S]*Other/, "Owner accounts page shows marketplace sections");
+assert.match(ownerAccountsPage, /Create seller account/, "Owner accounts page supports marketplace-aware account creation");
+assert.match(ownerAccountsPage, /name="marketplace"/, "Owner account form requires marketplace");
+assert.match(ownerAccountsPage, /accountDisplayName/, "Owner account form captures account display name");
+assert.match(ownerAccountsPage, /accountCode/, "Owner account form captures account code");
+assert.match(ownerAccountsPage, /marketplaceListings/, "Owner accounts page shows listing master counts");
+assert.match(ownerAccountsPage, /importJobs/, "Owner accounts page shows import counts");
 assert.match(ownerAccountsPage, /Deactivate|Reactivate/, "Owner accounts page supports activate/deactivate controls");
 assert.match(ownerAccountsActions, /OWNER_ACCOUNT_CREATED/, "Owner account creation is audited");
+assert.match(ownerAccountsActions, /marketplace: accountInput\.marketplace/, "Owner account action stores marketplace");
+assert.match(ownerAccountsActions, /accountDisplayName: accountName/, "Owner account action stores display name");
 assert.match(ownerAccountsActions, /OWNER_ACCOUNT_DEACTIVATED/, "Owner account deactivation is audited");
 assert.match(ownerUsersPage, /Passwords are securely hashed and cannot be viewed/, "Owner users page explains passwords cannot be viewed");
 assert.match(ownerUsersPage, /Force password change on next login/, "Owner password reset can force next-login password change");
@@ -1173,6 +1216,12 @@ assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local producti
 assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
+assert.match(sqliteSchema, /enum Marketplace[\s\S]*FLIPKART[\s\S]*MEESHO[\s\S]*AMAZON[\s\S]*WOOCOMMERCE[\s\S]*OTHER/, "SQLite schema defines marketplace enum");
+assert.match(postgresSchema, /enum Marketplace[\s\S]*FLIPKART[\s\S]*MEESHO[\s\S]*AMAZON[\s\S]*WOOCOMMERCE[\s\S]*OTHER/, "PostgreSQL schema defines marketplace enum");
+assert.match(sqliteSchema, /companyName\s+String\s+@default\("Sullery"\)[\s\S]*marketplace\s+Marketplace\s+@default\(FLIPKART\)[\s\S]*accountDisplayName\s+String\?[\s\S]*accountCode\s+String\?/, "SQLite Account model stores company, marketplace, display name, and account code");
+assert.match(postgresSchema, /companyName\s+String\s+@default\("Sullery"\)[\s\S]*marketplace\s+Marketplace\s+@default\(FLIPKART\)[\s\S]*accountDisplayName\s+String\?[\s\S]*accountCode\s+String\?/, "PostgreSQL Account model stores company, marketplace, display name, and account code");
+assert.equal(existsSync(join(repoRoot, "prisma", "migrations", "20260707000100_marketplace_accounts", "migration.sql")), true, "SQLite marketplace account migration exists");
+assert.equal(existsSync(join(repoRoot, "prisma", "migrations-postgres", "20260707000100_marketplace_accounts", "migration.sql")), true, "PostgreSQL marketplace account migration exists");
 assert.match(sqliteSchema, /cacheStatus\s+ImageCacheStatus/, "SQLite schema stores cache status metadata");
 assert.match(postgresSchema, /cacheStatus\s+ImageCacheStatus/, "PostgreSQL schema stores cache status metadata");
 assert.match(sqliteSchema, /active\s+Boolean\s+@default\(true\)[\s\S]*@@index\(\[active\]\)/, "SQLite schema supports active account management");

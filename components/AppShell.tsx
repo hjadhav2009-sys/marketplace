@@ -71,6 +71,8 @@ export async function AppShell({ children, title }: AppShellProps) {
   const user = await requireUser();
   const account = await requireAccount(user);
   const links = linksForRole(user.role);
+  const accountName = account.accountDisplayName ?? account.name;
+  const accountCode = account.accountCode ?? account.code;
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-950">
@@ -78,9 +80,12 @@ export async function AppShell({ children, title }: AppShellProps) {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 sm:py-3">
           <Link href={roleHomePath(user.role)} prefetch className="min-w-0">
             <p className="hidden text-xs font-semibold uppercase tracking-wide text-berry sm:block">Marketplace Pick & Pack</p>
-            <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account.name}</p>
+            <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account.companyName} / {accountName}</p>
             <p className="truncate text-xs font-medium text-slate-500 sm:hidden">
-              {user.role} / {user.name}
+              {account.marketplace} / {user.role}
+            </p>
+            <p className="hidden truncate text-xs font-medium text-slate-500 sm:block">
+              {account.marketplace} / {accountCode}
             </p>
           </Link>
           <div className="flex items-center gap-2">

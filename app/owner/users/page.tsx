@@ -130,7 +130,7 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                     {user.mustChangePassword ? <StatusBadge value="PASSWORD_REQUIRED" /> : null}
                   </div>
                   <p className="mt-1 text-sm text-slate-600">
-                    {user.username} - {user.account?.name ?? "All accounts"}
+                    {user.username} - {user.account ? `${user.account.marketplace} / ${user.account.accountDisplayName ?? user.account.name}` : "All accounts"}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
                     Last login {formatDateTime(user.lastLoginAt)} - {user.lastLoginIp ?? "IP not recorded"}
@@ -310,7 +310,7 @@ function AccountSelect({
   accounts,
   defaultValue = ""
 }: {
-  accounts: Array<{ id: string; name: string }>;
+  accounts: Array<{ id: string; name: string; code: string; marketplace: string; accountDisplayName: string | null; accountCode: string | null }>;
   defaultValue?: string;
 }) {
   return (
@@ -320,7 +320,7 @@ function AccountSelect({
         <option value="">All accounts / owner only</option>
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
-            {account.name}
+            {account.marketplace} / {account.accountDisplayName ?? account.name} / {account.accountCode ?? account.code}
           </option>
         ))}
       </select>

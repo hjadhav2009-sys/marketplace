@@ -18,32 +18,47 @@ export async function saveOwnerAccountAction(formData: FormData) {
   const request = await getRequestMeta();
   const parsed = ownerAccountSchema.safeParse({
     accountId: formData.get("accountId") || undefined,
-    name: formData.get("name"),
-    code: formData.get("code"),
-    active: formData.get("active") === "on"
+    companyName: formData.get("companyName"),
+    marketplace: formData.get("marketplace"),
+    accountDisplayName: formData.get("accountDisplayName"),
+    accountCode: formData.get("accountCode"),
+    active: formData.get("active") === "on",
+    notes: formData.get("notes") || undefined
   });
 
-  if (!parsed.success || !parsed.data.code) {
+  if (!parsed.success || !parsed.data.accountCode) {
     redirectWithError("invalid");
   }
 
   const accountInput = parsed.data;
+  const accountName = accountInput.accountDisplayName;
+  const accountCode = accountInput.accountCode;
 
   try {
     const account = accountInput.accountId
       ? await prisma.account.update({
           where: { id: accountInput.accountId },
           data: {
-            name: accountInput.name,
-            code: accountInput.code,
-            active: accountInput.active
+            name: accountName,
+            code: accountCode,
+            companyName: accountInput.companyName,
+            marketplace: accountInput.marketplace,
+            accountDisplayName: accountName,
+            accountCode,
+            active: accountInput.active,
+            notes: accountInput.notes
           }
         })
       : await prisma.account.create({
           data: {
-            name: accountInput.name,
-            code: accountInput.code,
-            active: accountInput.active
+            name: accountName,
+            code: accountCode,
+            companyName: accountInput.companyName,
+            marketplace: accountInput.marketplace,
+            accountDisplayName: accountName,
+            accountCode,
+            active: accountInput.active,
+            notes: accountInput.notes
           }
         });
 
@@ -55,8 +70,10 @@ export async function saveOwnerAccountAction(formData: FormData) {
       entityId: account.id,
       metadata: {
         accountId: account.id,
-        name: account.name,
-        code: account.code,
+        companyName: account.companyName,
+        marketplace: account.marketplace,
+        accountDisplayName: account.accountDisplayName ?? account.name,
+        accountCode: account.accountCode ?? account.code,
         active: account.active
       },
       request

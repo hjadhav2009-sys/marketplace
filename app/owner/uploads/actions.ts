@@ -68,8 +68,8 @@ async function ownerUploadAccount(formData: FormData, fallbackAccountId: string)
     return null;
   }
 
-  return prisma.account.findUnique({
-    where: { id: parsed.data.accountId }
+  return prisma.account.findFirst({
+    where: { id: parsed.data.accountId, active: true }
   });
 }
 

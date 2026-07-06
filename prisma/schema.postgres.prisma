@@ -78,6 +78,16 @@ enum ImageCacheStatus {
   RECHECK_NEEDED
 }
 
+enum Marketplace {
+  FLIPKART
+  MEESHO
+  AMAZON
+  MYNTRA
+  SHOPIFY
+  WOOCOMMERCE
+  OTHER
+}
+
 model User {
   id                 String              @id @default(cuid())
   username           String              @unique
@@ -136,23 +146,30 @@ model AuditLog {
 }
 
 model Account {
-  id               String            @id @default(cuid())
-  name             String            @unique
-  code             String            @unique
-  active           Boolean           @default(true)
-  users            User[]
-  skuImageMappings SkuImageMapping[]
+  id                  String               @id @default(cuid())
+  name                String               @unique
+  code                String               @unique
+  companyName         String               @default("Sullery")
+  marketplace         Marketplace          @default(FLIPKART)
+  accountDisplayName  String?
+  accountCode         String?
+  active              Boolean              @default(true)
+  notes               String?
+  users               User[]
+  skuImageMappings    SkuImageMapping[]
   marketplaceListings MarketplaceListing[]
-  uploadBatches    UploadBatch[]
-  importJobs       ImportJob[]
-  orders           Order[]
-  scanLogs         ScanLog[]
-  problemOrders    ProblemOrder[]
-  auditLogs        AuditLog[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  uploadBatches       UploadBatch[]
+  importJobs          ImportJob[]
+  orders              Order[]
+  scanLogs            ScanLog[]
+  problemOrders       ProblemOrder[]
+  auditLogs           AuditLog[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
   @@index([active])
+  @@index([companyName])
+  @@index([marketplace, active])
 }
 
 model ImportJob {
@@ -189,9 +206,9 @@ model ImportJob {
 }
 
 model MarketplaceListing {
-  id                        String   @id @default(cuid())
+  id                        String    @id @default(cuid())
   accountId                 String
-  account                   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account                   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
   marketplace               String
   sellerSkuId               String
   sku                       String
@@ -238,8 +255,8 @@ model MarketplaceListing {
   image1366Url10            String?
   mainImageUrl              String?
   lastImportedAt            DateTime?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   @@unique([accountId, marketplace, sellerSkuId])
   @@index([accountId, marketplace])

@@ -22,6 +22,26 @@ type DisplayListing = {
   description?: string | null;
   allSpecifications?: string | null;
   mainImageUrl: string | null;
+  imageUrl1?: string | null;
+  imageUrl2?: string | null;
+  imageUrl3?: string | null;
+  imageUrl4?: string | null;
+  imageUrl5?: string | null;
+  imageUrl6?: string | null;
+  imageUrl7?: string | null;
+  imageUrl8?: string | null;
+  imageUrl9?: string | null;
+  imageUrl10?: string | null;
+  image1366Url1?: string | null;
+  image1366Url2?: string | null;
+  image1366Url3?: string | null;
+  image1366Url4?: string | null;
+  image1366Url5?: string | null;
+  image1366Url6?: string | null;
+  image1366Url7?: string | null;
+  image1366Url8?: string | null;
+  image1366Url9?: string | null;
+  image1366Url10?: string | null;
 };
 
 type DisplayImageMapping = {
@@ -192,14 +212,14 @@ export async function getSkuGroups(
         batchId: options.batchId
       }),
       select: {
-      id: true,
-      awb: true,
-      marketplace: true,
-      shipmentId: true,
-      orderItemId: true,
-      fsn: true,
-      trackingId: true,
-      sku: true,
+        id: true,
+        awb: true,
+        marketplace: true,
+        shipmentId: true,
+        orderItemId: true,
+        fsn: true,
+        trackingId: true,
+        sku: true,
         qty: true,
         color: true,
         size: true,
@@ -362,7 +382,27 @@ export async function getSkuDetail(
         productHighlights: true,
         description: true,
         allSpecifications: true,
-        mainImageUrl: true
+        mainImageUrl: true,
+        imageUrl1: true,
+        imageUrl2: true,
+        imageUrl3: true,
+        imageUrl4: true,
+        imageUrl5: true,
+        imageUrl6: true,
+        imageUrl7: true,
+        imageUrl8: true,
+        imageUrl9: true,
+        imageUrl10: true,
+        image1366Url1: true,
+        image1366Url2: true,
+        image1366Url3: true,
+        image1366Url4: true,
+        image1366Url5: true,
+        image1366Url6: true,
+        image1366Url7: true,
+        image1366Url8: true,
+        image1366Url9: true,
+        image1366Url10: true
       }
     })
   ]);
@@ -705,7 +745,27 @@ export async function getOrderWithImage(accountId: string, awb: string) {
         productHighlights: true,
         description: true,
         allSpecifications: true,
-        mainImageUrl: true
+        mainImageUrl: true,
+        imageUrl1: true,
+        imageUrl2: true,
+        imageUrl3: true,
+        imageUrl4: true,
+        imageUrl5: true,
+        imageUrl6: true,
+        imageUrl7: true,
+        imageUrl8: true,
+        imageUrl9: true,
+        imageUrl10: true,
+        image1366Url1: true,
+        image1366Url2: true,
+        image1366Url3: true,
+        image1366Url4: true,
+        image1366Url5: true,
+        image1366Url6: true,
+        image1366Url7: true,
+        image1366Url8: true,
+        image1366Url9: true,
+        image1366Url10: true
       }
     })
   ]);

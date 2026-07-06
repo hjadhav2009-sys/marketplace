@@ -1,6 +1,7 @@
 "use client";
 
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeAwb, isValidAwb } from "@/lib/awb";
 import { ProductImage } from "./ProductImage";
@@ -41,6 +42,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
   const controlsRef = useRef<IScannerControls | null>(null);
   const hiddenFormRef = useRef<HTMLFormElement | null>(null);
   const hiddenAwbRef = useRef<HTMLInputElement | null>(null);
+  const manualAwbRef = useRef<HTMLInputElement | null>(null);
   const lastScanAtRef = useRef(0);
   const [cameraState, setCameraState] = useState<"idle" | "starting" | "scanning" | "stopped" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
 
   useEffect(() => {
     setHttpsWarning(window.location.protocol !== "https:" && !isLocalhost(window.location.hostname));
+    manualAwbRef.current?.focus();
 
     return () => {
       controlsRef.current?.stop();
@@ -270,6 +273,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
           <label className="block">
             <span className="text-base font-semibold text-slate-700 sm:text-sm sm:font-medium">Tracking ID / AWB</span>
             <input
+              ref={manualAwbRef}
               name="awb"
               inputMode="text"
               autoComplete="off"
@@ -305,9 +309,10 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
                     const displayId = suggestion.trackingId ?? suggestion.awb;
 
                     return (
-                      <a
+                      <Link
                         key={suggestion.awb}
                         href={`/packing/${encodeURIComponent(suggestion.awb)}`}
+                        prefetch
                         className="grid grid-cols-[4rem_1fr] gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm transition hover:border-berry hover:bg-slate-50 sm:grid-cols-[auto_1fr_auto]"
                       >
                         <ProductImage
@@ -338,7 +343,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
                         <span className="col-span-2 justify-self-start rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 sm:col-span-1 sm:self-center sm:justify-self-auto">
                           {suggestion.matchedField} {suggestion.matchType}
                         </span>
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>

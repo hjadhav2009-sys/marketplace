@@ -26,6 +26,30 @@ export function isDisplayableImageSrc(value: string | null | undefined) {
 export type ProductImageState = "loading" | "loaded" | "missing" | "broken";
 export type SkuMappingImageFilter = "all" | "cached" | "not-cached" | "broken" | "recheck-needed";
 
+export type ListingImageGalleryInput = {
+  mainImageUrl?: string | null;
+  imageUrl1?: string | null;
+  imageUrl2?: string | null;
+  imageUrl3?: string | null;
+  imageUrl4?: string | null;
+  imageUrl5?: string | null;
+  imageUrl6?: string | null;
+  imageUrl7?: string | null;
+  imageUrl8?: string | null;
+  imageUrl9?: string | null;
+  imageUrl10?: string | null;
+  image1366Url1?: string | null;
+  image1366Url2?: string | null;
+  image1366Url3?: string | null;
+  image1366Url4?: string | null;
+  image1366Url5?: string | null;
+  image1366Url6?: string | null;
+  image1366Url7?: string | null;
+  image1366Url8?: string | null;
+  image1366Url9?: string | null;
+  image1366Url10?: string | null;
+};
+
 type ImageMappingLike = {
   imageUrl?: string | null;
   imageHealth?: string | null;
@@ -78,7 +102,32 @@ export function productImageStateText(
     return hasSource ? "Image URL failed" : "Broken URL";
   }
 
-  return slowLoading ? (cacheStatus === "CACHED" ? "Cached image loading" : "External image slow") : "Loading image";
+  return slowLoading ? (cacheStatus === "CACHED" ? "Cached image loading" : "Still loading") : "Loading image";
+}
+
+export function buildListingImageGallery(listing: ListingImageGalleryInput | null | undefined, fallbackImageUrl?: string | null) {
+  const images: string[] = [];
+  const record = (listing ?? {}) as Record<string, string | null | undefined>;
+
+  function add(value: string | null | undefined) {
+    const imageUrl = value?.trim();
+
+    if (!imageUrl || !isDisplayableImageSrc(imageUrl) || images.includes(imageUrl)) {
+      return;
+    }
+
+    images.push(imageUrl);
+  }
+
+  for (let index = 1; index <= 10; index += 1) {
+    add(record[`image1366Url${index}`]);
+    add(record[`imageUrl${index}`]);
+  }
+
+  add(listing?.mainImageUrl);
+  add(fallbackImageUrl);
+
+  return images;
 }
 
 export function normalizeSkuMappingImageFilter(value: string | null | undefined): SkuMappingImageFilter {

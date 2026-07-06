@@ -25,7 +25,7 @@ type ProductImageProps = {
 const sizeClass = {
   sm: "h-16 w-16",
   md: "h-28 w-28",
-  lg: "aspect-square w-full"
+  lg: "aspect-[4/3] w-full"
 };
 
 function initialState(src: string | null | undefined, imageHealth: string | null | undefined, cacheStatus: string | null | undefined) {
@@ -104,10 +104,10 @@ export function ProductImage({
 
   return (
     <div
-      className={`relative flex shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 ${sizeClass[size]}`}
+      className={`relative flex shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white ${sizeClass[size]}`}
       title={src ? `${stateText}: ${src}` : stateText}
     >
-      {state === "loading" ? <div className="absolute inset-0 animate-pulse bg-slate-200" /> : null}
+      {state === "loading" ? <div className="absolute inset-0 animate-pulse bg-slate-100" /> : null}
       {validSrc && state !== "broken" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -135,11 +135,14 @@ export function ProductImage({
           }}
         />
       ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center px-3 text-center">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            {state === "broken" ? "Image URL failed" : stateText}
+        <div className="flex h-full w-full flex-col items-center justify-center bg-slate-50 px-3 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-black text-slate-400">
+            IMG
           </span>
-          <span className="mt-1 text-xs text-slate-500">{state === "missing" ? "Prepare images from owner upload review" : stateText}</span>
+          <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {state === "broken" ? "Image failed" : state === "missing" ? "No image" : stateText}
+          </span>
+          <span className="mt-1 max-w-36 text-xs text-slate-500">{state === "missing" ? "Use Listing Master or cache today's images" : stateText}</span>
           {showDebug && state === "broken" && validSrc && isExternalSrc ? (
             <button
               type="button"
@@ -157,8 +160,8 @@ export function ProductImage({
         </div>
       )}
       {state === "loading" && slowLoading && isExternalSrc ? (
-        <div className="absolute inset-x-2 bottom-2 rounded bg-white/90 px-2 py-1 text-center text-xs font-semibold text-amber-800">
-          External image slow
+        <div className="absolute inset-x-2 bottom-2 rounded bg-white/90 px-2 py-1 text-center text-xs font-semibold text-slate-700">
+          Still loading
         </div>
       ) : null}
       {showBadge ? (

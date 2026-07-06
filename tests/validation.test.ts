@@ -49,6 +49,7 @@ import { buildWorkQueueOrderWhere, normalizeWorkQueueFilter, orderMatchesWorkQue
 import { hashPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
 import {
+  buildListingImageGallery,
   getInitialProductImageState,
   imageHealthLabel,
   normalizeSkuMappingImageFilter,
@@ -648,9 +649,37 @@ assert.equal(getInitialProductImageState(null), "missing", "Product image fallba
 assert.equal(getInitialProductImageState("https://example.com/image.jpg"), "loading", "Product image starts loading for valid URL");
 assert.equal(getInitialProductImageState("not-a-url"), "broken", "Product image state separates invalid URLs from missing mappings");
 assert.equal(productImageStateText("missing", false), "No image URL", "Product image state labels missing URLs clearly");
-assert.equal(productImageStateText("loading", true, true), "External image slow", "Product image state labels slow external images clearly");
+assert.equal(productImageStateText("loading", true, true), "Still loading", "Product image state labels slow external images gently");
 assert.equal(productImageStateText("loaded", true, false, "CACHED"), "Cached image available", "Product image state labels cached local images clearly");
 assert.equal(productImageStateText("broken", true), "Image URL failed", "Product image state labels failed image loads clearly");
+const galleryImages = buildListingImageGallery({
+  mainImageUrl: "https://example.invalid/main.jpg",
+  imageUrl1: "https://example.invalid/small-1.jpg",
+  imageUrl2: "https://example.invalid/small-2.jpg",
+  image1366Url1: "https://example.invalid/large-1.jpg",
+  image1366Url2: "https://example.invalid/large-2.jpg"
+});
+assert.deepEqual(
+  galleryImages,
+  [
+    "https://example.invalid/large-1.jpg",
+    "https://example.invalid/small-1.jpg",
+    "https://example.invalid/large-2.jpg",
+    "https://example.invalid/small-2.jpg",
+    "https://example.invalid/main.jpg"
+  ],
+  "Listing image gallery prefers 1366 image then standard image for each slot"
+);
+assert.deepEqual(
+  buildListingImageGallery({ imageUrl1: "not-a-url", image1366Url1: "https://example.invalid/large-1.jpg", mainImageUrl: "https://example.invalid/large-1.jpg" }),
+  ["https://example.invalid/large-1.jpg"],
+  "Listing image gallery drops invalid URLs and de-duplicates repeats"
+);
+assert.deepEqual(
+  buildListingImageGallery(null, "https://example.invalid/fallback.jpg"),
+  ["https://example.invalid/fallback.jpg"],
+  "Listing image gallery falls back to a single mapped image"
+);
 assert.equal(picklistSummaryProductNameLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "MAPPED", productName: null }), "Mapped image, no product name", "Picklist summary shows mapped SKU without product name");
 assert.equal(picklistSummaryProductNameLabel(null), "No mapping", "Picklist summary shows no mapping separately");
 assert.equal(imageHealthLabel({ imageUrl: "https://example.com/image.jpg", imageHealth: "BROKEN" }), "Broken image URL", "Broken image health label is clear");
@@ -923,6 +952,7 @@ const importPreview = readFileSync(join(repoRoot, "lib", "import", "preview.ts")
 const uploadLimits = readFileSync(join(repoRoot, "lib", "upload-limits.ts"), "utf8");
 const uploadActions = readFileSync(join(repoRoot, "app", "owner", "uploads", "actions.ts"), "utf8");
 const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
+const productImageGalleryComponent = readFileSync(join(repoRoot, "components", "ProductImageGallery.tsx"), "utf8");
 const awbScannerComponent = readFileSync(join(repoRoot, "components", "AwbBarcodeScanner.tsx"), "utf8");
 const productImageRoute = readFileSync(join(repoRoot, "app", "product-images", "[...path]", "route.ts"), "utf8");
 const pickerPage = readFileSync(join(repoRoot, "app", "picker", "page.tsx"), "utf8");
@@ -956,6 +986,21 @@ const prodEnvExample = readFileSync(join(repoRoot, ".env.production.example"), "
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
 const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.prisma"), "utf8");
 const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
+
+function sourceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+
+  assert.notEqual(startIndex, -1, `Source includes ${start}`);
+  assert.notEqual(endIndex, -1, `Source includes ${end}`);
+
+  return source.slice(startIndex, endIndex);
+}
+
+const pickerListDataSource = sourceBetween(dataHelpers, "export async function getSkuGroups", "export async function getSkuDetail");
+const packingSearchDataSource = sourceBetween(dataHelpers, "export async function searchOrdersByAwbFragment", "export async function getOrderWithImage");
+const heavyListingFieldsPattern = /productHighlights|allSpecifications|description:\s*true|imageUrl1:\s*true|image1366Url1:\s*true/;
+
 assert.match(
   readme,
   /Free-first daily setup: Windows PC \+ Supabase \+ Cloudflare Tunnel/,
@@ -1000,13 +1045,18 @@ assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination
 assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
 assert.match(pickerPage, /sticky top-\[88px\]/, "Picker filters stay reachable on mobile");
 assert.match(pickerPage, /cacheStatus={group.mapping\?\.cacheStatus}/, "Picker card passes cache status to image component");
+assert.match(pickerPage, /prefetch href={detailHref}/, "Picker cards prefetch frequent detail links");
+assert.doesNotMatch(pickerListDataSource, heavyListingFieldsPattern, "Picker list query keeps heavy listing description/spec/gallery fields out of card payloads");
 assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
 assert.match(pickerDetailPage, /mapping\?\.cachedImageUrl/, "Picker detail uses cached image URL first");
+assert.match(pickerDetailPage, /ProductImageGallery/, "Picker detail opens the product image gallery");
 assert.match(packingPage, /<AwbBarcodeScanner[\s\S]*Packed today/, "Packing page places the scanner before lower-priority dashboard details");
 assert.doesNotMatch(packingPage, /recentScans/, "Packing page does not wait on recent scan logs before showing scanner");
 assert.match(packingResultPage, /Quantity to pack/, "Packing result makes quantity prominent on mobile");
 assert.match(packingResultPage, /fixed inset-x-0 bottom-0/, "Packing result has mobile sticky confirm actions");
 assert.match(packingResultPage, /mapping\?\.cachedImageUrl/, "Packing card uses cached image URL first");
+assert.match(packingResultPage, /ProductImageGallery/, "Packing result opens the product image gallery");
+assert.match(packingResultPage, /<details[\s\S]*Listing details/, "Packing result keeps heavy listing text collapsed by default");
 assert.match(reviewPage, /<details[\s\S]*Picklist SKU summary rows/, "Upload review makes picklist summary rows collapsible");
 assert.match(reviewPage, /Prepare today&apos;s product images/, "Upload review exposes daily image cache preparation");
 assert.match(reviewPage, /Missing image mappings/, "Upload review shows inline missing image mapping repair");
@@ -1018,10 +1068,13 @@ assert.match(uploadActions, /cacheQueueMapping\(mapping\)/, "Save and cache call
 assert.match(uploadActions, /clearMissingImageIssuesForSku/, "Missing image repair clears the batch preview missing-image status");
 assert.match(awbScannerComponent, /src={suggestion.cachedImageUrl}/, "Manual AWB suggestions use cached signed image URL first");
 assert.match(awbScannerComponent, /cacheStatus={suggestion.cacheStatus}/, "Manual AWB suggestions pass cached image status");
+assert.match(awbScannerComponent, /manualAwbRef\.current\?\.focus/, "Packing screen focuses the scan input immediately");
+assert.match(awbScannerComponent, /<Link[\s\S]*prefetch/, "Packing search suggestions prefetch scan-result pages");
 assert.match(packingSearchRoute, /cachedImageUrl/, "AWB suggestion API returns cachedImageUrl only for product images");
 assert.doesNotMatch(packingSearchRoute, /imageUrl: order\.imageUrl/, "AWB suggestion API does not return slow external image URLs");
 assert.match(dataHelpers, /awb: query[\s\S]*endsWith: query[\s\S]*contains: query/, "AWB search queries exact, suffix, then contains");
 assert.match(dataHelpers, /packStatus: "READY"[\s\S]*OR: \[\{ awb: query \}, \{ trackingId: query \}\]/, "Packing AWB search defaults to active READY orders and checks Tracking ID");
+assert.doesNotMatch(packingSearchDataSource, heavyListingFieldsPattern, "Packing search returns compact listing data without heavy descriptions/specs/gallery fields");
 assert.match(dataHelpers, /withDevTiming\("packing awb search"[\s\S]*500\)/, "AWB search has 500ms dev timing logs");
 assert.match(dataHelpers, /withDevTiming\("picker orders"[\s\S]*800[\s\S]*\);/, "Picker order query has 800ms dev timing logs");
 assert.match(dataHelpers, /buildWorkQueueOrderWhere/, "Picker queries are scoped through the daily active work queue");
@@ -1056,8 +1109,13 @@ assert.match(windowsLauncher, /SKIP_PRISMA_MIGRATE/, "Windows launcher defaults 
 assert.match(windowsCheckEnv, /printEnvironmentSummary/, "check-env prints a masked environment summary");
 assert.match(productImageComponent, /decoding="async"/, "Product images decode asynchronously");
 assert.match(productImageComponent, /state !== "loading" \|\| !isExternalSrc/, "ProductImage does not show slow external warning for local cached images");
+assert.match(productImageComponent, /Use Listing Master or cache today's images/, "Product cards show a clean missing-image fallback");
 assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
 assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
+assert.match(productImageGalleryComponent, /role="dialog"/, "Product image gallery opens as an accessible dialog");
+assert.match(productImageGalleryComponent, /Escape/, "Product image gallery closes with Escape");
+assert.match(productImageGalleryComponent, /ArrowRight[\s\S]*ArrowLeft/, "Product image gallery supports keyboard image navigation");
+assert.match(productImageGalleryComponent, /galleryImages\.length === 0 \? 0/, "Product image gallery handles one or zero images cleanly");
 assert.match(changePasswordAction, /await clearSession\(\);\s*redirect\("\/login\?passwordChanged=1"\)/, "Password changes clear session and redirect to login");
 assert.match(ownerSystemPage, /Cookie secure mode/, "Owner system page shows auth cookie diagnostics");
 assert.match(ownerSystemPage, /Database ping/, "Owner system page shows database latency");

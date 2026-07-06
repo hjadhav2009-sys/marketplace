@@ -52,7 +52,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
   const activeWork = normalizeWorkQueueFilter(params?.work);
   const activeFilter = params?.filter ?? (activeWork === "problems" ? "problem" : "pending");
   const largeImageMode = params?.large === "1";
-  const compactMode = params?.view !== "cards" && !largeImageMode;
+  const compactMode = params?.view === "compact" && !largeImageMode;
   const latestBatch = await getLatestImportedBatch(account.id);
   const activeBatchId = params?.batchId ?? (activeWork === "current-batch" ? latestBatch?.id : undefined);
   const pagedGroups = await getSkuGroups(account.id, {
@@ -211,7 +211,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             return (
               <article
                 key={`${group.sku}-${group.color ?? "none"}-${group.size ?? "none"}`}
-                className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md"
               >
                 {compactMode ? null : (
                   <ProductImage
@@ -219,7 +219,8 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                     alt={group.productName ?? group.sku}
                     size="lg"
                     mappingId={group.mapping?.id}
-                    showDebug={user.role === "OWNER"}
+                    showBadge={false}
+                    showDebug={false}
                     imageHealth={group.mapping?.imageHealth}
                     cacheStatus={group.mapping?.cacheStatus}
                     originalImageUrl={group.mapping?.imageUrl}
@@ -228,7 +229,19 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                 <div className="space-y-4 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge value={group.status} />
-                    {group.missingImage ? <StatusBadge value="MISSING_IMAGE" /> : null}
+                    {group.missingImage ? (
+                      <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                        No image
+                      </span>
+                    ) : group.mapping?.cacheStatus === "CACHED" ? (
+                      <span className="inline-flex rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700 ring-1 ring-teal-200">
+                        Cached image
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                        Listing image
+                      </span>
+                    )}
                     {group.mapping?.imageHealth === "BROKEN" ? (
                       <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
                         {user.role === "OWNER" ? "Broken image URL" : "Image issue"}
@@ -282,9 +295,6 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
-                    <Link href={detailHref} className="inline-flex min-h-12 items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">
-                      Open
-                    </Link>
                     <form action={markSkuGroupPickedAction}>
                       <input type="hidden" name="sku" value={group.sku} />
                       <input type="hidden" name="color" value={encodedColor} />
@@ -293,7 +303,10 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
                         Picked
                       </button>
                     </form>
-                    <Link href={`${detailHref}#problem-actions`} className="inline-flex min-h-12 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+                    <Link prefetch href={detailHref} className="inline-flex min-h-12 items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">
+                      Open
+                    </Link>
+                    <Link prefetch href={`${detailHref}#problem-actions`} className="inline-flex min-h-12 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
                       Problem
                     </Link>
                   </div>

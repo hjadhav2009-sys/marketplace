@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { ProductImage } from "@/components/ProductImage";
+import { ProductImageGallery } from "@/components/ProductImageGallery";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getSkuDetail } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
+import { buildListingImageGallery } from "@/lib/product-image";
 import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { markSkuGroupPickedAction, markSkuGroupProblemAction } from "./actions";
 
@@ -46,6 +47,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
   const courierEntries = Object.entries(detail.courierCounts);
   const groupStatus = detail.problemCount > 0 ? "PROBLEM" : detail.pendingCount === 0 ? "PICKED" : "READY";
   const canCacheImage = user.role === "OWNER" && detail.mapping?.id && detail.mapping.imageUrl && detail.mapping.cacheStatus !== "CACHED";
+  const galleryImages = buildListingImageGallery(detail.listing, detail.mapping?.imageUrl ?? imageUrl);
 
   return (
     <AppShell>
@@ -90,12 +92,11 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
       <section className="grid gap-5 pb-24 lg:grid-cols-[0.8fr_1.2fr] lg:pb-0">
         <div className="space-y-5">
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-            <ProductImage
-              src={imageUrl}
+            <ProductImageGallery
+              primarySrc={imageUrl ?? galleryImages[0]}
+              images={galleryImages}
               alt={detail.mapping?.productName ?? sku}
-              size="lg"
               mappingId={detail.mapping?.id}
-              showDebug={user.role === "OWNER"}
               imageHealth={detail.mapping?.imageHealth}
               cacheStatus={detail.mapping?.cacheStatus}
               originalImageUrl={detail.mapping?.imageUrl}

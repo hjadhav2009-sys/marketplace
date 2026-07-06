@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
-import { ProductImage } from "@/components/ProductImage";
+import { ProductImageGallery } from "@/components/ProductImageGallery";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getOrderWithImage } from "@/lib/data";
 import { formatDateTime } from "@/lib/format";
 import { packingResultLabel } from "@/lib/operations/packing";
+import { buildListingImageGallery } from "@/lib/product-image";
 import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { confirmPackedAction, reportProblemFromScanAction } from "./actions";
 
@@ -44,6 +45,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   const imageUrl = mapping?.cachedImageUrl ?? null;
   const listingTitle = mapping?.productName ?? listing?.productTitle ?? listing?.liveTitle ?? order.productDescription ?? "Product details not mapped";
   const canCacheImage = user.role === "OWNER" && mapping?.id && mapping.imageUrl && mapping.cacheStatus !== "CACHED";
+  const galleryImages = buildListingImageGallery(listing, mapping?.imageUrl ?? imageUrl);
 
   return (
     <AppShell>
@@ -85,12 +87,11 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
 
       <section className="grid gap-5 pb-28 lg:grid-cols-[0.75fr_1.25fr] lg:pb-0">
         <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-          <ProductImage
-            src={imageUrl}
+          <ProductImageGallery
+            primarySrc={imageUrl ?? galleryImages[0]}
+            images={galleryImages}
             alt={`${listingTitle} ${order.sku}`}
-            size="lg"
             mappingId={mapping?.id}
-            showDebug={user.role === "OWNER"}
             imageHealth={mapping?.imageHealth}
             cacheStatus={mapping?.cacheStatus}
             originalImageUrl={mapping?.imageUrl}
@@ -203,12 +204,12 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
               </div>
             </dl>
             {listing?.productHighlights || listing?.allSpecifications || listing?.description ? (
-              <div className="mt-4 rounded-md bg-slate-50 p-3">
-                <p className="text-sm font-semibold text-slate-500">Listing details</p>
+              <details className="mt-4 rounded-md bg-slate-50 p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-700">Listing details</summary>
                 <p className="mt-1 line-clamp-4 text-sm leading-6 text-slate-700">
                   {listing.productHighlights ?? listing.allSpecifications ?? listing.description}
                 </p>
-              </div>
+              </details>
             ) : null}
           </div>
 

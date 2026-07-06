@@ -43,7 +43,7 @@ import {
 import { planAccountSkuMappingImport, planSkuMappingImport, type RawImportRow } from "../lib/import/sku-mappings";
 import { isAllowedLocalNetworkIp, isIpInCidr, normalizeIp } from "../lib/network";
 import { findAwbSearchMatches } from "../lib/operations/awb-search";
-import { canConfirmPacked } from "../lib/operations/packing";
+import { canConfirmPacked, selectConfirmPackedOrderIds } from "../lib/operations/packing";
 import { buildPickerSkuGroups, normalizePickerLimit, paginatePickerSkuGroups } from "../lib/operations/picking";
 import { buildWorkQueueOrderWhere, normalizeWorkQueueFilter, orderMatchesWorkQueue, startOfWorkDay } from "../lib/operations/work-queue";
 import { hashPassword } from "../lib/password";
@@ -61,6 +61,7 @@ import { cutoffDate, isCleanupConfirmationValid, RETENTION_DAYS } from "../lib/r
 import { canUseFirstRunSetup, validateFirstRunSetupPassword } from "../lib/setup";
 import { normalizeSkuForMatching } from "../lib/sku";
 import { canDeactivateUser, shouldCloseSessionsAfterPasswordReset, validateWorkerPassword } from "../lib/user-management";
+import { importJobEstimatedRemainingSeconds, importJobPageWindow, IMPORT_JOB_PAGE_SIZE, IMPORT_JOB_PAGE_SIZES } from "../src/lib/import-jobs/progress";
 import {
   awbSearchSchema,
   flipkartExcelImportFileSchema,
@@ -477,6 +478,36 @@ assert.equal(canRoleAccessPath("PICKER", "/change-password"), true, "Workers can
 assert.equal(canConfirmPacked({ packStatus: "READY" }), true, "Ready order can be packed");
 assert.equal(canConfirmPacked({ packStatus: "PACKED" }), false, "Packed order is idempotently skipped");
 assert.equal(canConfirmPacked({ packStatus: "PROBLEM" }), false, "Problem order cannot be packed accidentally");
+assert.deepEqual(
+  selectConfirmPackedOrderIds(
+    { id: "o1", accountId: "a1", marketplace: "FLIPKART", trackingId: "FMPC0000000001", packStatus: "READY" },
+    [
+      { id: "o1", accountId: "a1", marketplace: "FLIPKART", trackingId: "FMPC0000000001", packStatus: "READY" },
+      { id: "o2", accountId: "a1", marketplace: "FLIPKART", trackingId: "FMPC0000000001", packStatus: "READY" },
+      { id: "o3", accountId: "a1", marketplace: "FLIPKART", trackingId: "FMPC0000000001", packStatus: "PACKED" },
+      { id: "o4", accountId: "a1", marketplace: "FLIPKART", trackingId: "FMPC0000000001", packStatus: "PROBLEM" },
+      { id: "o5", accountId: "a2", marketplace: "FLIPKART", trackingId: "FMPC0000000001", packStatus: "READY" }
+    ]
+  ),
+  ["o1", "o2"],
+  "Direct pack scope packs only ready same-account Flipkart Tracking ID items"
+);
+assert.equal(IMPORT_JOB_PAGE_SIZE, 10, "Import job pagination defaults to 10 rows");
+assert.deepEqual([...IMPORT_JOB_PAGE_SIZES], [10, 25, 50, 100], "Import job page size supports 10/25/50/100");
+assert.deepEqual(
+  importJobPageWindow(42, "2", 25),
+  { page: 2, pageSize: 25, totalPages: 2, skip: 25, take: 25, from: 26, to: 42 },
+  "Import job page window calculates page ranges"
+);
+assert.equal(
+  importJobEstimatedRemainingSeconds({
+    totalRows: 100,
+    processedRows: 40,
+    startedAt: "2026-07-07T10:00:00.000Z"
+  }, new Date("2026-07-07T10:00:20.000Z")),
+  30,
+  "Import job ETA uses rows per second"
+);
 const workQueueNow = new Date("2026-05-26T10:30:00.000Z");
 const workQueueStart = startOfWorkDay(workQueueNow);
 assert.equal(workQueueStart.getHours(), 0, "Work queue day starts at local midnight");
@@ -993,6 +1024,9 @@ const dashboardPage = readFileSync(join(repoRoot, "app", "dashboard", "page.tsx"
 const ownerPage = readFileSync(join(repoRoot, "app", "owner", "page.tsx"), "utf8");
 const accountsPage = readFileSync(join(repoRoot, "app", "accounts", "page.tsx"), "utf8");
 const accountActions = readFileSync(join(repoRoot, "app", "accounts", "actions.ts"), "utf8");
+const ownerImportsPage = readFileSync(join(repoRoot, "app", "owner", "imports", "page.tsx"), "utf8");
+const importJobProgressComponent = readFileSync(join(repoRoot, "components", "ImportJobProgress.tsx"), "utf8");
+const importJobExportRoute = readFileSync(join(repoRoot, "app", "owner", "imports", "export", "route.ts"), "utf8");
 const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
 const workQueueSource = readFileSync(join(repoRoot, "lib", "operations", "work-queue.ts"), "utf8");
 const ownerAccountsPage = readFileSync(join(repoRoot, "app", "owner", "accounts", "page.tsx"), "utf8");
@@ -1019,6 +1053,7 @@ const prodEnvExample = readFileSync(join(repoRoot, ".env.production.example"), "
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
 const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.prisma"), "utf8");
 const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
+const nextPhaseNotes = readFileSync(join(repoRoot, "NEXT_PHASE_NOTES.md"), "utf8");
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -1091,6 +1126,18 @@ assert.match(marketplaceImportWizardComponent, /accounts\.filter\(\(account\) =>
 assert.match(marketplaceImportWizardComponent, /marketplace === "FLIPKART"[\s\S]*Flipkart Listing Master[\s\S]*Flipkart Daily Orders/, "Flipkart import types appear only under Flipkart");
 assert.match(marketplaceImportWizardComponent, /marketplace === "MEESHO"[\s\S]*Advanced \/ Legacy imports[\s\S]*Legacy PDF parser for old Meesho label\/manifest workflow/, "Meesho legacy PDF import appears only under Meesho legacy");
 assert.match(marketplaceImportWizardComponent, /Amazon coming soon/, "Amazon import option is disabled for now");
+assert.match(ownerImportsPage, /IMPORT_JOB_PAGE_SIZES\.map/, "Import Progress page exposes configured page size choices");
+assert.match(ownerImportsPage, /Showing \{compactNumber\(window\.from\)\}-\{compactNumber\(window\.to\)\} of \{compactNumber\(totalRows\)\}/, "Import Progress page shows pagination range");
+assert.match(ownerImportsPage, /Previous[\s\S]*Next/, "Import Progress page includes previous and next pagination controls");
+assert.match(ownerImportsPage, /name="marketplace"[\s\S]*name="importType"[\s\S]*name="status"/, "Import Progress page filters by marketplace, import type, and status");
+assert.match(ownerImportsPage, /name="q"[\s\S]*File name or job ID/, "Import Progress page supports file/job search");
+assert.match(ownerImportsPage, /Open progress[\s\S]*Open review[\s\S]*CSV[\s\S]*XLSX[\s\S]*TXT/, "Import Progress table includes progress, review, and download actions");
+assert.match(importJobExportRoute, /jobId[\s\S]*summary[\s\S]*issues/, "Import job export route supports summary and issue exports");
+assert.match(importJobExportRoute, /ExcelJS/, "Import job export route supports XLSX downloads");
+assert.doesNotMatch(importJobExportRoute, /rawData/, "Import job exports do not include raw private row data");
+assert.match(importJobProgressComponent, /importJobEstimatedRemainingSeconds/, "Import job detail shows estimated remaining time");
+assert.match(importJobProgressComponent, /Live progress refreshes every 1\.5 seconds/, "Import job detail explains polling cadence");
+assert.match(importJobProgressComponent, /Summary CSV[\s\S]*Summary XLSX[\s\S]*Summary TXT/, "Import job detail exposes safe summary exports");
 assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");
 assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination");
 assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
@@ -1119,6 +1166,8 @@ assert.match(packingResultPage, /fixed inset-x-0 bottom-0/, "Packing result has 
 assert.match(packingResultPage, /mapping\?\.cachedImageUrl/, "Packing card uses cached image URL first");
 assert.match(packingResultPage, /ProductImageGallery/, "Packing result opens the product image gallery");
 assert.match(packingResultPage, /<details[\s\S]*Listing details/, "Packing result keeps heavy listing text collapsed by default");
+assert.match(packingResultPage, /sticky top-24[\s\S]*Scan next AWB/, "Packing detail keeps desktop action bar sticky and visible");
+assert.match(packingResultPage, /id="problem"/, "Packing detail exposes a problem anchor for search-card Problem links");
 assert.match(reviewPage, /<details[\s\S]*Picklist SKU summary rows/, "Upload review makes picklist summary rows collapsible");
 assert.match(reviewPage, /Prepare today&apos;s product images/, "Upload review exposes daily image cache preparation");
 assert.match(reviewPage, /Missing image mappings/, "Upload review shows inline missing image mapping repair");
@@ -1128,15 +1177,24 @@ assert.match(uploadActions, /repairMissingSkuImageMappingAction/, "Upload review
 assert.match(uploadActions, /accountId_sku[\s\S]*accountId: account\.id/, "Missing image repair creates or updates mappings in the selected account only");
 assert.match(uploadActions, /cacheQueueMapping\(mapping\)/, "Save and cache calls the image cache pipeline");
 assert.match(uploadActions, /clearMissingImageIssuesForSku/, "Missing image repair clears the batch preview missing-image status");
-assert.match(awbScannerComponent, /src={suggestion.cachedImageUrl}/, "Manual AWB suggestions use cached signed image URL first");
+assert.match(awbScannerComponent, /primarySrc={suggestion.cachedImageUrl}/, "Manual AWB suggestions use cached signed image URL first");
 assert.match(awbScannerComponent, /cacheStatus={suggestion.cacheStatus}/, "Manual AWB suggestions pass cached image status");
 assert.match(awbScannerComponent, /manualAwbRef\.current\?\.focus/, "Packing screen focuses the scan input immediately");
 assert.match(awbScannerComponent, /<Link[\s\S]*prefetch/, "Packing search suggestions prefetch scan-result pages");
+assert.match(awbScannerComponent, /directPackAction/, "AWB scanner accepts a direct Pack server action");
+assert.match(awbScannerComponent, /Pack now[\s\S]*Details[\s\S]*Problem/, "Packing search result cards expose Pack, Details, and Problem actions");
+assert.match(awbScannerComponent, /ProductImageGallery/, "Packing search result image opens gallery instead of navigating");
+assert.match(awbScannerComponent, /shouldAcceptScannerValue/, "Scanner has duplicate scan debounce helper");
+assert.match(awbScannerComponent, /playScannerSuccessFeedback[\s\S]*vibrate[\s\S]*AudioContext/, "Scanner success can trigger vibration and beep safely");
+assert.match(awbScannerComponent, /permission-denied[\s\S]*unsupported/, "Scanner exposes clear permission and unsupported states");
+assert.match(awbScannerComponent, /opening/, "Scanner exposes an opening-result state");
 assert.match(packingSearchRoute, /cachedImageUrl/, "AWB suggestion API returns cachedImageUrl only for product images");
+assert.match(packingSearchRoute, /id: order\.id[\s\S]*marketplace: order\.marketplace[\s\S]*accountName/, "AWB suggestion API returns compact metadata needed by result cards");
 assert.doesNotMatch(packingSearchRoute, /imageUrl: order\.imageUrl/, "AWB suggestion API does not return slow external image URLs");
 assert.match(dataHelpers, /awb: query[\s\S]*endsWith: query[\s\S]*contains: query/, "AWB search queries exact, suffix, then contains");
 assert.match(dataHelpers, /packStatus: "READY"[\s\S]*OR: \[\{ awb: query \}, \{ trackingId: query \}\]/, "Packing AWB search defaults to active READY orders and checks Tracking ID");
 assert.doesNotMatch(packingSearchDataSource, heavyListingFieldsPattern, "Packing search returns compact listing data without heavy descriptions/specs/gallery fields");
+assert.match(packingSearchDataSource, /OR: \[\{ awb: query \}, \{ trackingId: query \}\][\s\S]*endsWith: query[\s\S]*contains: query/, "Packing search checks exact Tracking ID/AWB before suffix and contains fallback");
 assert.match(dataHelpers, /withDevTiming\("packing awb search"[\s\S]*500\)/, "AWB search has 500ms dev timing logs");
 assert.match(dataHelpers, /withDevTiming\("picker orders"[\s\S]*800[\s\S]*\);/, "Picker order query has 800ms dev timing logs");
 assert.match(dataHelpers, /buildWorkQueueOrderWhere/, "Picker queries are scoped through the daily active work queue");
@@ -1146,8 +1204,12 @@ assert.match(pickerPage, /Current batch/, "Picker exposes a current-batch work q
 assert.match(pickerPage, /All pending/, "Picker exposes all-pending work queue chip");
 assert.match(packingPage, /Today ready[\s\S]*Old pending[\s\S]*Problems/, "Packing dashboard separates today, old pending, and problem counts");
 assert.match(packingPage, /Move old pending to review/, "Owner can move old pending work into a review-only flow");
+assert.match(packingPage, /directPackFromSearchAction/, "Packing page wires direct Pack action into search suggestions");
 assert.match(packingActions, /writeScanLogLater[\s\S]*redirect\(`\/packing\/\$\{encodeURIComponent\(matchedOrder\.awb\)\}`\)/, "Packing search redirects before scan logging can block order opening");
+assert.match(packingActions, /directPackFromSearchAction[\s\S]*buildConfirmPackedOrderWhere[\s\S]*updateMany/, "Direct Pack uses the shared READY-only packing scope");
+assert.match(packingActions, /buildConfirmPackedOrderWhere/, "Direct Pack skips already packed and problem items through the shared READY-only helper");
 assert.match(packingActions, /OLD_PENDING_REVIEW_REPORTED/, "Old pending review action is audited without deleting orders");
+assert.match(packingActions, /redirect\(`\/packing\?oldPendingReviewed=\$\{oldPendingCount\}`\)/, "Old pending review action redirects with a visible result");
 assert.match(productImageRoute, /getCurrentUser/, "Cached image route checks session without login redirect");
 assert.match(productImageRoute, /verifySignedCachedImageUrl/, "Cached image route verifies signed image URLs");
 assert.equal(productImageRoute.indexOf("verifySignedCachedImageUrl") < productImageRoute.indexOf("const user = await getCurrentUser"), true, "Signed cached image route avoids database auth before serving normal image requests");
@@ -1199,6 +1261,7 @@ assert.match(productImageComponent, /Use Listing Master or cache today's images/
 assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
 assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
 assert.match(productImageGalleryComponent, /role="dialog"/, "Product image gallery opens as an accessible dialog");
+assert.match(productImageGalleryComponent, /lg:grid-cols-\[minmax\(0,1fr\)_5rem\]/, "Product gallery uses desktop side thumbnails");
 assert.match(productImageGalleryComponent, /showInlineThumbnails = true/, "Product image gallery can show thumbnails outside compact cards");
 assert.match(productImageGalleryComponent, /Escape/, "Product image gallery closes with Escape");
 assert.match(productImageGalleryComponent, /ArrowRight[\s\S]*ArrowLeft/, "Product image gallery supports keyboard image navigation");
@@ -1214,6 +1277,9 @@ assert.match(productionChecksSource, /image-cache/, "Production checks warn when
 assert.match(windowsProdPs1, /start-local-prod\.mjs/, "Windows PowerShell launcher delegates to Node launcher");
 assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local production env example supports local Wi-Fi HTTP cookies");
 assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");
+assert.match(nextPhaseNotes, /Automatic retry for failed import jobs was not added/, "Next phase notes document skipped unsafe import retry");
+assert.match(nextPhaseNotes, /PDF export for import jobs was skipped/, "Next phase notes document skipped PDF export");
+assert.match(nextPhaseNotes, /Old pending review currently records an owner audit event/, "Next phase notes document old pending review status");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(sqliteSchema, /enum Marketplace[\s\S]*FLIPKART[\s\S]*MEESHO[\s\S]*AMAZON[\s\S]*WOOCOMMERCE[\s\S]*OTHER/, "SQLite schema defines marketplace enum");

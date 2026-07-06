@@ -1,4 +1,5 @@
-export const IMPORT_JOB_PAGE_SIZE = 50;
+export const IMPORT_JOB_PAGE_SIZE = 10;
+export const IMPORT_JOB_PAGE_SIZES = [10, 25, 50, 100] as const;
 
 export type ImportJobProgressLike = {
   totalRows: number;
@@ -13,7 +14,7 @@ export function clampImportJobPage(page: number | string | null | undefined) {
 }
 
 export function importJobPageWindow(totalRows: number, page: number | string | null | undefined, pageSize = IMPORT_JOB_PAGE_SIZE) {
-  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const safePageSize = IMPORT_JOB_PAGE_SIZES.includes(pageSize as (typeof IMPORT_JOB_PAGE_SIZES)[number]) ? pageSize : IMPORT_JOB_PAGE_SIZE;
   const safeTotal = Math.max(0, totalRows);
   const currentPage = clampImportJobPage(page);
   const totalPages = Math.max(1, Math.ceil(safeTotal / safePageSize));
@@ -62,4 +63,14 @@ export function importJobRowsPerSecond(job: ImportJobProgressLike, now = new Dat
   }
 
   return Math.round((job.processedRows / elapsed) * 10) / 10;
+}
+
+export function importJobEstimatedRemainingSeconds(job: ImportJobProgressLike, now = new Date()) {
+  const rowsPerSecond = importJobRowsPerSecond(job, now);
+
+  if (rowsPerSecond <= 0 || job.totalRows <= 0 || job.processedRows >= job.totalRows) {
+    return 0;
+  }
+
+  return Math.ceil((job.totalRows - job.processedRows) / rowsPerSecond);
 }

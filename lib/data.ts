@@ -534,6 +534,7 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
       id: true,
       accountId: true,
       awb: true,
+      marketplace: true,
       trackingId: true,
       sku: true,
       qty: true,

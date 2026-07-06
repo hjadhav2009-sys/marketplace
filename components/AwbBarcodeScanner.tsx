@@ -4,11 +4,12 @@ import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser"
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeAwb, isValidAwb } from "@/lib/awb";
-import { ProductImage } from "./ProductImage";
+import { ProductImageGallery } from "./ProductImageGallery";
 import { SubmitButton } from "./SubmitButton";
 
 type AwbBarcodeScannerProps = {
   action: (formData: FormData) => void | Promise<void>;
+  directPackAction: (formData: FormData) => void | Promise<void>;
   defaultAwb?: string;
 };
 
@@ -17,7 +18,10 @@ type BarcodeResult = {
 };
 
 type AwbSuggestion = {
+  id: string;
   awb: string;
+  marketplace?: string | null;
+  accountName?: string | null;
   trackingId?: string | null;
   sku: string;
   cachedImageUrl?: string | null;
@@ -33,18 +37,96 @@ type AwbSuggestion = {
   matchedField: "AWB" | "TRACKING_ID";
 };
 
+export function maskScanValue(value: string) {
+  const normalized = normalizeAwb(value);
+
+  if (normalized.length <= 8) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 4)}...${normalized.slice(-4)}`;
+}
+
+export function shouldAcceptScannerValue(input: { value: string; lastValue: string | null; lastScanAt: number; now: number; debounceMs?: number }) {
+  const normalized = normalizeAwb(input.value);
+
+  if (!isValidAwb(normalized)) {
+    return false;
+  }
+
+  return !(normalized === input.lastValue && input.now - input.lastScanAt < (input.debounceMs ?? 2000));
+}
+
+export function playScannerSuccessFeedback() {
+  navigator.vibrate?.(80);
+
+  try {
+    const audioWindow = window as Window & { webkitAudioContext?: typeof AudioContext };
+    const AudioContextCtor = window.AudioContext ?? audioWindow.webkitAudioContext;
+
+    if (!AudioContextCtor) {
+      return;
+    }
+
+    const context = new AudioContextCtor();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.06;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.08);
+  } catch {
+    // Audio feedback is optional. Scanning must keep working if the browser blocks sound.
+  }
+}
+
 function isLocalhost(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
-export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps) {
+function cameraStateLabel(state: "idle" | "starting" | "scanning" | "found" | "opening" | "stopped" | "permission-denied" | "unsupported" | "error") {
+  if (state === "starting") {
+    return "Camera starting";
+  }
+
+  if (state === "scanning") {
+    return "Scanning";
+  }
+
+  if (state === "found") {
+    return "Code found";
+  }
+
+  if (state === "opening") {
+    return "Opening result";
+  }
+
+  if (state === "permission-denied") {
+    return "Permission needed";
+  }
+
+  if (state === "unsupported") {
+    return "Manual only";
+  }
+
+  if (state === "error") {
+    return "Camera error";
+  }
+
+  return state === "stopped" ? "Stopped" : "Ready";
+}
+
+export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbBarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const hiddenFormRef = useRef<HTMLFormElement | null>(null);
   const hiddenAwbRef = useRef<HTMLInputElement | null>(null);
   const manualAwbRef = useRef<HTMLInputElement | null>(null);
   const lastScanAtRef = useRef(0);
-  const [cameraState, setCameraState] = useState<"idle" | "starting" | "scanning" | "stopped" | "error">("idle");
+  const lastScanValueRef = useRef<string | null>(null);
+  const [cameraState, setCameraState] = useState<"idle" | "starting" | "scanning" | "found" | "opening" | "stopped" | "permission-denied" | "unsupported" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [httpsWarning, setHttpsWarning] = useState(false);
   const [detectedAwb, setDetectedAwb] = useState<string | null>(null);
@@ -131,6 +213,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
 
   function submitDetectedAwb(awb: string) {
     setDetectedAwb(awb);
+    setCameraState("opening");
     stopScanner();
 
     if (hiddenAwbRef.current && hiddenFormRef.current) {
@@ -146,6 +229,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState("error");
       setError("Camera scanner is not supported in this browser. Use manual Tracking ID / AWB entry.");
+      setCameraState("unsupported");
       return;
     }
 
@@ -162,11 +246,6 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
         }
 
         const now = Date.now();
-
-        if (now - lastScanAtRef.current < 2000) {
-          return;
-        }
-
         const awb = normalizeAwb(result.getText());
 
         if (!isValidAwb(awb)) {
@@ -175,8 +254,14 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
           return;
         }
 
+        if (!shouldAcceptScannerValue({ value: awb, lastValue: lastScanValueRef.current, lastScanAt: lastScanAtRef.current, now })) {
+          return;
+        }
+
         lastScanAtRef.current = now;
-        navigator.vibrate?.(80);
+        lastScanValueRef.current = awb;
+        setCameraState("found");
+        playScannerSuccessFeedback();
         submitDetectedAwb(awb);
       };
 
@@ -198,6 +283,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
       setCameraState("error");
 
       if (caughtError instanceof DOMException && caughtError.name === "NotAllowedError") {
+        setCameraState("permission-denied");
         setError("Camera permission was denied. Allow camera access or use manual Tracking ID / AWB entry.");
       } else if (caughtError instanceof DOMException && caughtError.name === "NotFoundError") {
         setError("No camera was found on this device. Use manual Tracking ID / AWB entry.");
@@ -216,7 +302,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
             <p className="mt-1 text-base leading-6 text-slate-300 sm:text-sm">Point the frame at the Tracking ID / AWB barcode on the shipping label.</p>
           </div>
           <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
-            {cameraState === "scanning" ? "Scanning" : cameraState === "starting" ? "Starting" : "Ready"}
+            {cameraStateLabel(cameraState)}
           </span>
         </div>
 
@@ -243,7 +329,7 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
 
         {detectedAwb ? (
           <p className="mt-3 rounded-md bg-teal-400/10 px-3 py-2 text-sm font-semibold text-teal-100">
-            Scanned {detectedAwb}. Opening order...
+            Scanned {maskScanValue(detectedAwb)}. Opening result...
           </p>
         ) : null}
 
@@ -284,76 +370,93 @@ export function AwbBarcodeScanner({ action, defaultAwb }: AwbBarcodeScannerProps
               required
             />
           </label>
-          <div className="min-h-20">
-            {normalizeAwb(manualAwb).length > 0 && normalizeAwb(manualAwb).length < 5 ? (
-              <p className="text-base text-slate-500 sm:text-sm">Type at least last 5 Tracking ID / AWB characters for live suggestions.</p>
-            ) : null}
-            {suggestionState === "loading" ? (
-              <p className="text-base font-medium text-slate-500 sm:text-sm">Searching...</p>
-            ) : null}
-            {suggestionState === "error" ? (
-              <p className="text-base font-medium text-rose-700 sm:text-sm">Live suggestions failed. Manual submit still works.</p>
-            ) : null}
-            {suggestionState === "ready" && suggestions.length === 0 ? (
-              <p className="text-base font-medium text-amber-800 sm:text-sm">No matching Tracking ID / AWB found for this account.</p>
-            ) : null}
-            {suggestions.length > 0 ? (
-              <div className="space-y-2">
-                {suggestions.length === 1 ? (
-                  <p className="text-base font-medium text-teal-700 sm:text-sm">One match found. Open it or submit the search.</p>
-                ) : (
-                  <p className="text-base font-medium text-slate-600 sm:text-sm">{suggestions.length} matches found. Choose the correct Tracking ID / AWB.</p>
-                )}
-                <div className="max-h-[28rem] space-y-2 overflow-y-auto">
-                  {suggestions.map((suggestion) => {
-                    const displayId = suggestion.trackingId ?? suggestion.awb;
-
-                    return (
-                      <Link
-                        key={suggestion.awb}
-                        href={`/packing/${encodeURIComponent(suggestion.awb)}`}
-                        prefetch
-                        className="grid grid-cols-[4rem_1fr] gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm transition hover:border-berry hover:bg-slate-50 sm:grid-cols-[auto_1fr_auto]"
-                      >
-                        <ProductImage
-                          src={suggestion.cachedImageUrl}
-                          alt={`${suggestion.sku} ${displayId}`}
-                          size="sm"
-                          showBadge={false}
-                          cacheStatus={suggestion.cacheStatus}
-                        />
-                        <span className="min-w-0">
-                          <span className="block break-all text-lg font-black text-slate-950 sm:text-sm sm:font-bold">{displayId}</span>
-                          <span className="mt-1 block text-base font-semibold text-slate-800 sm:text-sm sm:font-normal sm:text-slate-600">
-                            {suggestion.sku}
-                          </span>
-                          {suggestion.listingTitle ? (
-                            <span className="mt-1 block line-clamp-1 text-sm font-medium text-slate-700">
-                              {suggestion.listingTitle}
-                              {suggestion.listingCategory ? ` / ${suggestion.listingCategory}` : ""}
-                            </span>
-                          ) : null}
-                          <span className="mt-1 block text-sm font-medium text-slate-600">
-                            Qty {suggestion.qty} / {suggestion.color ?? "Color unknown"} / {suggestion.courier ?? "Courier pending"}
-                          </span>
-                          <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">
-                            {suggestion.packStatus}
-                          </span>
-                        </span>
-                        <span className="col-span-2 justify-self-start rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 sm:col-span-1 sm:self-center sm:justify-self-auto">
-                          {suggestion.matchedField} {suggestion.matchType}
-                        </span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-          </div>
           <SubmitButton pendingText="Searching..." className="w-full">
             Find order
           </SubmitButton>
         </form>
+
+        <div className="mt-4 min-h-20">
+          {normalizeAwb(manualAwb).length > 0 && normalizeAwb(manualAwb).length < 5 ? (
+            <p className="text-base text-slate-500 sm:text-sm">Type at least last 5 Tracking ID / AWB characters for live suggestions.</p>
+          ) : null}
+          {suggestionState === "loading" ? (
+            <p className="text-base font-medium text-slate-500 sm:text-sm">Searching...</p>
+          ) : null}
+          {suggestionState === "error" ? (
+            <p className="text-base font-medium text-rose-700 sm:text-sm">Live suggestions failed. Manual submit still works.</p>
+          ) : null}
+          {suggestionState === "ready" && suggestions.length === 0 ? (
+            <p className="text-base font-medium text-amber-800 sm:text-sm">No matching Tracking ID / AWB found for this account.</p>
+          ) : null}
+          {suggestions.length > 0 ? (
+            <div className="space-y-2">
+              {suggestions.length === 1 ? (
+                <p className="text-base font-medium text-teal-700 sm:text-sm">One match found. Use Pack now only after checking the SKU and image.</p>
+              ) : (
+                <p className="text-base font-medium text-slate-600 sm:text-sm">{suggestions.length} matches found. Choose the correct Tracking ID / AWB.</p>
+              )}
+              <div className="max-h-[34rem] space-y-2 overflow-y-auto">
+                {suggestions.map((suggestion) => {
+                  const displayId = suggestion.trackingId ?? suggestion.awb;
+                  const detailsHref = `/packing/${encodeURIComponent(suggestion.awb)}`;
+
+                  return (
+                    <article
+                      key={suggestion.awb}
+                      className="grid grid-cols-[4.5rem_1fr] gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[4.5rem_1fr_auto]"
+                    >
+                      <ProductImageGallery
+                        primarySrc={suggestion.cachedImageUrl}
+                        images={suggestion.cachedImageUrl ? [suggestion.cachedImageUrl] : []}
+                        alt={`${suggestion.sku} ${displayId}`}
+                        size="sm"
+                        showBadge={false}
+                        showInlineThumbnails={false}
+                        cacheStatus={suggestion.cacheStatus}
+                      />
+                      <div className="min-w-0">
+                        <p className="break-all text-lg font-black text-slate-950 sm:text-sm sm:font-bold">{displayId}</p>
+                        <p className="mt-1 text-base font-semibold text-slate-800 sm:text-sm sm:font-normal sm:text-slate-600">{suggestion.sku}</p>
+                        {suggestion.listingTitle ? (
+                          <p className="mt-1 line-clamp-1 text-sm font-medium text-slate-700">
+                            {suggestion.listingTitle}
+                            {suggestion.listingCategory ? ` / ${suggestion.listingCategory}` : ""}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-sm font-medium text-slate-600">
+                          Qty {suggestion.qty} / {suggestion.color ?? "Color unknown"} / {suggestion.courier ?? "Courier pending"}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold">
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{suggestion.marketplace ?? "Marketplace"}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{suggestion.accountName ?? "Account"}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{suggestion.packStatus}</span>
+                          <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+                            {suggestion.matchedField} {suggestion.matchType}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="col-span-2 grid gap-2 sm:col-span-1 sm:w-28">
+                        <form action={directPackAction}>
+                          <input type="hidden" name="orderId" value={suggestion.id} />
+                          <input type="hidden" name="returnQuery" value={normalizeAwb(manualAwb)} />
+                          <SubmitButton pendingText="Packing..." className="w-full min-h-10 px-3 py-2 text-sm">
+                            Pack now
+                          </SubmitButton>
+                        </form>
+                        <Link href={detailsHref} prefetch className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800">
+                          Details
+                        </Link>
+                        <Link href={`${detailsHref}#problem`} prefetch className="inline-flex min-h-10 items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                          Problem
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <form ref={hiddenFormRef} action={action} className="hidden">

@@ -85,8 +85,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
         </div>
       ) : null}
 
-      <section className="grid gap-5 pb-28 lg:grid-cols-[0.75fr_1.25fr] lg:pb-0">
-        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <section className="grid gap-5 pb-28 lg:grid-cols-[0.62fr_1.38fr] lg:pb-0">
+        <div className="self-start overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:sticky lg:top-28">
           <ProductImageGallery
             primarySrc={imageUrl ?? galleryImages[0]}
             images={galleryImages}
@@ -112,16 +112,38 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
                 </button>
               </form>
             ) : null}
-            <h2 className="mt-3 break-words text-3xl font-black text-slate-950 sm:text-2xl">{order.sku}</h2>
+            <h2 className="mt-3 break-words text-2xl font-black text-slate-950">{order.sku}</h2>
             <div className="mt-4 rounded-md bg-slate-950 p-4 text-white">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Quantity to pack</p>
-              <p className="mt-1 text-6xl font-black leading-none text-white">{order.qty}</p>
+              <p className="mt-1 text-5xl font-black leading-none text-white">{order.qty}</p>
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-600">{order.productDescription ?? "No product description extracted yet."}</p>
           </div>
         </div>
 
         <div className="space-y-5">
+          <div className="sticky top-24 z-20 hidden rounded-md border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur lg:block">
+            <div className="flex flex-wrap items-center gap-2">
+              {canPack ? (
+                <form action={confirmPackedAction}>
+                  <input type="hidden" name="orderId" value={order.id} />
+                  <SubmitButton pendingText="Packing...">Pack</SubmitButton>
+                </form>
+              ) : null}
+              <Link
+                href="/packing"
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm"
+              >
+                Scan next AWB
+              </Link>
+              {canReportProblem ? (
+                <a href="#problem" className="inline-flex min-h-11 items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-900">
+                  Problem
+                </a>
+              ) : null}
+            </div>
+          </div>
+
           <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 rounded-md bg-slate-950 p-4 text-white">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Pack status</p>
@@ -272,7 +294,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             )}
 
             {canReportProblem ? (
-              <details className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <details id="problem" className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <summary className="cursor-pointer text-base font-semibold text-slate-950">Mark problem</summary>
                 <form action={reportProblemFromScanAction} className="mt-4">
                   <input type="hidden" name="orderId" value={order.id} />
@@ -355,7 +377,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             href="/packing"
             className="inline-flex min-h-12 flex-1 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm"
           >
-            Scan next
+            Scan next AWB
           </Link>
         </div>
       </div>

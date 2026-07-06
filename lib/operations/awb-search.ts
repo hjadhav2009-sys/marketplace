@@ -5,6 +5,7 @@ export type AwbSearchCandidate = {
   id: string;
   accountId: string;
   awb: string;
+  marketplace?: string | null;
   trackingId?: string | null;
   sku: string;
   qty: number;

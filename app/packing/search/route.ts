@@ -19,6 +19,9 @@ export async function GET(request: Request) {
     query,
     results: results.map((order) => ({
       awb: order.awb,
+      id: order.id,
+      marketplace: order.marketplace,
+      accountName: account.accountDisplayName ?? account.name,
       trackingId: order.trackingId,
       sku: order.sku,
       cachedImageUrl: order.cachedImageUrl,

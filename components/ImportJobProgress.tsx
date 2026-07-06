@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatDateTime } from "@/lib/format";
-import { importJobElapsedSeconds, importJobProgressPercent, importJobRowsPerSecond } from "@/src/lib/import-jobs/progress";
+import { importJobElapsedSeconds, importJobEstimatedRemainingSeconds, importJobProgressPercent, importJobRowsPerSecond } from "@/src/lib/import-jobs/progress";
 import type { ImportJobRecord } from "@/src/lib/import-jobs/store";
 
 type ImportJobProgressProps = {
@@ -40,6 +40,10 @@ function elapsedLabel(seconds: number) {
   return `${minutes}m ${remainder}s`;
 }
 
+function exportHref(jobId: string, format: "csv" | "xlsx" | "txt", type: "summary" | "issues" = "summary") {
+  return `/owner/imports/export?jobId=${encodeURIComponent(jobId)}&format=${format}&type=${type}`;
+}
+
 export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
   const [job, setJob] = useState<ImportJobJson>(() => ({
     ...initialJob,
@@ -51,8 +55,11 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
   const progress = importJobProgressPercent(job);
   const elapsedSeconds = importJobElapsedSeconds(job);
   const rowsPerSecond = importJobRowsPerSecond(job);
+  const remainingSeconds = importJobEstimatedRemainingSeconds(job);
   const href = reviewHref(job);
   const isDone = job.status === "COMPLETED" || job.status === "FAILED" || job.status === "CANCELLED";
+  const issueCount = job.errorRows + job.warningRows + job.missingImageRows + job.missingListingRows;
+  const [refreshState, setRefreshState] = useState<"idle" | "refreshing">("idle");
 
   const stats = useMemo(
     () => [
@@ -66,9 +73,10 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
       ["Missing listings", job.missingListingRows],
       ["Missing images", job.missingImageRows],
       ["Elapsed", elapsedLabel(elapsedSeconds)],
-      ["Rows/sec", rowsPerSecond]
+      ["Rows/sec", rowsPerSecond],
+      ["Remaining", remainingSeconds > 0 ? elapsedLabel(remainingSeconds) : isDone ? "Done" : "Calculating"]
     ],
-    [elapsedSeconds, job, rowsPerSecond]
+    [elapsedSeconds, isDone, job, remainingSeconds, rowsPerSecond]
   );
 
   useEffect(() => {
@@ -79,6 +87,7 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
     const controller = new AbortController();
     const timer = window.setInterval(async () => {
       try {
+        setRefreshState("refreshing");
         const response = await fetch(`/owner/imports/${job.id}/status`, {
           signal: controller.signal,
           cache: "no-store"
@@ -90,6 +99,8 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
         }
       } catch {
         // The next poll will retry.
+      } finally {
+        setRefreshState("idle");
       }
     }, 1500);
 
@@ -108,12 +119,21 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
           <p className="mt-1 text-sm text-slate-600">
             Status: <span className="font-semibold text-slate-950">{job.status}</span> / Started {formatDateTime(job.startedAt)}
           </p>
+          <p className="mt-1 text-xs font-medium text-slate-500">
+            {isDone ? `Finished ${formatDateTime(job.finishedAt)}` : "Live progress refreshes every 1.5 seconds."}
+            {refreshState === "refreshing" ? <span className="ml-2 inline-block h-2 w-12 animate-pulse rounded-full bg-slate-200 align-middle" /> : null}
+          </p>
         </div>
-        {job.status === "COMPLETED" && href ? (
-          <Link href={href} className="inline-flex rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-            Open review
+        <div className="flex flex-wrap gap-2">
+          {job.status === "COMPLETED" && href ? (
+            <Link href={href} className="inline-flex rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+              Open review
+            </Link>
+          ) : null}
+          <Link href="/owner/uploads/new" className="inline-flex rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
+            Upload another
           </Link>
-        ) : null}
+        </div>
       </div>
 
       <div className="mt-5">
@@ -140,6 +160,40 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
           {job.lastError}
         </div>
       ) : null}
+
+      <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+        <h3 className="font-semibold text-slate-950">{job.status === "FAILED" ? "Job failed" : job.status === "COMPLETED" ? "Job completed" : "Next actions"}</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href="/owner/imports" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+            Back to imports
+          </Link>
+          <Link href="/picker" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+            Open picker
+          </Link>
+          <Link href="/packing" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+            Open packer
+          </Link>
+          <Link href={exportHref(job.id, "csv")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+            Summary CSV
+          </Link>
+          <Link href={exportHref(job.id, "xlsx")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+            Summary XLSX
+          </Link>
+          <Link href={exportHref(job.id, "txt")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+            Summary TXT
+          </Link>
+          {issueCount > 0 && job.batchId ? (
+            <Link href={exportHref(job.id, "csv", "issues")} className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900">
+              Issues CSV
+            </Link>
+          ) : null}
+        </div>
+        {job.status === "FAILED" ? (
+          <p className="mt-3 text-sm text-slate-600">
+            Retry is not automatic yet because failed jobs may reference temporary upload files. Upload the corrected file again.
+          </p>
+        ) : null}
+      </div>
     </section>
   );
 }

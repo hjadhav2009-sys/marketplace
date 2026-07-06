@@ -3,7 +3,7 @@ import { AwbBarcodeScanner } from "@/components/AwbBarcodeScanner";
 import { PageHeader } from "@/components/PageHeader";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getLatestImportedBatch, getPackingDashboard } from "@/lib/data";
-import { moveOldPendingToReviewAction, searchAwbAction } from "./actions";
+import { directPackFromSearchAction, moveOldPendingToReviewAction, searchAwbAction } from "./actions";
 
 type PackingPageProps = {
   searchParams?: Promise<{
@@ -12,6 +12,7 @@ type PackingPageProps = {
     multiple?: string;
     q?: string;
     oldPendingReviewed?: string;
+    directPacked?: string;
   }>;
 };
 
@@ -32,7 +33,7 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
         description="Scan the label or type the last 5 to 8 Tracking ID / AWB characters."
       />
 
-      <AwbBarcodeScanner action={searchAwbAction} defaultAwb={params?.q} />
+      <AwbBarcodeScanner action={searchAwbAction} directPackAction={directPackFromSearchAction} defaultAwb={params?.q} />
 
       <section className="mt-4 flex gap-2 overflow-x-auto pb-1">
         <span className="whitespace-nowrap rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
@@ -77,6 +78,14 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
       {params?.oldPendingReviewed ? (
         <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-700">
           Old pending review noted for {params.oldPendingReviewed} order{params.oldPendingReviewed === "1" ? "" : "s"}. No orders were deleted or reset.
+        </div>
+      ) : null}
+
+      {params?.directPacked ? (
+        <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-700">
+          {params.directPacked === "already"
+            ? "No ready items were packed. The order may already be packed or marked problem."
+            : `Packed ${params.directPacked} ready item${params.directPacked === "1" ? "" : "s"} from the search result.`}
         </div>
       ) : null}
 

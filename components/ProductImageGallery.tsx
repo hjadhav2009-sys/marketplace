@@ -13,6 +13,7 @@ type ProductImageGalleryProps = {
   originalImageUrl?: string | null;
   showBadge?: boolean;
   showInlineThumbnails?: boolean;
+  size?: "sm" | "md" | "lg";
 };
 
 function uniqueImages(images: Array<string | null | undefined>) {
@@ -36,7 +37,8 @@ export function ProductImageGallery({
   cacheStatus,
   originalImageUrl,
   showBadge = false,
-  showInlineThumbnails = true
+  showInlineThumbnails = true,
+  size = "lg"
 }: ProductImageGalleryProps) {
   const galleryImages = useMemo(() => uniqueImages([primarySrc, ...images]), [images, primarySrc]);
   const [open, setOpen] = useState(false);
@@ -78,7 +80,7 @@ export function ProductImageGallery({
         <ProductImage
           src={displayImage}
           alt={alt}
-          size="lg"
+          size={size}
           mappingId={mappingId}
           showBadge={showBadge}
           imageHealth={imageHealth}
@@ -116,50 +118,52 @@ export function ProductImageGallery({
               </button>
             </div>
 
-            <div className="relative mt-4 flex min-h-0 flex-1 items-center justify-center rounded-md bg-slate-900">
+            <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_5rem]">
+              <div className="relative flex min-h-0 items-center justify-center rounded-md bg-slate-900">
+                {galleryImages.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveIndex((index) => (index - 1 + galleryImages.length) % galleryImages.length)}
+                    className="absolute bottom-3 left-3 z-10 rounded-md bg-white/95 px-3 py-3 text-sm font-bold text-slate-950"
+                  >
+                    Prev
+                  </button>
+                ) : null}
+                {activeImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={activeImage} alt={alt} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <div className="rounded-md bg-white px-6 py-5 text-center text-sm font-semibold text-slate-700">No product image available</div>
+                )}
+                {galleryImages.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveIndex((index) => (index + 1) % galleryImages.length)}
+                    className="absolute bottom-3 right-3 z-10 rounded-md bg-white/95 px-3 py-3 text-sm font-bold text-slate-950"
+                  >
+                    Next
+                  </button>
+                ) : null}
+              </div>
+
               {galleryImages.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveIndex((index) => (index - 1 + galleryImages.length) % galleryImages.length)}
-                  className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-3 text-sm font-bold text-slate-950"
-                >
-                  Prev
-                </button>
-              ) : null}
-              {activeImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={activeImage} alt={alt} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
-              ) : (
-                <div className="rounded-md bg-white px-6 py-5 text-center text-sm font-semibold text-slate-700">No product image available</div>
-              )}
-              {galleryImages.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveIndex((index) => (index + 1) % galleryImages.length)}
-                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-3 text-sm font-bold text-slate-950"
-                >
-                  Next
-                </button>
+                <div className="flex gap-2 overflow-x-auto pb-1 lg:max-h-full lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
+                  {galleryImages.map((imageUrl, index) => (
+                    <button
+                      key={`${imageUrl}-${index}`}
+                      type="button"
+                      onClick={() => setActiveIndex(index)}
+                      className={`h-16 w-16 shrink-0 overflow-hidden rounded-md border ${
+                        activeIndex === index ? "border-white" : "border-slate-700"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imageUrl} alt={`${alt} thumbnail ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
+                    </button>
+                  ))}
+                </div>
               ) : null}
             </div>
-
-            {galleryImages.length > 1 ? (
-              <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                {galleryImages.map((imageUrl, index) => (
-                  <button
-                    key={`${imageUrl}-${index}`}
-                    type="button"
-                    onClick={() => setActiveIndex(index)}
-                    className={`h-16 w-16 shrink-0 overflow-hidden rounded-md border ${
-                      activeIndex === index ? "border-white" : "border-slate-700"
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imageUrl} alt={`${alt} thumbnail ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
-                  </button>
-                ))}
-              </div>
-            ) : null}
           </div>
         </div>
       ) : null}

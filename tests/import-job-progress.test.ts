@@ -23,16 +23,16 @@ assert.deepEqual(
   importJobPageWindow(126, 3, IMPORT_JOB_PAGE_SIZE),
   {
     page: 3,
-    pageSize: 50,
-    totalPages: 3,
-    skip: 100,
-    take: 50,
-    from: 101,
-    to: 126
+    pageSize: 10,
+    totalPages: 13,
+    skip: 20,
+    take: 10,
+    from: 21,
+    to: 30
   },
   "Review pagination returns one bounded page window"
 );
-assert.equal(importJobPageWindow(126, "99").page, 3, "Review pagination clamps high page numbers");
+assert.equal(importJobPageWindow(126, "99").page, 13, "Review pagination clamps high page numbers");
 assert.equal(importJobPageWindow(0, "bad").from, 0, "Review pagination handles empty results");
 assert.deepEqual(chunkFlipkartListingRows(Array.from({ length: 1200 }, (_, index) => index), 500).map((chunk) => chunk.length), [500, 500, 200], "Listing chunks stay at the 500-row import target");
 

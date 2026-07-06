@@ -28,6 +28,61 @@ type ImportNotes = {
   importAllAccounts?: boolean;
 };
 
+type FlipkartListingStats = {
+  active: number | null;
+  latestImportAt: Date | null;
+  missingImages: number | null;
+  total: number | null;
+};
+
+async function safeStat<T>(query: () => Promise<T>, fallback: T) {
+  try {
+    return await query();
+  } catch {
+    return fallback;
+  }
+}
+
+async function getFlipkartListingStats(accountId: string): Promise<FlipkartListingStats> {
+  const total = await safeStat(
+    () =>
+      prisma.marketplaceListing.count({
+        where: { accountId, marketplace: "FLIPKART" }
+      }),
+    null
+  );
+  const active = await safeStat(
+    () =>
+      prisma.marketplaceListing.count({
+        where: { accountId, marketplace: "FLIPKART", listingStatus: "Active" }
+      }),
+    null
+  );
+  const missingImages = await safeStat(
+    () =>
+      prisma.marketplaceListing.count({
+        where: { accountId, marketplace: "FLIPKART", mainImageUrl: null }
+      }),
+    null
+  );
+  const latestListing = await safeStat(
+    () =>
+      prisma.marketplaceListing.findFirst({
+        where: { accountId, marketplace: "FLIPKART", lastImportedAt: { not: null } },
+        select: { lastImportedAt: true },
+        orderBy: { lastImportedAt: "desc" }
+      }),
+    null
+  );
+
+  return {
+    active,
+    latestImportAt: latestListing?.lastImportedAt ?? null,
+    missingImages,
+    total
+  };
+}
+
 function parseImportNotes(value: string | null): ImportNotes {
   if (!value) {
     return {};
@@ -59,22 +114,8 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
   const selectedAccount = await requireAccount(user);
   const params = await searchParams;
   const accounts = await getAvailableAccounts(user);
-  const [totalFlipkartListings, activeFlipkartListings, missingFlipkartImages, latestFlipkartListing] = await Promise.all([
-    prisma.marketplaceListing.count({
-      where: { accountId: selectedAccount.id, marketplace: "FLIPKART" }
-    }),
-    prisma.marketplaceListing.count({
-      where: { accountId: selectedAccount.id, marketplace: "FLIPKART", listingStatus: "Active" }
-    }),
-    prisma.marketplaceListing.count({
-      where: { accountId: selectedAccount.id, marketplace: "FLIPKART", mainImageUrl: null }
-    }),
-    prisma.marketplaceListing.findFirst({
-      where: { accountId: selectedAccount.id, marketplace: "FLIPKART", lastImportedAt: { not: null } },
-      select: { lastImportedAt: true },
-      orderBy: { lastImportedAt: "desc" }
-    })
-  ]);
+  const listingStats = await getFlipkartListingStats(selectedAccount.id);
+  const statsAreRefreshing = [listingStats.total, listingStats.active, listingStats.missingImages].some((value) => value === null);
   const batch = params?.batchId
     ? await prisma.uploadBatch.findFirst({
         where: { id: params.batchId, importType: "SKU_IMAGE" },
@@ -118,10 +159,10 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ["Total listings", totalFlipkartListings],
-            ["Active listings", activeFlipkartListings],
-            ["Missing images", missingFlipkartImages],
-            ["Last import", latestFlipkartListing?.lastImportedAt ? formatDateTime(latestFlipkartListing.lastImportedAt) : "Never"]
+            ["Total listings", listingStats.total ?? "Refreshing"],
+            ["Active listings", listingStats.active ?? "Refreshing"],
+            ["Missing images", listingStats.missingImages ?? "Refreshing"],
+            ["Last import", listingStats.latestImportAt ? formatDateTime(listingStats.latestImportAt) : statsAreRefreshing ? "Refreshing" : "Never"]
           ].map(([label, value]) => (
             <div key={label} className="rounded-md bg-slate-50 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
@@ -129,6 +170,11 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
             </div>
           ))}
         </div>
+        {statsAreRefreshing ? (
+          <p className="mt-3 text-sm font-medium text-amber-700">
+            Listing counters are refreshing because the local SQLite database is busy. Imports and uploads can continue.
+          </p>
+        ) : null}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">

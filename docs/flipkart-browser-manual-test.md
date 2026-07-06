@@ -24,7 +24,7 @@ Use a local database and temporary local secrets. From the app folder, initializ
 
 ```powershell
 cd E:\marketplace1\marketplace
-$env:DATABASE_URL="file:./dev.db"
+$env:DATABASE_URL="file:./dev.db?connection_limit=1&socket_timeout=20"
 $env:SESSION_SECRET="local-test-secret-change-me"
 $env:NEXT_PUBLIC_APP_URL="http://localhost:3000"
 $env:NEXT_PUBLIC_APP_NAME="Marketplace Pick & Pack"

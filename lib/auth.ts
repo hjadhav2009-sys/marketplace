@@ -19,6 +19,37 @@ type SessionState =
   | { status: "authenticated"; user: User }
   | { status: Exclude<AuthSessionStatus, "authenticated"> };
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isDatabaseBusyError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("database is locked") || message.includes("socket timeout");
+}
+
+async function retryBusyDatabase<T>(query: () => Promise<T>) {
+  const delays = [250, 500, 1000, 1500, 2500];
+
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      return await query();
+    } catch (error) {
+      if (!isDatabaseBusyError(error) || attempt === delays.length) {
+        throw error;
+      }
+
+      await sleep(delays[attempt] ?? 250);
+    }
+  }
+
+  throw new Error("Database remained busy after retry.");
+}
+
 function getSecret() {
   return process.env.SESSION_SECRET ?? "dev-only-change-me";
 }
@@ -118,17 +149,19 @@ export async function getCurrentSessionState(): Promise<SessionState> {
     return { status: "invalid" };
   }
 
-  const [user, session] = await Promise.all([
+  const user = await retryBusyDatabase(() =>
     prisma.user.findUnique({
       where: { id: payload.userId }
-    }),
+    })
+  );
+  const session = await retryBusyDatabase(() =>
     prisma.userDeviceSession.findFirst({
       where: {
         id: payload.sessionId,
         userId: payload.userId
       }
     })
-  ]);
+  );
 
   if (!user) {
     return { status: "expired" };
@@ -144,16 +177,24 @@ export async function getCurrentSessionState(): Promise<SessionState> {
 
   const lastSeenAt = session.lastSeenAt?.getTime() ?? 0;
   if (Date.now() - lastSeenAt > 5 * 60 * 1000) {
-    await prisma.userDeviceSession.updateMany({
-      where: {
-        id: payload.sessionId,
-        userId: user.id,
-        active: true
-      },
-      data: {
-        lastSeenAt: new Date()
+    try {
+      await retryBusyDatabase(() =>
+        prisma.userDeviceSession.updateMany({
+          where: {
+            id: payload.sessionId,
+            userId: user.id,
+            active: true
+          },
+          data: {
+            lastSeenAt: new Date()
+          }
+        })
+      );
+    } catch (error) {
+      if (!isDatabaseBusyError(error)) {
+        throw error;
       }
-    });
+    }
   }
 
   return { status: "authenticated", user };
@@ -214,13 +255,15 @@ export async function getSelectedAccount(user?: User | null) {
     return null;
   }
 
-  return prisma.account.findFirst({
-    where: {
-      id: selectedAccountId,
-      active: currentUser.role === "OWNER" ? undefined : true,
-      users: currentUser.role === "OWNER" ? undefined : { some: { id: currentUser.id } }
-    }
-  });
+  return retryBusyDatabase(() =>
+    prisma.account.findFirst({
+      where: {
+        id: selectedAccountId,
+        active: currentUser.role === "OWNER" ? undefined : true,
+        users: currentUser.role === "OWNER" ? undefined : { some: { id: currentUser.id } }
+      }
+    })
+  );
 }
 
 export async function requireAccount(user?: User | null) {
@@ -235,20 +278,24 @@ export async function requireAccount(user?: User | null) {
 
 export async function getAvailableAccounts(user: User) {
   if (user.role === "OWNER") {
-    return prisma.account.findMany({
-      orderBy: [{ active: "desc" }, { name: "asc" }]
-    });
+    return retryBusyDatabase(() =>
+      prisma.account.findMany({
+        orderBy: [{ active: "desc" }, { name: "asc" }]
+      })
+    );
   }
 
-  return prisma.account.findMany({
-    where: {
-      active: true,
-      users: {
-        some: { id: user.id }
-      }
-    },
-    orderBy: { name: "asc" }
-  });
+  return retryBusyDatabase(() =>
+    prisma.account.findMany({
+      where: {
+        active: true,
+        users: {
+          some: { id: user.id }
+        }
+      },
+      orderBy: { name: "asc" }
+    })
+  );
 }
 
 export function roleHomePath(role: Role) {

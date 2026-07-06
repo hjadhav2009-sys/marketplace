@@ -1,4 +1,6 @@
 import ExcelJS from "exceljs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { RawImportRow } from "./sku-mappings";
 
 function cellToString(value: ExcelJS.CellValue) {
@@ -74,6 +76,64 @@ export async function parseSpreadsheetRows(file: File): Promise<RawImportRow[]> 
       rows.push(record);
     }
   });
+
+  return rows;
+}
+
+export async function parseSpreadsheetRowsFromPath(filePath: string): Promise<RawImportRow[]> {
+  const extension = path.extname(filePath).toLowerCase();
+
+  if (extension === ".csv") {
+    return parseCsvRows(await readFile(filePath, "utf8"));
+  }
+
+  if (extension !== ".xlsx") {
+    throw new Error("Upload a CSV or .xlsx file.");
+  }
+
+  const rows: RawImportRow[] = [];
+  const workbook = new ExcelJS.stream.xlsx.WorkbookReader(filePath, {
+    hyperlinks: "ignore",
+    sharedStrings: "cache",
+    styles: "ignore",
+    worksheets: "emit"
+  });
+
+  for await (const worksheet of workbook) {
+    let headers: string[] = [];
+
+    for await (const row of worksheet) {
+      const values = row.values as ExcelJS.CellValue[];
+
+      if (row.number === 1) {
+        headers = values.slice(1).map((header) => cellToString(header).trim());
+        continue;
+      }
+
+      if (headers.length === 0) {
+        continue;
+      }
+
+      const record: RawImportRow = {};
+      let hasValue = false;
+
+      headers.forEach((header, index) => {
+        if (!header) {
+          return;
+        }
+
+        const value = cellToString(values[index + 1]).trim();
+        record[header] = value;
+        hasValue = hasValue || Boolean(value);
+      });
+
+      if (hasValue) {
+        rows.push(record);
+      }
+    }
+
+    break;
+  }
 
   return rows;
 }

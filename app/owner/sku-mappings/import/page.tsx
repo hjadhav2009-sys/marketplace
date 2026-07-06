@@ -120,7 +120,15 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
     ? await prisma.uploadBatch.findFirst({
         where: { id: params.batchId, importType: "SKU_IMAGE" },
         include: {
-          issues: { orderBy: { createdAt: "asc" } },
+          issues: {
+            orderBy: { createdAt: "asc" },
+            take: 50
+          },
+          _count: {
+            select: {
+              issues: true
+            }
+          },
           account: true
         }
       })
@@ -131,6 +139,7 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
       ...issue,
       context: flipkartIssueRawContext(parseIssueRawData(issue.rawData))
     })) ?? [];
+  const issueCount = batch?._count.issues ?? batch?.issues.length ?? 0;
   const hasFlipkartMissingImageIssues = issueRows.some((issue) => issue.issueType === "MISSING_IMAGE_URL" && issue.context.sku);
 
   return (
@@ -211,8 +220,8 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
               Required column: <span className="font-semibold">Seller SKU Id</span>. Image priority uses Image 1 1366 URL, then Image URL 1.
             </div>
             <FormPendingStatus
-              title="Flipkart listing import is running"
-              description="Large Listing Master files can take a few minutes. Keep this tab open until the import result appears."
+              title="Uploading Flipkart listings"
+              description="Large Listing Master files are saved first, then processed on the Import Progress page."
             />
             <SubmitButton pendingText="Importing...">Import Flipkart listings</SubmitButton>
           </div>
@@ -310,7 +319,7 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
                 <Link href="/owner/sku-mappings" className="text-sm font-semibold text-berry hover:text-pink-800">
                   View mappings
                 </Link>
-                {batch.issues.length > 0 ? (
+                {issueCount > 0 ? (
                   <Link
                     href={`/owner/sku-mappings/import/${batch.id}/errors`}
                     className="text-sm font-semibold text-berry hover:text-pink-800"
@@ -320,8 +329,11 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
                 ) : null}
               </div>
 
-              {batch.issues.length > 0 ? (
+              {issueCount > 0 ? (
                 <div className="mt-5 overflow-hidden rounded-md border border-slate-200">
+                  <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Showing {issueRows.length} of {issueCount} issue rows
+                  </div>
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
                     <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                       <tr>

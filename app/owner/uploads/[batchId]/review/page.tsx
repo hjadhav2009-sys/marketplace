@@ -23,6 +23,8 @@ import { normalizeSkuForMatching } from "@/lib/sku";
 import { flipkartIssueRawContext } from "@/src/lib/marketplaces/flipkart";
 import { confirmParsedBatchAction, prepareBatchProductImagesAction, repairMissingSkuImageMappingAction } from "../../actions";
 
+const REVIEW_PAGE_SIZE = 50;
+
 type ReviewPageProps = {
   params: Promise<{
     batchId: string;
@@ -262,7 +264,8 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         !heldRows.some((row) => row.id === issue.id) &&
         !missingMappingRows.some((row) => row.id === issue.id)
     );
-    const orderSkus = Array.from(new Set(batch.orders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
+    const visibleOrders = batch.orders.slice(0, REVIEW_PAGE_SIZE);
+    const orderSkus = Array.from(new Set(visibleOrders.flatMap((order) => [order.sku, normalizeSkuForMatching(order.sku)].filter(Boolean))));
     const reviewListings = await prisma.marketplaceListing.findMany({
       where: {
         accountId: account.id,
@@ -278,9 +281,14 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
     });
     const reviewListingBySku = new Map(reviewListings.map((listing) => [normalizeSkuForMatching(listing.sku), listing]));
     const validRows = notes.importableRows ?? batch.createdRows + batch.updatedRows + batch.duplicateRows;
-    const issueTable = (rows: typeof issueRows, emptyTitle: string, emptyDescription: string) =>
-      rows.length > 0 ? (
+    const issueTable = (rows: typeof issueRows, emptyTitle: string, emptyDescription: string) => {
+      const visibleRows = rows.slice(0, REVIEW_PAGE_SIZE);
+
+      return rows.length > 0 ? (
         <div className="overflow-x-auto rounded-md border border-slate-200">
+          <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Showing {visibleRows.length} of {rows.length} issue rows
+          </div>
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
@@ -295,7 +303,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.map((issue) => (
+              {visibleRows.map((issue) => (
                 <tr key={issue.id}>
                   <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-950">{issue.rowNumber ?? "-"}</td>
                   <td className="whitespace-nowrap px-3 py-2">
@@ -317,6 +325,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       ) : (
         <EmptyState title={emptyTitle} description={emptyDescription} />
       );
+    };
 
     return (
       <AppShell>
@@ -370,7 +379,10 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           </div>
           {batch.orders.length > 0 ? (
             <div className="divide-y divide-slate-100">
-              {batch.orders.map((order) => (
+              <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Showing {visibleOrders.length} of {batch.orders.length} imported rows
+              </div>
+              {visibleOrders.map((order) => (
                 <div key={order.id} className="grid gap-3 px-4 py-4 md:grid-cols-[auto_1fr] md:items-center">
                   <ProductImage
                     src={reviewListingBySku.get(normalizeSkuForMatching(order.sku))?.mainImageUrl ?? order.imageUrl}
@@ -529,6 +541,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       )
       .values()
   );
+  const visibleMissingImageRepairs = missingImageRepairs.slice(0, REVIEW_PAGE_SIZE);
   const issueTypes = Array.from(new Set(previewRows.flatMap((row) => row.parsedIssues.map((issue) => issue.issueType)))).sort();
   const query = filters?.q?.trim().toLowerCase() ?? "";
   const selectedIssue = filters?.issue ?? "";
@@ -562,6 +575,11 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       issue
     }))
   );
+  const visibleProblemRows = problemRows.slice(0, REVIEW_PAGE_SIZE);
+  const visibleOrderRows = filteredOrderRows.slice(0, REVIEW_PAGE_SIZE);
+  const visibleSummaryRows = filteredSummaryRows.slice(0, REVIEW_PAGE_SIZE);
+  const visibleIssues = batch.issues.slice(0, REVIEW_PAGE_SIZE);
+  const visibleImportedOrders = batch.orders.slice(0, REVIEW_PAGE_SIZE);
   const crossCheckIssueCount = batch.issues.filter((issue) => /MISMATCH|NOT_IN/i.test(issue.issueType)).length;
   const importableRows = importReviewStats.importableOrderRows;
   const confirmImportButtonText = `${importableRows} ${importSourceLabel} row${importableRows === 1 ? "" : "s"} will import`;
@@ -797,7 +815,10 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             </p>
           </div>
           <div className="divide-y divide-slate-100">
-            {missingImageRepairs.map((repair) => (
+            <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Showing {visibleMissingImageRepairs.length} of {missingImageRepairs.length} missing image mapping rows
+            </div>
+            {visibleMissingImageRepairs.map((repair) => (
               <form key={repair.sku} action={repairMissingSkuImageMappingAction} className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-end">
                 <input type="hidden" name="batchId" value={batch.id} />
                 <input type="hidden" name="sku" value={repair.sku} />
@@ -927,6 +948,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           </div>
         ) : (
           <div className="overflow-x-auto">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Showing {visibleProblemRows.length} of {problemRows.length} problem rows
+            </div>
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -938,7 +962,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {problemRows.map(({ row, issue }) => (
+                {visibleProblemRows.map(({ row, issue }) => (
                   <tr key={`${row.id}-${issue.issueType}-${issue.message}`}>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ring-1 ${issueTone(issue.issueType)}`}>
@@ -971,6 +995,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           </div>
         ) : (
           <div className="overflow-x-auto">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Showing {visibleOrderRows.length} of {filteredOrderRows.length} parsed order rows
+            </div>
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -986,7 +1013,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredOrderRows.map((row) => {
+                {visibleOrderRows.map((row) => {
                   const mapping = row.sku ? mappingBySku.get(normalizeSkuForMatching(row.sku)) : undefined;
 
                   return (
@@ -1059,6 +1086,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
           </div>
         ) : (
           <div className="overflow-x-auto">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Showing {visibleSummaryRows.length} of {filteredSummaryRows.length} summary rows
+            </div>
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -1073,7 +1103,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredSummaryRows.map((row) => {
+                {visibleSummaryRows.map((row) => {
                   const mapping = row.sku ? mappingBySku.get(normalizeSkuForMatching(row.sku)) : undefined;
 
                   return (
@@ -1114,7 +1144,10 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{batch.issues.length}</span>
           </summary>
           <div className="divide-y divide-slate-100">
-            {batch.issues.map((issue) => (
+            <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Showing {visibleIssues.length} of {batch.issues.length} issues
+            </div>
+            {visibleIssues.map((issue) => (
               <div key={issue.id} className="px-4 py-3 text-sm">
                 <p className="font-semibold text-slate-950">
                   {issue.issueType} {issue.rowNumber ? `. Page ${issue.rowNumber}` : ""}
@@ -1133,6 +1166,9 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             <span className="ml-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{batch.orders.length}</span>
           </summary>
           <div className="overflow-x-auto">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Showing {visibleImportedOrders.length} of {batch.orders.length} imported orders
+            </div>
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -1146,7 +1182,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {batch.orders.map((order) => (
+                {visibleImportedOrders.map((order) => (
                   <tr key={order.id}>
                     <td className="px-4 py-3 font-semibold text-slate-950">{order.awb}</td>
                     <td className="px-4 py-3">{order.sku}</td>

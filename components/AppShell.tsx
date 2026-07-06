@@ -13,6 +13,7 @@ type AppShellProps = {
 const ownerLinks = [
   { href: "/owner", label: "Dashboard" },
   { href: "/owner/uploads/new", label: "Upload" },
+  { href: "/owner/imports", label: "Imports" },
   { href: "/owner/sku-mappings", label: "SKU Images" },
   { href: "/owner/accounts", label: "Accounts" },
   { href: "/picker", label: "Pick" },

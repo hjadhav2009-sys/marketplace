@@ -3,6 +3,7 @@ import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { normalizeSkuForMatching } from "@/lib/sku";
+import { setImportJobBatch, updateImportJobProgress } from "@/src/lib/import-jobs/store";
 import {
   chunkFlipkartListingRows,
   dedupeFlipkartListingRows,
@@ -90,6 +91,7 @@ export async function importFlipkartOrderRows(input: {
   account: Account;
   user: User;
   request?: RequestMeta;
+  jobId?: string;
 }) {
   const parsed = parseFlipkartOrderRows(input.rows, input.fileName);
   const batch = await prisma.uploadBatch.create({
@@ -109,6 +111,15 @@ export async function importFlipkartOrderRows(input: {
       })
     }
   });
+  if (input.jobId) {
+    await setImportJobBatch(input.jobId, batch.id);
+    await updateImportJobProgress(input.jobId, {
+      totalRows: input.rows.length,
+      processedRows: 0,
+      errorRows: parsed.issues.length,
+      warningRows: parsed.issues.length
+    });
+  }
   const duplicateIssues: FlipkartParseIssue[] = [];
   const deduped = dedupeFlipkartOrderRows(parsed.orders);
   duplicateIssues.push(...deduped.duplicateIssues);
@@ -158,8 +169,18 @@ export async function importFlipkartOrderRows(input: {
   let updatedRows = 0;
   let duplicateRows = 0;
   let missingImageRows = 0;
+  let processedRows = parsed.issues.length + duplicateIssues.length;
+  const mappingIssues: FlipkartParseIssue[] = [];
 
   await writeIssues(batch.id, [...parsed.issues, ...duplicateIssues]);
+  if (input.jobId) {
+    await updateImportJobProgress(input.jobId, {
+      processedRows,
+      duplicateRows: duplicateIssues.length,
+      warningRows: parsed.issues.length + duplicateIssues.length,
+      errorRows: parsed.issues.length
+    });
+  }
 
   for (const order of importableOrders) {
     const internalKey = flipkartInternalOrderKey(order);
@@ -179,15 +200,7 @@ export async function importFlipkartOrderRows(input: {
 
     if (mappingIssue) {
       missingImageRows += 1;
-      await prisma.importRowIssue.create({
-        data: {
-          batchId: batch.id,
-          rowNumber: mappingIssue.rowNumber,
-          issueType: mappingIssue.issueType,
-          message: mappingIssue.message,
-          rawData: JSON.stringify(mappingIssue.rawData)
-        }
-      });
+      mappingIssues.push(mappingIssue);
     }
 
     const existing = existingByKey.get(internalKey);
@@ -233,7 +246,24 @@ export async function importFlipkartOrderRows(input: {
       });
       updatedRows += 1;
     }
+
+    processedRows += 1;
+    if (input.jobId && processedRows % 500 === 0) {
+      await updateImportJobProgress(input.jobId, {
+        processedRows,
+        createdRows,
+        updatedRows,
+        unchangedRows: duplicateRows,
+        duplicateRows: duplicateRows + duplicateIssues.length,
+        warningRows: parsed.issues.length + duplicateIssues.length + missingImageRows,
+        errorRows: parsed.issues.length,
+        missingListingRows: mappingIssues.filter((issue) => issue.issueType === "MISSING_FLIPKART_LISTING_MAPPING").length,
+        missingImageRows
+      });
+    }
   }
+
+  await writeIssues(batch.id, mappingIssues);
 
   const errorRows = parsed.issues.length;
   const reviewRows = parsed.issues.length + duplicateIssues.length + missingImageRows;
@@ -256,6 +286,20 @@ export async function importFlipkartOrderRows(input: {
       })
     }
   });
+  if (input.jobId) {
+    await updateImportJobProgress(input.jobId, {
+      totalRows: input.rows.length,
+      processedRows: input.rows.length,
+      createdRows,
+      updatedRows,
+      unchangedRows: duplicateRows,
+      duplicateRows: duplicateRows + duplicateIssues.length,
+      warningRows: reviewRows,
+      errorRows,
+      missingListingRows: mappingIssues.filter((issue) => issue.issueType === "MISSING_FLIPKART_LISTING_MAPPING").length,
+      missingImageRows
+    });
+  }
 
   await recordAuditLog({
     userId: input.user.id,
@@ -283,6 +327,7 @@ export async function importFlipkartListingRows(input: {
   account: Account;
   user: User;
   request?: RequestMeta;
+  jobId?: string;
 }) {
   const parsed = parseFlipkartListingRows(input.rows, input.fileName);
   const batch = await prisma.uploadBatch.create({
@@ -299,6 +344,15 @@ export async function importFlipkartListingRows(input: {
       })
     }
   });
+  if (input.jobId) {
+    await setImportJobBatch(input.jobId, batch.id);
+    await updateImportJobProgress(input.jobId, {
+      totalRows: input.rows.length,
+      processedRows: 0,
+      errorRows: parsed.issues.length,
+      warningRows: parsed.issues.length
+    });
+  }
   let createdRows = 0;
   let updatedRows = 0;
   let skippedRows = 0;
@@ -312,8 +366,17 @@ export async function importFlipkartListingRows(input: {
     data: flipkartListingMasterData(listing)
   }));
   const missingImageIssues: FlipkartParseIssue[] = [];
+  let processedRows = parsed.issues.length + deduped.duplicateIssues.length;
 
   await writeIssues(batch.id, issues);
+  if (input.jobId) {
+    await updateImportJobProgress(input.jobId, {
+      processedRows,
+      duplicateRows: deduped.duplicateIssues.length,
+      warningRows: issues.length,
+      errorRows: parsed.issues.length
+    });
+  }
 
   for (const chunk of chunkFlipkartListingRows(listingDrafts)) {
     const listingSkus = Array.from(new Set(chunk.map((draft) => draft.data.sku).filter(Boolean)));
@@ -384,6 +447,20 @@ export async function importFlipkartListingRows(input: {
       const result = await prisma.$transaction(updateChunk);
       updatedRows += result.length;
     }
+
+    processedRows += chunk.length;
+    if (input.jobId) {
+      await updateImportJobProgress(input.jobId, {
+        processedRows,
+        createdRows,
+        updatedRows,
+        unchangedRows: skippedRows,
+        duplicateRows: deduped.duplicateIssues.length,
+        warningRows: issues.length + missingImageRows,
+        errorRows: issues.length + missingImageRows,
+        missingImageRows
+      });
+    }
   }
 
   await writeIssues(batch.id, missingImageIssues);
@@ -407,6 +484,19 @@ export async function importFlipkartListingRows(input: {
       })
     }
   });
+  if (input.jobId) {
+    await updateImportJobProgress(input.jobId, {
+      totalRows: input.rows.length,
+      processedRows: input.rows.length,
+      createdRows,
+      updatedRows,
+      unchangedRows: skippedRows,
+      duplicateRows: deduped.duplicateIssues.length,
+      warningRows: allIssues.length,
+      errorRows: allIssues.length,
+      missingImageRows
+    });
+  }
 
   await recordAuditLog({
     userId: input.user.id,

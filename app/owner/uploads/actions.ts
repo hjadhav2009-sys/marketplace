@@ -6,7 +6,6 @@ import type { PaymentType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { cacheProductCardImage, imageCacheNeedsRefresh } from "@/lib/image-cache";
-import { parseSpreadsheetRows } from "@/lib/import/files";
 import { importParsedOrderRows, type ParsedOrderImportRow } from "@/lib/import/orders";
 import {
   buildPreviewImportStats,
@@ -24,7 +23,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
-import { importFlipkartOrderRows } from "@/src/lib/marketplaces/flipkart";
+import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
 import { PDF_UPLOAD_MAX_BYTES } from "@/lib/upload-limits";
 import { flipkartExcelImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 
@@ -926,23 +925,24 @@ export async function createFlipkartOrderImportAction(formData: FormData) {
     redirect("/owner/uploads/new?error=invalid-flipkart-orders");
   }
 
+  let jobId: string;
+
   try {
-    const rows = await parseSpreadsheetRows(file);
-    const batch = await importFlipkartOrderRows({
-      rows,
-      fileName: file.name,
+    const job = await createFlipkartImportJobFromFile({
+      file,
       account,
       user,
-      request
+      importType: "FLIPKART_ORDER"
     });
-
-    revalidatePath("/owner");
-    revalidatePath("/packing");
-    revalidatePath("/picker");
-    redirect(`/owner/uploads/${batch.id}/review`);
+    startImportJob(job.id, request);
+    jobId = job.id;
   } catch {
     redirect("/owner/uploads/new?error=flipkart-order-import-failed");
   }
+
+  revalidatePath("/owner");
+  revalidatePath("/owner/uploads/new");
+  redirect(`/owner/imports/${jobId}`);
 }
 
 export async function confirmParsedBatchAction(formData: FormData) {

@@ -76,10 +76,12 @@ Confirm the listing import summary:
 
 Expected behavior:
 
-- A live import bar appears after submitting the file. It shows that upload/import is running, but it does not show exact percent complete.
-- Listing Master rows are bulk-inserted where possible. Very large files still depend on browser upload time, Excel parsing time, and database write speed.
+- After submitting, the app redirects to `Owner -> Imports -> Import Progress`.
+- The progress page shows status, processed/total rows, created, updated, unchanged, duplicates, warnings, errors, missing images, elapsed time, and rows/sec.
+- Listing Master rows are processed in 500-row chunks and bulk-inserted where possible. Very large files still depend on browser upload time, Excel parsing time, and database write speed.
 - Listing rows with duplicate Seller SKU are reviewed or skipped according to the import summary.
 - Product image data is imported from Listing Master.
+- The listing result page shows summary counts first and only renders the first 50 issue rows.
 - No real URL values need to be copied into notes or screenshots.
 
 ## Import Daily Orders
@@ -107,9 +109,12 @@ Confirm the order review:
 
 Expected behavior:
 
+- After submitting, the app redirects to `Owner -> Imports -> Import Progress`.
+- Open the order review from the progress page after the job completes.
 - Bad or held rows are not auto-imported.
 - Missing listing mapping warnings are clear and exportable if present.
 - Missing image warnings are clear and exportable if present.
+- Review sections render only the first 50 visible rows per section.
 - Imported order rows use Flipkart duplicate-key priority: `ORDER ITEM ID`, then `Shipment ID + SKU`.
 
 ## Picker Page

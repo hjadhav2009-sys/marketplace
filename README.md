@@ -76,6 +76,14 @@ MEESHO
 
 `src/lib/marketplaces/flipkart/parser.ts` parses sanitized Flipkart Order Excel and Listing Excel rows into the shared marketplace model. Owner uploads include daily Flipkart Orders, and SKU image/listing imports update the permanent Flipkart Listing Master. Tracking ID is stored separately from the internal unique key so packing can search the scanned Flipkart label barcode.
 
+Large Flipkart Excel uploads now run through an Import Progress job:
+
+```text
+Upload file -> save ignored local copy -> create ImportJob -> process rows in 500-row chunks -> poll progress -> open review
+```
+
+Open `Owner -> Imports -> Import Progress` to watch total rows, processed rows, created, updated, unchanged, duplicates, warnings, errors, missing listings, missing images, elapsed time, and rows/sec. Keep the owner PC and Node app running while a job is `RUNNING`.
+
 Flipkart Listing Excel can contain 30,000+ products. Do not import it every day. Import/update it only when new listings are added or product title, image, price, listing status, or scraped product data changes.
 
 For sanitized real-export testing, keep files local under `private-test-data/` or `local-test-data/`. These folders and `*.real.xlsx`, `*.real.csv`, `*.seller.xlsx`, and `*.seller.csv` are ignored by Git. Never commit private Flipkart files, customer names, addresses, phone numbers, invoices, labels, Tracking IDs, `.env`, Supabase URLs, passwords, or secrets.
@@ -84,6 +92,8 @@ For sanitized real-export testing, keep files local under `private-test-data/` o
 
 Open `Owner -> SKU Images / Listings -> Flipkart Listings` and upload a sanitized Flipkart Listing `.xlsx` export.
 
+After upload, the app redirects to the import progress page. When the job completes, open the review/result page from the progress screen. The listing result page shows summary counts and only the first 50 issue rows in the browser; download error CSVs for bulk review.
+
 The importer upserts `MarketplaceListing` rows by `accountId + marketplace + Seller SKU Id`. Product images use this priority: `Image 1 1366 URL`, `Image URL 1`, `Image 2 1366 URL`, `Image URL 2`, and so on. `Generated Direct Product URL` is stored as a product page URL only; it is not treated as an image.
 
 Listing Master stores product/listing fields such as title, FSN, listing ID, status, prices, category, scraped title/brand/category, highlights, description, specifications, all image URLs, selected main image URL, scrape status, and scrape error. It reports created, updated, unchanged, missing image, and inactive listing counts.
@@ -91,6 +101,8 @@ Listing Master stores product/listing fields such as title, FSN, listing ID, sta
 ### Import Flipkart Orders
 
 Open `Owner -> Upload -> Flipkart Orders` and upload a sanitized Flipkart Order `.xlsx` export.
+
+After upload, the app redirects to the import progress page. The review page renders summary counts first and caps each visible row section to 50 rows so large daily files do not freeze the browser.
 
 Daily workers should upload only the Flipkart Order Excel. Order SKU matches Listing Master `Seller SKU Id`. Duplicate safety uses `ORDER ITEM ID` first. If it is missing, the importer falls back to `Shipment ID + SKU`. Rows missing both `ORDER ITEM ID` and `Shipment ID` are held for review and are not imported automatically.
 
@@ -132,6 +144,15 @@ tests/fixtures/flipkart/
 They are safe for tests only and contain masked names, masked addresses, PIN `000000`, and fake `FMPC0000000000` style Tracking IDs. Never upload real Flipkart exports, order files, customer data, invoices, labels, phone numbers, addresses, Tracking IDs, passwords, Supabase URLs, or `.env` files to GitHub.
 
 The next development step is to run a manual import using a sanitized copy of a real Flipkart export and refine any column edge cases found in that masked file.
+
+For performance testing, generate large fake files locally into ignored storage:
+
+```bash
+npm.cmd run flipkart:generate-performance-fixtures
+npm.cmd run flipkart:perf-test
+```
+
+Generated files go under `local-test-data/performance/` and must not be committed.
 
 ### Real Export Dry Run
 

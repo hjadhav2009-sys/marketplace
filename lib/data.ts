@@ -18,9 +18,9 @@ type DisplayListing = {
   subCategory: string | null;
   fsn: string | null;
   listingId: string | null;
-  productHighlights: string | null;
-  description: string | null;
-  allSpecifications: string | null;
+  productHighlights?: string | null;
+  description?: string | null;
+  allSpecifications?: string | null;
   mainImageUrl: string | null;
 };
 
@@ -264,9 +264,6 @@ export async function getSkuGroups(
           subCategory: true,
           fsn: true,
           listingId: true,
-          productHighlights: true,
-          description: true,
-          allSpecifications: true,
           mainImageUrl: true
         }
       }),
@@ -572,9 +569,6 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
                 subCategory: true,
                 fsn: true,
                 listingId: true,
-                productHighlights: true,
-                description: true,
-                allSpecifications: true,
                 mainImageUrl: true
               }
             })

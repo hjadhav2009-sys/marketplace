@@ -83,10 +83,10 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
             <span className="mt-2 block text-sm text-slate-500">Uses Tracking ID for packing scans and ORDER ITEM ID for duplicates.</span>
           </label>
           <div className="mt-4 rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-            Upload sanitized Flipkart `.xlsx` order exports only. Rows missing ORDER ITEM ID and Shipment ID + SKU are held for review.
+            Upload sanitized Flipkart `.xlsx` order exports only. The file is saved first, then processed on the Import Progress page.
           </div>
           <div className="mt-5">
-            <SubmitButton pendingText="Importing...">Import Flipkart orders</SubmitButton>
+            <SubmitButton pendingText="Creating job...">Import Flipkart orders</SubmitButton>
           </div>
         </form>
 

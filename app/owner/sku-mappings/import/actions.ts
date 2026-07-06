@@ -6,7 +6,7 @@ import { importSkuMappingsFromRows } from "@/lib/import/sku-mappings";
 import { parseSpreadsheetRows } from "@/lib/import/files";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
-import { importFlipkartListingRows } from "@/src/lib/marketplaces/flipkart";
+import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
 import { accountSelectionSchema, flipkartExcelImportFileSchema, skuImageImportFileSchema } from "@/lib/validators";
 
 export async function importSkuMappingFileAction(formData: FormData) {
@@ -39,25 +39,35 @@ export async function importSkuMappingFileAction(formData: FormData) {
     redirect("/owner/sku-mappings/import?error=account");
   }
 
+  if (importKind === "flipkart-listing") {
+    let jobId: string;
+
+    try {
+      const job = await createFlipkartImportJobFromFile({
+        file,
+        account: selectedAccount,
+        user,
+        importType: "FLIPKART_LISTING_MASTER"
+      });
+      startImportJob(job.id, request);
+      jobId = job.id;
+    } catch {
+      redirect("/owner/sku-mappings/import?error=parse");
+    }
+
+    redirect(`/owner/imports/${jobId}`);
+  }
+
   try {
     const rows = await parseSpreadsheetRows(file);
-    const batch =
-      importKind === "flipkart-listing"
-        ? await importFlipkartListingRows({
-            rows,
-            fileName: file.name,
-            account: selectedAccount,
-            user,
-            request
-          })
-        : await importSkuMappingsFromRows({
-            rows,
-            fileName: file.name,
-            selectedAccount,
-            importAllAccounts: formData.get("importAllAccounts") === "on",
-            user,
-            request
-          });
+    const batch = await importSkuMappingsFromRows({
+      rows,
+      fileName: file.name,
+      selectedAccount,
+      importAllAccounts: formData.get("importAllAccounts") === "on",
+      user,
+      request
+    });
     batchId = batch.id;
   } catch {
     redirect("/owner/sku-mappings/import?error=parse");

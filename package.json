@@ -12,10 +12,12 @@
     "check:env": "node scripts/windows/check-env.mjs",
     "check:production-readiness": "node scripts/check-production-readiness.mjs",
     "flipkart:dry-run": "tsx scripts/flipkart-dry-run.mjs",
+    "flipkart:generate-performance-fixtures": "node scripts/generate-flipkart-performance-fixtures.mjs",
+    "flipkart:perf-test": "tsx scripts/flipkart-perf-test.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run lint && npm run test:validators",
-    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts && tsx tests/flipkart-parser.test.ts && tsx tests/flipkart-import-workflow.test.ts",
+    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts && tsx tests/flipkart-parser.test.ts && tsx tests/flipkart-import-workflow.test.ts && tsx tests/import-job-progress.test.ts",
     "db:seed": "prisma db seed",
     "db:migrate:prod": "prisma migrate deploy --schema prisma/schema.postgres.prisma"
   },

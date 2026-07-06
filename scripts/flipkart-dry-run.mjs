@@ -163,6 +163,14 @@ function printSummary(summary, orderPath, listingPath) {
   line("listing duplicate Seller SKU Id count", summary.listingDuplicateSellerSkuCount);
   line("listing missing image count", summary.listingMissingImageCount);
   line("listing inactive count", summary.listingInactiveCount);
+  line("listing Image 1 1366 URL non-empty", summary.listingImageDiagnostics.image1366Url1NonEmpty);
+  line("listing Image URL 1 non-empty", summary.listingImageDiagnostics.imageUrl1NonEmpty);
+  line("listing Image 2 1366 URL non-empty", summary.listingImageDiagnostics.image1366Url2NonEmpty);
+  line("listing Image URL 2 non-empty", summary.listingImageDiagnostics.imageUrl2NonEmpty);
+  line("listing any Image URL 1-10 non-empty", summary.listingImageDiagnostics.anyImageUrlNonEmpty);
+  line("listing any Image 1366 URL 1-10 non-empty", summary.listingImageDiagnostics.anyImage1366UrlNonEmpty);
+  line("listing selected mainImageUrl non-empty", summary.listingImageDiagnostics.selectedMainImageUrlNonEmpty);
+  line("listing valid SKU all image fields blank", summary.listingImageDiagnostics.validSkuAllImageFieldsBlank);
   console.log("");
   line("order rows total", summary.orderRowsTotal);
   line("order valid rows", summary.orderRowsValid);

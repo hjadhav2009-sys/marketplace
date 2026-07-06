@@ -76,6 +76,31 @@ const aliasListingResult = parseFlipkartListingRows([
 assert.equal(aliasListingResult.listings[0]?.sellerSkuId, "FK-SKU-ALIAS", "Seller SKU ID alias with BOM is parsed");
 assert.equal(aliasListingResult.listings[0]?.mainImageUrl, "https://example.invalid/images/alias-large.jpg", "Image 1 1366 Url alias is parsed with priority");
 
+const imageAliasListingResult = parseFlipkartListingRows([
+  {
+    "Seller SKU Id": "FK-SKU-IMG-ALIAS-1",
+    "Product Title": "Alias Image Product 1",
+    "Image 1 1366 Url.": "https://example.invalid/images/alias-large-dot.jpg",
+    "Image Url1": "https://example.invalid/images/alias-small-one.jpg"
+  },
+  {
+    "Seller SKU Id": "FK-SKU-IMG-ALIAS-2",
+    "Product Title": "Alias Image Product 2",
+    "Image 2 1366URL": "https://example.invalid/images/alias-large-two.jpg",
+    "Image URL2": "https://example.invalid/images/alias-small-two.jpg"
+  }
+]);
+assert.equal(
+  imageAliasListingResult.listings[0]?.mainImageUrl,
+  "https://example.invalid/images/alias-large-dot.jpg",
+  "Image 1 1366 Url. alias is preferred over Image Url1"
+);
+assert.equal(
+  imageAliasListingResult.listings[1]?.mainImageUrl,
+  "https://example.invalid/images/alias-large-two.jpg",
+  "Image 2 1366URL alias is parsed before Image URL2"
+);
+
 assert.equal(deduped.importableOrders.length, 4, "Duplicate ORDER ITEM ID row is skipped from importable rows");
 assert.equal(deduped.duplicateIssues.length, 1, "Duplicate ORDER ITEM ID is detected");
 assert.equal(deduped.duplicateIssues[0]?.rowNumber, 5, "Duplicate issue keeps the original Excel row number");
@@ -156,6 +181,14 @@ assert.equal(dryRunSummary.duplicateRows, 1, "Dry-run counts duplicate order row
 assert.equal(dryRunSummary.missingListingCount, 1, "Dry-run counts missing listing SKUs");
 assert.equal(dryRunSummary.missingImageCount, 1, "Dry-run counts listing rows with missing image for ordered SKUs");
 assert.equal(dryRunSummary.multiItemTrackingIds[0]?.trackingId, "FMPC0000000001", "Dry-run reports multi-item Tracking IDs");
+assert.equal(dryRunSummary.listingImageDiagnostics.image1366Url1NonEmpty, 2, "Dry-run counts Image 1 1366 URL rows");
+assert.equal(dryRunSummary.listingImageDiagnostics.imageUrl1NonEmpty, 3, "Dry-run counts Image URL 1 rows");
+assert.equal(dryRunSummary.listingImageDiagnostics.image1366Url2NonEmpty, 0, "Dry-run counts Image 2 1366 URL rows");
+assert.equal(dryRunSummary.listingImageDiagnostics.imageUrl2NonEmpty, 0, "Dry-run counts Image URL 2 rows");
+assert.equal(dryRunSummary.listingImageDiagnostics.anyImageUrlNonEmpty, 3, "Dry-run counts any normal image URL rows");
+assert.equal(dryRunSummary.listingImageDiagnostics.anyImage1366UrlNonEmpty, 2, "Dry-run counts any 1366 image URL rows");
+assert.equal(dryRunSummary.listingImageDiagnostics.selectedMainImageUrlNonEmpty, 3, "Dry-run counts selected main image rows");
+assert.equal(dryRunSummary.listingImageDiagnostics.validSkuAllImageFieldsBlank, 1, "Dry-run counts valid SKU rows with blank image fields");
 
 const activeImageMappingSkus = new Set(listingResult.listings.filter((listing) => listing.imageUrl).map((listing) => normalizeSkuForMatching(listing.sku)));
 const sku3Order = deduped.importableOrders.find((order) => order.sku === "FK-SKU-3");

@@ -17,6 +17,16 @@ import { dedupeFlipkartOrderRows } from "./review";
 export type FlipkartDryRunSummary = {
   listingRowsTotal: number;
   listingRowsValid: number;
+  listingImageDiagnostics: {
+    image1366Url1NonEmpty: number;
+    imageUrl1NonEmpty: number;
+    image1366Url2NonEmpty: number;
+    imageUrl2NonEmpty: number;
+    anyImageUrlNonEmpty: number;
+    anyImage1366UrlNonEmpty: number;
+    selectedMainImageUrlNonEmpty: number;
+    validSkuAllImageFieldsBlank: number;
+  };
   listingMissingSkuCount: number;
   listingDuplicateSellerSkuCount: number;
   listingMissingImageCount: number;
@@ -61,6 +71,10 @@ function unique(values: Array<string | undefined>) {
   return Array.from(new Set(values.map((value) => normalizeSkuForMatching(value)).filter(Boolean))).sort((left, right) => left.localeCompare(right));
 }
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
 export function buildFlipkartDryRunSummary(input: {
   orderRows: FlipkartRawRow[];
   listingRows: FlipkartRawRow[];
@@ -75,6 +89,18 @@ export function buildFlipkartDryRunSummary(input: {
     sku: normalizeSkuForMatching(listing.sku),
     data: flipkartListingMasterData(listing)
   }));
+  const listingImageDiagnostics = {
+    image1366Url1NonEmpty: dedupedListings.importableListings.filter((listing) => hasText(listing.image1366Urls[0])).length,
+    imageUrl1NonEmpty: dedupedListings.importableListings.filter((listing) => hasText(listing.imageUrls[0])).length,
+    image1366Url2NonEmpty: dedupedListings.importableListings.filter((listing) => hasText(listing.image1366Urls[1])).length,
+    imageUrl2NonEmpty: dedupedListings.importableListings.filter((listing) => hasText(listing.imageUrls[1])).length,
+    anyImageUrlNonEmpty: dedupedListings.importableListings.filter((listing) => listing.imageUrls.some(hasText)).length,
+    anyImage1366UrlNonEmpty: dedupedListings.importableListings.filter((listing) => listing.image1366Urls.some(hasText)).length,
+    selectedMainImageUrlNonEmpty: dedupedListings.importableListings.filter((listing) => hasText(listing.mainImageUrl)).length,
+    validSkuAllImageFieldsBlank: dedupedListings.importableListings.filter(
+      (listing) => !listing.imageUrls.some(hasText) && !listing.image1366Urls.some(hasText)
+    ).length
+  };
   const listingPlan = planFlipkartListingMasterImport(input.existingListings ?? [], listingMasterRows);
   const listingBySku = new Map(listingMasterRows.map((row) => [normalizeSkuForMatching(row.sku), row.data]));
   const parsedOrders = parseFlipkartOrderRows(input.orderRows, "dry-run-orders.xlsx");
@@ -106,6 +132,7 @@ export function buildFlipkartDryRunSummary(input: {
   return {
     listingRowsTotal: input.listingRows.length,
     listingRowsValid: dedupedListings.importableListings.length,
+    listingImageDiagnostics,
     listingMissingSkuCount: countIssues(parsedListings.issues, "MISSING_SELLER_SKU_ID"),
     listingDuplicateSellerSkuCount: dedupedListings.duplicateIssues.length,
     listingMissingImageCount: dedupedListings.importableListings.filter((listing) => !listing.mainImageUrl).length,

@@ -310,11 +310,34 @@ const flipkartListingKnownHeaders = [
   ...Array.from({ length: 10 }, (_, index) => `Image ${index + 1} 1366 URL`)
 ] as const;
 
+const imageHeaderAliases: Record<string, string[]> = Object.fromEntries(
+  Array.from({ length: 10 }, (_, index) => {
+    const imageNumber = index + 1;
+
+    return [
+      [
+        normalizeHeader(`Image URL ${imageNumber}`),
+        [`Image URL ${imageNumber}`, `Image URL${imageNumber}`, `Image Url ${imageNumber}`, `Image Url${imageNumber}`]
+      ],
+      [
+        normalizeHeader(`Image ${imageNumber} 1366 URL`),
+        [
+          `Image ${imageNumber} 1366 URL`,
+          `Image ${imageNumber} 1366 Url`,
+          `Image ${imageNumber} 1366URL`,
+          `Image ${imageNumber} 1366 Url.`,
+          `Image ${imageNumber} 1366 URL `
+        ]
+      ]
+    ];
+  }).flat()
+);
+
 const explicitHeaderAliases: Record<string, string[]> = {
+  ...imageHeaderAliases,
   orderitemid: ["Order Item ID", "ORDER ITEM ID"],
   sellerskuid: ["Seller SKU ID", "Seller SKU Id"],
   trackingid: ["Tracking Id", "Tracking ID"],
-  image11366url: ["Image 1 1366 Url", "Image 1 1366 URL"],
   invoicedatemmddyy: ["Invoice Date (MM/DD/YY)", "Invoice Date (mm/dd/yy)"]
 };
 

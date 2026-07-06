@@ -23,6 +23,7 @@ Expected safe checks:
 Use a local database and temporary local secrets:
 
 ```powershell
+cd E:\marketplace1\marketplace
 $env:DATABASE_URL="file:./dev.db"
 $env:SESSION_SECRET="local-test-secret-change-me"
 $env:NEXT_PUBLIC_APP_URL="http://localhost:3000"

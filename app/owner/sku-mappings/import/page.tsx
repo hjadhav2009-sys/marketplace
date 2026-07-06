@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
+import { FormPendingStatus } from "@/components/FormPendingStatus";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getAvailableAccounts, requireAccount, requireUser } from "@/lib/auth";
@@ -163,6 +164,10 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
             <div className="rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
               Required column: <span className="font-semibold">Seller SKU Id</span>. Image priority uses Image 1 1366 URL, then Image URL 1.
             </div>
+            <FormPendingStatus
+              title="Flipkart listing import is running"
+              description="Large Listing Master files can take a few minutes. Keep this tab open until the import result appears."
+            />
             <SubmitButton pendingText="Importing...">Import Flipkart listings</SubmitButton>
           </div>
         </form>
@@ -217,6 +222,10 @@ export default async function SkuMappingImportPage({ searchParams }: ImportPageP
                 Download Excel template
               </Link>
             </div>
+            <FormPendingStatus
+              title="SKU mapping import is running"
+              description="The file is uploading and importing. Keep this tab open until the import result appears."
+            />
             <SubmitButton pendingText="Importing...">Import mappings</SubmitButton>
           </div>
         </form>

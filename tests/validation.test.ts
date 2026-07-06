@@ -16,6 +16,7 @@ import {
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
 import { formatCsvValue, rowsToCsv } from "../lib/csv";
 import { buildSkuMetadataAutoFillUpdates, planOrderImport } from "../lib/import/orders";
+import { importIssuePageWindow, maskOperationalKey, safeImportIssueContext } from "../lib/import/issues";
 import {
   cachedProductImageUrl,
   canUserAccessCachedImage,
@@ -62,6 +63,7 @@ import { canUseFirstRunSetup, validateFirstRunSetupPassword } from "../lib/setup
 import { normalizeSkuForMatching } from "../lib/sku";
 import { canDeactivateUser, shouldCloseSessionsAfterPasswordReset, validateWorkerPassword } from "../lib/user-management";
 import { importJobEstimatedRemainingSeconds, importJobPageWindow, IMPORT_JOB_PAGE_SIZE, IMPORT_JOB_PAGE_SIZES } from "../src/lib/import-jobs/progress";
+import { isRetainedImportJobFilePath } from "../src/lib/import-jobs/runner";
 import {
   awbSearchSchema,
   flipkartExcelImportFileSchema,
@@ -690,6 +692,30 @@ assert.equal(
   false,
   "Create account requires marketplace"
 );
+assert.deepEqual(
+  importIssuePageWindow(151, "2", 50),
+  { page: 2, pageSize: 50, totalPages: 4, skip: 50, take: 50, from: 51, to: 100 },
+  "Import issue drill-down defaults to 50-row pagination windows"
+);
+assert.equal(importIssuePageWindow(10, "1", 10).pageSize, 50, "Import issue page rejects unsupported page sizes");
+assert.equal(importIssuePageWindow(10, "1", 25).pageSize, 25, "Import issue page supports 25 rows");
+assert.equal(importIssuePageWindow(10, "1", 100).pageSize, 100, "Import issue page supports 100 rows");
+assert.equal(maskOperationalKey("FMPC0000000001"), "FMPC...0001", "Operational keys are masked before display");
+const safeIssueContext = safeImportIssueContext(JSON.stringify({
+  SKU: "SAFE-SKU-1",
+  "Shipment ID": "SHIPMENT00000001",
+  "ORDER ITEM ID": "ORDERITEM00000001",
+  "Buyer name": "PRIVATE BUYER",
+  "Address Line 1": "PRIVATE ADDRESS"
+}));
+assert.deepEqual(
+  safeIssueContext,
+  { sku: "SAFE-SKU-1", shipmentKey: "SHIP...0001", orderItemKey: "ORDE...0001" },
+  "Import issue context extracts only SKU and masked operational keys"
+);
+assert.equal(JSON.stringify(safeIssueContext).includes("PRIVATE"), false, "Import issue context excludes private customer raw data");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs", "fake.xlsx")), true, "Import retry accepts retained files under storage/import-jobs");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "private-test-data", "fake.xlsx")), false, "Import retry rejects files outside private retained import-job storage");
 
 assert.equal(normalizeIp("::ffff:192.168.1.10"), "192.168.1.10", "IPv4-mapped IPs normalize");
 assert.equal(isIpInCidr("192.168.1.10", "192.168.0.0/16"), true, "Local CIDR allows Wi-Fi IP");
@@ -1027,6 +1053,13 @@ const accountActions = readFileSync(join(repoRoot, "app", "accounts", "actions.t
 const ownerImportsPage = readFileSync(join(repoRoot, "app", "owner", "imports", "page.tsx"), "utf8");
 const importJobProgressComponent = readFileSync(join(repoRoot, "components", "ImportJobProgress.tsx"), "utf8");
 const importJobExportRoute = readFileSync(join(repoRoot, "app", "owner", "imports", "export", "route.ts"), "utf8");
+const importJobRunnerSource = readFileSync(join(repoRoot, "src", "lib", "import-jobs", "runner.ts"), "utf8");
+const importJobDetailPage = readFileSync(join(repoRoot, "app", "owner", "imports", "[jobId]", "page.tsx"), "utf8");
+const importJobRetryActions = readFileSync(join(repoRoot, "app", "owner", "imports", "[jobId]", "actions.ts"), "utf8");
+const importIssuesPage = readFileSync(join(repoRoot, "app", "owner", "imports", "[jobId]", "issues", "page.tsx"), "utf8");
+const importIssuesExportRoute = readFileSync(join(repoRoot, "app", "owner", "imports", "[jobId]", "issues", "export", "route.ts"), "utf8");
+const oldPendingPage = readFileSync(join(repoRoot, "app", "owner", "old-pending", "page.tsx"), "utf8");
+const oldPendingActions = readFileSync(join(repoRoot, "app", "owner", "old-pending", "actions.ts"), "utf8");
 const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
 const workQueueSource = readFileSync(join(repoRoot, "lib", "operations", "work-queue.ts"), "utf8");
 const ownerAccountsPage = readFileSync(join(repoRoot, "app", "owner", "accounts", "page.tsx"), "utf8");
@@ -1132,9 +1165,21 @@ assert.match(ownerImportsPage, /Previous[\s\S]*Next/, "Import Progress page incl
 assert.match(ownerImportsPage, /name="marketplace"[\s\S]*name="importType"[\s\S]*name="status"/, "Import Progress page filters by marketplace, import type, and status");
 assert.match(ownerImportsPage, /name="q"[\s\S]*File name or job ID/, "Import Progress page supports file/job search");
 assert.match(ownerImportsPage, /Open progress[\s\S]*Open review[\s\S]*CSV[\s\S]*XLSX[\s\S]*TXT/, "Import Progress table includes progress, review, and download actions");
+assert.match(ownerImportsPage, /View issues/, "Import Progress table links to issue drill-down when rows need review");
 assert.match(importJobExportRoute, /jobId[\s\S]*summary[\s\S]*issues/, "Import job export route supports summary and issue exports");
 assert.match(importJobExportRoute, /ExcelJS/, "Import job export route supports XLSX downloads");
-assert.doesNotMatch(importJobExportRoute, /rawData/, "Import job exports do not include raw private row data");
+assert.match(importJobExportRoute, /safeImportIssueContext/, "Import job issue exports derive safe SKU and masked operational keys");
+assert.doesNotMatch(sourceBetween(importJobExportRoute, "const headers = [\"rowNumber\"", "return responseFor(format, headers, rows, filenameBase);"), /rawData["']?\s*,/, "Import job issue export headers exclude private raw row data");
+assert.match(importJobDetailPage, /retainedImportJobFileExists/, "Import job detail checks retained source file availability before retry");
+assert.match(importJobRetryActions, /retainedImportJobFileExists[\s\S]*createRetryImportJob[\s\S]*startImportJob/, "Retry action starts a safe new job only when the retained file exists");
+assert.match(importJobRunnerSource, /IMPORT_JOB_STORAGE_DIR[\s\S]*storage", "import-jobs"/, "Import jobs retain uploaded files in private import-job storage");
+assert.match(importJobRunnerSource, /isRetainedImportJobFilePath[\s\S]*resolvedStorage[\s\S]*startsWith/, "Retry only accepts source files inside retained import-job storage");
+assert.match(importIssuesPage, /Row issue drill-down/, "Import issues page exists");
+assert.match(importIssuesPage, /IMPORT_ISSUE_PAGE_SIZES[\s\S]*issueType[\s\S]*row[\s\S]*sku/, "Import issues page has page-size, issue type, row, and SKU filters");
+assert.match(importIssuesPage, /safeImportIssueContext/, "Import issues page uses safe issue context extraction");
+assert.doesNotMatch(importIssuesPage, /Address Line|Buyer name|Ship to name/, "Import issues page does not render private customer fields");
+assert.match(importIssuesExportRoute, /safeImportIssueContext/, "Filtered import issue export uses safe context extraction");
+assert.doesNotMatch(importIssuesExportRoute, /Address Line|Buyer name|Ship to name/, "Filtered import issue export does not include private customer fields");
 assert.match(importJobProgressComponent, /importJobEstimatedRemainingSeconds/, "Import job detail shows estimated remaining time");
 assert.match(importJobProgressComponent, /Live progress refreshes every 1\.5 seconds/, "Import job detail explains polling cadence");
 assert.match(importJobProgressComponent, /Summary CSV[\s\S]*Summary XLSX[\s\S]*Summary TXT/, "Import job detail exposes safe summary exports");
@@ -1202,14 +1247,22 @@ assert.match(workQueueSource, /importedAt: \{ gte: startOfToday \}/, "Today work
 assert.match(workQueueSource, /importedAt: \{ lt: startOfToday \}/, "Old pending work queue separates older READY orders");
 assert.match(pickerPage, /Current batch/, "Picker exposes a current-batch work queue chip");
 assert.match(pickerPage, /All pending/, "Picker exposes all-pending work queue chip");
+assert.match(pickerPage, /Old pending review/, "Picker links owners to the old pending review queue");
 assert.match(packingPage, /Today ready[\s\S]*Old pending[\s\S]*Problems/, "Packing dashboard separates today, old pending, and problem counts");
 assert.match(packingPage, /Move old pending to review/, "Owner can move old pending work into a review-only flow");
 assert.match(packingPage, /directPackFromSearchAction/, "Packing page wires direct Pack action into search suggestions");
 assert.match(packingActions, /writeScanLogLater[\s\S]*redirect\(`\/packing\/\$\{encodeURIComponent\(matchedOrder\.awb\)\}`\)/, "Packing search redirects before scan logging can block order opening");
 assert.match(packingActions, /directPackFromSearchAction[\s\S]*buildConfirmPackedOrderWhere[\s\S]*updateMany/, "Direct Pack uses the shared READY-only packing scope");
 assert.match(packingActions, /buildConfirmPackedOrderWhere/, "Direct Pack skips already packed and problem items through the shared READY-only helper");
-assert.match(packingActions, /OLD_PENDING_REVIEW_REPORTED/, "Old pending review action is audited without deleting orders");
-assert.match(packingActions, /redirect\(`\/packing\?oldPendingReviewed=\$\{oldPendingCount\}`\)/, "Old pending review action redirects with a visible result");
+assert.match(packingActions, /oldPendingReviewStatus: "IN_REVIEW"/, "Old pending review action creates a durable review state");
+assert.match(packingActions, /OLD_PENDING_REVIEW_CREATED/, "Old pending review queue creation is audited");
+assert.match(packingActions, /redirect\(`\/owner\/old-pending\?moved=\$\{oldPendingCount\}`\)/, "Old pending move action opens the review queue");
+assert.match(oldPendingPage, /Old pending orders remain in history and reports/, "Old pending page explains the workflow");
+assert.match(oldPendingPage, /Keep pending[\s\S]*Carry forward[\s\S]*Archive from today[\s\S]*Move to problem/, "Old pending page exposes owner review actions");
+assert.doesNotMatch(oldPendingPage, /Buyer name|Address Line|phone/i, "Old pending page avoids private customer fields");
+assert.match(oldPendingActions, /oldPendingReviewStatus: reviewStatus/, "Old pending action updates review state");
+assert.match(oldPendingActions, /status: "PROBLEM"[\s\S]*pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"/, "Old pending move-to-problem updates order state");
+assert.match(oldPendingActions, /problemOrder\.create/, "Old pending move-to-problem creates an open problem when needed");
 assert.match(productImageRoute, /getCurrentUser/, "Cached image route checks session without login redirect");
 assert.match(productImageRoute, /verifySignedCachedImageUrl/, "Cached image route verifies signed image URLs");
 assert.equal(productImageRoute.indexOf("verifySignedCachedImageUrl") < productImageRoute.indexOf("const user = await getCurrentUser"), true, "Signed cached image route avoids database auth before serving normal image requests");
@@ -1277,9 +1330,9 @@ assert.match(productionChecksSource, /image-cache/, "Production checks warn when
 assert.match(windowsProdPs1, /start-local-prod\.mjs/, "Windows PowerShell launcher delegates to Node launcher");
 assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local production env example supports local Wi-Fi HTTP cookies");
 assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");
-assert.match(nextPhaseNotes, /Automatic retry for failed import jobs was not added/, "Next phase notes document skipped unsafe import retry");
-assert.match(nextPhaseNotes, /PDF export for import jobs was skipped/, "Next phase notes document skipped PDF export");
-assert.match(nextPhaseNotes, /Old pending review currently records an owner audit event/, "Next phase notes document old pending review status");
+assert.match(nextPhaseNotes, /Retry is unavailable when the retained file is missing/, "Next phase notes document guarded import retry");
+assert.match(nextPhaseNotes, /PDF export remains skipped/, "Next phase notes document skipped PDF export");
+assert.match(nextPhaseNotes, /\/owner\/old-pending/, "Next phase notes document old pending review queue status");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(sqliteSchema, /enum Marketplace[\s\S]*FLIPKART[\s\S]*MEESHO[\s\S]*AMAZON[\s\S]*WOOCOMMERCE[\s\S]*OTHER/, "SQLite schema defines marketplace enum");
@@ -1288,6 +1341,10 @@ assert.match(sqliteSchema, /companyName\s+String\s+@default\("Sullery"\)[\s\S]*m
 assert.match(postgresSchema, /companyName\s+String\s+@default\("Sullery"\)[\s\S]*marketplace\s+Marketplace\s+@default\(FLIPKART\)[\s\S]*accountDisplayName\s+String\?[\s\S]*accountCode\s+String\?/, "PostgreSQL Account model stores company, marketplace, display name, and account code");
 assert.equal(existsSync(join(repoRoot, "prisma", "migrations", "20260707000100_marketplace_accounts", "migration.sql")), true, "SQLite marketplace account migration exists");
 assert.equal(existsSync(join(repoRoot, "prisma", "migrations-postgres", "20260707000100_marketplace_accounts", "migration.sql")), true, "PostgreSQL marketplace account migration exists");
+assert.match(sqliteSchema, /oldPendingReviewStatus\s+String\s+@default\("NONE"\)[\s\S]*oldPendingReviewedAt\s+DateTime\?[\s\S]*oldPendingReviewNote\s+String\?/, "SQLite schema stores old pending review state");
+assert.match(postgresSchema, /oldPendingReviewStatus\s+String\s+@default\("NONE"\)[\s\S]*oldPendingReviewedAt\s+DateTime\?[\s\S]*oldPendingReviewNote\s+String\?/, "PostgreSQL schema stores old pending review state");
+assert.equal(existsSync(join(repoRoot, "prisma", "migrations", "20260707000200_old_pending_review", "migration.sql")), true, "SQLite old pending review migration exists");
+assert.equal(existsSync(join(repoRoot, "prisma", "migrations-postgres", "20260707000200_old_pending_review", "migration.sql")), true, "PostgreSQL old pending review migration exists");
 assert.match(sqliteSchema, /cacheStatus\s+ImageCacheStatus/, "SQLite schema stores cache status metadata");
 assert.match(postgresSchema, /cacheStatus\s+ImageCacheStatus/, "PostgreSQL schema stores cache status metadata");
 assert.match(sqliteSchema, /active\s+Boolean\s+@default\(true\)[\s\S]*@@index\(\[active\]\)/, "SQLite schema supports active account management");

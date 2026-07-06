@@ -298,6 +298,11 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
                               Open review
                             </Link>
                           ) : null}
+                          {issueCount > 0 && job.batchId ? (
+                            <Link href={`/owner/imports/${job.id}/issues`} prefetch className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900">
+                              View issues
+                            </Link>
+                          ) : null}
                           <Link href={exportHref(job.id, "csv")} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-bold text-slate-800">
                             CSV
                           </Link>

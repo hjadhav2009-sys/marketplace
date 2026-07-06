@@ -91,23 +91,30 @@ export async function moveOldPendingToReviewAction() {
   const user = await requireUser(["OWNER"]);
   const account = await requireAccount(user);
   const request = await getRequestMeta();
-  const oldPendingCount = await prisma.order.count({
-    where: buildWorkQueueOrderWhere(account.id, { work: "old-pending" })
+  const oldPendingWhere = buildWorkQueueOrderWhere(account.id, { work: "old-pending" });
+  const update = await prisma.order.updateMany({
+    where: oldPendingWhere,
+    data: {
+      oldPendingReviewStatus: "IN_REVIEW",
+      oldPendingReviewedAt: new Date(),
+      oldPendingReviewNote: "Moved from packing dashboard for owner review."
+    }
   });
+  const oldPendingCount = update.count;
 
   await recordAuditLog({
     userId: user.id,
     accountId: account.id,
-    action: "OLD_PENDING_REVIEW_REPORTED",
+    action: "OLD_PENDING_REVIEW_CREATED",
     entityType: "Order",
     metadata: {
       oldPendingCount,
-      mode: "filter-only"
+      mode: "review-queue"
     },
     request
   });
 
-  redirect(`/packing?oldPendingReviewed=${oldPendingCount}`);
+  redirect(`/owner/old-pending?moved=${oldPendingCount}`);
 }
 
 export async function directPackFromSearchAction(formData: FormData) {

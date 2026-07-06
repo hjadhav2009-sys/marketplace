@@ -183,14 +183,21 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
             Summary TXT
           </Link>
           {issueCount > 0 && job.batchId ? (
-            <Link href={exportHref(job.id, "csv", "issues")} className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900">
-              Issues CSV
-            </Link>
+            <>
+              <Link href={`/owner/imports/${job.id}/issues`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                View issues
+              </Link>
+              <Link href={exportHref(job.id, "csv", "issues")} className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900">
+                Issues CSV
+              </Link>
+            </>
+          ) : job.status === "COMPLETED" ? (
+            <span className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-800">No issues recorded</span>
           ) : null}
         </div>
         {job.status === "FAILED" ? (
           <p className="mt-3 text-sm text-slate-600">
-            Retry is not automatic yet because failed jobs may reference temporary upload files. Upload the corrected file again.
+            Retry appears on the job page only when the retained source file is still available in private import-job storage.
           </p>
         ) : null}
       </div>

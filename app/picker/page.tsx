@@ -165,6 +165,11 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
           {activeWork === "today" ? " from today" : activeWork === "current-batch" && latestBatch ? ` from ${latestBatch.fileName}` : null}
         </p>
         <div className="flex gap-2">
+          {user.role === "OWNER" ? (
+            <Link prefetch href="/owner/old-pending" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-semibold text-amber-900">
+              Old pending review
+            </Link>
+          ) : null}
           <Link
             href={`/picker?${compactViewParams}`}
             className={`rounded-md px-3 py-2 font-semibold ${compactMode ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}
@@ -196,6 +201,11 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             {user.role === "OWNER" ? (
               <Link prefetch href="/owner/uploads/new" className="rounded-md bg-berry px-4 py-2 text-sm font-bold text-white shadow-sm">
                 Upload today&apos;s orders
+              </Link>
+            ) : null}
+            {user.role === "OWNER" ? (
+              <Link prefetch href="/owner/old-pending" className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-900 shadow-sm">
+                Old pending review
               </Link>
             ) : null}
             <Link prefetch href="/picker?work=old-pending&filter=pending" className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-sm">

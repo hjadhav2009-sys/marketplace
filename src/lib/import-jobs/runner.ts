@@ -1,6 +1,6 @@
 import type { Account, User } from "@prisma/client";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseSpreadsheetRowsFromPath } from "@/lib/import/files";
 import type { RequestMeta } from "@/lib/network";
@@ -16,7 +16,7 @@ import {
   type ImportJobType
 } from "./store";
 
-const IMPORT_JOB_STORAGE_DIR = path.join(process.cwd(), "storage", "import-jobs");
+export const IMPORT_JOB_STORAGE_DIR = path.join(process.cwd(), "storage", "import-jobs");
 
 type RunningImportJobs = {
   runningImportJobs?: Set<string>;
@@ -30,6 +30,29 @@ function runningJobSet() {
 
 function safeUploadFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "upload.xlsx";
+}
+
+export function isRetainedImportJobFilePath(filePath: string | null | undefined) {
+  if (!filePath) {
+    return false;
+  }
+
+  const resolvedFile = path.resolve(filePath);
+  const resolvedStorage = path.resolve(IMPORT_JOB_STORAGE_DIR);
+  return resolvedFile === resolvedStorage || resolvedFile.startsWith(`${resolvedStorage}${path.sep}`);
+}
+
+export async function retainedImportJobFileExists(filePath: string | null | undefined) {
+  if (!isRetainedImportJobFilePath(filePath)) {
+    return false;
+  }
+
+  try {
+    await access(path.resolve(filePath ?? ""));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function createFlipkartImportJobFromFile(input: {
@@ -54,6 +77,25 @@ export async function createFlipkartImportJobFromFile(input: {
     importType: input.importType,
     fileName: input.file.name,
     filePath
+  });
+}
+
+export async function createRetryImportJob(input: {
+  sourceJob: ImportJobRecord;
+  user: User;
+}) {
+  if (!(await retainedImportJobFileExists(input.sourceJob.filePath))) {
+    throw new Error("Retry unavailable because source file was cleaned up.");
+  }
+
+  return createImportJob({
+    id: `job_${randomUUID()}`,
+    accountId: input.sourceJob.accountId,
+    createdByUserId: input.user.id,
+    marketplace: input.sourceJob.marketplace,
+    importType: input.sourceJob.importType,
+    fileName: input.sourceJob.fileName,
+    filePath: input.sourceJob.filePath ?? ""
   });
 }
 

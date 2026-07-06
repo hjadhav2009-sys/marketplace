@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { requireUser } from "@/lib/auth";
 import { csvResponse, rowsToCsv, type CsvValue } from "@/lib/csv";
 import { formatDateTime } from "@/lib/format";
+import { safeImportIssueContext } from "@/lib/import/issues";
 import { prisma } from "@/lib/prisma";
 import { importJobProgressPercent } from "@/src/lib/import-jobs/progress";
 
@@ -102,12 +103,16 @@ export async function GET(request: Request) {
         rowNumber: true,
         issueType: true,
         message: true,
+        rawData: true,
         createdAt: true
       },
       orderBy: [{ issueType: "asc" }, { rowNumber: "asc" }]
     });
-    const headers = ["rowNumber", "issueType", "message", "createdAt"];
-    const rows = issues.map((issue) => [issue.rowNumber, issue.issueType, issue.message, issue.createdAt] satisfies CsvValue[]);
+    const headers = ["rowNumber", "issueType", "message", "sku", "shipmentKey", "orderItemKey", "createdAt"];
+    const rows = issues.map((issue) => {
+      const safe = safeImportIssueContext(issue.rawData);
+      return [issue.rowNumber, issue.issueType, issue.message, safe.sku, safe.shipmentKey, safe.orderItemKey, issue.createdAt] satisfies CsvValue[];
+    });
     return responseFor(format, headers, rows, filenameBase);
   }
 

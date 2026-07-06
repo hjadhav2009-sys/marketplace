@@ -81,41 +81,38 @@ async function readCsvRows(filePath) {
 }
 
 async function readXlsxRows(filePath) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
-  const worksheet = workbook.worksheets[0];
-
-  if (!worksheet || worksheet.rowCount < 2) {
-    return [];
-  }
-
-  const headerValues = worksheet.getRow(1).values;
-  const headers = headerValues.slice(1).map((header) => cellToString(header).trim());
+  const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(filePath);
+  let headers = null;
   const rows = [];
 
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) {
-      return;
-    }
-
-    const values = row.values;
-    const record = {};
-    let hasValue = false;
-
-    headers.forEach((header, index) => {
-      if (!header) {
-        return;
+  for await (const worksheetReader of workbookReader) {
+    for await (const row of worksheetReader) {
+      if (!headers) {
+        headers = row.values.slice(1).map((header) => cellToString(header).trim());
+        continue;
       }
 
-      const value = cellToString(values[index + 1]).trim();
-      record[header] = value;
-      hasValue = hasValue || Boolean(value);
-    });
+      const values = row.values;
+      const record = {};
+      let hasValue = false;
 
-    if (hasValue) {
-      rows.push(record);
+      headers.forEach((header, index) => {
+        if (!header) {
+          return;
+        }
+
+        const value = cellToString(values[index + 1]).trim();
+        record[header] = value;
+        hasValue = hasValue || Boolean(value);
+      });
+
+      if (hasValue) {
+        rows.push(record);
+      }
     }
-  });
+
+    break;
+  }
 
   return rows;
 }
@@ -139,7 +136,15 @@ function line(label, value) {
 }
 
 function list(label, values) {
-  line(label, values.length > 0 ? values.join(", ") : "none");
+  if (values.length === 0) {
+    line(label, "none");
+    return;
+  }
+
+  const visibleValues = values.slice(0, 25);
+  const remainingCount = values.length - visibleValues.length;
+  const suffix = remainingCount > 0 ? `, ... (${remainingCount} more)` : "";
+  line(label, `${values.length} found: ${visibleValues.join(", ")}${suffix}`);
 }
 
 function printSummary(summary, orderPath, listingPath) {
@@ -169,9 +174,6 @@ function printSummary(summary, orderPath, listingPath) {
   line("unique SKUs in order", summary.uniqueOrderSkus.length);
   line("unique Tracking IDs", summary.uniqueTrackingIds.length);
   line("multi-item Tracking IDs", summary.multiItemTrackingIds.length);
-  for (const item of summary.multiItemTrackingIds) {
-    line(`  ${item.trackingId}`, `${item.itemCount} item(s): ${item.skus.join(", ")}`);
-  }
   console.log("");
   list("order unknown headers", summary.headers.orders.unknownHeaders);
   list("order missing expected headers", summary.headers.orders.missingExpectedHeaders);

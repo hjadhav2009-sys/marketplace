@@ -318,6 +318,9 @@ const explicitHeaderAliases: Record<string, string[]> = {
   invoicedatemmddyy: ["Invoice Date (MM/DD/YY)", "Invoice Date (mm/dd/yy)"]
 };
 
+const rowValueCache = new WeakMap<FlipkartRawRow, Map<string, FlipkartRawRow[string]>>();
+const normalizedHeaderAliasCache = new Map<string, string[]>();
+
 export function normalizeFlipkartHeader(value: string) {
   return String(value ?? "")
     .normalize("NFKC")
@@ -336,12 +339,45 @@ function headerAliases(header: string) {
   return Array.from(new Set([header, ...aliases]));
 }
 
-function rowValue(row: FlipkartRawRow, header: string) {
-  const wanted = new Set(headerAliases(header).map(normalizeHeader));
+function normalizedHeaderAliases(header: string) {
+  const cacheKey = normalizeHeader(header);
+  const cached = normalizedHeaderAliasCache.get(cacheKey);
 
+  if (cached) {
+    return cached;
+  }
+
+  const aliases = headerAliases(header).map(normalizeHeader);
+  normalizedHeaderAliasCache.set(cacheKey, aliases);
+  return aliases;
+}
+
+function normalizedRowValues(row: FlipkartRawRow) {
+  const cached = rowValueCache.get(row);
+
+  if (cached) {
+    return cached;
+  }
+
+  const values = new Map<string, FlipkartRawRow[string]>();
   for (const [key, value] of Object.entries(row)) {
-    if (wanted.has(normalizeHeader(key))) {
-      return value;
+    const normalized = normalizeHeader(key);
+
+    if (normalized && !values.has(normalized)) {
+      values.set(normalized, value);
+    }
+  }
+
+  rowValueCache.set(row, values);
+  return values;
+}
+
+function rowValue(row: FlipkartRawRow, header: string) {
+  const values = normalizedRowValues(row);
+
+  for (const alias of normalizedHeaderAliases(header)) {
+    if (values.has(alias)) {
+      return values.get(alias);
     }
   }
 

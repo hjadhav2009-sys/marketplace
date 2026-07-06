@@ -1,48 +1,52 @@
 # Next Phase Notes
 
-## Bugs fixed in Phase 5
+## Bugs fixed in Phase 6
 
-- Import job issue rows now have a drill-down page at `/owner/imports/[jobId]/issues` with pagination, filters, safe operational context, and downloads.
-- Job-level issue exports now include SKU and masked shipment/order-item keys without exposing raw customer/order row data.
-- Failed/cancelled import retry is now guarded by retained private source files under `storage/import-jobs`.
-- Retry is unavailable when the retained file is missing or outside the private import-job storage directory.
-- The old pending button no longer only records an audit event. It now moves old pending rows into an owner review queue.
-- Picker keeps Today work separate and links owners to the old pending review queue.
+- Reports no longer rely only on stale import-time missing listing/image warnings.
+- Reports now show both “At import time” and “Current now” missing listing/image counts.
+- Current missing listing/image status is recalculated from the current Listing Master for the selected account/marketplace/date/SKU filters.
+- Reports now support date, account, marketplace, batch, SKU, status, and courier filters.
+- Report tables are paginated and limited instead of rendering huge operational datasets.
+- Reports include safe CSV, XLSX, and TXT downloads through `/reports/export`.
+- Old pending is counted separately and linked to `/owner/old-pending`.
+- Problems now have open/resolved tabs, filters, resolution notes, audit logging, and explicit return-to-ready control.
 
-## Import issue drill-down
+## Reports workflow
 
-- Default page size is 50 rows.
-- Supported page sizes are 25, 50, and 100.
-- Filters include issue type, row number, and SKU.
-- The table shows row number, issue type, message, SKU, masked shipment key, masked order item key, and created time.
-- Raw import row data is not rendered or exported.
+- Owner opens `/reports`.
+- Default date filter is today.
+- Filters can narrow by seller account, marketplace, import batch, SKU, status, and courier.
+- Summary cards show total orders, today ready, today picked, today packed, open problems, old pending, current missing listing, current missing image, packed today, and pending today.
+- Tables show daily, SKU, courier, account/marketplace, problem, and recent import summaries.
 
-## Retry policy
+## Current vs import-time missing status
 
-- Browser import jobs retain uploaded files in ignored `storage/import-jobs`.
-- A failed or cancelled job can retry only when the retained file still exists inside that folder.
-- Retry creates a new job using the retained private file and starts processing it.
-- The UI shows: “Retry unavailable because source file was cleaned up.” when retry is not safe.
+- “At import time” comes from import job warning counters.
+- “Current now” recalculates against the latest Listing Master.
+- If Listing Master is uploaded after Order Excel, current missing listing/image counts can reduce while import-time warnings remain for audit history.
 
-## Old pending review workflow
+## Report export safety
 
-- `/owner/old-pending` lists older READY orders separately from Today work.
-- Owners can keep pending, move to problem, mark reviewed/carry forward, or archive from the today-view workflow.
-- Orders are not deleted.
-- Moving to problem creates an open problem order only if one is not already open.
+- CSV, XLSX, and TXT exports are supported.
+- Export types include order summary, packed orders, pending orders, problem orders, old pending, missing listing, missing image, and SKU summary.
+- Exports include operational fields only: marketplace, account, SKU, quantity, status, courier, batch/date, and masked tracking key.
+- Full customer address/phone/raw import row data is not exported from reports.
+- PDF export remains skipped because the app does not currently include a report-PDF generator.
 
-## Bugs found but intentionally left for Phase 6
+## Problem resolution workflow
 
-- Reports and Problems pages still need a full operational cleanup with current missing-listing/missing-image status.
-- PDF export remains skipped because the app does not currently have a report-PDF generator.
-- Problem resolution notes and audit history should be expanded in the dedicated Problems phase.
+- `/problems` supports open/resolved tabs.
+- Owner can resolve with a resolution note.
+- Returning an order to READY is explicit via checkbox.
+- “Keep as problem” records an audit log without deleting or resolving the problem.
+- Resolved problems no longer appear in the Open tab.
 
 ## Recommended next phase
 
-Phase 6: improve Reports and Problems workflow.
+Phase 7: improve Users, roles, password reset, account assignment, and access control UX.
 
-- Date/account/marketplace/status filters.
-- Current vs import-time missing listing/image counts.
-- Safe CSV/XLSX/TXT report downloads.
-- Owner/admin problem resolution with notes and audit log.
-- Old pending counts integrated into reports without polluting Today work.
+- Owner user-management UI.
+- Worker account assignment UX.
+- Owner password reset and temporary password workflow.
+- Forgot password request flow.
+- Role/account access checks for user management routes.

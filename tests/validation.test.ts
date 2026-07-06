@@ -49,6 +49,7 @@ import { buildPickerSkuGroups, normalizePickerLimit, paginatePickerSkuGroups } f
 import { buildWorkQueueOrderWhere, normalizeWorkQueueFilter, orderMatchesWorkQueue, startOfWorkDay } from "../lib/operations/work-queue";
 import { hashPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
+import { normalizeReportStatus, reportDateRange, reportStatusWhere } from "../lib/reports";
 import {
   buildListingImageGallery,
   getInitialProductImageState,
@@ -716,6 +717,14 @@ assert.deepEqual(
 assert.equal(JSON.stringify(safeIssueContext).includes("PRIVATE"), false, "Import issue context excludes private customer raw data");
 assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs", "fake.xlsx")), true, "Import retry accepts retained files under storage/import-jobs");
 assert.equal(isRetainedImportJobFilePath(join(repoRoot, "private-test-data", "fake.xlsx")), false, "Import retry rejects files outside private retained import-job storage");
+assert.equal(normalizeReportStatus("missing-image"), "missing-image", "Report status accepts current missing image filter");
+assert.equal(normalizeReportStatus("not-real"), "", "Report status falls back safely");
+const oldPendingReportWhere = reportStatusWhere("old-pending", new Date("2026-07-07T12:00:00.000Z"));
+assert.equal(oldPendingReportWhere.packStatus, "READY", "Report old pending filter uses READY pack status");
+assert.equal(oldPendingReportWhere.importedAt instanceof Object, true, "Report old pending filter separates work before today");
+const explicitReportRange = reportDateRange({ from: "2026-07-01", to: "2026-07-02" });
+assert.equal(explicitReportRange?.gte?.toISOString().slice(0, 10), "2026-07-01", "Report date filter parses from date");
+assert.equal(explicitReportRange?.lte?.toISOString().slice(0, 10), "2026-07-02", "Report date filter parses to date");
 
 assert.equal(normalizeIp("::ffff:192.168.1.10"), "192.168.1.10", "IPv4-mapped IPs normalize");
 assert.equal(isIpInCidr("192.168.1.10", "192.168.0.0/16"), true, "Local CIDR allows Wi-Fi IP");
@@ -1044,6 +1053,11 @@ const packingPage = readFileSync(join(repoRoot, "app", "packing", "page.tsx"), "
 const packingActions = readFileSync(join(repoRoot, "app", "packing", "actions.ts"), "utf8");
 const packingSearchRoute = readFileSync(join(repoRoot, "app", "packing", "search", "route.ts"), "utf8");
 const packingResultPage = readFileSync(join(repoRoot, "app", "packing", "[awb]", "page.tsx"), "utf8");
+const reportsPage = readFileSync(join(repoRoot, "app", "reports", "page.tsx"), "utf8");
+const reportsExportRoute = readFileSync(join(repoRoot, "app", "reports", "export", "route.ts"), "utf8");
+const reportsHelper = readFileSync(join(repoRoot, "lib", "reports.ts"), "utf8");
+const problemsPage = readFileSync(join(repoRoot, "app", "problems", "page.tsx"), "utf8");
+const problemsActions = readFileSync(join(repoRoot, "app", "problems", "actions.ts"), "utf8");
 const pickerActions = readFileSync(join(repoRoot, "app", "picker", "[sku]", "actions.ts"), "utf8");
 const pickerDetailsRoute = readFileSync(join(repoRoot, "app", "picker", "details", "route.ts"), "utf8");
 const dashboardPage = readFileSync(join(repoRoot, "app", "dashboard", "page.tsx"), "utf8");
@@ -1236,6 +1250,32 @@ assert.match(awbScannerComponent, /opening/, "Scanner exposes an opening-result 
 assert.match(packingSearchRoute, /cachedImageUrl/, "AWB suggestion API returns cachedImageUrl only for product images");
 assert.match(packingSearchRoute, /id: order\.id[\s\S]*marketplace: order\.marketplace[\s\S]*accountName/, "AWB suggestion API returns compact metadata needed by result cards");
 assert.doesNotMatch(packingSearchRoute, /imageUrl: order\.imageUrl/, "AWB suggestion API does not return slow external image URLs");
+assert.match(reportsPage, /name="from"[\s\S]*name="to"/, "Reports page supports date filters");
+assert.match(reportsPage, /name="accountId"[\s\S]*name="marketplace"/, "Reports page supports account and marketplace filters");
+assert.match(reportsPage, /name="status"[\s\S]*missing-listing[\s\S]*missing-image/, "Reports page supports status and current missing filters");
+assert.match(reportsPage, /Current now vs at import time/, "Reports page labels current vs import-time status clearly");
+assert.match(reportsPage, /Old pending review/, "Reports page links old pending review");
+assert.match(reportsPage, /Previous[\s\S]*Next/, "Reports order rows are paginated");
+assert.match(reportsHelper, /marketplaceListing\.findMany/, "Reports recalculate current missing status from Listing Master");
+assert.match(reportsHelper, /missingListingOrders = currentScopeOrders\.filter/, "Reports compute current missing listing rows from current listings");
+assert.match(reportsHelper, /!listing\.mainImageUrl/, "Reports compute current missing image rows from current listing image URL");
+assert.match(reportsHelper, /importJob\.aggregate[\s\S]*missingListingRows[\s\S]*missingImageRows/, "Reports keep import-time warning counters separate");
+assert.match(reportsHelper, /REPORT_PAGE_SIZE = 25[\s\S]*REPORT_EXPORT_LIMIT = 5000/, "Report queries are paginated and export-limited");
+assert.match(reportsExportRoute, /reportExportTypes/, "Report export route validates export types");
+assert.match(reportsExportRoute, /\"csv\", \"xlsx\", \"txt\"/, "Report exports support CSV, XLSX, and TXT");
+assert.match(reportsExportRoute, /maskReportTrackingKey/, "Report exports mask tracking keys");
+assert.doesNotMatch(reportsExportRoute, /Address Line|Buyer name|phone|rawData/i, "Report exports avoid private raw customer data");
+assert.match(problemsPage, /Open \(\{countByStatus\.get\("OPEN"\)/, "Problems page has an open tab");
+assert.match(problemsPage, /Resolved \(\{countByStatus\.get\("RESOLVED"\)/, "Problems page has a resolved tab");
+assert.match(problemsPage, /name="accountId"[\s\S]*name="marketplace"[\s\S]*name="sku"[\s\S]*name="reason"[\s\S]*name="reporter"/, "Problems page supports account, marketplace, SKU, reason, and reporter filters");
+assert.match(problemsPage, /status: tab === "resolved" \? "RESOLVED" : "OPEN"/, "Resolved problems disappear from the open problem query");
+assert.match(problemsPage, /name="resolutionNote"/, "Problem resolution accepts a note");
+assert.match(problemsPage, /name="returnToReady"[\s\S]*Mark order back to ready/, "Problem return-to-ready is explicit");
+assert.match(problemsActions, /requireUser\(\["OWNER"\]\)/, "Problem resolution actions are owner-only");
+assert.match(problemsActions, /resolutionNote: resolutionNote \|\| null/, "Problem resolution stores resolution note");
+assert.match(problemsActions, /recordAuditLog[\s\S]*PROBLEM_ORDER_RESOLVED/, "Resolving a problem creates an audit log");
+assert.match(problemsActions, /returnToReady[\s\S]*status: "READY"[\s\S]*pickStatus: "READY"[\s\S]*packStatus: "READY"/, "Problem resolution returns to ready only when explicit");
+assert.match(problemsActions, /PROBLEM_ORDER_KEPT_OPEN/, "Keeping a problem open is audited");
 assert.match(dataHelpers, /awb: query[\s\S]*endsWith: query[\s\S]*contains: query/, "AWB search queries exact, suffix, then contains");
 assert.match(dataHelpers, /packStatus: "READY"[\s\S]*OR: \[\{ awb: query \}, \{ trackingId: query \}\]/, "Packing AWB search defaults to active READY orders and checks Tracking ID");
 assert.doesNotMatch(packingSearchDataSource, heavyListingFieldsPattern, "Packing search returns compact listing data without heavy descriptions/specs/gallery fields");
@@ -1330,9 +1370,9 @@ assert.match(productionChecksSource, /image-cache/, "Production checks warn when
 assert.match(windowsProdPs1, /start-local-prod\.mjs/, "Windows PowerShell launcher delegates to Node launcher");
 assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local production env example supports local Wi-Fi HTTP cookies");
 assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");
-assert.match(nextPhaseNotes, /Retry is unavailable when the retained file is missing/, "Next phase notes document guarded import retry");
-assert.match(nextPhaseNotes, /PDF export remains skipped/, "Next phase notes document skipped PDF export");
-assert.match(nextPhaseNotes, /\/owner\/old-pending/, "Next phase notes document old pending review queue status");
+assert.match(nextPhaseNotes, /Current now/, "Next phase notes document current missing status");
+assert.match(nextPhaseNotes, /PDF export remains skipped/, "Next phase notes document skipped report PDF export");
+assert.match(nextPhaseNotes, /Phase 7: improve Users/, "Next phase notes recommend user and role workflow next");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(sqliteSchema, /enum Marketplace[\s\S]*FLIPKART[\s\S]*MEESHO[\s\S]*AMAZON[\s\S]*WOOCOMMERCE[\s\S]*OTHER/, "SQLite schema defines marketplace enum");
@@ -1345,6 +1385,10 @@ assert.match(sqliteSchema, /oldPendingReviewStatus\s+String\s+@default\("NONE"\)
 assert.match(postgresSchema, /oldPendingReviewStatus\s+String\s+@default\("NONE"\)[\s\S]*oldPendingReviewedAt\s+DateTime\?[\s\S]*oldPendingReviewNote\s+String\?/, "PostgreSQL schema stores old pending review state");
 assert.equal(existsSync(join(repoRoot, "prisma", "migrations", "20260707000200_old_pending_review", "migration.sql")), true, "SQLite old pending review migration exists");
 assert.equal(existsSync(join(repoRoot, "prisma", "migrations-postgres", "20260707000200_old_pending_review", "migration.sql")), true, "PostgreSQL old pending review migration exists");
+assert.match(sqliteSchema, /model ProblemOrder[\s\S]*resolutionNote\s+String\?/, "SQLite schema stores problem resolution notes");
+assert.match(postgresSchema, /model ProblemOrder[\s\S]*resolutionNote\s+String\?/, "PostgreSQL schema stores problem resolution notes");
+assert.equal(existsSync(join(repoRoot, "prisma", "migrations", "20260707000300_problem_resolution_note", "migration.sql")), true, "SQLite problem resolution note migration exists");
+assert.equal(existsSync(join(repoRoot, "prisma", "migrations-postgres", "20260707000300_problem_resolution_note", "migration.sql")), true, "PostgreSQL problem resolution note migration exists");
 assert.match(sqliteSchema, /cacheStatus\s+ImageCacheStatus/, "SQLite schema stores cache status metadata");
 assert.match(postgresSchema, /cacheStatus\s+ImageCacheStatus/, "PostgreSQL schema stores cache status metadata");
 assert.match(sqliteSchema, /active\s+Boolean\s+@default\(true\)[\s\S]*@@index\(\[active\]\)/, "SQLite schema supports active account management");

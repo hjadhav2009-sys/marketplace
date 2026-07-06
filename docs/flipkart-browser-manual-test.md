@@ -20,7 +20,7 @@ Expected safe checks:
 
 ## Start The App
 
-Use a local database and temporary local secrets:
+Use a local database and temporary local secrets. From the app folder, initialize the local SQLite database before starting the server:
 
 ```powershell
 cd E:\marketplace1\marketplace
@@ -28,8 +28,12 @@ $env:DATABASE_URL="file:./dev.db"
 $env:SESSION_SECRET="local-test-secret-change-me"
 $env:NEXT_PUBLIC_APP_URL="http://localhost:3000"
 $env:NEXT_PUBLIC_APP_NAME="Marketplace Pick & Pack"
+npx.cmd prisma migrate deploy
+npx.cmd prisma db seed
 npm.cmd run dev -- --host 0.0.0.0
 ```
+
+If you want to use the first-run setup page instead of the seeded demo users, run `npx.cmd prisma migrate deploy`, skip `npx.cmd prisma db seed`, then open `/setup`.
 
 Open:
 

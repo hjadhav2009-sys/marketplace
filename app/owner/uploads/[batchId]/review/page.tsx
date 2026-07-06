@@ -332,7 +332,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         <PageHeader
           eyebrow="Review"
           title="Flipkart import review"
-          description="Review imported rows, duplicate rows, held bad rows, and missing listing or image mappings for this Flipkart Order Excel batch."
+          description="Review imported rows, duplicate rows, held bad rows, and missing listing or image mappings for this Flipkart Order Excel/CSV batch."
         >
           <StatusBadge value={batch.status} />
         </PageHeader>

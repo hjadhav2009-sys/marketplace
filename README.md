@@ -74,7 +74,7 @@ MEESHO
 
 ## Flipkart Importer
 
-`src/lib/marketplaces/flipkart/parser.ts` parses sanitized Flipkart Order Excel and Listing Excel rows into the shared marketplace model. Owner uploads include daily Flipkart Orders, and SKU image/listing imports update the permanent Flipkart Listing Master. Tracking ID is stored separately from the internal unique key so packing can search the scanned Flipkart label barcode.
+`src/lib/marketplaces/flipkart/parser.ts` parses sanitized Flipkart Order Excel/CSV and Listing Excel rows into the shared marketplace model. Owner uploads include daily Flipkart Orders, and SKU image/listing imports update the permanent Flipkart Listing Master. Tracking ID is stored separately from the internal unique key so packing can search the scanned Flipkart label barcode.
 
 Large Flipkart Excel uploads now run through an Import Progress job:
 
@@ -100,11 +100,11 @@ Listing Master stores product/listing fields such as title, FSN, listing ID, sta
 
 ### Import Flipkart Orders
 
-Open `Owner -> Upload -> Flipkart Orders` and upload a sanitized Flipkart Order `.xlsx` export.
+Open `Owner -> Upload -> Flipkart Orders` and upload a sanitized Flipkart Order `.xlsx` or `.csv` export.
 
 After upload, the app redirects to the import progress page. The review page renders summary counts first and caps each visible row section to 50 rows so large daily files do not freeze the browser.
 
-Daily workers should upload only the Flipkart Order Excel. Order SKU matches Listing Master `Seller SKU Id`. Duplicate safety uses `ORDER ITEM ID` first. If it is missing, the importer falls back to `Shipment ID + SKU`. Rows missing both `ORDER ITEM ID` and `Shipment ID` are held for review and are not imported automatically.
+Daily workers should upload only the Flipkart Order Excel/CSV. Order SKU matches Listing Master `Seller SKU Id`. Duplicate safety uses `ORDER ITEM ID` first. If it is missing, the importer falls back to `Shipment ID + SKU`. Rows missing both `ORDER ITEM ID` and `Shipment ID` are held for review and are not imported automatically.
 
 Orders store order-specific fields only: marketplace, shipment/order item/tracking IDs, SKU, FSN, order product title when present, quantity, city/state when present, and pick/pack/problem state. Full listing descriptions, specifications, and all image URLs stay in Listing Master.
 

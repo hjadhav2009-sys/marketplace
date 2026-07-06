@@ -28,9 +28,9 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
     params?.error === "missing-file"
       ? "Upload a label PDF, a manifest PDF, or both."
       : params?.error === "missing-flipkart-orders"
-        ? "Upload a Flipkart Order Excel file."
+        ? "Upload a Flipkart Order Excel or CSV file."
         : params?.error === "invalid-flipkart-orders"
-          ? "Choose a valid Flipkart .xlsx order export."
+          ? "Choose a valid Flipkart .xlsx or .csv order export."
           : params?.error === "flipkart-order-import-failed"
             ? "The Flipkart order file could not be imported. Check the Excel headers and try again."
       : params?.error === "too-large"
@@ -46,7 +46,7 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
       <PageHeader
         eyebrow="Upload"
         title="Upload marketplace files"
-        description="Upload Flipkart Order Excel files or use the inherited PDF review pipeline for the existing foundation."
+        description="Upload Flipkart Order Excel/CSV files or use the inherited PDF review pipeline for the existing foundation."
       />
 
       {flipkartBatch ? (
@@ -72,18 +72,18 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
           </div>
           <h2 className="text-lg font-semibold text-slate-950">Flipkart Orders</h2>
           <label className="mt-4 block">
-            <span className="text-sm font-medium text-slate-700">Flipkart Order Excel</span>
+            <span className="text-sm font-medium text-slate-700">Flipkart Order Excel or CSV</span>
             <input
               name="flipkartOrderExcel"
               type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
               required
               className="mt-2 block w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
             <span className="mt-2 block text-sm text-slate-500">Uses Tracking ID for packing scans and ORDER ITEM ID for duplicates.</span>
           </label>
           <div className="mt-4 rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-            Upload sanitized Flipkart `.xlsx` order exports only. The file is saved first, then processed on the Import Progress page.
+            Upload sanitized Flipkart `.xlsx` or `.csv` order exports only. The file is saved first, then processed on the Import Progress page.
           </div>
           <div className="mt-5">
             <SubmitButton pendingText="Creating job...">Import Flipkart orders</SubmitButton>

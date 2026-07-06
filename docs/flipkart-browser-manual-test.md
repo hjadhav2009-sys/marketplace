@@ -92,10 +92,11 @@ Go to:
 Owner -> Upload -> Flipkart Orders
 ```
 
-Upload:
+Upload either order format:
 
 ```text
 private-test-data/flipkart-order.real.xlsx
+private-test-data/flipkart-order.real.csv
 ```
 
 Confirm the order review:

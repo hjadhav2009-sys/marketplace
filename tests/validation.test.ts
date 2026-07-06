@@ -62,6 +62,8 @@ import { normalizeSkuForMatching } from "../lib/sku";
 import { canDeactivateUser, shouldCloseSessionsAfterPasswordReset, validateWorkerPassword } from "../lib/user-management";
 import {
   awbSearchSchema,
+  flipkartExcelImportFileSchema,
+  flipkartOrderImportFileSchema,
   loginSchema,
   ownerAccountSchema,
   parsedOrderSchema,
@@ -173,6 +175,10 @@ assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a1", 
 assert.equal(findAwbSearchMatches({ candidates: awbCandidates, accountId: "a1", query: "00000" }).length, 0, "AWB search returns no results cleanly");
 assert.equal(uploadBatchSchema.safeParse({ filename: "labels.pdf" }).success, true, "PDF upload should validate");
 assert.equal(uploadBatchSchema.safeParse({ filename: "labels.xlsx" }).success, false, "non-PDF upload should fail");
+assert.equal(flipkartOrderImportFileSchema.safeParse({ filename: "flipkart-order.csv" }).success, true, "Flipkart order CSV upload should validate");
+assert.equal(flipkartOrderImportFileSchema.safeParse({ filename: "flipkart-order.xlsx" }).success, true, "Flipkart order XLSX upload should validate");
+assert.equal(flipkartOrderImportFileSchema.safeParse({ filename: "flipkart-order.pdf" }).success, false, "Flipkart order non-spreadsheet upload should fail");
+assert.equal(flipkartExcelImportFileSchema.safeParse({ filename: "flipkart-listing.csv" }).success, false, "Flipkart Listing Master stays XLSX-only for now");
 assert.equal(
   skuImageMappingSchema.safeParse({
     sku: sampleOrder.sku,

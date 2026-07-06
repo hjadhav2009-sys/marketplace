@@ -25,7 +25,7 @@ import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
 import { PDF_UPLOAD_MAX_BYTES } from "@/lib/upload-limits";
-import { flipkartExcelImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
+import { flipkartOrderImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 
 type PreviewRowDraft = {
   sourceFileName: string;
@@ -919,7 +919,7 @@ export async function createFlipkartOrderImportAction(formData: FormData) {
     redirect("/owner/uploads/new?error=missing-flipkart-orders");
   }
 
-  const parsed = flipkartExcelImportFileSchema.safeParse({ filename: file.name });
+  const parsed = flipkartOrderImportFileSchema.safeParse({ filename: file.name });
 
   if (!parsed.success) {
     redirect("/owner/uploads/new?error=invalid-flipkart-orders");

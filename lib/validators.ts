@@ -68,6 +68,17 @@ export const flipkartExcelImportFileSchema = z.object({
     .refine((value) => value.toLowerCase().endsWith(".xlsx"), "Upload a Flipkart .xlsx Excel file")
 });
 
+export const flipkartOrderImportFileSchema = z.object({
+  filename: z
+    .string()
+    .trim()
+    .min(1, "Choose a Flipkart order file")
+    .refine(
+      (value) => [".xlsx", ".csv"].some((extension) => value.toLowerCase().endsWith(extension)),
+      "Upload a Flipkart .xlsx Excel or .csv order file"
+    )
+});
+
 export const awbSearchSchema = z.object({
   awb: z.preprocess(
     normalizeAwb,

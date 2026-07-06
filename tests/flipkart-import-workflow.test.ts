@@ -31,13 +31,31 @@ async function readXlsxFixture(fileName: string) {
   return parseSpreadsheetRows(file);
 }
 
+async function readFakeOrderCsvRows() {
+  const csv = [
+    "Ordered On,Shipment ID,ORDER ITEM ID,Order Id,FSN,SKU,Product,Quantity,Buyer name,Ship to name,City,State,PIN Code,Tracking ID",
+    "07/06/26,SHIP-CSV-0001,OI-CSV-0001,ORDER-CSV-0001,FSNCSV0001,FK-SKU-CSV-1,Fake CSV Product,2,Test Buyer,Test Receiver,Test City,Test State,000000,FMPC0000000199"
+  ].join("\n");
+  const file = new File([csv], "flipkart-order-export.fake.csv", {
+    type: "text/csv"
+  });
+
+  return parseSpreadsheetRows(file);
+}
+
 const orderRows = await readXlsxFixture("flipkart-order-export.fake.xlsx");
 const listingRows = await readXlsxFixture("flipkart-listing-export.fake.xlsx");
+const orderCsvRows = await readFakeOrderCsvRows();
 const orderResult = parseFlipkartOrderRows(orderRows, "flipkart-order-export.fake.xlsx");
+const orderCsvResult = parseFlipkartOrderRows(orderCsvRows, "flipkart-order-export.fake.csv");
 const listingResult = parseFlipkartListingRows(listingRows, "flipkart-listing-export.fake.xlsx");
 const deduped = dedupeFlipkartOrderRows(orderResult.orders);
 
 assert.equal(orderRows.length, 6, "Fake order XLSX rows load through spreadsheet parser");
+assert.equal(orderCsvRows.length, 1, "Fake order CSV rows load through spreadsheet parser");
+assert.equal(orderCsvResult.orders[0]?.orderItemId, "OI-CSV-0001", "Fake order CSV extracts ORDER ITEM ID");
+assert.equal(orderCsvResult.orders[0]?.trackingId, "FMPC0000000199", "Fake order CSV extracts Tracking ID");
+assert.equal(orderCsvResult.orders[0]?.quantity, 2, "Fake order CSV parses quantity");
 assert.equal(listingRows.length, 4, "Fake listing XLSX rows load through spreadsheet parser");
 assert.equal(orderResult.orders.length, 5, "Fake order XLSX parses valid and duplicate-key rows");
 assert.equal(orderResult.issues.length, 1, "Fake order XLSX holds the row missing ORDER ITEM ID and Shipment ID");

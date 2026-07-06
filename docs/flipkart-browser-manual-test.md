@@ -35,6 +35,8 @@ npm.cmd run dev -- --host 0.0.0.0
 
 If you want to use the first-run setup page instead of the seeded demo users, run `npx.cmd prisma migrate deploy`, skip `npx.cmd prisma db seed`, then open `/setup`.
 
+If a large upload shows `Unexpected end of form`, stop and restart the dev server so the configured `100mb` upload limits are loaded.
+
 Open:
 
 ```text

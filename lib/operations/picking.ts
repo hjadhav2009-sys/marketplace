@@ -21,6 +21,7 @@ export type PickerMappingInput = {
   sku: string;
   imageUrl: string | null;
   cachedImageUrl?: string | null;
+  galleryImages?: string[];
   productName: string | null;
   color?: string | null;
   size?: string | null;

@@ -579,6 +579,7 @@ const pickerGroups = buildPickerSkuGroups(
       sku: "SKU1",
       imageUrl: "https://example.com/image.jpg",
       cachedImageUrl: "/product-images/meesho/a1/SKU1/card.webp",
+      galleryImages: ["https://example.invalid/large-1.jpg", "https://example.invalid/small-1.jpg"],
       productName: "Pendant",
       cacheStatus: "CACHED"
     }
@@ -589,6 +590,7 @@ assert.equal(pickerGroups.length, 2, "Picker grouping separates SKU by color and
 assert.equal(pickerGroups.find((group) => group.color === "Silver")?.totalQuantity, 1, "Picker group sums quantity");
 assert.equal(pickerGroups.find((group) => group.color === "Gold")?.status, "PICKED", "Picked group status is derived");
 assert.equal(pickerGroups[0]?.imageUrl, "/product-images/meesho/a1/SKU1/card.webp", "Picker group uses cached image URL first");
+assert.deepEqual(pickerGroups[0]?.mapping?.galleryImages, ["https://example.invalid/large-1.jpg", "https://example.invalid/small-1.jpg"], "Picker card receives listing gallery images");
 assert.equal(paginatePickerSkuGroups(pickerGroups, { limit: 1 }).groups.length, 1, "Picker pagination limits first render");
 assert.equal(paginatePickerSkuGroups(pickerGroups, { limit: 1 }).hasMore, true, "Picker pagination exposes load-more state");
 assert.equal(paginatePickerSkuGroups(pickerGroups, { limit: 1, page: 2 }).groups.length, 2, "Picker load-more keeps previous groups visible");
@@ -953,6 +955,8 @@ const uploadLimits = readFileSync(join(repoRoot, "lib", "upload-limits.ts"), "ut
 const uploadActions = readFileSync(join(repoRoot, "app", "owner", "uploads", "actions.ts"), "utf8");
 const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
 const productImageGalleryComponent = readFileSync(join(repoRoot, "components", "ProductImageGallery.tsx"), "utf8");
+const pickerProductCardComponent = readFileSync(join(repoRoot, "components", "PickerProductCard.tsx"), "utf8");
+const productDetailsDrawerComponent = readFileSync(join(repoRoot, "components", "ProductDetailsDrawer.tsx"), "utf8");
 const awbScannerComponent = readFileSync(join(repoRoot, "components", "AwbBarcodeScanner.tsx"), "utf8");
 const productImageRoute = readFileSync(join(repoRoot, "app", "product-images", "[...path]", "route.ts"), "utf8");
 const pickerPage = readFileSync(join(repoRoot, "app", "picker", "page.tsx"), "utf8");
@@ -961,6 +965,8 @@ const packingPage = readFileSync(join(repoRoot, "app", "packing", "page.tsx"), "
 const packingActions = readFileSync(join(repoRoot, "app", "packing", "actions.ts"), "utf8");
 const packingSearchRoute = readFileSync(join(repoRoot, "app", "packing", "search", "route.ts"), "utf8");
 const packingResultPage = readFileSync(join(repoRoot, "app", "packing", "[awb]", "page.tsx"), "utf8");
+const pickerActions = readFileSync(join(repoRoot, "app", "picker", "[sku]", "actions.ts"), "utf8");
+const pickerDetailsRoute = readFileSync(join(repoRoot, "app", "picker", "details", "route.ts"), "utf8");
 const reviewPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "[batchId]", "review", "page.tsx"), "utf8");
 const workQueueSource = readFileSync(join(repoRoot, "lib", "operations", "work-queue.ts"), "utf8");
 const ownerAccountsPage = readFileSync(join(repoRoot, "app", "owner", "accounts", "page.tsx"), "utf8");
@@ -999,7 +1005,7 @@ function sourceBetween(source: string, start: string, end: string) {
 
 const pickerListDataSource = sourceBetween(dataHelpers, "export async function getSkuGroups", "export async function getSkuDetail");
 const packingSearchDataSource = sourceBetween(dataHelpers, "export async function searchOrdersByAwbFragment", "export async function getOrderWithImage");
-const heavyListingFieldsPattern = /productHighlights|allSpecifications|description:\s*true|imageUrl1:\s*true|image1366Url1:\s*true/;
+const heavyListingFieldsPattern = /productHighlights|allSpecifications|description:\s*true/;
 
 assert.match(
   readme,
@@ -1044,9 +1050,18 @@ assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile
 assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination");
 assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
 assert.match(pickerPage, /sticky top-\[88px\]/, "Picker filters stay reachable on mobile");
-assert.match(pickerPage, /cacheStatus={group.mapping\?\.cacheStatus}/, "Picker card passes cache status to image component");
-assert.match(pickerPage, /prefetch href={detailHref}/, "Picker cards prefetch frequent detail links");
+assert.match(pickerPage, /PickerProductCard/, "Picker page renders worker cards through the client card component");
+assert.match(pickerListDataSource, /imageUrl1:\s*true[\s\S]*imageUrl10:\s*true[\s\S]*image1366Url1:\s*true/, "Picker card query includes listing image URLs for gallery");
 assert.doesNotMatch(pickerListDataSource, heavyListingFieldsPattern, "Picker list query keeps heavy listing description/spec/gallery fields out of card payloads");
+assert.match(pickerProductCardComponent, /ProductImageGallery/, "Picker card image area opens the image gallery");
+assert.match(pickerProductCardComponent, /showInlineThumbnails={false}/, "Picker card keeps the top image area square without inline thumbnail rows");
+assert.match(pickerProductCardComponent, /data-card-actions="3"/, "Picker card keeps worker actions under the four-button maximum");
+assert.match(pickerProductCardComponent, /Details[\s\S]*ProductDetailsDrawer/, "Picker card separates Details from the image gallery");
+assert.doesNotMatch(pickerProductCardComponent, /href=.*picker\/\$\{/, "Picker card image/details controls do not navigate to the SKU page");
+assert.match(productDetailsDrawerComponent, /fetch\(detailsUrl/, "Product details drawer fetches heavy detail data only after opening");
+assert.match(pickerDetailsRoute, /getSkuDetail/, "Picker details drawer route reuses the full SKU detail query");
+assert.match(pickerActions, /markSkuGroupPickedInlineAction[\s\S]*return \{ ok: true, updatedRows: result\.count \}/, "Direct picker card action returns picked result without redirecting");
+assert.match(pickerActions, /markSkuGroupProblemInlineAction[\s\S]*return \{ ok: true, affectedOrders: orders\.length/, "Direct picker problem action returns problem result without redirecting");
 assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
 assert.match(pickerDetailPage, /mapping\?\.cachedImageUrl/, "Picker detail uses cached image URL first");
 assert.match(pickerDetailPage, /ProductImageGallery/, "Picker detail opens the product image gallery");
@@ -1109,10 +1124,13 @@ assert.match(windowsLauncher, /SKIP_PRISMA_MIGRATE/, "Windows launcher defaults 
 assert.match(windowsCheckEnv, /printEnvironmentSummary/, "check-env prints a masked environment summary");
 assert.match(productImageComponent, /decoding="async"/, "Product images decode asynchronously");
 assert.match(productImageComponent, /state !== "loading" \|\| !isExternalSrc/, "ProductImage does not show slow external warning for local cached images");
+assert.match(productImageComponent, /aspect-square w-full/, "Large product image areas stay square");
+assert.match(productImageComponent, /object-contain/, "Product images fit without cropping");
 assert.match(productImageComponent, /Use Listing Master or cache today's images/, "Product cards show a clean missing-image fallback");
 assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
 assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
 assert.match(productImageGalleryComponent, /role="dialog"/, "Product image gallery opens as an accessible dialog");
+assert.match(productImageGalleryComponent, /showInlineThumbnails = true/, "Product image gallery can show thumbnails outside compact cards");
 assert.match(productImageGalleryComponent, /Escape/, "Product image gallery closes with Escape");
 assert.match(productImageGalleryComponent, /ArrowRight[\s\S]*ArrowLeft/, "Product image gallery supports keyboard image navigation");
 assert.match(productImageGalleryComponent, /galleryImages\.length === 0 \? 0/, "Product image gallery handles one or zero images cleanly");

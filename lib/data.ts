@@ -5,7 +5,7 @@ import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups, pag
 import { buildWorkQueueOrderWhere, startOfWorkDay } from "./operations/work-queue";
 import { withDevTiming } from "./perf";
 import { prisma } from "./prisma";
-import { normalizeSkuMappingImageFilter } from "./product-image";
+import { buildListingImageGallery, normalizeSkuMappingImageFilter } from "./product-image";
 import { normalizeSkuForMatching } from "./sku";
 
 type DisplayListing = {
@@ -18,6 +18,12 @@ type DisplayListing = {
   subCategory: string | null;
   fsn: string | null;
   listingId: string | null;
+  mrp?: number | null;
+  sellingPrice?: number | null;
+  livePrice?: number | null;
+  liveMrp?: number | null;
+  rating?: number | null;
+  reviewCount?: number | null;
   productHighlights?: string | null;
   description?: string | null;
   allSpecifications?: string | null;
@@ -84,12 +90,14 @@ function mergeDisplayMappings(input: {
     const mapping = mappingBySku.get(normalizedSku) ?? null;
     const listing = listingBySku.get(normalizedSku) ?? null;
     const imageUrl = displayImageUrl(mapping, listing);
+    const galleryImages = buildListingImageGallery(listing, imageUrl);
 
     return {
       id: mapping?.id,
       sku,
       imageUrl: listing?.mainImageUrl ?? mapping?.imageUrl ?? null,
       cachedImageUrl: imageUrl,
+      galleryImages,
       productName: listingDisplayName(listing) ?? mapping?.productName ?? null,
       color: mapping?.color ?? null,
       size: mapping?.size ?? null,
@@ -284,7 +292,27 @@ export async function getSkuGroups(
           subCategory: true,
           fsn: true,
           listingId: true,
-          mainImageUrl: true
+          mainImageUrl: true,
+          imageUrl1: true,
+          imageUrl2: true,
+          imageUrl3: true,
+          imageUrl4: true,
+          imageUrl5: true,
+          imageUrl6: true,
+          imageUrl7: true,
+          imageUrl8: true,
+          imageUrl9: true,
+          imageUrl10: true,
+          image1366Url1: true,
+          image1366Url2: true,
+          image1366Url3: true,
+          image1366Url4: true,
+          image1366Url5: true,
+          image1366Url6: true,
+          image1366Url7: true,
+          image1366Url8: true,
+          image1366Url9: true,
+          image1366Url10: true
         }
       }),
       800
@@ -379,6 +407,12 @@ export async function getSkuDetail(
         subCategory: true,
         fsn: true,
         listingId: true,
+        mrp: true,
+        sellingPrice: true,
+        livePrice: true,
+        liveMrp: true,
+        rating: true,
+        reviewCount: true,
         productHighlights: true,
         description: true,
         allSpecifications: true,
@@ -742,6 +776,12 @@ export async function getOrderWithImage(accountId: string, awb: string) {
         subCategory: true,
         fsn: true,
         listingId: true,
+        mrp: true,
+        sellingPrice: true,
+        livePrice: true,
+        liveMrp: true,
+        rating: true,
+        reviewCount: true,
         productHighlights: true,
         description: true,
         allSpecifications: true,

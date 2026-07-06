@@ -2,14 +2,11 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { ProductImage } from "@/components/ProductImage";
-import { StatusBadge } from "@/components/StatusBadge";
+import { PickerProductCard } from "@/components/PickerProductCard";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getLatestImportedBatch, getSkuGroups } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
 import { normalizeWorkQueueFilter } from "@/lib/operations/work-queue";
-import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
-import { markSkuGroupPickedAction } from "./[sku]/actions";
 
 type PickerSkuGroupsPageProps = {
   searchParams?: Promise<{
@@ -40,10 +37,6 @@ const workFilters = [
   { value: "old-pending", label: "Old pending" },
   { value: "problems", label: "Problems" }
 ];
-
-function pickerDetailHref(sku: string, color: string | null, size: string | null) {
-  return `/picker/${encodeURIComponent(sku)}?color=${encodePickerDimension(color)}&size=${encodePickerDimension(size)}`;
-}
 
 export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGroupsPageProps) {
   const user = await requireUser(["OWNER", "PICKER"]);
@@ -203,124 +196,24 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
       ) : (
         <section className={`grid gap-4 ${compactMode ? "md:grid-cols-2 xl:grid-cols-3" : largeImageMode ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}`}>
           {groups.map((group) => {
-            const detailHref = pickerDetailHref(group.sku, group.color, group.size);
             const encodedColor = encodePickerDimension(group.color);
             const encodedSize = encodePickerDimension(group.size);
-            const canCacheImage = user.role === "OWNER" && group.mapping?.id && group.mapping.imageUrl && group.mapping.cacheStatus !== "CACHED";
+            const detailsParams = new URLSearchParams({
+              sku: group.sku,
+              color: encodedColor,
+              size: encodedSize
+            });
 
             return (
-              <article
+              <PickerProductCard
                 key={`${group.sku}-${group.color ?? "none"}-${group.size ?? "none"}`}
-                className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md"
-              >
-                {compactMode ? null : (
-                  <ProductImage
-                    src={group.imageUrl}
-                    alt={group.productName ?? group.sku}
-                    size="lg"
-                    mappingId={group.mapping?.id}
-                    showBadge={false}
-                    showDebug={false}
-                    imageHealth={group.mapping?.imageHealth}
-                    cacheStatus={group.mapping?.cacheStatus}
-                    originalImageUrl={group.mapping?.imageUrl}
-                  />
-                )}
-                <div className="space-y-4 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge value={group.status} />
-                    {group.missingImage ? (
-                      <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                        No image
-                      </span>
-                    ) : group.mapping?.cacheStatus === "CACHED" ? (
-                      <span className="inline-flex rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700 ring-1 ring-teal-200">
-                        Cached image
-                      </span>
-                    ) : (
-                      <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                        Listing image
-                      </span>
-                    )}
-                    {group.mapping?.imageHealth === "BROKEN" ? (
-                      <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                        {user.role === "OWNER" ? "Broken image URL" : "Image issue"}
-                      </span>
-                    ) : null}
-                    {!compactMode && !group.imageUrl && user.role !== "OWNER" ? (
-                      <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                        Ask owner to prepare image
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <h2 className="break-words text-2xl font-black leading-tight text-slate-950">{group.sku}</h2>
-                    {compactMode ? null : (
-                      <p className="mt-1 line-clamp-2 min-h-10 text-base leading-5 text-slate-600">
-                        {group.productName ?? (group.mapping?.imageUrl ? "Mapped image, no product name" : "Product name not mapped")}
-                      </p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
-                        {group.color ?? group.mapping?.color ?? "Color unknown"}
-                      </span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
-                        {group.size ?? group.mapping?.size ?? "Size unknown"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-[1.1fr_1fr] gap-3">
-                    <div className="rounded-md bg-slate-950 p-4 text-white">
-                      <p className="text-sm font-semibold text-slate-300">Total qty</p>
-                      <p className="mt-1 text-5xl font-black leading-none">{group.totalQuantity}</p>
-                    </div>
-                    <div className="grid gap-2">
-                      <div className="rounded-md bg-slate-50 px-3 py-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending</p>
-                        <p className="text-xl font-black text-slate-950">{group.pendingCount}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="rounded-md bg-slate-50 px-3 py-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Picked</p>
-                          <p className="text-lg font-black text-slate-950">{group.pickedCount}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-3 py-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Problem</p>
-                          <p className="text-lg font-black text-slate-950">{group.problemCount}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <form action={markSkuGroupPickedAction}>
-                      <input type="hidden" name="sku" value={group.sku} />
-                      <input type="hidden" name="color" value={encodedColor} />
-                      <input type="hidden" name="size" value={encodedSize} />
-                      <button type="submit" className="min-h-12 w-full rounded-md bg-berry px-3 py-2 text-sm font-bold text-white">
-                        Picked
-                      </button>
-                    </form>
-                    <Link prefetch href={detailHref} className="inline-flex min-h-12 items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">
-                      Open
-                    </Link>
-                    <Link prefetch href={`${detailHref}#problem-actions`} className="inline-flex min-h-12 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-                      Problem
-                    </Link>
-                  </div>
-                  {canCacheImage ? (
-                    <form action={cacheSkuImageAction}>
-                      <input type="hidden" name="mappingId" value={group.mapping?.id} />
-                      <input type="hidden" name="returnTo" value={`/picker?filter=${activeFilter}&view=${compactMode ? "compact" : "cards"}`} />
-                      <button className="min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-                        Cache now
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
-              </article>
+                group={group}
+                encodedColor={encodedColor}
+                encodedSize={encodedSize}
+                detailsUrl={`/picker/details?${detailsParams}`}
+                activeFilter={activeFilter}
+                compactMode={compactMode}
+              />
             );
           })}
         </section>

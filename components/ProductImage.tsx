@@ -25,7 +25,7 @@ type ProductImageProps = {
 const sizeClass = {
   sm: "h-16 w-16",
   md: "h-28 w-28",
-  lg: "aspect-[4/3] w-full"
+  lg: "aspect-square w-full"
 };
 
 function initialState(src: string | null | undefined, imageHealth: string | null | undefined, cacheStatus: string | null | undefined) {
@@ -114,7 +114,7 @@ export function ProductImage({
           key={`${validSrc}-${retryVersion}`}
           src={validSrc}
           alt={alt}
-          className={`h-full w-full object-cover transition-opacity ${state === "loaded" ? "opacity-100" : "opacity-0"}`}
+          className={`h-full w-full object-contain p-2 transition-opacity ${state === "loaded" ? "opacity-100" : "opacity-0"}`}
           decoding="async"
           loading="lazy"
           onLoad={() => {

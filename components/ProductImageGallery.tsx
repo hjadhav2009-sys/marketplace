@@ -12,6 +12,7 @@ type ProductImageGalleryProps = {
   cacheStatus?: string | null;
   originalImageUrl?: string | null;
   showBadge?: boolean;
+  showInlineThumbnails?: boolean;
 };
 
 function uniqueImages(images: Array<string | null | undefined>) {
@@ -34,7 +35,8 @@ export function ProductImageGallery({
   imageHealth,
   cacheStatus,
   originalImageUrl,
-  showBadge = false
+  showBadge = false,
+  showInlineThumbnails = true
 }: ProductImageGalleryProps) {
   const galleryImages = useMemo(() => uniqueImages([primarySrc, ...images]), [images, primarySrc]);
   const [open, setOpen] = useState(false);
@@ -85,7 +87,7 @@ export function ProductImageGallery({
         />
       </button>
 
-      {galleryImages.length > 1 ? (
+      {showInlineThumbnails && galleryImages.length > 1 ? (
         <div className="flex gap-2 overflow-x-auto border-t border-slate-100 bg-white px-3 py-3">
           {galleryImages.slice(0, 8).map((imageUrl, index) => (
             <button
@@ -96,7 +98,7 @@ export function ProductImageGallery({
               aria-label={`Open product image ${index + 1}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imageUrl} alt={`${alt} thumbnail ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+              <img src={imageUrl} alt={`${alt} thumbnail ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
             </button>
           ))}
         </div>
@@ -153,7 +155,7 @@ export function ProductImageGallery({
                     }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imageUrl} alt={`${alt} thumbnail ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                    <img src={imageUrl} alt={`${alt} thumbnail ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
                   </button>
                 ))}
               </div>

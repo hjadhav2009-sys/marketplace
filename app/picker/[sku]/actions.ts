@@ -68,6 +68,42 @@ export async function markSkuGroupPickedAction(formData: FormData) {
   redirect(`${pickerDetailPath(group.sku, group.color, group.size)}&picked=${result.count > 0 ? "1" : "already"}`);
 }
 
+export async function markSkuGroupPickedInlineAction(formData: FormData) {
+  const user = await requireUser(["OWNER", "PICKER"]);
+  const account = await requireAccount(user);
+  const request = await getRequestMeta();
+  const group = groupWhere(account.id, formData);
+
+  const result = await prisma.order.updateMany({
+    where: {
+      ...group.where,
+      pickStatus: "READY",
+      packStatus: "READY"
+    },
+    data: {
+      pickStatus: "PICKED"
+    }
+  });
+
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "SKU_GROUP_PICKED",
+    entityType: "Order",
+    metadata: {
+      sku: group.sku,
+      color: group.color,
+      size: group.size,
+      updatedRows: result.count,
+      source: "picker-card"
+    },
+    request
+  });
+
+  revalidatePath("/picker");
+  return { ok: true, updatedRows: result.count };
+}
+
 export async function markSkuGroupProblemAction(formData: FormData) {
   const user = await requireUser(["OWNER", "PICKER"]);
   const account = await requireAccount(user);
@@ -144,4 +180,83 @@ export async function markSkuGroupProblemAction(formData: FormData) {
   revalidatePath("/picker");
   revalidatePath("/problems");
   redirect(`${pickerDetailPath(group.sku, group.color, group.size)}&problem=1`);
+}
+
+export async function markSkuGroupProblemInlineAction(formData: FormData) {
+  const user = await requireUser(["OWNER", "PICKER"]);
+  const account = await requireAccount(user);
+  const request = await getRequestMeta();
+  const group = groupWhere(account.id, formData);
+  const reason = String(formData.get("reason") ?? "").trim();
+  const details = String(formData.get("details") ?? "").trim() || undefined;
+
+  if (reason.length < 3) {
+    return { ok: false, error: "Add a clear reason." };
+  }
+
+  const orders = await prisma.order.findMany({
+    where: group.where,
+    select: { id: true, awb: true }
+  });
+
+  if (orders.length === 0) {
+    return { ok: false, error: "No active orders found for this SKU group." };
+  }
+
+  const existingProblems = await prisma.problemOrder.findMany({
+    where: {
+      accountId: account.id,
+      orderId: {
+        in: orders.map((order) => order.id)
+      },
+      status: "OPEN"
+    },
+    select: { orderId: true }
+  });
+  const existingOrderIds = new Set(existingProblems.map((problem) => problem.orderId));
+  const ordersNeedingProblems = orders.filter((order) => !existingOrderIds.has(order.id));
+
+  await prisma.$transaction(async (tx) => {
+    await tx.order.updateMany({
+      where: group.where,
+      data: {
+        status: "PROBLEM",
+        pickStatus: "PROBLEM",
+        packStatus: "PROBLEM"
+      }
+    });
+
+    for (const order of ordersNeedingProblems) {
+      await tx.problemOrder.create({
+        data: {
+          accountId: account.id,
+          orderId: order.id,
+          reason,
+          details,
+          reportedById: user.id
+        }
+      });
+    }
+  });
+
+  await recordAuditLog({
+    userId: user.id,
+    accountId: account.id,
+    action: "PICK_PROBLEM_CREATED",
+    entityType: "Order",
+    metadata: {
+      sku: group.sku,
+      color: group.color,
+      size: group.size,
+      reason,
+      affectedOrders: orders.length,
+      createdProblems: ordersNeedingProblems.length,
+      source: "picker-card"
+    },
+    request
+  });
+
+  revalidatePath("/picker");
+  revalidatePath("/problems");
+  return { ok: true, affectedOrders: orders.length, createdProblems: ordersNeedingProblems.length };
 }

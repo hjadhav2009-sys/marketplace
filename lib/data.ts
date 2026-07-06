@@ -129,9 +129,12 @@ export async function getDashboardStats(accountId: string) {
 export async function getRecentOrders(accountId: string) {
   return prisma.order.findMany({
     where: { accountId },
-    include: {
-      account: true,
-      uploadBatch: true
+    select: {
+      id: true,
+      sku: true,
+      qty: true,
+      courier: true,
+      packStatus: true
     },
     orderBy: { createdAt: "desc" },
     take: 8

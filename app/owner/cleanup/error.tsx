@@ -9,7 +9,7 @@ export default function CleanupError() {
         <p className="text-sm font-semibold uppercase tracking-wide text-rose-700">Cleanup error</p>
         <h1 className="mt-2 text-2xl font-bold text-slate-950">Cleanup tools could not load</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">No data was deleted. Try again after checking the database connection.</p>
-        <Link href="/owner" className="mt-5 inline-flex rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+        <Link href="/dashboard" className="mt-5 inline-flex rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
           Back to dashboard
         </Link>
       </section>

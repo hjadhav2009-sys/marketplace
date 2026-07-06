@@ -1,6 +1,6 @@
 import type { Role, User } from "@prisma/client";
 
-const ownerPrefixes = ["/owner", "/picker", "/packing", "/problems", "/reports", "/accounts", "/change-password"];
+const ownerPrefixes = ["/dashboard", "/owner", "/picker", "/packing", "/problems", "/reports", "/accounts", "/change-password"];
 const pickerPrefixes = ["/picker", "/accounts", "/change-password"];
 const packerPrefixes = ["/packing", "/problems", "/accounts", "/change-password"];
 

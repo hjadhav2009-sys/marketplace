@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
-import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { PickerProductCard } from "@/components/PickerProductCard";
 import { requireAccount, requireUser } from "@/lib/auth";
@@ -113,7 +112,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             className="min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
           />
         </label>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-2">
           {workFilters.map((filter) => (
             <label
               key={filter.value}
@@ -182,17 +181,28 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
       </div>
 
       {groups.length === 0 ? (
-        <EmptyState
-          title={activeFilter === "missing-image" ? "No missing image SKUs" : "No orders"}
-          description={
-            activeFilter === "pending"
+        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 shadow-sm">
+          <h2 className="text-base font-black text-slate-950">
+            {activeFilter === "missing-image" ? "No missing image SKUs" : "No orders"}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+            {activeFilter === "pending"
               ? activeWork === "today"
-                ? "No pending picking groups from today's imports. Use All pending to see older carry-forward orders."
+                ? "No pending picking groups from today's imports."
                 : "No pending picking groups for this account."
-              : "No SKU groups match the current search and filter."
-          }
-          action={user.role === "OWNER" ? { href: "/owner/uploads/new", label: "Upload labels" } : undefined}
-        />
+              : "No SKU groups match the current search and filter."}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2" data-picker-empty-actions>
+            {user.role === "OWNER" ? (
+              <Link prefetch href="/owner/uploads/new" className="rounded-md bg-berry px-4 py-2 text-sm font-bold text-white shadow-sm">
+                Upload today&apos;s orders
+              </Link>
+            ) : null}
+            <Link prefetch href="/picker?work=old-pending&filter=pending" className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-sm">
+              View old pending
+            </Link>
+          </div>
+        </section>
       ) : (
         <section className={`grid gap-4 ${compactMode ? "md:grid-cols-2 xl:grid-cols-3" : largeImageMode ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}`}>
           {groups.map((group) => {

@@ -25,7 +25,7 @@ import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
 import { PDF_UPLOAD_MAX_BYTES } from "@/lib/upload-limits";
-import { flipkartOrderImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
+import { accountSelectionSchema, flipkartOrderImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 
 type PreviewRowDraft = {
   sourceFileName: string;
@@ -58,6 +58,19 @@ type CacheQueueMapping = {
 
 function isUploadFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
+}
+
+async function ownerUploadAccount(formData: FormData, fallbackAccountId: string) {
+  const accountId = String(formData.get("accountId") ?? fallbackAccountId).trim();
+  const parsed = accountSelectionSchema.safeParse({ accountId });
+
+  if (!parsed.success) {
+    return null;
+  }
+
+  return prisma.account.findUnique({
+    where: { id: parsed.data.accountId }
+  });
 }
 
 function hasIssue(row: PreviewRowDraft, issueType: string) {
@@ -606,12 +619,17 @@ export async function repairMissingSkuImageMappingAction(formData: FormData) {
 
 export async function createUploadBatchAction(formData: FormData) {
   const user = await requireUser(["OWNER"]);
-  const account = await requireAccount(user);
+  const selectedAccount = await requireAccount(user);
+  const account = await ownerUploadAccount(formData, selectedAccount.id);
   const request = await getRequestMeta();
   const labelFile = formData.get("labelPdf");
   const manifestFile = formData.get("manifestPdf");
   const labelFileUploaded = isUploadFile(labelFile);
   const files = [labelFile, manifestFile].filter(isUploadFile);
+
+  if (!account) {
+    redirect("/owner/uploads/new?error=account");
+  }
 
   if (files.length === 0) {
     redirect("/owner/uploads/new?error=missing-file");
@@ -839,6 +857,7 @@ export async function createUploadBatchAction(formData: FormData) {
       request
     });
 
+    revalidatePath("/dashboard");
     revalidatePath("/owner");
     redirectTo = `/owner/uploads/${batch.id}/review`;
   } catch (error) {
@@ -911,9 +930,14 @@ export async function createUploadBatchAction(formData: FormData) {
 
 export async function createFlipkartOrderImportAction(formData: FormData) {
   const user = await requireUser(["OWNER"]);
-  const account = await requireAccount(user);
+  const selectedAccount = await requireAccount(user);
+  const account = await ownerUploadAccount(formData, selectedAccount.id);
   const request = await getRequestMeta();
   const file = formData.get("flipkartOrderExcel");
+
+  if (!account) {
+    redirect("/owner/uploads/new?error=account");
+  }
 
   if (!(file instanceof File) || file.size === 0) {
     redirect("/owner/uploads/new?error=missing-flipkart-orders");
@@ -940,6 +964,7 @@ export async function createFlipkartOrderImportAction(formData: FormData) {
     redirect("/owner/uploads/new?error=flipkart-order-import-failed");
   }
 
+  revalidatePath("/dashboard");
   revalidatePath("/owner");
   revalidatePath("/owner/uploads/new");
   redirect(`/owner/imports/${jobId}`);
@@ -1042,6 +1067,7 @@ export async function confirmParsedBatchAction(formData: FormData) {
         redirectTo = `/owner/uploads/${batch.id}/review?imported=1`;
       }
 
+      revalidatePath("/dashboard");
       revalidatePath("/owner");
       revalidatePath(`/owner/uploads/${batch.id}/review`);
     }

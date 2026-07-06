@@ -300,7 +300,7 @@ export async function getAvailableAccounts(user: User) {
 
 export function roleHomePath(role: Role) {
   if (role === "OWNER") {
-    return "/owner";
+    return "/dashboard";
   }
 
   if (role === "PICKER") {

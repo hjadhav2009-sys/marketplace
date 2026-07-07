@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { isIP } from "node:net";
 import path from "node:path";
 import type { User } from "@prisma/client";
 
@@ -10,6 +12,7 @@ export const IMAGE_CACHE_RETENTION_DAYS = 30;
 export const IMAGE_CACHE_MAX_MB = 5000;
 export const IMAGE_CACHE_DOWNLOAD_TIMEOUT_MS = 10_000;
 export const IMAGE_CACHE_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+export const IMAGE_CACHE_MAX_REDIRECTS = 3;
 export const IMAGE_CACHE_MARKETPLACE = "meesho";
 export const IMAGE_CACHE_CONFIRMATION = "DELETE IMAGE CACHE";
 export const ALLOWED_CACHED_IMAGE_FILE_NAMES = new Set(["card.webp", "card.jpg", "card.jpeg", "card.png", "card.avif"]);
@@ -375,40 +378,126 @@ export function isBlockedImageDownloadUrl(value: string) {
 
   const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
 
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0") {
-    return true;
-  }
-
-  if (/^10\./.test(hostname) || /^192\.168\./.test(hostname) || /^169\.254\./.test(hostname)) {
-    return true;
-  }
-
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) {
-    return true;
-  }
-
-  if (/^(fc|fd)[0-9a-f]{2}:/i.test(hostname) || /^fe80:/i.test(hostname)) {
+  if (isPrivateOrLocalHostname(hostname)) {
     return true;
   }
 
   return false;
 }
 
-async function downloadImage(url: string) {
-  if (isBlockedImageDownloadUrl(url)) {
+function isPrivateOrLocalHostname(hostname: string) {
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) {
+    return true;
+  }
+
+  if (hostname === "0.0.0.0") {
+    return true;
+  }
+
+  const ipVersion = isIP(hostname);
+
+  if (ipVersion === 4) {
+    return isPrivateOrLocalIpv4(hostname);
+  }
+
+  if (ipVersion === 6) {
+    return isPrivateOrLocalIpv6(hostname);
+  }
+
+  return false;
+}
+
+function isPrivateOrLocalIpv4(ip: string) {
+  const parts = ip.split(".").map((part) => Number(part));
+
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return true;
+  }
+
+  const [a, b] = parts;
+
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a >= 224
+  );
+}
+
+function isPrivateOrLocalIpv6(ip: string) {
+  const normalized = ip.toLowerCase();
+
+  if (normalized === "::1" || normalized === "::" || normalized.startsWith("fe80:") || /^(fc|fd)[0-9a-f]{2}:/i.test(normalized)) {
+    return true;
+  }
+
+  if (normalized.startsWith("::ffff:")) {
+    return isPrivateOrLocalIpv4(normalized.slice("::ffff:".length));
+  }
+
+  return false;
+}
+
+async function assertImageDownloadUrlAllowed(value: string) {
+  if (isBlockedImageDownloadUrl(value)) {
     throw new Error("Image URL host is not allowed for server-side caching.");
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), IMAGE_CACHE_DOWNLOAD_TIMEOUT_MS);
+  const hostname = new URL(value).hostname.toLowerCase().replace(/^\[|\]$/g, "");
 
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
+  if (isIP(hostname)) {
+    return;
+  }
+
+  const addresses = await lookup(hostname, { all: true, verbatim: true });
+
+  if (addresses.length === 0 || addresses.some((address) => isPrivateOrLocalHostname(address.address.toLowerCase()))) {
+    throw new Error("Image URL host is not allowed for server-side caching.");
+  }
+}
+
+async function fetchImageResponse(url: string, signal: AbortSignal) {
+  let currentUrl = url;
+
+  for (let redirectCount = 0; redirectCount <= IMAGE_CACHE_MAX_REDIRECTS; redirectCount += 1) {
+    await assertImageDownloadUrlAllowed(currentUrl);
+
+    const response = await fetch(currentUrl, {
+      signal,
+      redirect: "manual",
       headers: {
         Accept: "image/avif,image/webp,image/jpeg,image/png,image/*;q=0.8,*/*;q=0.5"
       }
     });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+
+      if (!location) {
+        throw new Error("Image download redirect did not include a location.");
+      }
+
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+
+    await assertImageDownloadUrlAllowed(response.url || currentUrl);
+    return { response, finalUrl: response.url || currentUrl };
+  }
+
+  throw new Error("Image download followed too many redirects.");
+}
+
+async function downloadImage(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), IMAGE_CACHE_DOWNLOAD_TIMEOUT_MS);
+
+  try {
+    const { response, finalUrl } = await fetchImageResponse(url, controller.signal);
 
     if (!response.ok) {
       throw new Error(`Image download failed with HTTP ${response.status}.`);
@@ -420,7 +509,7 @@ async function downloadImage(url: string) {
       throw new Error(`Source image is larger than ${Math.round(IMAGE_CACHE_MAX_SOURCE_BYTES / 1024 / 1024)} MB.`);
     }
 
-    const contentType = inferContentType(url, response.headers.get("content-type"));
+    const contentType = inferContentType(finalUrl, response.headers.get("content-type"));
 
     if (!contentType.startsWith("image/")) {
       throw new Error("URL did not return an image.");

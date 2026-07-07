@@ -24,7 +24,7 @@ import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
-import { PDF_UPLOAD_MAX_BYTES } from "@/lib/upload-limits";
+import { FLIPKART_IMPORT_MAX_BYTES, PDF_UPLOAD_MAX_BYTES, isUploadTooLarge } from "@/lib/upload-limits";
 import { accountSelectionSchema, flipkartOrderImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 
 type PreviewRowDraft = {
@@ -941,6 +941,10 @@ export async function createFlipkartOrderImportAction(formData: FormData) {
 
   if (!(file instanceof File) || file.size === 0) {
     redirect("/owner/uploads/new?error=missing-flipkart-orders");
+  }
+
+  if (isUploadTooLarge(file, FLIPKART_IMPORT_MAX_BYTES)) {
+    redirect("/owner/uploads/new?error=flipkart-file-too-large");
   }
 
   const parsed = flipkartOrderImportFileSchema.safeParse({ filename: file.name });

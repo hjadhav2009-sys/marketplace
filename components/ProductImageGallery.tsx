@@ -107,7 +107,7 @@ export function ProductImageGallery({
       ) : null}
 
       {open ? (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 p-3 text-white sm:p-6" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 bg-slate-950/95 p-3 text-white sm:p-6" role="dialog" aria-modal="true" data-mobile-product-gallery>
           <div className="mx-auto flex h-full max-w-6xl flex-col">
             <div className="flex items-center justify-between gap-3">
               <p className="min-w-0 truncate text-sm font-semibold text-slate-200">
@@ -118,13 +118,13 @@ export function ProductImageGallery({
               </button>
             </div>
 
-            <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_5rem]">
-              <div className="relative flex min-h-0 items-center justify-center rounded-md bg-slate-900">
+            <div className="mt-3 grid min-h-0 flex-1 content-start gap-3 sm:mt-4 lg:grid-cols-[minmax(0,1fr)_5rem] lg:content-stretch">
+              <div className="relative flex aspect-square max-h-[68vh] min-h-0 items-center justify-center rounded-md bg-slate-900 lg:aspect-auto lg:max-h-none">
                 {galleryImages.length > 1 ? (
                   <button
                     type="button"
                     onClick={() => setActiveIndex((index) => (index - 1 + galleryImages.length) % galleryImages.length)}
-                    className="absolute bottom-3 left-3 z-10 rounded-md bg-white/95 px-3 py-3 text-sm font-bold text-slate-950"
+                    className="absolute bottom-3 left-3 z-10 min-h-11 rounded-md bg-white/95 px-4 py-2 text-sm font-bold text-slate-950"
                   >
                     Prev
                   </button>
@@ -139,7 +139,7 @@ export function ProductImageGallery({
                   <button
                     type="button"
                     onClick={() => setActiveIndex((index) => (index + 1) % galleryImages.length)}
-                    className="absolute bottom-3 right-3 z-10 rounded-md bg-white/95 px-3 py-3 text-sm font-bold text-slate-950"
+                    className="absolute bottom-3 right-3 z-10 min-h-11 rounded-md bg-white/95 px-4 py-2 text-sm font-bold text-slate-950"
                   >
                     Next
                   </button>
@@ -147,7 +147,7 @@ export function ProductImageGallery({
               </div>
 
               {galleryImages.length > 1 ? (
-                <div className="flex gap-2 overflow-x-auto pb-1 lg:max-h-full lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
+                <div className="flex gap-2 overflow-x-auto pb-2 lg:max-h-full lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0" data-mobile-gallery-thumbnails>
                   {galleryImages.map((imageUrl, index) => (
                     <button
                       key={`${imageUrl}-${index}`}

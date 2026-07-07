@@ -48,7 +48,7 @@ import { findAwbSearchMatches } from "../lib/operations/awb-search";
 import { canConfirmPacked, selectConfirmPackedOrderIds } from "../lib/operations/packing";
 import { buildPickerSkuGroups, normalizePickerLimit, paginatePickerSkuGroups } from "../lib/operations/picking";
 import { buildWorkQueueOrderWhere, normalizeWorkQueueFilter, orderMatchesWorkQueue, startOfWorkDay } from "../lib/operations/work-queue";
-import { hashPassword } from "../lib/password";
+import { hashPassword, isLegacyPasswordHash, legacySha256PasswordHash, passwordHashNeedsUpgrade, verifyPassword } from "../lib/password";
 import { runProductionChecks, summarizeProductionChecks } from "../lib/production-checks";
 import { normalizeReportStatus, reportDateRange, reportStatusWhere } from "../lib/reports";
 import {
@@ -66,6 +66,7 @@ import { normalizeSkuForMatching } from "../lib/sku";
 import { canDeactivateUser, shouldCloseSessionsAfterPasswordReset, validateWorkerPassword } from "../lib/user-management";
 import { importJobEstimatedRemainingSeconds, importJobPageWindow, IMPORT_JOB_PAGE_SIZE, IMPORT_JOB_PAGE_SIZES } from "../src/lib/import-jobs/progress";
 import { isRetainedImportJobFilePath } from "../src/lib/import-jobs/runner";
+import { FLIPKART_IMPORT_MAX_BYTES, isUploadTooLarge } from "../lib/upload-limits";
 import {
   awbSearchSchema,
   flipkartExcelImportFileSchema,
@@ -78,6 +79,7 @@ import {
 } from "../lib/validators";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const imageCacheSource = readFileSync(join(repoRoot, "lib", "image-cache.ts"), "utf8");
 
 const sampleOrder = {
   awb: "1490834915493571",
@@ -93,6 +95,15 @@ const sampleOrder = {
 };
 
 const authPasswordHash = hashPassword("correct-password");
+const secondPasswordHash = hashPassword("correct-password");
+const legacyPasswordHash = legacySha256PasswordHash("correct-password");
+assert.match(authPasswordHash, /^scrypt\$/, "New password hashes use the salted scrypt format");
+assert.notEqual(authPasswordHash, secondPasswordHash, "New password hashes use random salt");
+assert.equal(verifyPassword("correct-password", authPasswordHash), true, "Scrypt password verification works");
+assert.equal(isLegacyPasswordHash(legacyPasswordHash), true, "Legacy SHA-256 hashes are recognized");
+assert.equal(verifyPassword("correct-password", legacyPasswordHash), true, "Legacy SHA-256 hashes can still log in once");
+assert.equal(passwordHashNeedsUpgrade(legacyPasswordHash), true, "Legacy SHA-256 hashes are marked for upgrade");
+assert.equal(passwordHashNeedsUpgrade(authPasswordHash), false, "Fresh scrypt hashes do not need upgrade");
 assert.equal(normalizeUsername("  PICKER "), "picker", "Username normalization trims and lowercases");
 assert.equal(
   evaluateLoginCredentials({ active: true, lockedUntil: null, mustChangePassword: false, passwordHash: authPasswordHash }, "correct-password"),
@@ -131,6 +142,9 @@ assert.equal(awbSearchSchema.safeParse({ awb: sampleOrder.awb }).success, true, 
 assert.equal(normalizeAwb(" 1490 8349 1549 3571 "), "1490834915493571", "numeric AWB normalizes");
 assert.equal(normalizeAwb("sf3423949467fpl"), "SF3423949467FPL", "Shadowfax AWB normalizes");
 assert.equal(isValidAwb("bad"), false, "bad AWB is rejected");
+assert.equal(isAllowedLocalNetworkIp(undefined, "192.168.0.0/16"), false, "LOCAL_NETWORK_ONLY fails closed when client IP is unavailable");
+assert.equal(isAllowedLocalNetworkIp("127.0.0.1", "192.168.0.0/16"), true, "LOCAL_NETWORK_ONLY allows loopback");
+assert.equal(isAllowedLocalNetworkIp("203.0.113.5", "192.168.0.0/16"), false, "LOCAL_NETWORK_ONLY blocks public IPs outside configured ranges");
 const awbCandidates = [
   {
     id: "o1",
@@ -184,6 +198,8 @@ assert.equal(uploadBatchSchema.safeParse({ filename: "labels.xlsx" }).success, f
 assert.equal(flipkartOrderImportFileSchema.safeParse({ filename: "flipkart-order.csv" }).success, true, "Flipkart order CSV upload should validate");
 assert.equal(flipkartOrderImportFileSchema.safeParse({ filename: "flipkart-order.xlsx" }).success, true, "Flipkart order XLSX upload should validate");
 assert.equal(flipkartOrderImportFileSchema.safeParse({ filename: "flipkart-order.pdf" }).success, false, "Flipkart order non-spreadsheet upload should fail");
+assert.equal(isUploadTooLarge({ size: FLIPKART_IMPORT_MAX_BYTES + 1 }, FLIPKART_IMPORT_MAX_BYTES), true, "Oversized Flipkart imports are rejected before buffering");
+assert.equal(isUploadTooLarge({ size: FLIPKART_IMPORT_MAX_BYTES }, FLIPKART_IMPORT_MAX_BYTES), false, "Flipkart imports at the size limit are accepted");
 assert.equal(flipkartExcelImportFileSchema.safeParse({ filename: "flipkart-listing.csv" }).success, false, "Flipkart Listing Master stays XLSX-only for now");
 assert.equal(
   skuImageMappingSchema.safeParse({
@@ -789,8 +805,14 @@ assert.equal(isAllowedCachedImageFileName("meta.json"), false, "meta.json is not
 assert.equal(isAllowedCachedImageFileName("other.jpg"), false, "Arbitrary cached image files are not served");
 assert.equal(isBlockedImageDownloadUrl("file:///etc/passwd"), true, "Image cache blocks non-http URLs");
 assert.equal(isBlockedImageDownloadUrl("http://localhost/admin"), true, "Image cache blocks localhost URLs");
+assert.equal(isBlockedImageDownloadUrl("http://127.0.0.2/admin"), true, "Image cache blocks all IPv4 loopback addresses");
+assert.equal(isBlockedImageDownloadUrl("http://[::ffff:127.0.0.1]/admin"), true, "Image cache blocks IPv4-mapped IPv6 loopback addresses");
+assert.equal(isBlockedImageDownloadUrl("http://169.254.169.254/latest/meta-data"), true, "Image cache blocks link-local metadata addresses");
 assert.equal(isBlockedImageDownloadUrl("http://192.168.1.1/router"), true, "Image cache blocks private LAN URLs");
 assert.equal(isBlockedImageDownloadUrl("https://images-r.meesho.com/image.jpg"), false, "Image cache allows normal public HTTPS image URLs");
+assert.match(imageCacheSource, /lookup\(hostname, \{ all: true, verbatim: true \}\)/, "Image cache checks DNS answers before server-side download");
+assert.match(imageCacheSource, /redirect: "manual"/, "Image cache does not follow redirects without validation");
+assert.match(imageCacheSource, /IMAGE_CACHE_MAX_REDIRECTS/, "Image cache caps redirect hops");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "card.webp"])?.relativePath, "meesho/a1/SKU1/card.webp", "Valid cache route path parses");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "meta.json"]), null, "Cache route rejects meta.json");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "..", "card.webp"]), null, "Cache route rejects traversal segments");
@@ -1089,12 +1111,14 @@ const workQueueSource = readFileSync(join(repoRoot, "lib", "operations", "work-q
 const ownerAccountsPage = readFileSync(join(repoRoot, "app", "owner", "accounts", "page.tsx"), "utf8");
 const ownerAccountsActions = readFileSync(join(repoRoot, "app", "owner", "accounts", "actions.ts"), "utf8");
 const skuExportRoute = readFileSync(join(repoRoot, "app", "owner", "sku-mappings", "export", "route.ts"), "utf8");
+const skuMappingImportActions = readFileSync(join(repoRoot, "app", "owner", "sku-mappings", "import", "actions.ts"), "utf8");
 const ownerUsersPage = readFileSync(join(repoRoot, "app", "owner", "users", "page.tsx"), "utf8");
 const ownerUsersActions = readFileSync(join(repoRoot, "app", "owner", "users", "actions.ts"), "utf8");
 const forgotPasswordPage = readFileSync(join(repoRoot, "app", "forgot-password", "page.tsx"), "utf8");
 const forgotPasswordActions = readFileSync(join(repoRoot, "app", "forgot-password", "actions.ts"), "utf8");
 const accountSelectionActions = readFileSync(join(repoRoot, "app", "accounts", "actions.ts"), "utf8");
 const loginPage = readFileSync(join(repoRoot, "app", "login", "page.tsx"), "utf8");
+const loginActions = readFileSync(join(repoRoot, "app", "login", "actions.ts"), "utf8");
 const appShell = readFileSync(join(repoRoot, "components", "AppShell.tsx"), "utf8");
 const dataHelpers = readFileSync(join(repoRoot, "lib", "data.ts"), "utf8");
 const authHelpers = readFileSync(join(repoRoot, "lib", "auth.ts"), "utf8");
@@ -1102,6 +1126,7 @@ const changePasswordAction = readFileSync(join(repoRoot, "app", "change-password
 const ownerSystemPage = readFileSync(join(repoRoot, "app", "owner", "system", "page.tsx"), "utf8");
 const systemHealth = readFileSync(join(repoRoot, "lib", "system-health.ts"), "utf8");
 const productionChecksSource = readFileSync(join(repoRoot, "lib", "production-checks.ts"), "utf8");
+const networkSource = readFileSync(join(repoRoot, "lib", "network.ts"), "utf8");
 const windowsProdPs1 = readFileSync(join(repoRoot, "scripts", "windows", "start-local-prod.ps1"), "utf8");
 const windowsLauncher = readFileSync(join(repoRoot, "scripts", "windows", "start-local-prod.mjs"), "utf8");
 const windowsEnvUtils = readFileSync(join(repoRoot, "scripts", "windows", "env-utils.mjs"), "utf8");
@@ -1185,6 +1210,9 @@ assert.match(manualSmokeTestDoc, /duplicate PDF upload|Repeated Imports/i, "Manu
 assert.match(manualSmokeTestDoc, /create a second Meesho account/i, "Manual smoke test covers second account creation");
 assert.match(packageJsonText, /check:production-readiness/, "Package scripts include production readiness check");
 assert.match(middlewareSource, /PUBLIC_PATHS[\s\S]*"\/forgot-password"/, "Forgot password remains a public route in middleware");
+assert.match(middlewareSource, /getSafeClientIp[\s\S]*shouldTrustProxyHeaders/, "Middleware uses trusted-proxy-aware client IP detection");
+assert.match(networkSource, /TRUST_PROXY_HEADERS/, "Forwarded headers are trusted only when explicitly configured");
+assert.match(networkSource, /if \(!normalized\) \{[\s\S]*return false;/, "LOCAL_NETWORK_ONLY fails closed when client IP is unavailable");
 assert.match(nextConfig, /bodySizeLimit:\s*"100mb"/, "Next config allows large local Meesho PDF uploads");
 assert.match(nextConfig, /X-Frame-Options[\s\S]*DENY/, "Next config sets frame protection header");
 assert.match(nextConfig, /X-Content-Type-Options[\s\S]*nosniff/, "Next config sets content-type sniffing protection");
@@ -1198,7 +1226,10 @@ assert.equal(pdfExtractor.includes(".next/server/chunks/pdf.worker.mjs"), false,
 assert.match(pdfExtractor, /pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs/, "PDF extraction preloads the PDF.js worker module explicitly");
 assert.match(pdfExtractor, /PDF text extraction failed before pages could be read\./, "PDF extraction reports startup failures before page reads");
 assert.match(uploadLimits, /PDF_UPLOAD_MAX_BYTES\s*=\s*100 \* 1024 \* 1024/, "Upload action has a 100 MB friendly file-size guard");
+assert.match(uploadLimits, /FLIPKART_IMPORT_MAX_BYTES\s*=\s*100 \* 1024 \* 1024/, "Flipkart imports have a max file-size guard");
 assert.match(uploadActions, /error=too-large/, "Upload action redirects to friendly too-large PDF error");
+assert.match(uploadActions, /isUploadTooLarge\(file, FLIPKART_IMPORT_MAX_BYTES\)/, "Flipkart order import checks file size before retaining");
+assert.match(skuMappingImportActions, /isUploadTooLarge\(file, FLIPKART_IMPORT_MAX_BYTES\)/, "Flipkart Listing Master import checks file size before retaining");
 assert.match(uploadActions, /ownerUploadAccount/, "Upload actions use the chosen seller account instead of a stale account cookie");
 assert.match(uploadActions, /revalidatePath\("\/dashboard"\)/, "Upload actions refresh the dashboard route after imports");
 assert.match(uploadActions, /selectPreviewRowsForImport/, "Confirm import uses centralized label-over-manifest source selection");
@@ -1251,8 +1282,8 @@ assert.match(importJobProgressComponent, /Summary CSV[\s\S]*Summary XLSX[\s\S]*S
 assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");
 assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination");
 assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
-assert.match(pickerPage, /sticky top-\[88px\]/, "Picker filters stay reachable on mobile");
-assert.doesNotMatch(pickerPage, /overflow-x-auto/, "Picker filters avoid unwanted horizontal scrolling");
+assert.match(pickerPage, /data-mobile-picker-filter-pills/, "Picker filters become compact horizontal pills on mobile");
+assert.match(pickerPage, /data-mobile-picker-one-column/, "Picker cards explicitly use one mobile column");
 assert.match(pickerPage, /Upload today&apos;s orders[\s\S]*View old pending/, "Picker empty state has compact practical actions");
 assert.match(pickerPage, /PickerProductCard/, "Picker page renders worker cards through the client card component");
 assert.match(pickerListDataSource, /imageUrl1:\s*true[\s\S]*imageUrl10:\s*true[\s\S]*image1366Url1:\s*true/, "Picker card query includes listing image URLs for gallery");
@@ -1260,6 +1291,7 @@ assert.doesNotMatch(pickerListDataSource, heavyListingFieldsPattern, "Picker lis
 assert.match(pickerProductCardComponent, /ProductImageGallery/, "Picker card image area opens the image gallery");
 assert.match(pickerProductCardComponent, /showInlineThumbnails={false}/, "Picker card keeps the top image area square without inline thumbnail rows");
 assert.match(pickerProductCardComponent, /data-card-actions="3"/, "Picker card keeps worker actions under the four-button maximum");
+assert.match(pickerProductCardComponent, /data-mobile-worker-actions/, "Picker card uses thumb-friendly mobile worker actions");
 assert.match(pickerProductCardComponent, /Details[\s\S]*ProductDetailsDrawer/, "Picker card separates Details from the image gallery");
 assert.doesNotMatch(pickerProductCardComponent, /href=.*picker\/\$\{/, "Picker card image/details controls do not navigate to the SKU page");
 assert.match(productDetailsDrawerComponent, /fetch\(detailsUrl/, "Product details drawer fetches heavy detail data only after opening");
@@ -1290,6 +1322,12 @@ assert.match(uploadActions, /clearMissingImageIssuesForSku/, "Missing image repa
 assert.match(awbScannerComponent, /primarySrc={suggestion.cachedImageUrl}/, "Manual AWB suggestions use cached signed image URL first");
 assert.match(awbScannerComponent, /cacheStatus={suggestion.cacheStatus}/, "Manual AWB suggestions pass cached image status");
 assert.match(awbScannerComponent, /manualAwbRef\.current\?\.focus/, "Packing screen focuses the scan input immediately");
+assert.equal(
+  awbScannerComponent.indexOf("data-mobile-manual-search") < awbScannerComponent.indexOf("data-mobile-scanner-panel"),
+  true,
+  "Packing mobile puts manual Tracking ID search before the scanner"
+);
+assert.match(awbScannerComponent, /<details open[\s\S]*data-mobile-scanner-panel/, "Packing scanner is secondary and collapsible");
 assert.match(awbScannerComponent, /<Link[\s\S]*prefetch/, "Packing search suggestions prefetch scan-result pages");
 assert.match(awbScannerComponent, /directPackAction/, "AWB scanner accepts a direct Pack server action");
 assert.match(awbScannerComponent, /Pack now[\s\S]*Details[\s\S]*Problem/, "Packing search result cards expose Pack, Details, and Problem actions");
@@ -1369,7 +1407,11 @@ assert.doesNotMatch(sourceBetween(appShell, "const pickerLinks", "const packerLi
 assert.doesNotMatch(sourceBetween(appShell, "const packerLinks", "async function logoutAction"), /\/owner/, "Packer navigation does not show owner management links");
 assert.match(appNavComponent, /usePathname/, "Top navigation can style the active route");
 assert.match(appNavComponent, /prefetch/, "Top navigation prefetches common route links");
+assert.match(appNavComponent, /data-mobile-bottom-nav/, "Mobile bottom navigation exists");
+assert.match(appNavComponent, /hidden[\s\S]*sm:flex[\s\S]*data-desktop-nav/, "Desktop nav is hidden on small screens");
 assert.match(appShell, /\/owner\/accounts/, "Owner navigation includes account management");
+assert.match(appShell, /MobileBottomNav/, "App shell renders mobile bottom navigation for workers");
+assert.match(appShell, /data-owner-mobile-menu/, "Owner mobile navigation is tucked behind a compact menu");
 assert.match(appShell, /account\.companyName[\s\S]*account\.marketplace/, "App shell shows selected company and marketplace context");
 assert.match(accountsPage, /AccountSwitcherForm/, "Account switch page uses the grouped marketplace switcher");
 assert.match(accountSwitcherComponent, /Search accounts/, "Switch account UX is searchable");
@@ -1413,6 +1455,15 @@ assert.match(forgotPasswordActions, /passwordResetRequest\.create/, "Forgot pass
 assert.match(forgotPasswordActions, /redirect\("\/forgot-password\?sent=1"\)/, "Forgot password action returns the same public confirmation");
 assert.doesNotMatch(forgotPasswordActions, /invalid_credentials|not-found|unknown user/i, "Forgot password action does not reveal username existence");
 assert.match(loginPage, /Forgot password\?/, "Login page links to password reset request flow");
+assert.doesNotMatch(loginPage, /Seed users|demo1234/, "Login page does not publicly expose demo credentials");
+assert.match(loginPage, /SHOW_DEV_LOGIN_HINTS/, "Any login hint is gated behind explicit local development opt-in");
+assert.doesNotMatch(loginPage, /Account inactive|Too many failed attempts/, "Login page does not reveal inactive or locked account state");
+assert.match(loginActions, /passwordHashNeedsUpgrade[\s\S]*hashPassword\(parsed\.data\.password\)/, "Web login upgrades legacy password hashes after successful login");
+assert.match(loginActions, /metadata: \{ reason: "inactive"/, "Web login still audits inactive login internally");
+assert.doesNotMatch(sourceBetween(loginActions, 'if (loginCheck === "inactive")', 'if (loginCheck === "invalid_credentials")'), /loginRedirectForResult/, "Web login does not publicly redirect to inactive or locked reasons");
+assert.match(mobileLoginRoute, /passwordHashNeedsUpgrade[\s\S]*hashPassword\(parsed\.data\.password\)/, "Mobile login upgrades legacy password hashes after successful login");
+assert.doesNotMatch(mobileLoginRoute, /inactive_user|Too many failed attempts|This user is inactive/, "Mobile login does not reveal inactive or locked account state");
+assert.match(mobileApiHelper, /getSafeClientIp[\s\S]*shouldTrustProxyHeaders/, "Mobile API rate limit metadata uses the safe client IP helper");
 assert.match(accountSelectionActions, /assignedUsers/, "Worker account switch checks assigned accounts");
 assert.match(authHelpers, /assignedUsers/, "Auth available-account helper includes assigned accounts");
 assert.match(windowsLauncher + windowsEnvUtils, /dotenv/, "Windows launcher loads .env with dotenv");
@@ -1426,6 +1477,8 @@ assert.match(productImageComponent, /Use Listing Master or cache today's images/
 assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
 assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
 assert.match(productImageGalleryComponent, /role="dialog"/, "Product image gallery opens as an accessible dialog");
+assert.match(productImageGalleryComponent, /data-mobile-product-gallery/, "Product gallery has mobile-specific modal structure");
+assert.match(productImageGalleryComponent, /data-mobile-gallery-thumbnails/, "Product gallery uses horizontal mobile thumbnails");
 assert.match(productImageGalleryComponent, /lg:grid-cols-\[minmax\(0,1fr\)_5rem\]/, "Product gallery uses desktop side thumbnails");
 assert.match(productImageGalleryComponent, /showInlineThumbnails = true/, "Product image gallery can show thumbnails outside compact cards");
 assert.match(productImageGalleryComponent, /Escape/, "Product image gallery closes with Escape");
@@ -1467,9 +1520,9 @@ assert.match(mobileApiHelper, /NextResponse\.json/, "Mobile API helper returns J
 assert.doesNotMatch(mobileApiHelper, /stack/i, "Mobile API helper does not expose stack traces in errors");
 assert.match(mobileApiHelper, /account_forbidden[\s\S]*getAvailableAccounts|getAvailableAccounts[\s\S]*account_forbidden/, "Mobile account checks authorize against server-side available accounts");
 assert.match(mobileLoginRoute, /evaluateLoginCredentials[\s\S]*createSession[\s\S]*serializeMobileUser/, "Mobile login verifies credentials server-side and returns safe user data");
-assert.match(mobileLoginRoute, /inactive_user/, "Mobile login rejects disabled users");
+assert.match(mobileLoginRoute, /loginCheck === "inactive"[\s\S]*invalid_login/, "Mobile login rejects disabled users without exposing account state");
 assert.match(mobileLoginRoute, /mustChangePassword: loginCheck === "must_change_password"/, "Mobile login returns mustChangePassword clearly");
-assert.doesNotMatch(mobileLoginRoute, /passwordHash|passwordSalt|SESSION_SECRET|DATABASE_URL/, "Mobile login route does not return secrets or password hashes");
+assert.doesNotMatch(sourceBetween(mobileLoginRoute, "return mobileJson", "});\n}"), /passwordHash|passwordSalt|SESSION_SECRET|DATABASE_URL/, "Mobile login response does not return secrets or password hashes");
 assert.match(mobileMeRoute, /serializeMobileUser/, "Mobile me route returns safe user/account data");
 assert.match(mobileLogoutRoute, /clearSession/, "Mobile logout clears server session");
 assert.match(mobilePickerGroupsRoute, /getMobileAccountContext\(request, \["OWNER", "PICKER"\]/, "Mobile picker groups are owner/picker only");

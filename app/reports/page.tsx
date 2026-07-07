@@ -222,7 +222,36 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             <EmptyState title="No report rows" description="Try a wider date range, another account, or a different status filter." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="grid gap-3 p-3 md:hidden" data-mobile-card-list>
+            {report.orders.map((order) => (
+              <article key={order.id} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-all font-mono text-sm font-black text-slate-950">{order.sku}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-600">{order.marketplace} / {order.account.accountDisplayName ?? order.account.name}</p>
+                  </div>
+                  <StatusBadge value={order.packStatus} />
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
+                  <span>Qty {order.qty}</span>
+                  <span>{order.courier ?? "Courier -"}</span>
+                  <span className="font-mono">{maskReportTrackingKey(order)}</span>
+                  <span>{formatDateTime(order.importedAt)}</span>
+                </div>
+                <p className="mt-3 text-sm font-bold">
+                  {report.currentMissingListingIds.has(order.id) ? (
+                    <span className="text-rose-700">Missing listing</span>
+                  ) : report.currentMissingImageIds.has(order.id) ? (
+                    <span className="text-amber-700">Missing image</span>
+                  ) : (
+                    <span className="text-teal-700">Mapped</span>
+                  )}
+                </p>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                 <tr>
@@ -263,6 +292,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
 

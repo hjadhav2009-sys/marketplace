@@ -26,6 +26,8 @@ The future native Android app should connect to the owner PC/server running Mark
 
 Use this only on trusted warehouse Wi-Fi.
 
+If `LOCAL_NETWORK_ONLY=true`, keep `TRUST_PROXY_HEADERS=false` for direct same-Wi-Fi access. Enable `TRUST_PROXY_HEADERS=true` only when a trusted proxy overwrites `X-Forwarded-For` / `X-Real-IP`; do not trust client-supplied forwarding headers.
+
 ## Different Wi-Fi Or Mobile Data
 
 Use a private VPN instead of exposing the database or router port publicly.
@@ -56,6 +58,7 @@ No public domain is required. Supabase is not required for local owner-PC mode.
 - Do not put password hashes, password salt, `SESSION_SECRET`, `.env`, or SQLite files in the Android app.
 - Do not port-forward the router unless the app is properly secured and intentionally exposed.
 - Private VPN access is recommended for phones outside the warehouse Wi-Fi.
+- Prefer Tailscale/ZeroTier private IP access over public router forwarding.
 
 ## Scanner Flow
 

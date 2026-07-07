@@ -42,14 +42,6 @@ export function evaluateLoginCredentials(user: LoginCheckUser | null | undefined
 }
 
 export function loginRedirectForResult(result: Exclude<LoginCheckResult, "allowed">) {
-  if (result === "inactive") {
-    return "/login?inactive=1";
-  }
-
-  if (result === "locked") {
-    return "/login?error=locked";
-  }
-
   if (result === "must_change_password") {
     return "/change-password?required=1";
   }

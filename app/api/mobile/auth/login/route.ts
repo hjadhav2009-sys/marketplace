@@ -1,6 +1,7 @@
 import { createSession } from "@/lib/auth";
 import { evaluateLoginCredentials } from "@/lib/auth-helpers";
 import { recordAuditLog } from "@/lib/audit";
+import { hashPassword, passwordHashNeedsUpgrade } from "@/lib/password";
 import {
   checkMobileRateLimit,
   getMobileRequestMeta,
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
       metadata: { reason: "inactive" },
       request: requestMeta
     });
-    return mobileError("inactive_user", "This user is inactive.", 403);
+    return mobileError("invalid_login", "Invalid username or password.", 401);
   }
 
   if (loginCheck === "locked") {
@@ -100,12 +101,13 @@ export async function POST(request: Request) {
       metadata: { reason: "locked" },
       request: requestMeta
     });
-    return mobileError("locked", "Too many failed attempts. Try again later.", 423);
+    return mobileError("invalid_login", "Invalid username or password.", 401);
   }
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
+      passwordHash: loginCheck === "allowed" && passwordHashNeedsUpgrade(user.passwordHash) ? hashPassword(parsed.data.password) : undefined,
       failedLoginCount: 0,
       lockedUntil: null,
       lastLoginAt: new Date(),

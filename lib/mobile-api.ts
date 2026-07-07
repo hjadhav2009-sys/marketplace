@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Account, Role, User } from "@prisma/client";
 import { getAvailableAccounts, getCurrentSessionState } from "@/lib/auth";
-import { normalizeIp, type RequestMeta } from "@/lib/network";
+import { getSafeClientIp, shouldTrustProxyHeaders, type RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import type { MobileAccount, MobileApiError, MobileUser } from "@/src/lib/mobile-api/types";
 
@@ -52,7 +52,7 @@ export async function readMobileJsonBody(request: Request) {
 
 export function getMobileRequestMeta(request: Request): RequestMeta {
   return {
-    ipAddress: normalizeIp(request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip")),
+    ipAddress: getSafeClientIp(request.headers, { trustProxyHeaders: shouldTrustProxyHeaders() }),
     userAgent: request.headers.get("user-agent") ?? undefined
   };
 }

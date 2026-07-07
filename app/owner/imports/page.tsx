@@ -223,7 +223,61 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
             <EmptyState title="No import jobs found" description="Change the filters or upload Flipkart Listings / Daily Orders to see job progress here." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="grid gap-3 p-3 md:hidden" data-mobile-card-list>
+            {jobs.map((job) => {
+              const progress = importJobProgressPercent(job);
+              const review = reviewHref(job);
+              const issueCount = job.errorRows + job.warningRows + job.missingImageRows + job.missingListingRows;
+
+              return (
+                <article key={job.id} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-black text-slate-950">{importTypeLabel(job.importType)}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">{job.fileName}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-600">{job.marketplace} / {job.account.accountDisplayName ?? job.account.name}</p>
+                    </div>
+                    <StatusBadge value={job.status} />
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs font-bold text-slate-700">
+                      <span>Progress</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-berry" style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
+                    <span>Rows {compactNumber(job.processedRows)} / {compactNumber(job.totalRows)}</span>
+                    <span>Issues {compactNumber(issueCount)}</span>
+                    <span>Created {compactNumber(job.createdRows)}</span>
+                    <span>Duplicates {compactNumber(job.duplicateRows)}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link href={`/owner/imports/${job.id}`} prefetch className="min-h-10 rounded-md bg-slate-950 px-3 py-2 text-xs font-bold text-white">
+                      Open
+                    </Link>
+                    {job.status === "COMPLETED" && review ? (
+                      <Link href={review} prefetch className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
+                        Review
+                      </Link>
+                    ) : null}
+                    {issueCount > 0 && job.batchId ? (
+                      <Link href={`/owner/imports/${job.id}/issues`} prefetch className="min-h-10 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
+                        Issues
+                      </Link>
+                    ) : null}
+                    <Link href={exportHref(job.id, "csv")} className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
+                      CSV
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="min-w-[1500px] divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -325,6 +379,7 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

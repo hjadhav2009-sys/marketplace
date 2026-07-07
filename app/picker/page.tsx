@@ -102,7 +102,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
         </div>
       ) : null}
 
-      <form className="sticky top-[88px] z-20 mb-4 grid gap-2 rounded-md border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur md:top-[106px] md:grid-cols-[1fr_auto] md:p-3">
+      <form className="sticky top-[64px] z-20 mb-3 grid gap-2 rounded-md border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur sm:top-[88px] md:top-[106px] md:grid-cols-[1fr_auto] md:p-3">
         <label className="block">
           <span className="sr-only">Search SKU or product</span>
           <input
@@ -112,7 +112,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
             className="min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
           />
         </label>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:pb-0" data-mobile-picker-filter-pills>
           {workFilters.map((filter) => (
             <label
               key={filter.value}
@@ -159,12 +159,12 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
         </div>
       </form>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+      <div className="mb-3 flex flex-col gap-2 rounded-md border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
         <p className="font-semibold text-slate-700">
           Showing {pagedGroups.visibleCount} of {pagedGroups.total} SKU groups
           {activeWork === "today" ? " from today" : activeWork === "current-batch" && latestBatch ? ` from ${latestBatch.fileName}` : null}
         </p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:overflow-visible sm:pb-0">
           {user.role === "OWNER" ? (
             <Link prefetch href="/owner/old-pending" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-semibold text-amber-900">
               Old pending review
@@ -214,7 +214,7 @@ export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGro
           </div>
         </section>
       ) : (
-        <section className={`grid gap-4 ${compactMode ? "md:grid-cols-2 xl:grid-cols-3" : largeImageMode ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}`}>
+        <section className={`grid grid-cols-1 gap-3 sm:gap-4 ${compactMode ? "md:grid-cols-2 xl:grid-cols-3" : largeImageMode ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"}`} data-mobile-picker-one-column>
           {groups.map((group) => {
             const encodedColor = encodePickerDimension(group.color);
             const encodedSize = encodePickerDimension(group.size);

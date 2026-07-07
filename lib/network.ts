@@ -3,6 +3,15 @@ export type RequestMeta = {
   userAgent?: string;
 };
 
+type HeaderReader = {
+  get(name: string): string | null;
+};
+
+type ClientIpOptions = {
+  directIp?: string | null;
+  trustProxyHeaders?: boolean;
+};
+
 function ipv4ToNumber(ip: string) {
   const parts = ip.split(".").map((part) => Number(part));
 
@@ -35,6 +44,24 @@ export function normalizeIp(ip: string | null | undefined) {
   return firstIp;
 }
 
+export function shouldTrustProxyHeaders(env: NodeJS.ProcessEnv = process.env) {
+  return env["TRUST_PROXY_HEADERS"] === "true";
+}
+
+export function getSafeClientIp(headers: HeaderReader, options: ClientIpOptions = {}) {
+  const directIp = normalizeIp(options.directIp);
+
+  if (directIp) {
+    return directIp;
+  }
+
+  if (!options.trustProxyHeaders) {
+    return undefined;
+  }
+
+  return normalizeIp(headers.get("x-forwarded-for") ?? headers.get("x-real-ip"));
+}
+
 export function isLocalhostIp(ip: string | null | undefined) {
   const normalized = normalizeIp(ip);
   return normalized === "127.0.0.1" || normalized === "localhost";
@@ -57,7 +84,11 @@ export function isIpInCidr(ip: string, cidr: string) {
 export function isAllowedLocalNetworkIp(ip: string | null | undefined, ranges: string) {
   const normalized = normalizeIp(ip);
 
-  if (!normalized || isLocalhostIp(normalized)) {
+  if (!normalized) {
+    return false;
+  }
+
+  if (isLocalhostIp(normalized)) {
     return true;
   }
 

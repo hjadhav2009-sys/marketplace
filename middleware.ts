@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isAllowedLocalNetworkIp, normalizeIp } from "./lib/network";
+import { getSafeClientIp, isAllowedLocalNetworkIp, shouldTrustProxyHeaders } from "./lib/network";
 
 const PUBLIC_PATHS = ["/auth/session-ended", "/forgot-password", "/login", "/network-blocked", "/setup"];
 const STATIC_FILE = /\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest)$/;
@@ -9,7 +9,11 @@ function isPublicPath(pathname: string) {
 }
 
 function getRequestIp(request: NextRequest) {
-  return normalizeIp(request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip"));
+  const directIp = (request as NextRequest & { ip?: string }).ip;
+  return getSafeClientIp(request.headers, {
+    directIp,
+    trustProxyHeaders: shouldTrustProxyHeaders()
+  });
 }
 
 export function middleware(request: NextRequest) {

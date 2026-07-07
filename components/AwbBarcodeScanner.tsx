@@ -294,14 +294,46 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-      <section className="rounded-md border border-slate-200 bg-slate-950 p-4 text-white shadow-sm sm:p-5">
+    <div className="space-y-4" data-packing-mobile-flow>
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm lg:hidden" data-mobile-manual-search>
+        <h2 className="text-lg font-black text-slate-950">Manual Tracking ID / AWB</h2>
+        <p className="mt-1 text-sm leading-5 text-slate-600">Type or paste the barcode value. This is the fastest warehouse fallback.</p>
+        <form action={action} className="mt-4 space-y-3">
+          <label className="block">
+            <span className="sr-only">Tracking ID / AWB</span>
+            <input
+              name="awb"
+              inputMode="text"
+              autoComplete="off"
+              defaultValue={manualAwb}
+              placeholder="FMPC0000000000"
+              className="min-h-14 w-full rounded-md border border-slate-300 px-4 py-3 text-xl font-black uppercase outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              required
+            />
+          </label>
+          <SubmitButton pendingText="Searching..." className="min-h-12 w-full text-base">
+            Find order
+          </SubmitButton>
+        </form>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+      <details open className="rounded-md border border-slate-200 bg-slate-950 p-4 text-white shadow-sm sm:p-5" data-mobile-scanner-panel>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 lg:cursor-default">
+          <span>
+            <span className="block text-lg font-black lg:text-xl">Camera scanner</span>
+            <span className="mt-1 block text-sm leading-5 text-slate-300 lg:text-base">Optional scanner. Manual search stays ready above.</span>
+          </span>
+          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
+            {cameraStateLabel(cameraState)}
+          </span>
+        </summary>
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="hidden lg:block">
             <h2 className="text-xl font-bold sm:text-lg">Camera scanner</h2>
             <p className="mt-1 text-base leading-6 text-slate-300 sm:text-sm">Point the frame at the Tracking ID / AWB barcode on the shipping label.</p>
           </div>
-          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
+          <span className="hidden rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200 lg:inline-flex">
             {cameraStateLabel(cameraState)}
           </span>
         </div>
@@ -318,7 +350,7 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
           </div>
         ) : null}
 
-        <div className="relative mt-4 aspect-[4/3] overflow-hidden rounded-md border border-slate-700 bg-slate-900 sm:aspect-video">
+        <div className="relative mt-4 aspect-[16/10] overflow-hidden rounded-md border border-slate-700 bg-slate-900 lg:aspect-video">
           <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-32 w-64 max-w-[78%] rounded-md border-2 border-white shadow-[0_0_0_999px_rgba(2,6,23,0.45)]">
@@ -350,9 +382,9 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
             Stop
           </button>
         </div>
-      </section>
+      </details>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <section className="hidden rounded-md border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:block">
         <h2 className="text-xl font-bold text-slate-950 sm:text-lg sm:font-semibold">Manual Tracking ID / AWB entry</h2>
         <p className="mt-1 text-base leading-6 text-slate-600 sm:text-sm">Manual search is always available if camera scanning fails.</p>
         <form action={action} className="mt-5 space-y-4">
@@ -463,6 +495,7 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
         <input ref={hiddenAwbRef} type="hidden" name="awb" />
         <input type="hidden" name="source" value="camera" />
       </form>
+      </div>
     </div>
   );
 }

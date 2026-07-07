@@ -8,7 +8,6 @@ type LoginPageProps = {
   searchParams?: Promise<{
     error?: string;
     expired?: string;
-    inactive?: string;
     passwordChanged?: string;
     setup?: string;
   }>;
@@ -23,12 +22,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   const params = await searchParams;
   const hasInvalidError = params?.error === "invalid";
-  const hasLockedError = params?.error === "locked";
   const hasSessionError = params?.error === "session";
   const hasExpiredMessage = params?.expired === "1";
-  const hasInactiveMessage = params?.inactive === "1";
   const hasPasswordChangedMessage = params?.passwordChanged === "1";
   const hasSetupComplete = params?.setup === "1";
+  const showDevHint = process.env.NODE_ENV !== "production" && process.env.SHOW_DEV_LOGIN_HINTS === "true";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4 py-10">
@@ -57,15 +55,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         ) : null}
 
-        {hasInactiveMessage ? (
+        {hasInvalidError || hasSessionError ? (
           <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-            Account inactive. Ask the owner to reactivate this user.
-          </div>
-        ) : null}
-
-        {hasInvalidError || hasLockedError || hasSessionError ? (
-          <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-            {hasLockedError ? "Too many failed attempts. Try again later or ask the owner." : null}
             {hasInvalidError ? "Invalid username or password." : null}
             {hasSessionError ? "Session creation failed. Try again." : null}
           </div>
@@ -90,7 +81,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               type="password"
               autoComplete="current-password"
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
-              placeholder="demo1234"
+              placeholder="Password"
               required
             />
           </label>
@@ -102,12 +93,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Forgot password?
         </Link>
 
-        <div className="mt-6 rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-          Seed users: <span className="font-semibold text-slate-900">owner</span>,{" "}
-          <span className="font-semibold text-slate-900">picker</span>,{" "}
-          <span className="font-semibold text-slate-900">packer</span>. Password:{" "}
-          <span className="font-semibold text-slate-900">demo1234</span>.
-        </div>
+        {showDevHint ? (
+          <div className="mt-6 rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+            Development login hints are enabled locally. Disable <span className="font-semibold text-slate-900">SHOW_DEV_LOGIN_HINTS</span> before sharing this app.
+          </div>
+        ) : null}
       </section>
     </main>
   );

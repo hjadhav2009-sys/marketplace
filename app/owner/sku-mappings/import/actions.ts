@@ -6,6 +6,7 @@ import { importSkuMappingsFromRows } from "@/lib/import/sku-mappings";
 import { parseSpreadsheetRows } from "@/lib/import/files";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
+import { FLIPKART_IMPORT_MAX_BYTES, isUploadTooLarge } from "@/lib/upload-limits";
 import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
 import { accountSelectionSchema, flipkartExcelImportFileSchema, skuImageImportFileSchema } from "@/lib/validators";
 
@@ -29,6 +30,10 @@ export async function importSkuMappingFileAction(formData: FormData) {
 
   if (!fileParsed.success) {
     redirect("/owner/sku-mappings/import?error=file");
+  }
+
+  if (isUploadTooLarge(file, FLIPKART_IMPORT_MAX_BYTES)) {
+    redirect("/owner/sku-mappings/import?error=too-large");
   }
 
   const selectedAccount = await prisma.account.findFirst({

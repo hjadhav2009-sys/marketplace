@@ -189,12 +189,12 @@ export function PickerProductCard({ group, encodedColor, encodedSize, detailsUrl
           </div>
         </div>
 
-        <div className="mt-auto grid grid-cols-3 gap-2" data-card-actions="3">
+        <div className="mt-auto grid grid-cols-2 gap-2 sm:grid-cols-3" data-card-actions="3" data-mobile-worker-actions>
           <button
             type="button"
             onClick={markPicked}
             disabled={isPicking || local.pendingCount === 0 || local.status === "PROBLEM"}
-            className="min-h-12 rounded-md bg-berry px-3 py-2 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="col-span-2 min-h-12 rounded-md bg-berry px-3 py-2 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300 sm:col-span-1"
           >
             {isPicking ? "Picking..." : "Picked"}
           </button>

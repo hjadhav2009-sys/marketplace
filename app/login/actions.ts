@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createSession } from "@/lib/auth";
 import { evaluateLoginCredentials, loginRedirectForResult } from "@/lib/auth-helpers";
 import { recordAuditLog } from "@/lib/audit";
+import { hashPassword, passwordHashNeedsUpgrade } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { loginSchema } from "@/lib/validators";
@@ -48,7 +49,7 @@ export async function loginAction(formData: FormData) {
       metadata: { reason: "inactive", username: parsed.data.username },
       request
     });
-    redirect(loginRedirectForResult(loginCheck));
+    redirect("/login?error=invalid");
   }
 
   if (loginCheck === "locked") {
@@ -61,7 +62,7 @@ export async function loginAction(formData: FormData) {
       metadata: { reason: "locked" },
       request
     });
-    redirect(loginRedirectForResult(loginCheck));
+    redirect("/login?error=invalid");
   }
 
   if (loginCheck === "invalid_credentials") {
@@ -85,12 +86,13 @@ export async function loginAction(formData: FormData) {
       metadata: { reason: lockedUntil ? "locked_after_failures" : "bad_password", failedLoginCount, username: parsed.data.username },
       request
     });
-    redirect(lockedUntil ? "/login?error=locked" : "/login?error=invalid");
+    redirect("/login?error=invalid");
   }
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
+      passwordHash: loginCheck === "allowed" && passwordHashNeedsUpgrade(user.passwordHash) ? hashPassword(parsed.data.password) : undefined,
       failedLoginCount: 0,
       lockedUntil: null,
       lastLoginAt: new Date(),

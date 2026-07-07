@@ -355,7 +355,17 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                 </form>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-md border border-slate-200">
+              <div className="mt-4 grid gap-2 md:hidden" data-mobile-card-list>
+                {user.sessions.map((session) => (
+                  <div key={session.id} className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                    <p className="font-bold text-slate-950">{session.ipAddress ?? "Unknown IP"}</p>
+                    <p className="mt-1 line-clamp-2 text-slate-600">{session.userAgent ?? "Unknown device"}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{formatDateTime(session.lastSeenAt)} / {session.active ? "Active" : "Inactive"}</p>
+                  </div>
+                ))}
+                {user.sessions.length === 0 ? <div className="rounded-md bg-slate-50 p-3 text-center text-sm text-slate-500">No sessions recorded yet.</div> : null}
+              </div>
+              <div className="mt-4 hidden overflow-hidden rounded-md border border-slate-200 md:block">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <tr>

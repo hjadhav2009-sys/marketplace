@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { AppNav } from "@/components/AppNav";
+import { AppNav, MobileBottomNav } from "@/components/AppNav";
 import { clearSession, requireAccount, requireUser, roleHomePath } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { getRequestMeta } from "@/lib/request-context";
@@ -37,6 +37,18 @@ const packerLinks = [
   { href: "/change-password", label: "Password" }
 ];
 
+const pickerMobileLinks = [
+  { href: "/picker", label: "Pick" },
+  { href: "/problems", label: "Problems" },
+  { href: "/accounts", label: "Account" }
+];
+
+const packerMobileLinks = [
+  { href: "/packing", label: "Pack" },
+  { href: "/problems", label: "Problems" },
+  { href: "/accounts", label: "Account" }
+];
+
 async function logoutAction() {
   "use server";
 
@@ -67,12 +79,26 @@ function linksForRole(role: string) {
   return packerLinks;
 }
 
+function mobileLinksForRole(role: string) {
+  if (role === "PICKER") {
+    return pickerMobileLinks;
+  }
+
+  if (role === "PACKER") {
+    return packerMobileLinks;
+  }
+
+  return [];
+}
+
 export async function AppShell({ children, title }: AppShellProps) {
   const user = await requireUser();
   const account = await requireAccount(user);
   const links = linksForRole(user.role);
   const accountName = account.accountDisplayName ?? account.name;
   const accountCode = account.accountCode ?? account.code;
+  const mobileLinks = mobileLinksForRole(user.role);
+  const ownerMobileLinks = ownerLinks.filter((link) => link.href !== "/change-password");
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-950">
@@ -99,8 +125,28 @@ export async function AppShell({ children, title }: AppShellProps) {
             >
               Switch account
             </Link>
+            {user.role === "OWNER" ? (
+              <details className="relative sm:hidden" data-owner-mobile-menu>
+                <summary className="list-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 shadow-sm">
+                  Menu
+                </summary>
+                <div className="absolute right-0 mt-2 grid w-56 gap-1 rounded-md border border-slate-200 bg-white p-2 shadow-xl">
+                  {ownerMobileLinks.map((link) => (
+                    <Link key={link.href} href={link.href} prefetch className="rounded-md px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
+                      {link.label}
+                    </Link>
+                  ))}
+                  <Link href="/accounts" prefetch className="rounded-md px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
+                    Switch account
+                  </Link>
+                  <Link href="/change-password" prefetch className="rounded-md px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
+                    Password
+                  </Link>
+                </div>
+              </details>
+            ) : null}
             <form action={logoutAction}>
-              <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+              <button className="rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:text-sm">
                 Logout
               </button>
             </form>
@@ -108,10 +154,11 @@ export async function AppShell({ children, title }: AppShellProps) {
         </div>
         <AppNav links={links} />
       </header>
-      <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:py-8">
+      <main className="mx-auto max-w-7xl px-3 pb-24 pt-4 sm:px-6 sm:py-6 lg:py-8">
         {title ? <h1 className="mb-5 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{title}</h1> : null}
         {children}
       </main>
+      {mobileLinks.length > 0 ? <MobileBottomNav links={mobileLinks} /> : null}
     </div>
   );
 }

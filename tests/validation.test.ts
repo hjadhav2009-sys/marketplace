@@ -14,7 +14,7 @@ import {
   shouldUseSecureSessionCookie
 } from "../lib/auth-helpers";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
-import { formatCsvValue, rowsToCsv } from "../lib/csv";
+import { escapeCsvFormulaText, formatCsvValue, rowsToCsv } from "../lib/csv";
 import { buildSkuMetadataAutoFillUpdates, planOrderImport } from "../lib/import/orders";
 import { importIssuePageWindow, maskOperationalKey, safeImportIssueContext } from "../lib/import/issues";
 import {
@@ -23,6 +23,7 @@ import {
   cardFileNameForContentType,
   findImageCacheCleanupCandidates,
   imageCacheNeedsRefresh,
+  isBlockedImageDownloadUrl,
   isAllowedCachedImageFileName,
   parseProductImageCacheRoutePath,
   productImageCacheDir,
@@ -786,6 +787,10 @@ assert.equal(cardFileNameForContentType("image/webp"), "card.webp", "WebP cached
 assert.equal(cardFileNameForContentType("image/jpeg"), "card.jpg", "JPEG cached originals use jpg extension");
 assert.equal(isAllowedCachedImageFileName("meta.json"), false, "meta.json is not served by cached image route");
 assert.equal(isAllowedCachedImageFileName("other.jpg"), false, "Arbitrary cached image files are not served");
+assert.equal(isBlockedImageDownloadUrl("file:///etc/passwd"), true, "Image cache blocks non-http URLs");
+assert.equal(isBlockedImageDownloadUrl("http://localhost/admin"), true, "Image cache blocks localhost URLs");
+assert.equal(isBlockedImageDownloadUrl("http://192.168.1.1/router"), true, "Image cache blocks private LAN URLs");
+assert.equal(isBlockedImageDownloadUrl("https://images-r.meesho.com/image.jpg"), false, "Image cache allows normal public HTTPS image URLs");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "card.webp"])?.relativePath, "meesho/a1/SKU1/card.webp", "Valid cache route path parses");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "meta.json"]), null, "Cache route rejects meta.json");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "..", "card.webp"]), null, "Cache route rejects traversal segments");
@@ -954,6 +959,8 @@ try {
 assert.equal(typeof AwbBarcodeScanner, "function", "Scanner component compiles");
 
 assert.equal(formatCsvValue('A "quoted", value'), '"A ""quoted"", value"', "CSV values are safely escaped");
+assert.equal(escapeCsvFormulaText("=1+1"), "'=1+1", "CSV formula text is neutralized");
+assert.equal(formatCsvValue("+SUM(A1:A2)"), "'+SUM(A1:A2)", "CSV export values neutralize spreadsheet formulas");
 assert.equal(rowsToCsv(["sku", "qty"], [["SKU1", 2]]), "sku,qty\nSKU1,2", "CSV rows format");
 
 assert.equal(RETENTION_DAYS.previewRows, 30, "Preview row retention is 30 days");
@@ -1105,6 +1112,7 @@ const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "ut
 const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.prisma"), "utf8");
 const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
 const nextPhaseNotes = readFileSync(join(repoRoot, "NEXT_PHASE_NOTES.md"), "utf8");
+const securityAudit = readFileSync(join(repoRoot, "SECURITY_AUDIT.md"), "utf8");
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -1144,6 +1152,9 @@ assert.match(manualSmokeTestDoc, /duplicate PDF upload|Repeated Imports/i, "Manu
 assert.match(manualSmokeTestDoc, /create a second Meesho account/i, "Manual smoke test covers second account creation");
 assert.match(packageJsonText, /check:production-readiness/, "Package scripts include production readiness check");
 assert.match(nextConfig, /bodySizeLimit:\s*"100mb"/, "Next config allows large local Meesho PDF uploads");
+assert.match(nextConfig, /X-Frame-Options[\s\S]*DENY/, "Next config sets frame protection header");
+assert.match(nextConfig, /X-Content-Type-Options[\s\S]*nosniff/, "Next config sets content-type sniffing protection");
+assert.match(nextConfig, /Content-Security-Policy[\s\S]*frame-ancestors 'none'/, "Next config sets basic CSP frame protections");
 assert.equal(buildScript.indexOf('import "dotenv/config";') < buildScript.indexOf("process.env.DATABASE_URL"), true, "Build loads .env before choosing Prisma schema");
 assert.match(startScript, /check-production-readiness\.mjs/, "Startup runs production readiness preflight");
 assert.match(readinessScript, /AUTO_APPLY_MIGRATIONS/, "Production readiness check supports automatic migration apply opt-in");
@@ -1393,9 +1404,13 @@ assert.match(productionChecksSource, /image-cache/, "Production checks warn when
 assert.match(windowsProdPs1, /start-local-prod\.mjs/, "Windows PowerShell launcher delegates to Node launcher");
 assert.match(localProdEnvExample, /SESSION_COOKIE_SECURE=false/, "Local production env example supports local Wi-Fi HTTP cookies");
 assert.match(prodEnvExample, /SESSION_COOKIE_SECURE=true/, "Production env example uses secure cookies for HTTPS");
-assert.match(nextPhaseNotes, /Password reset workflow/, "Next phase notes document password reset workflow");
-assert.match(nextPhaseNotes, /Picker and packer can switch only assigned active accounts/, "Next phase notes document assigned account access");
-assert.match(nextPhaseNotes, /Phase 8: defensive Security 360 audit/, "Next phase notes recommend security audit next");
+assert.match(nextPhaseNotes, /CSV exports now neutralize spreadsheet formula injection/, "Next phase notes document CSV hardening");
+assert.match(nextPhaseNotes, /Server-side product image caching now rejects/, "Next phase notes document image URL hardening");
+assert.match(nextPhaseNotes, /Run the full Codex Security preflight after Python is available/, "Next phase notes document remaining preflight limitation");
+assert.match(securityAudit, /Route Map[\s\S]*Owner Only[\s\S]*Worker Routes/, "Security audit documents route protection map");
+assert.match(securityAudit, /CSV formula injection risk[\s\S]*Fixed centrally/, "Security audit documents CSV formula fix");
+assert.match(securityAudit, /Server-side image cache could request obvious local\/private URLs[\s\S]*Fixed/, "Security audit documents image URL hardening");
+assert.match(securityAudit, /python` and `py` are not available/, "Security audit documents preflight limitation");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(sqliteSchema, /enum Marketplace[\s\S]*FLIPKART[\s\S]*MEESHO[\s\S]*AMAZON[\s\S]*WOOCOMMERCE[\s\S]*OTHER/, "SQLite schema defines marketplace enum");

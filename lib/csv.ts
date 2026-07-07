@@ -1,11 +1,15 @@
 export type CsvValue = string | number | boolean | Date | null | undefined;
 
+export function escapeCsvFormulaText(text: string) {
+  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+}
+
 export function formatCsvValue(value: CsvValue) {
   if (value === null || value === undefined) {
     return "";
   }
 
-  const text = value instanceof Date ? value.toISOString() : String(value);
+  const text = value instanceof Date ? value.toISOString() : escapeCsvFormulaText(String(value));
   const escaped = text.replace(/"/g, '""');
 
   if (/[",\r\n]/.test(escaped)) {

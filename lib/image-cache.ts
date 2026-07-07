@@ -360,7 +360,45 @@ export function cardFileNameForContentType(contentType: string) {
   return "card.jpg";
 }
 
+export function isBlockedImageDownloadUrl(value: string) {
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    return true;
+  }
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return true;
+  }
+
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0") {
+    return true;
+  }
+
+  if (/^10\./.test(hostname) || /^192\.168\./.test(hostname) || /^169\.254\./.test(hostname)) {
+    return true;
+  }
+
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) {
+    return true;
+  }
+
+  if (/^(fc|fd)[0-9a-f]{2}:/i.test(hostname) || /^fe80:/i.test(hostname)) {
+    return true;
+  }
+
+  return false;
+}
+
 async function downloadImage(url: string) {
+  if (isBlockedImageDownloadUrl(url)) {
+    throw new Error("Image URL host is not allowed for server-side caching.");
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMAGE_CACHE_DOWNLOAD_TIMEOUT_MS);
 

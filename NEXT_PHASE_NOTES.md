@@ -1,45 +1,34 @@
 # Next Phase Notes
 
-## Bugs fixed in Phase 7
+## Bugs fixed in Phase 8
 
-- Worker account access is no longer limited to one legacy `accountId`; users can now have multiple assigned active accounts.
-- Account switching checks both legacy default account and assigned accounts, so workers cannot switch to unassigned accounts.
-- Owner user management now has search, role, active/inactive, and assigned-account filters.
-- Owner user forms show grouped marketplace/account assignment.
-- Password reset requests can be submitted from `/forgot-password` without revealing publicly whether the username exists.
-- Owner can see open reset requests on `/owner/users`, reset the worker password, force next-login password change, or mark the request handled.
-- Password reset actions still hash passwords, clear worker sessions, and never log plaintext passwords.
-- Owner cannot remove the last active owner through role/status changes.
+- CSV exports now neutralize spreadsheet formula injection values.
+- Server-side product image caching now rejects obvious localhost, loopback, link-local, and private-network URLs before fetch.
+- Global security headers were added for framing, MIME sniffing, referrer policy, permissions policy, and base CSP controls.
+- `SECURITY_AUDIT.md` documents route protection, server actions, file/export surfaces, fixes applied, and remaining risks.
 
-## User roles and assignment
+## Security audit summary
 
-- Owner has full access to active accounts.
-- Picker and packer can switch only assigned active accounts.
-- Workers require at least one assigned account when active.
-- `accountId` remains the default selected account for compatibility, while assigned accounts support multi-account workers.
+- Authentication already had password hashing, failed-login lockout, active-user checks, must-change-password redirect, and session invalidation.
+- Authorization now includes multi-account worker assignment from Phase 7.
+- Upload/import retained files remain under ignored `storage/import-jobs`.
+- Product image cache remains under ignored `storage/product-images`.
+- Exports use safe operational fields and now include CSV formula protection.
 
-## Password reset workflow
+## Remaining security risks
 
-- Worker opens `/forgot-password`.
-- Worker submits username.
-- App always shows the same confirmation message.
-- Owner reviews open requests on `/owner/users`.
-- Owner sets a temporary password, forces password change on next login, and the app closes existing worker sessions.
-- Plaintext temporary passwords are never logged or stored.
-
-## Access control UX
-
-- `/owner/users` explains password hashes cannot be viewed.
-- User cards show role, active status, last login, failed-login/lock status, active sessions, and assigned accounts.
-- Account assignment is grouped by marketplace.
+- Add per-IP rate limits for forgot password, exports, scanner/search, and uploads.
+- Consider full CSRF token coverage for sensitive server actions beyond SameSite cookies and server-side auth checks.
+- Expand CSP after testing Next.js runtime script/style requirements.
+- Run the full Codex Security preflight after Python is available in the environment.
+- Run dependency audit regularly during release preparation.
 
 ## Recommended next phase
 
-Phase 8: defensive Security 360 audit and hardening.
+Manual security QA and release hardening:
 
-- Route/action authorization map.
-- Upload/export hardening.
-- CSV formula safety review.
-- Image URL download hardening.
-- Session, CSRF, and security-header review.
-- Secret/private-file scan.
+- Verify Cloudflare Tunnel access rules.
+- Test worker role boundaries in browser.
+- Test forgotten-password request flow.
+- Test CSV exports opening safely in Excel.
+- Test image cache rejects local/private URLs with fake mappings.

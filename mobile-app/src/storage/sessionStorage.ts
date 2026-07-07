@@ -3,7 +3,11 @@ import * as SecureStore from "expo-secure-store";
 const COOKIE_KEY = "marketplace.sessionCookie";
 
 export async function getSessionCookie() {
-  return SecureStore.getItemAsync(COOKIE_KEY);
+  try {
+    return await SecureStore.getItemAsync(COOKIE_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export async function saveSessionCookie(cookie: string | null) {
@@ -11,9 +15,17 @@ export async function saveSessionCookie(cookie: string | null) {
     return;
   }
 
-  await SecureStore.setItemAsync(COOKIE_KEY, cookie);
+  try {
+    await SecureStore.setItemAsync(COOKIE_KEY, cookie);
+  } catch {
+    // The app can still show login again if secure storage is unavailable.
+  }
 }
 
 export async function clearSessionCookie() {
-  await SecureStore.deleteItemAsync(COOKIE_KEY);
+  try {
+    await SecureStore.deleteItemAsync(COOKIE_KEY);
+  } catch {
+    // A reset should not crash the app if device secure storage is unavailable.
+  }
 }

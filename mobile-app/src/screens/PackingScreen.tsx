@@ -7,7 +7,6 @@ import { WorkerButton } from "../components/WorkerButton";
 import type { MobilePackingSearchResult, MobileUser } from "../types/mobile";
 import { ProductDetailsScreen } from "./ProductDetailsScreen";
 import { ProductGalleryScreen } from "./ProductGalleryScreen";
-import { ScannerScreen } from "./ScannerScreen";
 
 export function PackingScreen({ user }: { user: MobileUser }) {
   const inputRef = useRef<TextInput>(null);
@@ -90,6 +89,8 @@ export function PackingScreen({ user }: { user: MobileUser }) {
   }
 
   if (scannerOpen) {
+    const { ScannerScreen } = require("./ScannerScreen") as typeof import("./ScannerScreen");
+
     return (
       <ScannerScreen
         onCancel={() => setScannerOpen(false)}

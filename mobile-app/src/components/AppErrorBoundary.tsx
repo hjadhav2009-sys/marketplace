@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { clearServerUrl } from "../storage/serverStorage";
+import { clearSessionCookie } from "../storage/sessionStorage";
 import { WorkerButton } from "./WorkerButton";
 
 type Props = {
@@ -19,19 +21,31 @@ export class AppErrorBoundary extends Component<Props, State> {
     return { error };
   }
 
+  resetApp = async () => {
+    await Promise.all([clearServerUrl(), clearSessionCookie()]);
+    this.setState({ error: null });
+  };
+
   render() {
     if (this.state.error) {
       return (
         <View style={styles.wrap}>
-          <Text style={styles.title}>App could not start</Text>
-          <Text style={styles.copy}>{this.state.error.message || "Restart Expo Go and try again."}</Text>
+          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={styles.copy}>{safeErrorMessage(this.state.error)}</Text>
           <WorkerButton onPress={() => this.setState({ error: null })} variant="secondary">Try again</WorkerButton>
+          <WorkerButton onPress={this.resetApp} variant="danger">Reset server/session</WorkerButton>
         </View>
       );
     }
 
     return this.props.children;
   }
+}
+
+function safeErrorMessage(error: Error) {
+  const message = error.message || "Restart Expo Go and try again.";
+
+  return message.length > 140 ? `${message.slice(0, 137)}...` : message;
 }
 
 const styles = StyleSheet.create({

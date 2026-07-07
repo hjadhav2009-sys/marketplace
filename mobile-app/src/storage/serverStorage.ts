@@ -12,7 +12,11 @@ export function isValidServerUrl(value: string) {
 }
 
 export async function getServerUrl() {
-  return SecureStore.getItemAsync(SERVER_URL_KEY);
+  try {
+    return await SecureStore.getItemAsync(SERVER_URL_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export async function saveServerUrl(value: string) {
@@ -27,5 +31,9 @@ export async function saveServerUrl(value: string) {
 }
 
 export async function clearServerUrl() {
-  await SecureStore.deleteItemAsync(SERVER_URL_KEY);
+  try {
+    await SecureStore.deleteItemAsync(SERVER_URL_KEY);
+  } catch {
+    // A reset should not crash the app if device secure storage is unavailable.
+  }
 }

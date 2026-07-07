@@ -30,7 +30,14 @@ function RootApp() {
   const [route, setRoute] = useState<AppRoute>({ name: "settings" });
 
   const refreshSession = useCallback(async () => {
-    const savedServerUrl = await getServerUrl();
+    let savedServerUrl: string | null = null;
+
+    try {
+      savedServerUrl = await getServerUrl();
+    } catch {
+      savedServerUrl = null;
+    }
+
     setServerUrl(savedServerUrl);
 
     if (!savedServerUrl) {
@@ -61,7 +68,7 @@ function RootApp() {
   }, [user]);
 
   async function handleLogout() {
-    await clearSessionCookie();
+    await clearSessionCookie().catch(() => undefined);
     setUser(null);
     setRoute({ name: "login" });
   }

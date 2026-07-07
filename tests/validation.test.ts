@@ -1109,6 +1109,8 @@ const windowsCheckEnv = readFileSync(join(repoRoot, "scripts", "windows", "check
 const windowsServerSetupDoc = readFileSync(join(repoRoot, "docs", "windows-server-setup.md"), "utf8");
 const cloudflareSecurityDoc = readFileSync(join(repoRoot, "docs", "cloudflare-tunnel", "security-setup.md"), "utf8");
 const manualSmokeTestDoc = readFileSync(join(repoRoot, "docs", "manual-smoke-test.md"), "utf8");
+const mobileApiPlanDoc = readFileSync(join(repoRoot, "docs", "mobile-native-api-plan.md"), "utf8");
+const mobileLocalConnectionDoc = readFileSync(join(repoRoot, "docs", "mobile-local-connection.md"), "utf8");
 const localProdEnvExample = readFileSync(join(repoRoot, ".env.local.production.example"), "utf8");
 const prodEnvExample = readFileSync(join(repoRoot, ".env.production.example"), "utf8");
 const sqliteSchema = readFileSync(join(repoRoot, "prisma", "schema.prisma"), "utf8");
@@ -1116,6 +1118,20 @@ const postgresSchema = readFileSync(join(repoRoot, "prisma", "schema.postgres.pr
 const gitignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
 const nextPhaseNotes = readFileSync(join(repoRoot, "NEXT_PHASE_NOTES.md"), "utf8");
 const securityAudit = readFileSync(join(repoRoot, "SECURITY_AUDIT.md"), "utf8");
+const mobileApiTypes = readFileSync(join(repoRoot, "src", "lib", "mobile-api", "types.ts"), "utf8");
+const mobileApiHelper = readFileSync(join(repoRoot, "lib", "mobile-api.ts"), "utf8");
+const mobileLoginRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "auth", "login", "route.ts"), "utf8");
+const mobileLogoutRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "auth", "logout", "route.ts"), "utf8");
+const mobileMeRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "me", "route.ts"), "utf8");
+const mobilePickerGroupsRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "picker", "groups", "route.ts"), "utf8");
+const mobilePickerPickedRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "picker", "mark-picked", "route.ts"), "utf8");
+const mobilePickerProblemRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "picker", "problem", "route.ts"), "utf8");
+const mobilePackingSearchRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "packing", "search", "route.ts"), "utf8");
+const mobilePackingConfirmRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "packing", "confirm", "route.ts"), "utf8");
+const mobilePackingProblemRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "packing", "problem", "route.ts"), "utf8");
+const mobileProductImagesRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "products", "[sku]", "images", "route.ts"), "utf8");
+const mobileProductDetailsRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "products", "[sku]", "details", "route.ts"), "utf8");
+const mobileSyncStatusRoute = readFileSync(join(repoRoot, "app", "api", "mobile", "sync", "status", "route.ts"), "utf8");
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -1130,6 +1146,20 @@ function sourceBetween(source: string, start: string, end: string) {
 const pickerListDataSource = sourceBetween(dataHelpers, "export async function getSkuGroups", "export async function getSkuDetail");
 const packingSearchDataSource = sourceBetween(dataHelpers, "export async function searchOrdersByAwbFragment", "export async function getOrderWithImage");
 const heavyListingFieldsPattern = /productHighlights|allSpecifications|description:\s*true/;
+const mobileRouteBundle = [
+  mobileLoginRoute,
+  mobileLogoutRoute,
+  mobileMeRoute,
+  mobilePickerGroupsRoute,
+  mobilePickerPickedRoute,
+  mobilePickerProblemRoute,
+  mobilePackingSearchRoute,
+  mobilePackingConfirmRoute,
+  mobilePackingProblemRoute,
+  mobileProductImagesRoute,
+  mobileProductDetailsRoute,
+  mobileSyncStatusRoute
+].join("\n");
 
 assert.match(
   readme,
@@ -1419,6 +1449,46 @@ assert.match(securityAudit, /Route Map[\s\S]*Owner Only[\s\S]*Worker Routes/, "S
 assert.match(securityAudit, /CSV formula injection risk[\s\S]*Fixed centrally/, "Security audit documents CSV formula fix");
 assert.match(securityAudit, /Server-side image cache could request obvious local\/private URLs[\s\S]*Fixed/, "Security audit documents image URL hardening");
 assert.match(securityAudit, /python` and `py` are not available/, "Security audit documents preflight limitation");
+assert.match(mobileApiPlanDoc, /must never connect directly to SQLite, PostgreSQL, Supabase, or any database host/i, "Mobile API plan forbids direct database access");
+assert.match(mobileApiPlanDoc, /No database password belongs in the Android/i, "Mobile API plan forbids DB passwords in Android");
+assert.match(mobileApiPlanDoc, /Android sends username and password to `POST \/api\/mobile\/auth\/login`[\s\S]*server verifies the password hash/i, "Mobile API plan documents server-side password verification");
+assert.match(mobileApiPlanDoc, /Worker data is scoped by role and assigned account/i, "Mobile API plan documents worker scoping");
+assert.match(mobileApiPlanDoc, /Tailscale or ZeroTier/i, "Mobile API plan recommends private VPN for different Wi-Fi");
+assert.match(mobileApiPlanDoc, /Plain public router port forwarding is not recommended/i, "Mobile API plan warns against public port forwarding");
+assert.match(mobileApiPlanDoc, /Native Android scanner reads the barcode locally[\s\S]*\/api\/mobile\/packing\/search/i, "Mobile API plan documents native scanner search flow");
+assert.match(mobileLocalConnectionDoc, /0\.0\.0\.0[\s\S]*3001[\s\S]*http:\/\/192\.168\.1\.10:3001/i, "Mobile local docs explain same-Wi-Fi owner PC connection");
+assert.match(mobileLocalConnectionDoc, /Tailscale[\s\S]*ZeroTier[\s\S]*http:\/\/100\.x\.y\.z:3001/i, "Mobile local docs explain private VPN connection");
+assert.match(mobileLocalConnectionDoc, /Do not put `DATABASE_URL` in the Android app/i, "Mobile local docs warn against DB URL in Android");
+assert.match(mobileLocalConnectionDoc, /sends only the scanned code to/i, "Mobile local docs explain scanner sends scanned value to API");
+for (const typeName of ["MobileUser", "MobileAccount", "MobilePickerGroup", "MobilePackingSearchResult", "MobileProductImages", "MobileApiError"]) {
+  assert.match(mobileApiTypes, new RegExp(`export type ${typeName}`), `Mobile API safe response type exists: ${typeName}`);
+}
+assert.match(mobileApiHelper, /NextResponse\.json/, "Mobile API helper returns JSON responses");
+assert.doesNotMatch(mobileApiHelper, /stack/i, "Mobile API helper does not expose stack traces in errors");
+assert.match(mobileApiHelper, /account_forbidden[\s\S]*getAvailableAccounts|getAvailableAccounts[\s\S]*account_forbidden/, "Mobile account checks authorize against server-side available accounts");
+assert.match(mobileLoginRoute, /evaluateLoginCredentials[\s\S]*createSession[\s\S]*serializeMobileUser/, "Mobile login verifies credentials server-side and returns safe user data");
+assert.match(mobileLoginRoute, /inactive_user/, "Mobile login rejects disabled users");
+assert.match(mobileLoginRoute, /mustChangePassword: loginCheck === "must_change_password"/, "Mobile login returns mustChangePassword clearly");
+assert.doesNotMatch(mobileLoginRoute, /passwordHash|passwordSalt|SESSION_SECRET|DATABASE_URL/, "Mobile login route does not return secrets or password hashes");
+assert.match(mobileMeRoute, /serializeMobileUser/, "Mobile me route returns safe user/account data");
+assert.match(mobileLogoutRoute, /clearSession/, "Mobile logout clears server session");
+assert.match(mobilePickerGroupsRoute, /getMobileAccountContext\(request, \["OWNER", "PICKER"\]/, "Mobile picker groups are owner/picker only");
+assert.doesNotMatch(mobilePickerGroupsRoute, /productDescription|allSpecifications|description/, "Mobile picker groups omit heavy/private listing fields");
+assert.match(mobilePickerGroupsRoute, /pendingCount[\s\S]*pickedCount[\s\S]*problemCount[\s\S]*mainImageUrl[\s\S]*cacheStatus/, "Mobile picker groups return compact worker fields");
+assert.match(mobilePickerPickedRoute, /pickStatus: "READY"[\s\S]*packStatus: "READY"[\s\S]*pickStatus: "PICKED"/, "Mobile mark-picked updates only ready picker rows");
+assert.match(mobilePickerProblemRoute, /pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"[\s\S]*MOBILE_PICK_PROBLEM_CREATED|MOBILE_PICK_PROBLEM_CREATED[\s\S]*pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"/, "Mobile picker problem marks grouped items problem");
+assert.match(mobilePackingSearchRoute, /getMobileAccountContext\(request, \["OWNER", "PACKER"\]/, "Mobile packing search is owner/packer only");
+assert.equal(mobilePackingSearchRoute.indexOf("trackingId: code") < mobilePackingSearchRoute.indexOf("awb: code"), true, "Mobile packing search checks Tracking ID before AWB");
+assert.match(mobilePackingSearchRoute, /canPack: order\.packStatus === "READY"/, "Mobile packing search exposes pack eligibility");
+assert.doesNotMatch(mobilePackingSearchRoute, /productDescription|allSpecifications|description/, "Mobile packing search returns compact fields only");
+assert.match(mobilePackingConfirmRoute, /buildConfirmPackedOrderWhere[\s\S]*PACKED[\s\S]*skippedCount/, "Mobile packing confirm packs ready scope and reports skipped rows");
+assert.match(mobilePackingConfirmRoute, /MOBILE_ORDER_PACKED/, "Mobile packing confirm writes audit log action");
+assert.match(mobilePackingProblemRoute, /packStatus === "PACKED"[\s\S]*already_packed/, "Mobile packing problem refuses already packed rows");
+assert.match(mobileProductImagesRoute, /buildListingImageGallery[\s\S]*mainImageUrl[\s\S]*gallery/, "Mobile product images route returns safe gallery data");
+assert.doesNotMatch(mobileProductImagesRoute, /description|allSpecifications|productHighlights/, "Mobile product images route excludes heavy listing details");
+assert.match(mobileProductDetailsRoute, /description[\s\S]*allSpecifications/, "Mobile product details route loads heavier listing fields only on details");
+assert.match(mobileSyncStatusRoute, /readyOrders[\s\S]*openProblems[\s\S]*latestImport/, "Mobile sync status is compact and account-scoped");
+assert.doesNotMatch(mobileRouteBundle, /rawData|passwordSalt|SESSION_SECRET|DATABASE_URL/, "Mobile routes do not expose raw private data or secrets");
 assert.match(sqliteSchema, /@@unique\(\[accountId, sku\]\)/, "SQLite schema keeps SKU mappings unique by account and SKU");
 assert.match(postgresSchema, /@@unique\(\[accountId, sku\]\)/, "PostgreSQL schema keeps SKU mappings unique by account and SKU");
 assert.match(sqliteSchema, /enum Marketplace[\s\S]*FLIPKART[\s\S]*MEESHO[\s\S]*AMAZON[\s\S]*WOOCOMMERCE[\s\S]*OTHER/, "SQLite schema defines marketplace enum");

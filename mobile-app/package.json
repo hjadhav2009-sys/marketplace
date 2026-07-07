@@ -18,11 +18,11 @@
     "expo-camera": "^16.0.0",
     "expo-haptics": "^14.0.0",
     "expo-secure-store": "^14.0.0",
-    "react": "^19.0.0",
-    "react-native": "^0.79.0"
+    "react": "19.0.0",
+    "react-native": "0.79.6"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "typescript": "^5.8.0"
+    "@types/react": "19.0.14",
+    "typescript": "5.8.3"
   }
 }

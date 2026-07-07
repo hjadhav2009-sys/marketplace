@@ -5,6 +5,7 @@ import { clearSessionCookie } from "./src/storage/sessionStorage";
 import { getServerUrl } from "./src/storage/serverStorage";
 import type { MobileUser } from "./src/types/mobile";
 import { AccountScreen } from "./src/screens/AccountScreen";
+import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { ServerSettingsScreen } from "./src/screens/ServerSettingsScreen";
@@ -15,6 +16,14 @@ export type AppRoute =
   | { name: "login" };
 
 export default function App() {
+  return (
+    <AppErrorBoundary>
+      <RootApp />
+    </AppErrorBoundary>
+  );
+}
+
+function RootApp() {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [user, setUser] = useState<MobileUser | null>(null);
   const [booting, setBooting] = useState(true);

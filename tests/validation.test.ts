@@ -14,7 +14,7 @@ import {
   shouldUseSecureSessionCookie
 } from "../lib/auth-helpers";
 import { canAccessAccount, canRoleAccessPath } from "../lib/authz";
-import { escapeCsvFormulaText, formatCsvValue, rowsToCsv } from "../lib/csv";
+import { escapeCsvFormulaText, formatCsvValue, rowsToCsv, safeSpreadsheetValue } from "../lib/csv";
 import { buildSkuMetadataAutoFillUpdates, planOrderImport } from "../lib/import/orders";
 import { importIssuePageWindow, maskOperationalKey, safeImportIssueContext } from "../lib/import/issues";
 import {
@@ -961,6 +961,8 @@ assert.equal(typeof AwbBarcodeScanner, "function", "Scanner component compiles")
 assert.equal(formatCsvValue('A "quoted", value'), '"A ""quoted"", value"', "CSV values are safely escaped");
 assert.equal(escapeCsvFormulaText("=1+1"), "'=1+1", "CSV formula text is neutralized");
 assert.equal(formatCsvValue("+SUM(A1:A2)"), "'+SUM(A1:A2)", "CSV export values neutralize spreadsheet formulas");
+assert.equal(safeSpreadsheetValue("-SUM(A1:A2)"), "'-SUM(A1:A2)", "Spreadsheet exports neutralize formula-like values");
+assert.equal(safeSpreadsheetValue(new Date("2026-01-02T03:04:05.000Z")), "2026-01-02T03:04:05.000Z", "Spreadsheet exports serialize dates");
 assert.equal(rowsToCsv(["sku", "qty"], [["SKU1", 2]]), "sku,qty\nSKU1,2", "CSV rows format");
 
 assert.equal(RETENTION_DAYS.previewRows, 30, "Preview row retention is 30 days");
@@ -1035,6 +1037,7 @@ assert.equal(envSummary.sessionCookieSecure, "false", "Launcher/check-env defaul
 
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 const packageJsonText = readFileSync(join(repoRoot, "package.json"), "utf8");
+const middlewareSource = readFileSync(join(repoRoot, "middleware.ts"), "utf8");
 const nextConfig = readFileSync(join(repoRoot, "next.config.ts"), "utf8");
 const buildScript = readFileSync(join(repoRoot, "scripts", "build.mjs"), "utf8");
 const startScript = readFileSync(join(repoRoot, "scripts", "start.mjs"), "utf8");
@@ -1151,6 +1154,7 @@ assert.match(cloudflareSecurityDoc, /SESSION_COOKIE_SECURE=true/, "Cloudflare sa
 assert.match(manualSmokeTestDoc, /duplicate PDF upload|Repeated Imports/i, "Manual smoke test covers duplicate PDF upload");
 assert.match(manualSmokeTestDoc, /create a second Meesho account/i, "Manual smoke test covers second account creation");
 assert.match(packageJsonText, /check:production-readiness/, "Package scripts include production readiness check");
+assert.match(middlewareSource, /PUBLIC_PATHS[\s\S]*"\/forgot-password"/, "Forgot password remains a public route in middleware");
 assert.match(nextConfig, /bodySizeLimit:\s*"100mb"/, "Next config allows large local Meesho PDF uploads");
 assert.match(nextConfig, /X-Frame-Options[\s\S]*DENY/, "Next config sets frame protection header");
 assert.match(nextConfig, /X-Content-Type-Options[\s\S]*nosniff/, "Next config sets content-type sniffing protection");
@@ -1197,6 +1201,7 @@ assert.match(ownerImportsPage, /Open progress[\s\S]*Open review[\s\S]*CSV[\s\S]*
 assert.match(ownerImportsPage, /View issues/, "Import Progress table links to issue drill-down when rows need review");
 assert.match(importJobExportRoute, /jobId[\s\S]*summary[\s\S]*issues/, "Import job export route supports summary and issue exports");
 assert.match(importJobExportRoute, /ExcelJS/, "Import job export route supports XLSX downloads");
+assert.match(importJobExportRoute, /safeSpreadsheetValue/, "Import job XLSX/TXT exports neutralize formula-like values");
 assert.match(importJobExportRoute, /safeImportIssueContext/, "Import job issue exports derive safe SKU and masked operational keys");
 assert.doesNotMatch(sourceBetween(importJobExportRoute, "const headers = [\"rowNumber\"", "return responseFor(format, headers, rows, filenameBase);"), /rawData["']?\s*,/, "Import job issue export headers exclude private raw row data");
 assert.match(importJobDetailPage, /retainedImportJobFileExists/, "Import job detail checks retained source file availability before retry");
@@ -1208,6 +1213,7 @@ assert.match(importIssuesPage, /IMPORT_ISSUE_PAGE_SIZES[\s\S]*issueType[\s\S]*ro
 assert.match(importIssuesPage, /safeImportIssueContext/, "Import issues page uses safe issue context extraction");
 assert.doesNotMatch(importIssuesPage, /Address Line|Buyer name|Ship to name/, "Import issues page does not render private customer fields");
 assert.match(importIssuesExportRoute, /safeImportIssueContext/, "Filtered import issue export uses safe context extraction");
+assert.match(importIssuesExportRoute, /safeSpreadsheetValue/, "Filtered import issue XLSX/TXT exports neutralize formula-like values");
 assert.doesNotMatch(importIssuesExportRoute, /Address Line|Buyer name|Ship to name/, "Filtered import issue export does not include private customer fields");
 assert.match(importJobProgressComponent, /importJobEstimatedRemainingSeconds/, "Import job detail shows estimated remaining time");
 assert.match(importJobProgressComponent, /Live progress refreshes every 1\.5 seconds/, "Import job detail explains polling cadence");
@@ -1279,6 +1285,7 @@ assert.match(reportsHelper, /REPORT_PAGE_SIZE = 25[\s\S]*REPORT_EXPORT_LIMIT = 5
 assert.match(reportsExportRoute, /reportExportTypes/, "Report export route validates export types");
 assert.match(reportsExportRoute, /\"csv\", \"xlsx\", \"txt\"/, "Report exports support CSV, XLSX, and TXT");
 assert.match(reportsExportRoute, /maskReportTrackingKey/, "Report exports mask tracking keys");
+assert.match(reportsExportRoute, /safeSpreadsheetValue/, "Report XLSX/TXT exports neutralize formula-like values");
 assert.doesNotMatch(reportsExportRoute, /Address Line|Buyer name|phone|rawData/i, "Report exports avoid private raw customer data");
 assert.match(problemsPage, /Open \(\{countByStatus\.get\("OPEN"\)/, "Problems page has an open tab");
 assert.match(problemsPage, /Resolved \(\{countByStatus\.get\("RESOLVED"\)/, "Problems page has a resolved tab");
@@ -1325,6 +1332,7 @@ assert.match(productImageRoute, /status: 401/, "Cached image route returns 401 f
 assert.match(productImageRoute, /canUserAccessCachedImage/, "Cached image route enforces account access");
 assert.match(skuExportRoute, /cache_status/, "Full SKU export includes cache status");
 assert.match(skuExportRoute, /product_name[\s\S]*color[\s\S]*size/, "Full SKU export includes auto-filled metadata");
+assert.match(skuExportRoute, /safeSpreadsheetValue/, "SKU mapping XLSX exports neutralize formula-like values");
 assert.match(appShell, /\{ href: "\/dashboard", label: "Dashboard" \}/, "Owner navigation uses /dashboard as the dashboard link");
 assert.match(appShell, /const pickerLinks = \[[\s\S]*\/picker[\s\S]*\/change-password[\s\S]*\]/, "Picker navigation stays worker-only");
 assert.doesNotMatch(sourceBetween(appShell, "const pickerLinks", "const packerLinks"), /\/owner/, "Picker navigation does not show owner management links");

@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { requireAccount, requireUser } from "@/lib/auth";
-import { csvResponse, rowsToCsv, type CsvValue } from "@/lib/csv";
+import { csvResponse, rowsToCsv, safeSpreadsheetValue, type CsvValue } from "@/lib/csv";
 import { prisma } from "@/lib/prisma";
 
 const headers = ["sku", "image_url", "product_name", "color", "size", "cache_status", "image_health", "last_used_at", "updated_at"];
@@ -44,7 +44,7 @@ async function xlsxResponse(rows: CsvValue[][], allAccounts: boolean, kind: stri
 
   worksheet.addRow(headers);
   for (const row of rows) {
-    worksheet.addRow(row.map((value) => (value instanceof Date ? value.toISOString() : value)));
+    worksheet.addRow(row.map(safeSpreadsheetValue));
   }
 
   worksheet.columns.forEach((column) => {

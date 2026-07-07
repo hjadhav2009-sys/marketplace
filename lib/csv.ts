@@ -4,12 +4,28 @@ export function escapeCsvFormulaText(text: string) {
   return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
 }
 
+export function safeSpreadsheetValue(value: CsvValue) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string") {
+    return escapeCsvFormulaText(value);
+  }
+
+  return value;
+}
+
 export function formatCsvValue(value: CsvValue) {
   if (value === null || value === undefined) {
     return "";
   }
 
-  const text = value instanceof Date ? value.toISOString() : escapeCsvFormulaText(String(value));
+  const text = String(safeSpreadsheetValue(value));
   const escaped = text.replace(/"/g, '""');
 
   if (/[",\r\n]/.test(escaped)) {

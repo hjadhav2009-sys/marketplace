@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { requireUser } from "@/lib/auth";
-import { csvResponse, rowsToCsv, type CsvValue } from "@/lib/csv";
+import { csvResponse, rowsToCsv, safeSpreadsheetValue, type CsvValue } from "@/lib/csv";
 import { formatDateTime } from "@/lib/format";
 import { safeImportIssueContext } from "@/lib/import/issues";
 import { prisma } from "@/lib/prisma";
@@ -27,7 +27,7 @@ async function xlsxResponse(headers: string[], rows: CsvValue[][], filename: str
   const worksheet = workbook.addWorksheet("Import job");
   worksheet.addRow(headers);
   for (const row of rows) {
-    worksheet.addRow(row.map((value) => (value instanceof Date ? value.toISOString() : value ?? "")));
+    worksheet.addRow(row.map(safeSpreadsheetValue));
   }
   worksheet.views = [{ state: "frozen", ySplit: 1 }];
   worksheet.columns.forEach((column) => {
@@ -44,7 +44,7 @@ async function xlsxResponse(headers: string[], rows: CsvValue[][], filename: str
 }
 
 function tableText(headers: string[], rows: CsvValue[][]) {
-  return [headers.join("\t"), ...rows.map((row) => row.map((value) => (value instanceof Date ? value.toISOString() : value ?? "")).join("\t"))].join("\n");
+  return [headers.join("\t"), ...rows.map((row) => row.map(safeSpreadsheetValue).join("\t"))].join("\n");
 }
 
 function responseFor(format: string, headers: string[], rows: CsvValue[][], filenameBase: string) {

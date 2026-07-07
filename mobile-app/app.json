@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Marketplace Pick Pack",
+    "slug": "marketplace-pick-pack",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.sullery.marketplacepickpack",
+      "permissions": [
+        "INTERNET",
+        "CAMERA",
+        "VIBRATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
+  }
+}

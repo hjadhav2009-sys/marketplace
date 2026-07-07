@@ -88,27 +88,30 @@ enum Marketplace {
 }
 
 model User {
-  id                 String              @id @default(cuid())
-  username           String              @unique
-  passwordHash       String
-  name               String
-  role               Role
-  active             Boolean             @default(true)
-  mustChangePassword Boolean             @default(false)
-  failedLoginCount   Int                 @default(0)
-  lockedUntil        DateTime?
-  lastLoginAt        DateTime?
-  lastLoginIp        String?
-  lastUserAgent      String?
-  accountId          String?
-  account            Account?            @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  uploadedBatches    UploadBatch[]       @relation("UploadedBatches")
-  scanLogs           ScanLog[]           @relation("UserScanLogs")
-  problemOrders      ProblemOrder[]      @relation("ReportedProblems")
-  sessions           UserDeviceSession[]
-  auditLogs          AuditLog[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                           String                 @id @default(cuid())
+  username                     String                 @unique
+  passwordHash                 String
+  name                         String
+  role                         Role
+  active                       Boolean                @default(true)
+  mustChangePassword           Boolean                @default(false)
+  failedLoginCount             Int                    @default(0)
+  lockedUntil                  DateTime?
+  lastLoginAt                  DateTime?
+  lastLoginIp                  String?
+  lastUserAgent                String?
+  accountId                    String?
+  account                      Account?               @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  assignedAccounts             Account[]              @relation("UserAssignedAccounts")
+  passwordResetRequests        PasswordResetRequest[] @relation("PasswordResetTarget")
+  handledPasswordResetRequests PasswordResetRequest[] @relation("PasswordResetHandler")
+  uploadedBatches              UploadBatch[]          @relation("UploadedBatches")
+  scanLogs                     ScanLog[]              @relation("UserScanLogs")
+  problemOrders                ProblemOrder[]         @relation("ReportedProblems")
+  sessions                     UserDeviceSession[]
+  auditLogs                    AuditLog[]
+  createdAt                    DateTime               @default(now())
+  updatedAt                    DateTime               @updatedAt
 }
 
 model UserDeviceSession {
@@ -123,6 +126,23 @@ model UserDeviceSession {
 
   @@index([userId, active])
   @@index([lastSeenAt])
+}
+
+model PasswordResetRequest {
+  id          String    @id @default(cuid())
+  username    String
+  userId      String?
+  user        User?     @relation("PasswordResetTarget", fields: [userId], references: [id], onDelete: SetNull)
+  status      String    @default("OPEN")
+  handledById String?
+  handledBy   User?     @relation("PasswordResetHandler", fields: [handledById], references: [id], onDelete: SetNull)
+  handledAt   DateTime?
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, status])
 }
 
 model AuditLog {
@@ -155,6 +175,7 @@ model Account {
   active              Boolean              @default(true)
   notes               String?
   users               User[]
+  assignedUsers       User[]               @relation("UserAssignedAccounts")
   skuImageMappings    SkuImageMapping[]
   marketplaceListings MarketplaceListing[]
   uploadBatches       UploadBatch[]

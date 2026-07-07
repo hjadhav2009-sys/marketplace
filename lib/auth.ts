@@ -260,7 +260,13 @@ export async function getSelectedAccount(user?: User | null) {
       where: {
         id: selectedAccountId,
         active: true,
-        users: currentUser.role === "OWNER" ? undefined : { some: { id: currentUser.id } }
+        OR:
+          currentUser.role === "OWNER"
+            ? undefined
+            : [
+                { users: { some: { id: currentUser.id } } },
+                { assignedUsers: { some: { id: currentUser.id } } }
+              ]
       }
     })
   );
@@ -289,15 +295,24 @@ export async function getAvailableAccounts(user: User) {
   }
 
   return retryBusyDatabase(() =>
-    prisma.account.findMany({
-      where: {
-        active: true,
-        users: {
-          some: { id: user.id }
-        }
-      },
-      orderBy: { name: "asc" }
-    })
+      prisma.account.findMany({
+        where: {
+          active: true,
+          OR: [
+            {
+              users: {
+                some: { id: user.id }
+              }
+            },
+            {
+              assignedUsers: {
+                some: { id: user.id }
+              }
+            }
+          ]
+        },
+        orderBy: { name: "asc" }
+      })
   );
 }
 

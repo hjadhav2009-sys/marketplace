@@ -4,6 +4,7 @@ import type { Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAccount, requireUser } from "@/lib/auth";
+import { normalizeUsername } from "@/lib/auth-helpers";
 import { recordAuditLog } from "@/lib/audit";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
@@ -21,15 +22,21 @@ function parseRole(value: FormDataEntryValue | null): Role | null {
 
 function parseUserForm(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const username = String(formData.get("username") ?? "").trim().toLowerCase();
+  const username = normalizeUsername(formData.get("username"));
   const role = parseRole(formData.get("role"));
-  const accountId = String(formData.get("accountId") ?? "").trim() || null;
+  const accountIds = formData
+    .getAll("accountIds")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  const legacyAccountId = String(formData.get("accountId") ?? "").trim();
+  const uniqueAccountIds = [...new Set([...accountIds, legacyAccountId].filter(Boolean))];
+  const active = formData.getAll("active").includes("on");
 
   if (!name || !username || !role || !/^[a-z0-9._-]{3,40}$/.test(username)) {
     return null;
   }
 
-  if (role !== "OWNER" && !accountId) {
+  if (role !== "OWNER" && active && uniqueAccountIds.length === 0) {
     return null;
   }
 
@@ -37,21 +44,44 @@ function parseUserForm(formData: FormData) {
     name,
     username,
     role,
-    accountId
+    active,
+    accountIds: uniqueAccountIds,
+    accountId: uniqueAccountIds[0] ?? null
   };
 }
 
-async function assertAccountExists(accountId: string | null) {
-  if (!accountId) {
+async function assertAccountsExist(accountIds: string[]) {
+  if (accountIds.length === 0) {
     return;
   }
 
-  const account = await prisma.account.findUnique({
-    where: { id: accountId }
+  const count = await prisma.account.count({
+    where: {
+      id: { in: accountIds },
+      active: true
+    }
   });
 
-  if (!account) {
+  if (count !== accountIds.length) {
     redirect("/owner/users?error=account");
+  }
+}
+
+async function assertCanLeaveOwnerRole(target: { id: string; role: Role; active: boolean }, nextRole: Role, nextActive: boolean) {
+  if (target.role !== "OWNER" || (nextRole === "OWNER" && nextActive)) {
+    return;
+  }
+
+  const activeOwners = await prisma.user.count({
+    where: {
+      role: "OWNER",
+      active: true,
+      id: { not: target.id }
+    }
+  });
+
+  if (activeOwners === 0) {
+    redirect("/owner/users?error=last-owner");
   }
 }
 
@@ -72,7 +102,7 @@ export async function createUserAction(formData: FormData) {
     redirect("/owner/users?error=password");
   }
 
-  await assertAccountExists(parsed.accountId);
+  await assertAccountsExist(parsed.accountIds);
 
   let createdUser;
 
@@ -83,8 +113,12 @@ export async function createUserAction(formData: FormData) {
         username: parsed.username,
         role: parsed.role,
         accountId: parsed.accountId,
+        active: parsed.active,
         passwordHash: hashPassword(password),
-        mustChangePassword: true
+        mustChangePassword: true,
+        assignedAccounts: {
+          connect: parsed.accountIds.map((id) => ({ id }))
+        }
       }
     });
   } catch {
@@ -116,7 +150,7 @@ export async function updateUserAction(formData: FormData) {
     redirect("/owner/users?error=invalid");
   }
 
-  await assertAccountExists(parsed.accountId);
+  await assertAccountsExist(parsed.accountIds);
 
   const target = await prisma.user.findUnique({
     where: { id: userId }
@@ -130,6 +164,8 @@ export async function updateUserAction(formData: FormData) {
     redirect("/owner/users?error=self-owner");
   }
 
+  await assertCanLeaveOwnerRole(target, parsed.role, parsed.active);
+
   let updatedUser;
 
   try {
@@ -139,7 +175,11 @@ export async function updateUserAction(formData: FormData) {
         name: parsed.name,
         username: parsed.username,
         role: parsed.role,
-        accountId: parsed.accountId
+        accountId: parsed.accountId,
+        active: parsed.active,
+        assignedAccounts: {
+          set: parsed.accountIds.map((id) => ({ id }))
+        }
       }
     });
   } catch {
@@ -165,6 +205,7 @@ export async function changeUserPasswordAction(formData: FormData) {
   const account = await requireAccount(owner);
   const request = await getRequestMeta();
   const userId = String(formData.get("userId") ?? "");
+  const requestId = String(formData.get("requestId") ?? "");
   const password = String(formData.get("password") ?? "");
   const mustChangePassword = formData.get("mustChangePassword") === "on";
   const passwordResult = validateWorkerPassword(password);
@@ -184,8 +225,8 @@ export async function changeUserPasswordAction(formData: FormData) {
   const sessionsClosed = shouldCloseSessionsAfterPasswordReset(owner.id, user.id);
 
   if (sessionsClosed) {
-    await prisma.$transaction([
-      prisma.user.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: user.id },
         data: {
           passwordHash: hashPassword(password),
@@ -194,8 +235,8 @@ export async function changeUserPasswordAction(formData: FormData) {
           lockedUntil: null,
           active: true
         }
-      }),
-      prisma.userDeviceSession.updateMany({
+      });
+      await tx.userDeviceSession.updateMany({
         where: {
           userId: user.id,
           active: true
@@ -204,17 +245,47 @@ export async function changeUserPasswordAction(formData: FormData) {
           active: false,
           lastSeenAt: new Date()
         }
-      })
-    ]);
+      });
+      if (requestId) {
+        await tx.passwordResetRequest.updateMany({
+          where: {
+            id: requestId,
+            OR: [{ userId: user.id }, { username: user.username }]
+          },
+          data: {
+            status: "HANDLED",
+            handledById: owner.id,
+            handledAt: new Date(),
+            note: "Password reset completed by owner."
+          }
+        });
+      }
+    });
   } else {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: hashPassword(password),
-        mustChangePassword,
-        failedLoginCount: 0,
-        lockedUntil: null,
-        active: true
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: hashPassword(password),
+          mustChangePassword,
+          failedLoginCount: 0,
+          lockedUntil: null,
+          active: true
+        }
+      });
+      if (requestId) {
+        await tx.passwordResetRequest.updateMany({
+          where: {
+            id: requestId,
+            OR: [{ userId: user.id }, { username: user.username }]
+          },
+          data: {
+            status: "HANDLED",
+            handledById: owner.id,
+            handledAt: new Date(),
+            note: "Password reset completed by owner."
+          }
+        });
       }
     });
   }
@@ -225,7 +296,7 @@ export async function changeUserPasswordAction(formData: FormData) {
     action: "OWNER_PASSWORD_RESET",
     entityType: "User",
     entityId: user.id,
-    metadata: { username: user.username, changedByOwner: true, mustChangePassword, sessionsClosed },
+    metadata: { username: user.username, changedByOwner: true, mustChangePassword, sessionsClosed, requestHandled: Boolean(requestId) },
     request
   });
 
@@ -291,6 +362,8 @@ export async function deactivateUserAction(formData: FormData) {
   if (!user) {
     redirect("/owner/users?error=invalid");
   }
+
+  await assertCanLeaveOwnerRole(user, user.role, false);
 
   await prisma.$transaction([
     prisma.user.update({
@@ -392,4 +465,38 @@ export async function closeUserSessionsAction(formData: FormData) {
 
   revalidatePath("/owner/users");
   redirect("/owner/users?sessions=1");
+}
+
+export async function markPasswordResetRequestHandledAction(formData: FormData) {
+  const owner = await requireUser(["OWNER"]);
+  const account = await requireAccount(owner);
+  const request = await getRequestMeta();
+  const requestId = String(formData.get("requestId") ?? "");
+
+  if (!requestId) {
+    redirect("/owner/users?error=invalid");
+  }
+
+  const resetRequest = await prisma.passwordResetRequest.update({
+    where: { id: requestId },
+    data: {
+      status: "HANDLED",
+      handledById: owner.id,
+      handledAt: new Date(),
+      note: "Marked handled by owner."
+    }
+  });
+
+  await recordAuditLog({
+    userId: owner.id,
+    accountId: account.id,
+    action: "PASSWORD_RESET_REQUEST_HANDLED",
+    entityType: "PasswordResetRequest",
+    entityId: resetRequest.id,
+    metadata: { username: resetRequest.username },
+    request
+  });
+
+  revalidatePath("/owner/users");
+  redirect("/owner/users?requestHandled=1");
 }

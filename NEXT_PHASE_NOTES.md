@@ -1,52 +1,45 @@
 # Next Phase Notes
 
-## Bugs fixed in Phase 6
+## Bugs fixed in Phase 7
 
-- Reports no longer rely only on stale import-time missing listing/image warnings.
-- Reports now show both “At import time” and “Current now” missing listing/image counts.
-- Current missing listing/image status is recalculated from the current Listing Master for the selected account/marketplace/date/SKU filters.
-- Reports now support date, account, marketplace, batch, SKU, status, and courier filters.
-- Report tables are paginated and limited instead of rendering huge operational datasets.
-- Reports include safe CSV, XLSX, and TXT downloads through `/reports/export`.
-- Old pending is counted separately and linked to `/owner/old-pending`.
-- Problems now have open/resolved tabs, filters, resolution notes, audit logging, and explicit return-to-ready control.
+- Worker account access is no longer limited to one legacy `accountId`; users can now have multiple assigned active accounts.
+- Account switching checks both legacy default account and assigned accounts, so workers cannot switch to unassigned accounts.
+- Owner user management now has search, role, active/inactive, and assigned-account filters.
+- Owner user forms show grouped marketplace/account assignment.
+- Password reset requests can be submitted from `/forgot-password` without revealing publicly whether the username exists.
+- Owner can see open reset requests on `/owner/users`, reset the worker password, force next-login password change, or mark the request handled.
+- Password reset actions still hash passwords, clear worker sessions, and never log plaintext passwords.
+- Owner cannot remove the last active owner through role/status changes.
 
-## Reports workflow
+## User roles and assignment
 
-- Owner opens `/reports`.
-- Default date filter is today.
-- Filters can narrow by seller account, marketplace, import batch, SKU, status, and courier.
-- Summary cards show total orders, today ready, today picked, today packed, open problems, old pending, current missing listing, current missing image, packed today, and pending today.
-- Tables show daily, SKU, courier, account/marketplace, problem, and recent import summaries.
+- Owner has full access to active accounts.
+- Picker and packer can switch only assigned active accounts.
+- Workers require at least one assigned account when active.
+- `accountId` remains the default selected account for compatibility, while assigned accounts support multi-account workers.
 
-## Current vs import-time missing status
+## Password reset workflow
 
-- “At import time” comes from import job warning counters.
-- “Current now” recalculates against the latest Listing Master.
-- If Listing Master is uploaded after Order Excel, current missing listing/image counts can reduce while import-time warnings remain for audit history.
+- Worker opens `/forgot-password`.
+- Worker submits username.
+- App always shows the same confirmation message.
+- Owner reviews open requests on `/owner/users`.
+- Owner sets a temporary password, forces password change on next login, and the app closes existing worker sessions.
+- Plaintext temporary passwords are never logged or stored.
 
-## Report export safety
+## Access control UX
 
-- CSV, XLSX, and TXT exports are supported.
-- Export types include order summary, packed orders, pending orders, problem orders, old pending, missing listing, missing image, and SKU summary.
-- Exports include operational fields only: marketplace, account, SKU, quantity, status, courier, batch/date, and masked tracking key.
-- Full customer address/phone/raw import row data is not exported from reports.
-- PDF export remains skipped because the app does not currently include a report-PDF generator.
-
-## Problem resolution workflow
-
-- `/problems` supports open/resolved tabs.
-- Owner can resolve with a resolution note.
-- Returning an order to READY is explicit via checkbox.
-- “Keep as problem” records an audit log without deleting or resolving the problem.
-- Resolved problems no longer appear in the Open tab.
+- `/owner/users` explains password hashes cannot be viewed.
+- User cards show role, active status, last login, failed-login/lock status, active sessions, and assigned accounts.
+- Account assignment is grouped by marketplace.
 
 ## Recommended next phase
 
-Phase 7: improve Users, roles, password reset, account assignment, and access control UX.
+Phase 8: defensive Security 360 audit and hardening.
 
-- Owner user-management UI.
-- Worker account assignment UX.
-- Owner password reset and temporary password workflow.
-- Forgot password request flow.
-- Role/account access checks for user management routes.
+- Route/action authorization map.
+- Upload/export hardening.
+- CSV formula safety review.
+- Image URL download hardening.
+- Session, CSRF, and security-header review.
+- Secret/private-file scan.

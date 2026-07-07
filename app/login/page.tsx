@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getCurrentUser } from "@/lib/auth";
 import { loginAction } from "./actions";
@@ -96,6 +97,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
           <SubmitButton pendingText="Signing in...">Sign in</SubmitButton>
         </form>
+
+        <Link href="/forgot-password" className="mt-4 inline-flex text-sm font-semibold text-berry hover:text-pink-800">
+          Forgot password?
+        </Link>
 
         <div className="mt-6 rounded-md bg-slate-50 p-4 text-sm leading-6 text-slate-600">
           Seed users: <span className="font-semibold text-slate-900">owner</span>,{" "}

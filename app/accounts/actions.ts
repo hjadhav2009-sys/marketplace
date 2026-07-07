@@ -19,7 +19,13 @@ export async function selectAccountAction(formData: FormData) {
     where: {
       id: parsed.data.accountId,
       active: true,
-      users: user.role === "OWNER" ? undefined : { some: { id: user.id } }
+      OR:
+        user.role === "OWNER"
+          ? undefined
+          : [
+              { users: { some: { id: user.id } } },
+              { assignedUsers: { some: { id: user.id } } }
+            ]
     }
   });
 

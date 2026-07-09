@@ -63,7 +63,7 @@ function RootApp() {
   }, [refreshSession]);
 
   const accountLabel = useMemo(() => {
-    const account = user?.accounts[0];
+    const account = user?.selectedAccount ?? user?.accounts[0];
     return account ? `${account.marketplace} - ${account.name}` : "No account";
   }, [user]);
 

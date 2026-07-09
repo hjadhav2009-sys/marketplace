@@ -31,6 +31,9 @@ function parseUserForm(formData: FormData) {
   const legacyAccountId = String(formData.get("accountId") ?? "").trim();
   const uniqueAccountIds = [...new Set([...accountIds, legacyAccountId].filter(Boolean))];
   const active = formData.getAll("active").includes("on");
+  const canPick = role === "OWNER" || role === "PICKER" || formData.getAll("canPick").includes("on");
+  const canPack = role === "OWNER" || role === "PACKER" || formData.getAll("canPack").includes("on");
+  const canReportProblem = role === "OWNER" || formData.getAll("canReportProblem").includes("on");
 
   if (!name || !username || !role || !/^[a-z0-9._-]{3,40}$/.test(username)) {
     return null;
@@ -45,6 +48,9 @@ function parseUserForm(formData: FormData) {
     username,
     role,
     active,
+    canPick,
+    canPack,
+    canReportProblem,
     accountIds: uniqueAccountIds,
     accountId: uniqueAccountIds[0] ?? null
   };
@@ -112,6 +118,9 @@ export async function createUserAction(formData: FormData) {
         name: parsed.name,
         username: parsed.username,
         role: parsed.role,
+        canPick: parsed.canPick,
+        canPack: parsed.canPack,
+        canReportProblem: parsed.canReportProblem,
         accountId: parsed.accountId,
         active: parsed.active,
         passwordHash: hashPassword(password),
@@ -175,6 +184,9 @@ export async function updateUserAction(formData: FormData) {
         name: parsed.name,
         username: parsed.username,
         role: parsed.role,
+        canPick: parsed.canPick,
+        canPack: parsed.canPack,
+        canReportProblem: parsed.canReportProblem,
         accountId: parsed.accountId,
         active: parsed.active,
         assignedAccounts: {

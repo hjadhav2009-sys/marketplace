@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { MobilePackingSearchResult, MobilePickerGroup } from "../types/mobile";
+import { mobileTheme } from "../theme/mobileTheme";
 import { StatusPill } from "./StatusPill";
 import { WorkerButton } from "./WorkerButton";
 
@@ -89,25 +90,18 @@ export function PackingProductCard({ item, onImage, onDetails, onPack, onProblem
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 18,
-    borderWidth: 1,
+    ...mobileTheme.card,
     overflow: "hidden"
   },
   imageWrap: {
-    alignItems: "center",
-    aspectRatio: 1,
-    backgroundColor: "#f8fafc",
-    justifyContent: "center",
-    width: "100%"
+    ...mobileTheme.imageSquare
   },
   image: {
     height: "92%",
     width: "92%"
   },
   noImage: {
-    color: "#64748b",
+    color: mobileTheme.colors.textMuted,
     fontSize: 15,
     fontWeight: "800"
   },
@@ -122,18 +116,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   sku: {
-    color: "#0f172a",
+    color: mobileTheme.colors.text,
     flex: 1,
     fontSize: 19,
     fontWeight: "900"
   },
   title: {
-    color: "#334155",
+    color: mobileTheme.colors.textSubtle,
     fontSize: 15,
     lineHeight: 21
   },
   meta: {
-    color: "#64748b",
+    color: mobileTheme.colors.textMuted,
     fontSize: 13,
     fontWeight: "700"
   },

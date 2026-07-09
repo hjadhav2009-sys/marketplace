@@ -95,6 +95,9 @@ model User {
   name                         String
   role                         Role
   active                       Boolean                @default(true)
+  canPick                      Boolean                @default(false)
+  canPack                      Boolean                @default(false)
+  canReportProblem             Boolean                @default(true)
   mustChangePassword           Boolean                @default(false)
   failedLoginCount             Int                    @default(0)
   lockedUntil                  DateTime?

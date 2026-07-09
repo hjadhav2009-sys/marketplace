@@ -1,5 +1,6 @@
 import { cachedProductImageUrl } from "@/lib/image-cache";
 import { getMobileAccountContext, mobileError, mobileJson } from "@/lib/mobile-api";
+import { startMobileTiming } from "@/lib/mobile-timing";
 import { buildListingImageGallery } from "@/lib/product-image";
 import { prisma } from "@/lib/prisma";
 import { normalizeSkuForMatching } from "@/lib/sku";
@@ -9,9 +10,11 @@ type RouteContext = {
 };
 
 export async function GET(request: Request, context: RouteContext) {
+  const done = startMobileTiming("/api/mobile/products/[sku]/details");
   const mobileContext = await getMobileAccountContext(request, ["OWNER", "PICKER", "PACKER"]);
 
   if (!mobileContext.ok) {
+    done({ status: 403 });
     return mobileContext.response;
   }
 
@@ -19,6 +22,7 @@ export async function GET(request: Request, context: RouteContext) {
   const decodedSku = decodeURIComponent(sku).trim();
 
   if (!decodedSku) {
+    done({ status: 400 });
     return mobileError("invalid_sku", "SKU is required.", 400);
   }
 
@@ -95,11 +99,13 @@ export async function GET(request: Request, context: RouteContext) {
   ]);
 
   if (!mapping && !listing) {
+    done({ status: 404 });
     return mobileError("not_found", "No product data found for this SKU.", 404);
   }
 
   const mainImageUrl = (mapping ? cachedProductImageUrl(mapping) : null) ?? listing?.mainImageUrl ?? mapping?.imageUrl ?? null;
 
+  done({ status: 200, images: buildListingImageGallery(listing, mainImageUrl).length });
   return mobileJson({
     ok: true,
     product: {

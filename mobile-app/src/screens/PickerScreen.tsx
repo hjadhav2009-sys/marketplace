@@ -8,6 +8,9 @@ import { WorkerButton } from "../components/WorkerButton";
 import type { MobilePickerGroup, MobileUser } from "../types/mobile";
 import { ProductGalleryScreen } from "./ProductGalleryScreen";
 import { ProductDetailsScreen } from "./ProductDetailsScreen";
+import { EmptyState } from "../components/EmptyState";
+
+let cachedPickerGroups: { at: number; groups: MobilePickerGroup[] } | null = null;
 
 export function PickerScreen({ user }: { user: MobileUser }) {
   const [items, setItems] = useState<MobilePickerGroup[]>([]);
@@ -24,7 +27,13 @@ export function PickerScreen({ user }: { user: MobileUser }) {
     setError(null);
 
     try {
+      if (cachedPickerGroups && Date.now() - cachedPickerGroups.at < 15_000) {
+        setItems(cachedPickerGroups.groups);
+        setLoading(false);
+      }
+
       const response = await getPickerGroups();
+      cachedPickerGroups = { at: Date.now(), groups: response.groups };
       setItems(response.groups);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Picker data failed to load.");
@@ -39,11 +48,23 @@ export function PickerScreen({ user }: { user: MobileUser }) {
 
   async function submitPicked(item: MobilePickerGroup) {
     setBusySku(item.sku);
+    const previousItems = items;
+    const key = `${item.sku}:${item.color ?? ""}:${item.size ?? ""}`;
+    const nextItems = previousItems
+      .map((candidate) =>
+        `${candidate.sku}:${candidate.color ?? ""}:${candidate.size ?? ""}` === key
+          ? { ...candidate, pendingCount: Math.max(0, candidate.pendingCount - 1), pickedCount: candidate.pickedCount + 1 }
+          : candidate
+      )
+      .filter((candidate) => candidate.pendingCount > 0);
+    setItems(nextItems);
 
     try {
       await markPicked({ sku: item.sku, color: item.color, size: item.size });
+      cachedPickerGroups = null;
       await load();
     } catch (err) {
+      setItems(previousItems);
       setError(err instanceof Error ? err.message : "Could not mark picked.");
     } finally {
       setBusySku(null);
@@ -89,10 +110,7 @@ export function PickerScreen({ user }: { user: MobileUser }) {
       {loading ? <LoadingState label="Loading pick work..." /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
       {!loading && !error && items.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No pick work ready</Text>
-          <Text style={styles.emptyText}>Ask owner to upload today's orders or switch account on web.</Text>
-        </View>
+        <EmptyState title="No pick work ready" message="Ask owner to upload today's orders or switch account on web." actionLabel="Refresh" onAction={load} />
       ) : null}
       <FlatList
         contentContainerStyle={styles.list}
@@ -158,23 +176,6 @@ const styles = StyleSheet.create({
   list: {
     gap: 14,
     paddingBottom: 18
-  },
-  empty: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16
-  },
-  emptyTitle: {
-    color: "#0f172a",
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  emptyText: {
-    color: "#64748b",
-    fontSize: 14,
-    marginTop: 6
   },
   modalShade: {
     backgroundColor: "rgba(15,23,42,0.45)",

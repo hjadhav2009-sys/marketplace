@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { mobileTheme } from "../theme/mobileTheme";
 
 type Props = {
   label: string;
@@ -15,25 +16,25 @@ export function StatusPill({ label, tone = "neutral" }: Props) {
 
 const styles = StyleSheet.create({
   pill: {
-    borderRadius: 999,
+    borderRadius: mobileTheme.radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 5
   },
   neutral: {
-    backgroundColor: "#e2e8f0"
+    backgroundColor: mobileTheme.colors.border
   },
   good: {
-    backgroundColor: "#dcfce7"
+    backgroundColor: mobileTheme.colors.success
   },
   warn: {
-    backgroundColor: "#fef3c7"
+    backgroundColor: mobileTheme.colors.warning
   },
   bad: {
-    backgroundColor: "#fee2e2"
+    backgroundColor: mobileTheme.colors.danger
   },
   text: {
-    color: "#0f172a",
-    fontSize: 12,
+    color: mobileTheme.colors.text,
+    fontSize: mobileTheme.font.tiny,
     fontWeight: "800"
   }
 });

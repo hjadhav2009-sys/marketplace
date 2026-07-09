@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Account, Role, User } from "@prisma/client";
 import { getAvailableAccounts, getCurrentSessionState } from "@/lib/auth";
+import { getMobilePermissions, getMobileTabs, type MobilePermissionSet } from "@/lib/mobile-permissions";
 import { getSafeClientIp, shouldTrustProxyHeaders, type RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import type { MobileAccount, MobileApiError, MobileUser } from "@/src/lib/mobile-api/types";
@@ -90,6 +91,8 @@ export function serializeMobileAccount(account: Account): MobileAccount {
 
 export async function serializeMobileUser(user: User): Promise<MobileUser> {
   const accounts = await getAvailableAccounts(user);
+  const permissions = getMobilePermissions(user);
+  const selectedAccount = accounts.find((account) => account.id === user.accountId) ?? accounts[0] ?? null;
 
   return {
     id: user.id,
@@ -97,8 +100,27 @@ export async function serializeMobileUser(user: User): Promise<MobileUser> {
     name: user.name,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
+    permissions,
+    tabs: getMobileTabs(user.role, permissions),
+    selectedAccount: selectedAccount ? serializeMobileAccount(selectedAccount) : null,
     accounts: accounts.map(serializeMobileAccount)
   };
+}
+
+function roleAllowsPermission(role: Role, permission: keyof MobilePermissionSet) {
+  if (role === "OWNER") {
+    return true;
+  }
+
+  if (role === "PICKER") {
+    return permission === "canPick" || permission === "canReportProblem" || permission === "canViewAssignedProblems";
+  }
+
+  if (role === "PACKER") {
+    return permission === "canPack" || permission === "canReportProblem" || permission === "canViewAssignedProblems";
+  }
+
+  return false;
 }
 
 export async function getMobileUser(roles?: Role[]) {
@@ -154,6 +176,33 @@ export async function getMobileAccountContext(request: Request, roles: Role[], a
 
   if (!auth.ok) {
     return auth;
+  }
+
+  const selectedAccountId = accountId ?? new URL(request.url).searchParams.get("accountId");
+  const account = await resolveMobileAccount(auth.user, selectedAccountId);
+
+  if (!account.ok) {
+    return account;
+  }
+
+  return {
+    ok: true as const,
+    user: auth.user,
+    account: account.account
+  };
+}
+
+export async function getMobilePermissionAccountContext(request: Request, permission: keyof MobilePermissionSet, accountId?: unknown) {
+  const auth = await getMobileUser();
+
+  if (!auth.ok) {
+    return auth;
+  }
+
+  const permissions = getMobilePermissions(auth.user);
+
+  if (!permissions[permission] && !roleAllowsPermission(auth.user.role, permission)) {
+    return { ok: false as const, response: mobileError("forbidden", "This mobile action is not allowed for your permissions.", 403) };
   }
 
   const selectedAccountId = accountId ?? new URL(request.url).searchParams.get("accountId");

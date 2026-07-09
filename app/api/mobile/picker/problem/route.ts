@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { recordAuditLog } from "@/lib/audit";
 import { decodePickerDimension } from "@/lib/operations/picking";
 import {
-  getMobileAccountContext,
+  getMobilePermissionAccountContext,
   getMobileRequestMeta,
   mobileError,
   mobileJson,
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return body.response;
   }
 
-  const context = await getMobileAccountContext(request, ["OWNER", "PICKER"], body.data.accountId);
+  const context = await getMobilePermissionAccountContext(request, "canReportProblem", body.data.accountId);
 
   if (!context.ok) {
     return context.response;

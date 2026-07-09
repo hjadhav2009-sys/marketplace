@@ -3,24 +3,28 @@ import { normalizeAwb } from "@/lib/awb";
 import { recordAuditLog } from "@/lib/audit";
 import { buildConfirmPackedOrderWhere } from "@/lib/operations/packing";
 import {
-  getMobileAccountContext,
+  getMobilePermissionAccountContext,
   getMobileRequestMeta,
   mobileError,
   mobileJson,
   readMobileJsonBody
 } from "@/lib/mobile-api";
+import { startMobileTiming } from "@/lib/mobile-timing";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
+  const done = startMobileTiming("/api/mobile/packing/confirm");
   const body = await readMobileJsonBody(request);
 
   if (!body.ok) {
+    done({ status: 400 });
     return body.response;
   }
 
-  const context = await getMobileAccountContext(request, ["OWNER", "PACKER"], body.data.accountId);
+  const context = await getMobilePermissionAccountContext(request, "canPack", body.data.accountId);
 
   if (!context.ok) {
+    done({ status: 403 });
     return context.response;
   }
 
@@ -44,6 +48,7 @@ export async function POST(request: Request) {
       : null;
 
   if (!target) {
+    done({ status: 404 });
     return mobileError("not_found", "No order found for packing.", 404);
   }
 
@@ -115,5 +120,6 @@ export async function POST(request: Request) {
 
   revalidatePath("/packing");
   revalidatePath("/picker");
+  done({ status: 200, packed: result.packedCount, skipped: result.skippedCount });
   return mobileJson({ ok: true, ...result });
 }

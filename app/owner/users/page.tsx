@@ -140,6 +140,9 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
           <div className="xl:col-span-2">
             <AccountChecklist accounts={accounts} selectedIds={accounts[0]?.id ? [accounts[0].id] : []} />
           </div>
+          <div className="md:col-span-2 xl:col-span-5">
+            <WorkerPermissionChecklist canPick canPack={false} canReportProblem />
+          </div>
           <TextField name="password" label="Temporary password" type="password" placeholder="At least 8 characters" />
           <label className="flex items-center gap-2 rounded-md bg-slate-50 p-3 text-sm font-semibold text-slate-700">
             <input name="active" type="checkbox" value="on" defaultChecked className="h-4 w-4 rounded border-slate-300" />
@@ -327,6 +330,13 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                       Active user
                     </label>
                     <div className="md:col-span-2">
+                      <WorkerPermissionChecklist
+                        canPick={user.role === "OWNER" || user.role === "PICKER" || user.canPick}
+                        canPack={user.role === "OWNER" || user.role === "PACKER" || user.canPack}
+                        canReportProblem={user.role === "OWNER" || user.canReportProblem}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
                       <AccountChecklist accounts={accounts} selectedIds={user.assignedAccounts.map((assigned) => assigned.id)} />
                     </div>
                   </div>
@@ -472,6 +482,37 @@ function AccountChecklist({
           </div>
         ))}
       </div>
+    </fieldset>
+  );
+}
+
+function WorkerPermissionChecklist({
+  canPick,
+  canPack,
+  canReportProblem
+}: {
+  canPick: boolean;
+  canPack: boolean;
+  canReportProblem: boolean;
+}) {
+  return (
+    <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-3">
+      <legend className="px-1 text-sm font-bold text-slate-700">Worker permissions</legend>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <input name="canPick" type="checkbox" defaultChecked={canPick} className="h-4 w-4 rounded border-slate-300" />
+          Pick orders
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <input name="canPack" type="checkbox" defaultChecked={canPack} className="h-4 w-4 rounded border-slate-300" />
+          Pack / scan AWB
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <input name="canReportProblem" type="checkbox" defaultChecked={canReportProblem} className="h-4 w-4 rounded border-slate-300" />
+          Report problems
+        </label>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Tick both Pick and Pack for a multi-role worker. Owner role always has full access.</p>
     </fieldset>
   );
 }

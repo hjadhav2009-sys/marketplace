@@ -1,11 +1,14 @@
 import { getSkuGroups } from "@/lib/data";
-import { getMobileAccountContext, mobileJson } from "@/lib/mobile-api";
+import { getMobilePermissionAccountContext, mobileJson } from "@/lib/mobile-api";
+import { startMobileTiming } from "@/lib/mobile-timing";
 import type { MobilePickerGroup } from "@/src/lib/mobile-api/types";
 
 export async function GET(request: Request) {
-  const context = await getMobileAccountContext(request, ["OWNER", "PICKER"]);
+  const done = startMobileTiming("/api/mobile/picker/groups");
+  const context = await getMobilePermissionAccountContext(request, "canPick");
 
   if (!context.ok) {
+    done({ status: 403 });
     return context.response;
   }
 
@@ -14,7 +17,7 @@ export async function GET(request: Request) {
     query: url.searchParams.get("q") ?? undefined,
     filter: url.searchParams.get("filter") ?? undefined,
     page: url.searchParams.get("page") ?? undefined,
-    limit: url.searchParams.get("limit") ?? "24",
+    limit: url.searchParams.get("limit") ?? "50",
     work: url.searchParams.get("work") ?? undefined,
     batchId: url.searchParams.get("batchId") ?? undefined
   });
@@ -32,6 +35,7 @@ export async function GET(request: Request) {
     status: group.status
   }));
 
+  done({ status: 200, rows: groups.length, total: result.total });
   return mobileJson({
     ok: true,
     accountId: context.account.id,

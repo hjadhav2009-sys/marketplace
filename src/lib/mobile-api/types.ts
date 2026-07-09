@@ -15,7 +15,30 @@ export type MobileUser = {
   name: string;
   role: Role;
   mustChangePassword: boolean;
+  permissions: MobilePermissionSet;
+  tabs: MobileTab[];
+  selectedAccount: MobileAccount | null;
   accounts: MobileAccount[];
+};
+
+export type MobileTab = "dashboard" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
+
+export type MobilePermissionSet = {
+  canPick: boolean;
+  canPack: boolean;
+  canReportProblem: boolean;
+  canViewAssignedProblems: boolean;
+  canViewDashboard: boolean;
+  canImportOrders: boolean;
+  canImportListings: boolean;
+  canViewImports: boolean;
+  canManageListings: boolean;
+  canManageAccounts: boolean;
+  canManageUsers: boolean;
+  canViewReports: boolean;
+  canResolveProblems: boolean;
+  canViewSystem: boolean;
+  canReviewOldPending: boolean;
 };
 
 export type MobileApiError = {

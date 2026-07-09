@@ -54,6 +54,8 @@ export function PackingScreen({ user }: { user: MobileUser }) {
 
     setBusy(true);
     setError(null);
+    const previousResults = results;
+    setResults((current) => current.map((item) => (item.canPack ? { ...item, canPack: false, packStatus: "PACKING" } : item)));
 
     try {
       const response = await confirmPacking({ code: targetCode });
@@ -62,6 +64,7 @@ export function PackingScreen({ user }: { user: MobileUser }) {
       setResults([]);
       setTimeout(() => inputRef.current?.focus(), 150);
     } catch (err) {
+      setResults(previousResults);
       setError(err instanceof Error ? err.message : "Pack failed.");
     } finally {
       setBusy(false);

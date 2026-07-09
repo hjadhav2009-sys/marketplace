@@ -2,10 +2,11 @@ import { normalizeAwb } from "@/lib/awb";
 import { cachedProductImageUrl } from "@/lib/image-cache";
 import {
   checkMobileRateLimit,
-  getMobileAccountContext,
+  getMobilePermissionAccountContext,
   mobileError,
   mobileJson
 } from "@/lib/mobile-api";
+import { startMobileTiming } from "@/lib/mobile-timing";
 import { prisma } from "@/lib/prisma";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import type { MobilePackingSearchResult } from "@/src/lib/mobile-api/types";
@@ -85,15 +86,18 @@ async function hydrateResults(accountId: string, orders: Array<{
 }
 
 export async function GET(request: Request) {
+  const done = startMobileTiming("/api/mobile/packing/search");
   const limited = checkMobileRateLimit(request, "mobile-packing-search", 60, 60_000);
 
   if (limited) {
+    done({ status: 429 });
     return limited;
   }
 
-  const context = await getMobileAccountContext(request, ["OWNER", "PACKER"]);
+  const context = await getMobilePermissionAccountContext(request, "canPack");
 
   if (!context.ok) {
+    done({ status: 403 });
     return context.response;
   }
 
@@ -101,6 +105,7 @@ export async function GET(request: Request) {
   const code = normalizeAwb(url.searchParams.get("code"));
 
   if (code.length < 5) {
+    done({ status: 400 });
     return mobileError("invalid_code", "Scan or enter a valid Tracking ID or AWB.", 400);
   }
 
@@ -172,6 +177,7 @@ export async function GET(request: Request) {
     }
   }).catch(() => undefined);
 
+  done({ status: 200, rows: orders.length, mode: matchMode });
   return mobileJson({
     ok: true,
     accountId: context.account.id,

@@ -1525,12 +1525,12 @@ assert.match(mobileLoginRoute, /mustChangePassword: loginCheck === "must_change_
 assert.doesNotMatch(sourceBetween(mobileLoginRoute, "return mobileJson", "});\n}"), /passwordHash|passwordSalt|SESSION_SECRET|DATABASE_URL/, "Mobile login response does not return secrets or password hashes");
 assert.match(mobileMeRoute, /serializeMobileUser/, "Mobile me route returns safe user/account data");
 assert.match(mobileLogoutRoute, /clearSession/, "Mobile logout clears server session");
-assert.match(mobilePickerGroupsRoute, /getMobileAccountContext\(request, \["OWNER", "PICKER"\]/, "Mobile picker groups are owner/picker only");
+assert.match(mobilePickerGroupsRoute, /getMobilePermissionAccountContext\(request, "canPick"\)/, "Mobile picker groups require canPick permission");
 assert.doesNotMatch(mobilePickerGroupsRoute, /productDescription|allSpecifications|description/, "Mobile picker groups omit heavy/private listing fields");
 assert.match(mobilePickerGroupsRoute, /pendingCount[\s\S]*pickedCount[\s\S]*problemCount[\s\S]*mainImageUrl[\s\S]*cacheStatus/, "Mobile picker groups return compact worker fields");
 assert.match(mobilePickerPickedRoute, /pickStatus: "READY"[\s\S]*packStatus: "READY"[\s\S]*pickStatus: "PICKED"/, "Mobile mark-picked updates only ready picker rows");
 assert.match(mobilePickerProblemRoute, /pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"[\s\S]*MOBILE_PICK_PROBLEM_CREATED|MOBILE_PICK_PROBLEM_CREATED[\s\S]*pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"/, "Mobile picker problem marks grouped items problem");
-assert.match(mobilePackingSearchRoute, /getMobileAccountContext\(request, \["OWNER", "PACKER"\]/, "Mobile packing search is owner/packer only");
+assert.match(mobilePackingSearchRoute, /getMobilePermissionAccountContext\(request, "canPack"\)/, "Mobile packing search requires canPack permission");
 assert.equal(mobilePackingSearchRoute.indexOf("trackingId: code") < mobilePackingSearchRoute.indexOf("awb: code"), true, "Mobile packing search checks Tracking ID before AWB");
 assert.match(mobilePackingSearchRoute, /canPack: order\.packStatus === "READY"/, "Mobile packing search exposes pack eligibility");
 assert.doesNotMatch(mobilePackingSearchRoute, /productDescription|allSpecifications|description/, "Mobile packing search returns compact fields only");

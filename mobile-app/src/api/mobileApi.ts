@@ -72,6 +72,18 @@ export function getMe() {
   return apiRequest<{ ok: true; user: MobileUser }>("/api/mobile/me");
 }
 
+export function getOwnerDashboard() {
+  return apiRequest<{
+    ok: true;
+    account: { id: string; companyName: string | null; marketplace: string; name: string; code: string | null };
+    stats: { todayReady: number; packedToday: number; problemsOpen: number; oldPending: number };
+    latestImports: {
+      listing: { id: string; status: string; updatedAt: string; totalRows: number | null } | null;
+      orders: { id: string; status: string; updatedAt: string; totalRows: number | null } | null;
+    };
+  }>("/api/mobile/owner/dashboard");
+}
+
 export function getPickerGroups(accountId?: string) {
   const query = accountId ? `?accountId=${encodeURIComponent(accountId)}` : "";
   return apiRequest<{ ok: true; groups: MobilePickerGroup[] }>(`/api/mobile/picker/groups${query}`);

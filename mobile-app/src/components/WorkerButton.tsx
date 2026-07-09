@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { mobileTheme } from "../theme/mobileTheme";
 
 type Props = {
   children: ReactNode;
@@ -33,7 +34,7 @@ export function WorkerButton({ children, onPress, variant = "primary", disabled,
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: 14,
+    borderRadius: mobileTheme.radius.md,
     flexDirection: "row",
     gap: 8,
     justifyContent: "center",
@@ -42,13 +43,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   primary: {
-    backgroundColor: "#0f172a"
+    backgroundColor: mobileTheme.colors.primary
   },
   secondary: {
-    backgroundColor: "#e2e8f0"
+    backgroundColor: mobileTheme.colors.border
   },
   danger: {
-    backgroundColor: "#b91c1c"
+    backgroundColor: mobileTheme.colors.dangerStrong
   },
   ghost: {
     backgroundColor: "transparent"
@@ -61,10 +62,10 @@ const styles = StyleSheet.create({
   },
   text: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: mobileTheme.font.md,
     fontWeight: "800"
   },
   darkText: {
-    color: "#0f172a"
+    color: mobileTheme.colors.text
   }
 });

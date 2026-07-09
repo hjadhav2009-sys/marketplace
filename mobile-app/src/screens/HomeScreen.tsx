@@ -1,9 +1,15 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import type { MobileUser } from "../types/mobile";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import type { MobileTab, MobileUser } from "../types/mobile";
 import { AccountScreen } from "./AccountScreen";
+import { AppHeader } from "../components/AppHeader";
+import { BottomNav } from "../components/BottomNav";
+import { DashboardScreen } from "./DashboardScreen";
 import { PickerScreen } from "./PickerScreen";
 import { PackingScreen } from "./PackingScreen";
+import { EmptyState } from "../components/EmptyState";
+import { WorkerButton } from "../components/WorkerButton";
+import { mobileTheme } from "../theme/mobileTheme";
 
 type Props = {
   user: MobileUser;
@@ -14,37 +20,24 @@ type Props = {
   onUserRefresh: (user: MobileUser | null) => void;
 };
 
-type Tab = "picker" | "packing" | "account";
-
 export function HomeScreen({ user, accountLabel, serverUrl, onLogout, onChangeServer, onUserRefresh }: Props) {
   const tabs = useMemo(() => {
-    const available: Tab[] = [];
-
-    if (user.role === "OWNER" || user.role === "PICKER") {
-      available.push("picker");
-    }
-
-    if (user.role === "OWNER" || user.role === "PACKER") {
-      available.push("packing");
-    }
-
-    available.push("account");
-    return available;
-  }, [user.role]);
-  const [activeTab, setActiveTab] = useState<Tab>(tabs[0] ?? "account");
+    const preferred = user.tabs.length > 0 ? user.tabs : ["account" as MobileTab];
+    return preferred.length > 5 && user.role === "OWNER" ? ["dashboard", "picker", "packing", "admin", "account"] as MobileTab[] : preferred;
+  }, [user.role, user.tabs]);
+  const [activeTab, setActiveTab] = useState<MobileTab>(tabs[0] ?? "account");
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.brand}>Marketplace</Text>
-          <Text numberOfLines={1} style={styles.context}>{accountLabel}</Text>
-        </View>
-        <Text style={styles.role}>{user.role}</Text>
-      </View>
+      <AppHeader user={user} accountLabel={accountLabel} />
       <View style={styles.content}>
+        {activeTab === "dashboard" ? <DashboardScreen onOpenPicker={() => setActiveTab("picker")} onOpenPacking={() => setActiveTab("packing")} /> : null}
         {activeTab === "picker" ? <PickerScreen user={user} /> : null}
         {activeTab === "packing" ? <PackingScreen user={user} /> : null}
+        {activeTab === "problems" ? <ComingSoon title="Problems" message="Problem review is available in the web dashboard for this APK version." /> : null}
+        {activeTab === "imports" ? <ComingSoon title="Imports" message="Large Excel imports stay on the web owner dashboard in this APK version." /> : null}
+        {activeTab === "reports" ? <ComingSoon title="Reports" message="Reports are available in the web dashboard while mobile reports are being expanded." /> : null}
+        {activeTab === "admin" ? <OwnerAdminMenu onAccount={() => setActiveTab("account")} /> : null}
         {activeTab === "account" ? (
           <AccountScreen
             user={user}
@@ -55,13 +48,37 @@ export function HomeScreen({ user, accountLabel, serverUrl, onLogout, onChangeSe
           />
         ) : null}
       </View>
-      <View style={styles.nav}>
-        {tabs.map((tab) => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[styles.navItem, activeTab === tab && styles.navActive]}>
-            <Text style={[styles.navText, activeTab === tab && styles.navTextActive]}>{tab === "packing" ? "Pack" : tab[0].toUpperCase() + tab.slice(1)}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <BottomNav tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+    </View>
+  );
+}
+
+function ComingSoon({ title, message }: { title: string; message: string }) {
+  return (
+    <View style={styles.panel}>
+      <EmptyState title={title} message={message} />
+    </View>
+  );
+}
+
+function OwnerAdminMenu({ onAccount }: { onAccount: () => void }) {
+  return (
+    <ScrollView contentContainerStyle={styles.adminMenu}>
+      <Text style={styles.adminTitle}>Admin</Text>
+      <AdminCard title="Listings / SKU Images" body="Use web dashboard for listing import and large image review in this APK version." />
+      <AdminCard title="Accounts" body="Switch and manage seller accounts from web. Mobile account info is available in Account." />
+      <AdminCard title="Users" body="Create users and reset passwords from web. Mobile password-change support is active." />
+      <AdminCard title="System / Sync" body="Server URL and connection test are in Account." />
+      <WorkerButton onPress={onAccount} variant="secondary">Open Account</WorkerButton>
+    </ScrollView>
+  );
+}
+
+function AdminCard({ title, body }: { title: string; body: string }) {
+  return (
+    <View style={styles.adminCard}>
+      <Text style={styles.adminCardTitle}>{title}</Text>
+      <Text style={styles.adminCardBody}>{body}</Text>
     </View>
   );
 }
@@ -70,66 +87,35 @@ const styles = StyleSheet.create({
   wrap: {
     flex: 1
   },
-  header: {
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderBottomColor: "#e2e8f0",
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10
-  },
-  headerText: {
-    flex: 1
-  },
-  brand: {
-    color: "#0f172a",
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  context: {
-    color: "#64748b",
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  role: {
-    backgroundColor: "#dbeafe",
-    borderRadius: 999,
-    color: "#1d4ed8",
-    fontSize: 12,
-    fontWeight: "900",
-    paddingHorizontal: 10,
-    paddingVertical: 5
-  },
   content: {
     flex: 1
   },
-  nav: {
-    backgroundColor: "#ffffff",
-    borderTopColor: "#e2e8f0",
-    borderTopWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    padding: 10
+  panel: {
+    padding: mobileTheme.spacing.md
   },
-  navItem: {
-    alignItems: "center",
-    borderRadius: 16,
-    flex: 1,
-    minHeight: 52,
-    justifyContent: "center"
+  adminMenu: {
+    gap: mobileTheme.spacing.md,
+    padding: mobileTheme.spacing.md,
+    paddingBottom: mobileTheme.spacing.xxl
   },
-  navActive: {
-    backgroundColor: "#0f172a"
-  },
-  navText: {
-    color: "#475569",
-    fontSize: 14,
+  adminTitle: {
+    color: mobileTheme.colors.text,
+    fontSize: mobileTheme.font.xl,
     fontWeight: "900"
   },
-  navTextActive: {
-    color: "#ffffff"
+  adminCard: {
+    ...mobileTheme.card,
+    gap: mobileTheme.spacing.xs,
+    padding: mobileTheme.spacing.lg
+  },
+  adminCardTitle: {
+    color: mobileTheme.colors.text,
+    fontSize: mobileTheme.font.lg,
+    fontWeight: "900"
+  },
+  adminCardBody: {
+    color: mobileTheme.colors.textMuted,
+    fontSize: mobileTheme.font.base,
+    lineHeight: 21
   }
 });

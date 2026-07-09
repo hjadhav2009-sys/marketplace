@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import type { MobileTab, MobileUser } from "../types/mobile";
 import { AccountScreen } from "./AccountScreen";
 import { AppHeader } from "../components/AppHeader";
@@ -7,8 +7,12 @@ import { BottomNav } from "../components/BottomNav";
 import { DashboardScreen } from "./DashboardScreen";
 import { PickerScreen } from "./PickerScreen";
 import { PackingScreen } from "./PackingScreen";
+import { OwnerAdminScreen } from "./OwnerAdminScreen";
+import { OwnerImportsScreen } from "./OwnerImportsScreen";
+import { OwnerOldPendingScreen } from "./OwnerOldPendingScreen";
+import { ProblemsScreen } from "./ProblemsScreen";
+import { WorkScreen } from "./WorkScreen";
 import { EmptyState } from "../components/EmptyState";
-import { WorkerButton } from "../components/WorkerButton";
 import { mobileTheme } from "../theme/mobileTheme";
 
 type Props = {
@@ -22,22 +26,44 @@ type Props = {
 
 export function HomeScreen({ user, accountLabel, serverUrl, onLogout, onChangeServer, onUserRefresh }: Props) {
   const tabs = useMemo(() => {
-    const preferred = user.tabs.length > 0 ? user.tabs : ["account" as MobileTab];
-    return preferred.length > 5 && user.role === "OWNER" ? ["dashboard", "picker", "packing", "admin", "account"] as MobileTab[] : preferred;
-  }, [user.role, user.tabs]);
-  const [activeTab, setActiveTab] = useState<MobileTab>(tabs[0] ?? "account");
+    return user.tabs.length > 0 ? user.tabs : ["account" as MobileTab];
+  }, [user.tabs]);
+  const [activeTab, setActiveTab] = useState<MobileTab | "oldPending">(tabs[0] ?? "account");
+  const navActiveTab = tabs.includes(activeTab as MobileTab)
+    ? activeTab as MobileTab
+    : ["picker", "packing", "problems", "oldPending"].includes(activeTab)
+      ? "work"
+      : "admin";
 
   return (
     <View style={styles.wrap}>
       <AppHeader user={user} accountLabel={accountLabel} />
       <View style={styles.content}>
-        {activeTab === "dashboard" ? <DashboardScreen onOpenPicker={() => setActiveTab("picker")} onOpenPacking={() => setActiveTab("packing")} /> : null}
+        {activeTab === "dashboard" ? (
+          <DashboardScreen
+            onOpenPicker={() => setActiveTab("picker")}
+            onOpenPacking={() => setActiveTab("packing")}
+            onOpenImports={() => setActiveTab("imports")}
+            onOpenReports={() => setActiveTab("admin")}
+            onOpenUsers={() => setActiveTab("admin")}
+          />
+        ) : null}
+        {activeTab === "work" ? (
+          <WorkScreen
+            user={user}
+            onOpenPicker={() => setActiveTab("picker")}
+            onOpenPacking={() => setActiveTab("packing")}
+            onOpenProblems={() => setActiveTab("problems")}
+            onOpenOldPending={() => setActiveTab("oldPending")}
+          />
+        ) : null}
         {activeTab === "picker" ? <PickerScreen user={user} /> : null}
         {activeTab === "packing" ? <PackingScreen user={user} /> : null}
-        {activeTab === "problems" ? <ComingSoon title="Problems" message="Problem review is available in the web dashboard for this APK version." /> : null}
-        {activeTab === "imports" ? <ComingSoon title="Imports" message="Large Excel imports stay on the web owner dashboard in this APK version." /> : null}
+        {activeTab === "problems" ? <ProblemsScreen /> : null}
+        {activeTab === "oldPending" ? <OwnerOldPendingScreen /> : null}
+        {activeTab === "imports" ? <OwnerImportsScreen /> : null}
         {activeTab === "reports" ? <ComingSoon title="Reports" message="Reports are available in the web dashboard while mobile reports are being expanded." /> : null}
-        {activeTab === "admin" ? <OwnerAdminMenu onAccount={() => setActiveTab("account")} /> : null}
+        {activeTab === "admin" ? <OwnerAdminScreen serverUrl={serverUrl} /> : null}
         {activeTab === "account" ? (
           <AccountScreen
             user={user}
@@ -48,7 +74,7 @@ export function HomeScreen({ user, accountLabel, serverUrl, onLogout, onChangeSe
           />
         ) : null}
       </View>
-      <BottomNav tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+      <BottomNav tabs={tabs} activeTab={navActiveTab} onChange={setActiveTab} />
     </View>
   );
 }
@@ -57,28 +83,6 @@ function ComingSoon({ title, message }: { title: string; message: string }) {
   return (
     <View style={styles.panel}>
       <EmptyState title={title} message={message} />
-    </View>
-  );
-}
-
-function OwnerAdminMenu({ onAccount }: { onAccount: () => void }) {
-  return (
-    <ScrollView contentContainerStyle={styles.adminMenu}>
-      <Text style={styles.adminTitle}>Admin</Text>
-      <AdminCard title="Listings / SKU Images" body="Use web dashboard for listing import and large image review in this APK version." />
-      <AdminCard title="Accounts" body="Switch and manage seller accounts from web. Mobile account info is available in Account." />
-      <AdminCard title="Users" body="Create users and reset passwords from web. Mobile password-change support is active." />
-      <AdminCard title="System / Sync" body="Server URL and connection test are in Account." />
-      <WorkerButton onPress={onAccount} variant="secondary">Open Account</WorkerButton>
-    </ScrollView>
-  );
-}
-
-function AdminCard({ title, body }: { title: string; body: string }) {
-  return (
-    <View style={styles.adminCard}>
-      <Text style={styles.adminCardTitle}>{title}</Text>
-      <Text style={styles.adminCardBody}>{body}</Text>
     </View>
   );
 }
@@ -93,30 +97,5 @@ const styles = StyleSheet.create({
   },
   panel: {
     padding: mobileTheme.spacing.md
-  },
-  adminMenu: {
-    gap: mobileTheme.spacing.md,
-    padding: mobileTheme.spacing.md,
-    paddingBottom: mobileTheme.spacing.xxl
-  },
-  adminTitle: {
-    color: mobileTheme.colors.text,
-    fontSize: mobileTheme.font.xl,
-    fontWeight: "900"
-  },
-  adminCard: {
-    ...mobileTheme.card,
-    gap: mobileTheme.spacing.xs,
-    padding: mobileTheme.spacing.lg
-  },
-  adminCardTitle: {
-    color: mobileTheme.colors.text,
-    fontSize: mobileTheme.font.lg,
-    fontWeight: "900"
-  },
-  adminCardBody: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: mobileTheme.font.base,
-    lineHeight: 21
   }
 });

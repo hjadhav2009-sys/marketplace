@@ -1,9 +1,11 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileTab } from "../types/mobile";
 import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 const labels: Record<MobileTab, string> = {
   dashboard: "Home",
+  work: "Work",
   picker: "Picker",
   packing: "Pack",
   problems: "Problems",
@@ -14,8 +16,10 @@ const labels: Record<MobileTab, string> = {
 };
 
 export function BottomNav({ tabs, activeTab, onChange }: { tabs: MobileTab[]; activeTab: MobileTab; onChange: (tab: MobileTab) => void }) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.nav}>
+    <View style={[styles.nav, { paddingBottom: Math.max(insets.bottom, 8) }]} testID="bottom-nav-safe-area">
       {tabs.map((tab) => (
         <Pressable key={tab} onPress={() => onChange(tab)} style={[styles.navItem, activeTab === tab && styles.navActive]}>
           <Text style={[styles.navText, activeTab === tab && styles.navTextActive]}>{labels[tab]}</Text>

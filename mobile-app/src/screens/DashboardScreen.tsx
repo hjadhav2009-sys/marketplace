@@ -11,7 +11,19 @@ import { mobileTheme } from "../theme/mobileTheme";
 
 type DashboardData = Awaited<ReturnType<typeof getOwnerDashboard>>;
 
-export function DashboardScreen({ onOpenPicker, onOpenPacking }: { onOpenPicker: () => void; onOpenPacking: () => void }) {
+export function DashboardScreen({
+  onOpenPicker,
+  onOpenPacking,
+  onOpenImports,
+  onOpenReports,
+  onOpenUsers
+}: {
+  onOpenPicker: () => void;
+  onOpenPacking: () => void;
+  onOpenImports?: () => void;
+  onOpenReports?: () => void;
+  onOpenUsers?: () => void;
+}) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +81,9 @@ export function DashboardScreen({ onOpenPicker, onOpenPacking }: { onOpenPicker:
       <View style={styles.actions}>
         <WorkerButton onPress={onOpenPicker}>Open Picker</WorkerButton>
         <WorkerButton onPress={onOpenPacking} variant="secondary">Open Packing</WorkerButton>
+        {onOpenImports ? <WorkerButton onPress={onOpenImports} variant="secondary">Import Orders</WorkerButton> : null}
+        {onOpenReports ? <WorkerButton onPress={onOpenReports} variant="secondary">Reports</WorkerButton> : null}
+        {onOpenUsers ? <WorkerButton onPress={onOpenUsers} variant="secondary">Users</WorkerButton> : null}
       </View>
     </ScrollView>
   );

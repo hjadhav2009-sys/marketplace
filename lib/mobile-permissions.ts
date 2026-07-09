@@ -18,7 +18,7 @@ export type MobilePermissionSet = {
   canReviewOldPending: boolean;
 };
 
-export type MobileTab = "dashboard" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
+export type MobileTab = "dashboard" | "work" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
 
 type PermissionUser = Pick<User, "role" | "canPick" | "canPack" | "canReportProblem">;
 
@@ -49,7 +49,7 @@ export function getMobilePermissions(user: PermissionUser): MobilePermissionSet 
 
 export function getMobileTabs(role: Role, permissions: MobilePermissionSet): MobileTab[] {
   if (role === "OWNER") {
-    return ["dashboard", "picker", "packing", "problems", "imports", "reports", "admin", "account"];
+    return ["dashboard", "work", "imports", "admin", "account"];
   }
 
   const tabs: MobileTab[] = [];

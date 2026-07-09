@@ -19,7 +19,7 @@ export type MobileUser = {
   accounts: MobileAccount[];
 };
 
-export type MobileTab = "dashboard" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
+export type MobileTab = "dashboard" | "work" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
 
 export type MobilePermissionSet = {
   canPick: boolean;
@@ -96,6 +96,48 @@ export type MobileProductDetails = {
   gallery: string[];
   cacheStatus: string | null;
   imageHealth: string | null;
+};
+
+export type MobileOwnerImportJob = {
+  id: string;
+  marketplace: string;
+  importType: string;
+  fileName: string;
+  status: string;
+  totalRows: number;
+  processedRows: number;
+  createdRows: number;
+  updatedRows: number;
+  duplicateRows: number;
+  warningRows: number;
+  errorRows: number;
+  missingListingRows: number;
+  missingImageRows: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MobileProblemRow = {
+  id: string;
+  reason: string;
+  details: string | null;
+  status: string;
+  createdAt: string;
+  reporter: string | null;
+  order: {
+    id: string;
+    marketplace: string;
+    sku: string;
+    qty: number;
+    color: string | null;
+    size: string | null;
+    packStatus: string;
+    pickStatus: string;
+    trackingId: string | null;
+    awb: string | null;
+    title: string | null;
+    mainImageUrl: string | null;
+  };
 };
 
 export type ApiState<T> = {

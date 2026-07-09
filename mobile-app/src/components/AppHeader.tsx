@@ -1,12 +1,14 @@
 import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileUser } from "../types/mobile";
 import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 export function AppHeader({ user, accountLabel }: { user: MobileUser; accountLabel: string }) {
+  const insets = useSafeAreaInsets();
   const marketplace = user.selectedAccount?.marketplace ?? user.accounts[0]?.marketplace ?? "Marketplace";
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]} testID="app-header-safe-area">
       <View style={styles.headerText}>
         <Text style={styles.brand}>Marketplace Pick & Pack</Text>
         <Text numberOfLines={1} style={styles.title}>{user.selectedAccount?.companyName ?? "Company"} / {accountLabel}</Text>

@@ -6,6 +6,8 @@ import type {
   MobilePickerGroup,
   MobileProductDetails,
   MobileProductImages,
+  MobileProblemRow,
+  MobileOwnerImportJob,
   MobileUser
 } from "../types/mobile";
 
@@ -82,6 +84,113 @@ export function getOwnerDashboard() {
       orders: { id: string; status: string; updatedAt: string; totalRows: number | null } | null;
     };
   }>("/api/mobile/owner/dashboard");
+}
+
+export function getOwnerImports(page = 1, pageSize = 10) {
+  return apiRequest<{ ok: true; page: number; pageSize: number; total: number; jobs: MobileOwnerImportJob[] }>(
+    `/api/mobile/owner/imports?page=${page}&pageSize=${pageSize}`
+  );
+}
+
+export function getOwnerListingsSummary() {
+  return apiRequest<{
+    ok: true;
+    totalListings: number;
+    activeListings: number;
+    missingImageCount: number;
+    latestListingImport: { id: string; status: string; updatedAt: string; totalRows: number | null } | null;
+    recentListings: Array<{ id: string; sku: string; productTitle: string | null; listingStatus: string | null; mainImageUrl: string | null; updatedAt: string }>;
+  }>("/api/mobile/owner/listings/summary");
+}
+
+export function getOwnerReportsSummary() {
+  return apiRequest<{
+    ok: true;
+    summary: {
+      totalOrders: number;
+      todayReady: number;
+      todayPicked: number;
+      todayPacked: number;
+      openProblems: number;
+      oldPending: number;
+      missingListingCurrent: number;
+      missingImageCurrent: number;
+    };
+    skuSummary: Array<{ sku: string; orders: number; qty: number }>;
+    courierSummary: Array<{ courier: string; orders: number; qty: number }>;
+  }>("/api/mobile/owner/reports/summary");
+}
+
+export function getOwnerAccounts() {
+  return apiRequest<{
+    ok: true;
+    accounts: Array<{
+      id: string;
+      companyName: string;
+      marketplace: string;
+      name: string;
+      code: string;
+      active: boolean;
+      users: number;
+      orders: number;
+      listings: number;
+      imports: number;
+    }>;
+  }>("/api/mobile/owner/accounts");
+}
+
+export function getOwnerUsers() {
+  return apiRequest<{
+    ok: true;
+    users: Array<{
+      id: string;
+      username: string;
+      name: string;
+      role: string;
+      active: boolean;
+      canPick: boolean;
+      canPack: boolean;
+      canReportProblem: boolean;
+      mustChangePassword: boolean;
+      lastLoginAt: string | null;
+      openPasswordResetRequests: number;
+      assignedAccounts: Array<{ id: string; companyName: string; marketplace: string; name: string }>;
+    }>;
+  }>("/api/mobile/owner/users");
+}
+
+export function getOwnerSystem() {
+  return apiRequest<{
+    ok: true;
+    app: { name: string; mode: string; mobileApi: string };
+    counts: { activeAccounts: number; activeUsers: number; openProblems: number };
+    recentImport: { id: string; status: string; importType: string; marketplace: string; updatedAt: string } | null;
+    notes: string[];
+  }>("/api/mobile/owner/system");
+}
+
+export function getOwnerOldPending() {
+  return apiRequest<{
+    ok: true;
+    total: number;
+    statusGroups: Array<{ status: string; count: number }>;
+    orders: Array<{
+      id: string;
+      marketplace: string;
+      sku: string;
+      qty: number;
+      trackingId: string | null;
+      awb: string | null;
+      packStatus: string;
+      pickStatus: string;
+      oldPendingReviewStatus: string;
+      importedAt: string;
+    }>;
+  }>("/api/mobile/owner/old-pending");
+}
+
+export function getProblems(status: "OPEN" | "RESOLVED" = "OPEN") {
+  return apiRequest<{ ok: true; status: string; problems: MobileProblemRow[] }>(`/api/mobile/problems?status=${status}`);
 }
 
 export function getPickerGroups(accountId?: string) {

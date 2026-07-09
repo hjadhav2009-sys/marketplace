@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileApiError } from "../api/client";
 import { testConnection } from "../api/mobileApi";
 import { isValidServerUrl, saveServerUrl } from "../storage/serverStorage";
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function ServerSettingsScreen({ currentUrl, onSaved }: Props) {
+  const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(currentUrl ?? "");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function ServerSettingsScreen({ currentUrl, onSaved }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.wrap}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 20), paddingTop: Math.max(insets.top, 20) }]}>
       <View style={styles.card}>
         <Text style={styles.eyebrow}>Server setup</Text>
         <Text style={styles.title}>Connect to owner PC</Text>

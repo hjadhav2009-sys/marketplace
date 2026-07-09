@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileApiError } from "../api/client";
 import { changePassword, login } from "../api/mobileApi";
 import { ErrorState } from "../components/ErrorState";
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function LoginScreen({ serverUrl, onLoggedIn, onChangeServer }: Props) {
+  const insets = useSafeAreaInsets();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -72,7 +74,7 @@ export function LoginScreen({ serverUrl, onLoggedIn, onChangeServer }: Props) {
 
   if (passwordChangeRequired) {
     return (
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.wrap}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 20), paddingTop: Math.max(insets.top, 20) }]}>
         <View style={styles.card}>
           <Text style={styles.title}>Change password</Text>
           <Text style={styles.copy}>Owner reset is complete. Set your new password to enter the app.</Text>
@@ -120,7 +122,7 @@ export function LoginScreen({ serverUrl, onLoggedIn, onChangeServer }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.wrap}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 20), paddingTop: Math.max(insets.top, 20) }]}>
       <View style={styles.card}>
         <Text style={styles.title}>Marketplace Pick Pack</Text>
         <Text style={styles.copy}>Sign in with your worker account.</Text>

@@ -219,6 +219,25 @@ export async function getMobilePermissionAccountContext(request: Request, permis
   };
 }
 
+export async function getMobilePermissionUser(permission: keyof MobilePermissionSet) {
+  const auth = await getMobileUser();
+
+  if (!auth.ok) {
+    return auth;
+  }
+
+  const permissions = getMobilePermissions(auth.user);
+
+  if (!permissions[permission] && !roleAllowsPermission(auth.user.role, permission)) {
+    return { ok: false as const, response: mobileError("forbidden", "This mobile action is not allowed for your permissions.", 403) };
+  }
+
+  return {
+    ok: true as const,
+    user: auth.user
+  };
+}
+
 export function compactMobileError(error: unknown) {
   if (error instanceof Error && error.message === "Image URL host is not allowed for server-side caching.") {
     return mobileError("image_blocked", "Image URL is not allowed.", 400);

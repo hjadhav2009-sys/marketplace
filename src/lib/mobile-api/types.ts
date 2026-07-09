@@ -21,7 +21,7 @@ export type MobileUser = {
   accounts: MobileAccount[];
 };
 
-export type MobileTab = "dashboard" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
+export type MobileTab = "dashboard" | "work" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
 
 export type MobilePermissionSet = {
   canPick: boolean;

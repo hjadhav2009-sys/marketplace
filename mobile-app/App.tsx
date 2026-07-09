@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { SafeAreaView, StatusBar, StyleSheet, Text, View } from "react-native";
+import { StatusBar, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getMe } from "./src/api/mobileApi";
 import { clearSessionCookie } from "./src/storage/sessionStorage";
 import { getServerUrl } from "./src/storage/serverStorage";
@@ -17,9 +18,11 @@ export type AppRoute =
 
 export default function App() {
   return (
-    <AppErrorBoundary>
-      <RootApp />
-    </AppErrorBoundary>
+    <SafeAreaProvider>
+      <AppErrorBoundary>
+        <RootApp />
+      </AppErrorBoundary>
+    </SafeAreaProvider>
   );
 }
 
@@ -75,18 +78,18 @@ function RootApp() {
 
   if (booting) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.boot}>
           <Text style={styles.brand}>Marketplace Pick Pack</Text>
           <Text style={styles.muted}>Starting worker app...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.shell}>
         {route.name === "settings" ? (
@@ -128,7 +131,7 @@ function RootApp() {
           />
         ) : null}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

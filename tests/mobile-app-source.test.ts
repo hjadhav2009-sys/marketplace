@@ -37,7 +37,8 @@ assert.equal(getMobilePermissions(dualWorker).canPack, true, "Dual worker can pa
 assert.deepEqual(getMobileTabs(dualWorker.role, getMobilePermissions(dualWorker)), ["picker", "packing", "problems", "account"], "Dual worker sees Picker and Pack tabs");
 assert.deepEqual(getMobileTabs(picker.role, getMobilePermissions(picker)), ["picker", "problems", "account"], "Picker-only worker does not see Pack tab");
 assert.deepEqual(getMobileTabs(packer.role, getMobilePermissions(packer)), ["packing", "problems", "account"], "Packer-only worker does not see Picker tab");
-assert.ok(getMobileTabs(owner.role, getMobilePermissions(owner)).includes("admin"), "Owner sees admin tab");
+assert.deepEqual(getMobileTabs(owner.role, getMobilePermissions(owner)), ["dashboard", "work", "imports", "admin", "account"], "Owner sees five native APK tabs");
+assert.ok(!getMobileTabs(picker.role, getMobilePermissions(picker)).includes("admin"), "Picker-only worker does not see Admin");
 
 const homeSource = read("mobile-app", "src", "screens", "HomeScreen.tsx");
 const productCardSource = read("mobile-app", "src", "components", "ProductCard.tsx");
@@ -46,12 +47,27 @@ const packingSource = read("mobile-app", "src", "screens", "PackingScreen.tsx");
 const gallerySource = read("mobile-app", "src", "screens", "ProductGalleryScreen.tsx");
 const detailsSource = read("mobile-app", "src", "screens", "ProductDetailsScreen.tsx");
 const bottomNavSource = read("mobile-app", "src", "components", "BottomNav.tsx");
+const appSource = read("mobile-app", "App.tsx");
+const headerSource = read("mobile-app", "src", "components", "AppHeader.tsx");
 const designSource = read("mobile-app", "src", "theme", "webMobileDesign.ts");
 const packageJsonSource = read("mobile-app", "package.json");
+const ownerImportsApiSource = read("app", "api", "mobile", "owner", "imports", "route.ts");
+const ownerIssuesApiSource = read("app", "api", "mobile", "owner", "imports", "[jobId]", "issues", "route.ts");
+const ownerUsersApiSource = read("app", "api", "mobile", "owner", "users", "route.ts");
+const ownerSystemApiSource = read("app", "api", "mobile", "owner", "system", "route.ts");
 
 assert.match(homeSource, /user\.tabs/, "APK bottom nav uses /api/mobile/me tabs");
 assert.match(homeSource, /DashboardScreen/, "Owner dashboard screen is wired");
+assert.match(homeSource, /WorkScreen/, "Owner Work tab screen is wired");
+assert.match(homeSource, /OwnerImportsScreen/, "Owner Imports tab screen is wired");
+assert.match(homeSource, /OwnerAdminScreen/, "Owner Admin tab screen is wired");
+assert.match(appSource, /SafeAreaProvider/, "SafeAreaProvider exists at app root");
+assert.match(packageJsonSource, /react-native-safe-area-context/, "Safe area dependency is installed");
+assert.match(headerSource, /useSafeAreaInsets/, "Header uses top safe area inset");
+assert.match(headerSource, /paddingTop: Math\.max\(insets\.top/, "Header applies top safe area padding");
 assert.match(bottomNavSource, /MobileTab/, "Bottom nav is driven by mobile API tab permissions");
+assert.match(bottomNavSource, /useSafeAreaInsets/, "Bottom nav uses bottom safe area inset");
+assert.match(bottomNavSource, /paddingBottom: Math\.max\(insets\.bottom/, "Bottom nav applies bottom safe area padding");
 assert.match(designSource, /webMobileDesign/, "Native app has web mobile design map");
 assert.match(designSource, /berry: "#be185d"/, "Native design map mirrors web berry color");
 assert.match(productCardSource, /design\.imageSquare/, "Product card uses shared square image style");
@@ -64,6 +80,11 @@ assert.match(gallerySource, /getProductImages/, "Gallery fetches images from ima
 assert.match(gallerySource, /design\.colors\.overlay/, "Gallery uses dark web-style lightbox background");
 assert.match(detailsSource, /getProductDetails/, "Details fetches product details from details screen only");
 assert.doesNotMatch(packageJsonSource, /react-native-webview/i, "Mobile app does not depend on WebView");
+assert.match(ownerImportsApiSource, /pageSize/, "Owner mobile imports are paginated");
+assert.match(ownerImportsApiSource, /take: pageSize/, "Owner mobile imports use page size limit");
+assert.doesNotMatch(ownerIssuesApiSource, /rawData:\s*true/, "Owner issue API does not return raw private issue data");
+assert.doesNotMatch(ownerUsersApiSource, /passwordHash|passwordSalt|salt/i, "Owner users API does not return password hashes or salts");
+assert.doesNotMatch(ownerSystemApiSource, /DATABASE_URL|SESSION_SECRET|process\.env/, "Owner system API does not expose environment secrets");
 
 function readFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

@@ -5,6 +5,7 @@ import { changePassword, login } from "../api/mobileApi";
 import { ErrorState } from "../components/ErrorState";
 import { WorkerButton } from "../components/WorkerButton";
 import type { MobileUser } from "../types/mobile";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 type Props = {
   serverUrl: string | null;
@@ -149,40 +150,38 @@ export function LoginScreen({ serverUrl, onLoggedIn, onChangeServer }: Props) {
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: design.colors.background,
     flex: 1,
     justifyContent: "center",
     padding: 20
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 22,
-    borderWidth: 1,
+    ...design.card,
     gap: 14,
     padding: 20
   },
   title: {
-    color: "#0f172a",
-    fontSize: 28,
-    fontWeight: "900"
+    color: design.colors.text,
+    fontSize: design.text.hero,
+    fontWeight: design.text.weightBlack
   },
   copy: {
-    color: "#475569",
+    color: design.colors.textSubtle,
     fontSize: 15
   },
   server: {
-    color: "#2563eb",
+    color: design.colors.berry,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: design.text.weightBold
   },
   input: {
-    backgroundColor: "#f8fafc",
-    borderColor: "#cbd5e1",
-    borderRadius: 14,
+    backgroundColor: design.colors.surfaceMuted,
+    borderColor: design.colors.borderStrong,
+    borderRadius: design.radius.lg,
     borderWidth: 1,
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 17,
-    minHeight: 54,
+    minHeight: design.sizes.inputHeight,
     paddingHorizontal: 14
   }
 });

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileUser } from "../types/mobile";
-import { mobileTheme } from "../theme/mobileTheme";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 export function AppHeader({ user, accountLabel }: { user: MobileUser; accountLabel: string }) {
   const marketplace = user.selectedAccount?.marketplace ?? user.accounts[0]?.marketplace ?? "Marketplace";
@@ -8,8 +8,9 @@ export function AppHeader({ user, accountLabel }: { user: MobileUser; accountLab
   return (
     <View style={styles.header}>
       <View style={styles.headerText}>
-        <Text style={styles.brand}>{user.selectedAccount?.companyName ?? "Marketplace"}</Text>
-        <Text numberOfLines={1} style={styles.context}>{marketplace} / {accountLabel}</Text>
+        <Text style={styles.brand}>Marketplace Pick & Pack</Text>
+        <Text numberOfLines={1} style={styles.title}>{user.selectedAccount?.companyName ?? "Company"} / {accountLabel}</Text>
+        <Text numberOfLines={1} style={styles.context}>{marketplace} / {user.role}</Text>
       </View>
       <Text style={styles.role}>{user.role}</Text>
     </View>
@@ -19,34 +20,40 @@ export function AppHeader({ user, accountLabel }: { user: MobileUser; accountLab
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
-    backgroundColor: mobileTheme.colors.surface,
-    borderBottomColor: mobileTheme.colors.border,
+    backgroundColor: design.colors.surface,
+    borderBottomColor: design.colors.border,
     borderBottomWidth: 1,
     flexDirection: "row",
-    gap: mobileTheme.spacing.md,
+    gap: design.spacing.md,
     justifyContent: "space-between",
-    paddingHorizontal: mobileTheme.spacing.lg,
+    paddingHorizontal: design.spacing.lg,
     paddingVertical: 10
   },
   headerText: {
     flex: 1
   },
   brand: {
-    color: mobileTheme.colors.text,
-    fontSize: mobileTheme.font.lg,
-    fontWeight: "900"
+    color: design.colors.berry,
+    fontSize: design.text.tiny,
+    fontWeight: design.text.weightBlack,
+    textTransform: "uppercase"
+  },
+  title: {
+    color: design.colors.text,
+    fontSize: 16,
+    fontWeight: design.text.weightBlack
   },
   context: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: mobileTheme.font.tiny,
-    fontWeight: "700"
+    color: design.colors.textMuted,
+    fontSize: design.text.sm,
+    fontWeight: design.text.weightMedium
   },
   role: {
-    backgroundColor: mobileTheme.colors.primarySoft,
-    borderRadius: mobileTheme.radius.pill,
-    color: mobileTheme.colors.primaryText,
-    fontSize: mobileTheme.font.tiny,
-    fontWeight: "900",
+    backgroundColor: design.colors.surfaceMuted,
+    borderRadius: design.radius.pill,
+    color: design.colors.textSubtle,
+    fontSize: design.text.tiny,
+    fontWeight: design.text.weightBlack,
     paddingHorizontal: 10,
     paddingVertical: 5
   }

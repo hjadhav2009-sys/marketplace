@@ -6,6 +6,7 @@ import { LoadingState } from "../components/LoadingState";
 import { StatusPill } from "../components/StatusPill";
 import { WorkerButton } from "../components/WorkerButton";
 import type { MobileProductDetails } from "../types/mobile";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 export function ProductDetailsScreen({ sku, onBack, onOpenGallery }: { sku: string; onBack: () => void; onOpenGallery: () => void }) {
   const [product, setProduct] = useState<MobileProductDetails | null>(null);
@@ -81,6 +82,7 @@ function Info({ label, value, multiline }: { label: string; value: unknown; mult
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: design.colors.background,
     gap: 12,
     padding: 14,
     paddingBottom: 24
@@ -91,45 +93,39 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   title: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 24,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   sku: {
-    color: "#64748b",
+    color: design.colors.textMuted,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: design.text.weightBold
   },
   close: {
     minHeight: 42
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 18,
-    borderWidth: 1,
+    ...design.card,
     gap: 12,
     padding: 14
   },
   imageWrap: {
-    alignItems: "center",
-    aspectRatio: 1,
-    backgroundColor: "#f8fafc",
-    borderRadius: 14,
-    justifyContent: "center"
+    ...design.imageSquare,
+    borderRadius: design.radius.lg
   },
   image: {
     height: "92%",
     width: "92%"
   },
   noImage: {
-    color: "#64748b",
-    fontWeight: "800"
+    color: design.colors.textMuted,
+    fontWeight: design.text.weightBold
   },
   productTitle: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 19,
-    fontWeight: "900",
+    fontWeight: design.text.weightBlack,
     lineHeight: 25
   },
   pills: {
@@ -138,21 +134,21 @@ const styles = StyleSheet.create({
     gap: 8
   },
   info: {
-    borderTopColor: "#e2e8f0",
+    borderTopColor: design.colors.border,
     borderTopWidth: 1,
     gap: 4,
     paddingTop: 10
   },
   infoLabel: {
-    color: "#64748b",
+    color: design.colors.textMuted,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: design.text.weightBlack,
     textTransform: "uppercase"
   },
   infoValue: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 15,
-    fontWeight: "700"
+    fontWeight: design.text.weightMedium
   },
   multiline: {
     fontWeight: "500",

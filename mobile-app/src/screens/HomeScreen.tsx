@@ -85,6 +85,7 @@ function AdminCard({ title, body }: { title: string; body: string }) {
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: mobileTheme.colors.background,
     flex: 1
   },
   content: {

@@ -3,6 +3,7 @@ import { StyleSheet, Text, Vibration, View } from "react-native";
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { WorkerButton } from "../components/WorkerButton";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 type Props = {
   onScanned: (value: string) => void;
@@ -74,11 +75,13 @@ export function ScannerScreen({ onScanned, onCancel }: Props) {
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: design.colors.background,
     flex: 1,
     gap: 14,
     padding: 14
   },
   center: {
+    backgroundColor: design.colors.background,
     flex: 1,
     gap: 14,
     justifyContent: "center",
@@ -88,24 +91,24 @@ const styles = StyleSheet.create({
     gap: 4
   },
   title: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 24,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   copy: {
-    color: "#64748b",
+    color: design.colors.textMuted,
     fontSize: 15,
     lineHeight: 22
   },
   camera: {
-    borderRadius: 20,
+    borderRadius: design.radius.xl,
     flex: 1,
     overflow: "hidden"
   },
   last: {
-    color: "#334155",
+    color: design.colors.textSubtle,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: design.text.weightBold,
     textAlign: "center"
   }
 });

@@ -4,6 +4,8 @@ Phase 1 Android worker prototype for Marketplace Pick & Pack.
 
 ## Architecture
 
+- This is a native React Native / Expo app. It does not use WebView.
+- The native UI is expected to match the existing web mobile worker UI: compact header, bottom navigation, square product images, picker cards, packing search, and dark product gallery.
 - The Android app talks only to the existing Next.js mobile API.
 - The database stays on the owner PC.
 - The APK does not contain `DATABASE_URL`, `SESSION_SECRET`, password hashes, salts, `.env`, database files, or admin secrets.

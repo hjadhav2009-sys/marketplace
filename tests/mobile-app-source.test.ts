@@ -45,16 +45,25 @@ const pickerSource = read("mobile-app", "src", "screens", "PickerScreen.tsx");
 const packingSource = read("mobile-app", "src", "screens", "PackingScreen.tsx");
 const gallerySource = read("mobile-app", "src", "screens", "ProductGalleryScreen.tsx");
 const detailsSource = read("mobile-app", "src", "screens", "ProductDetailsScreen.tsx");
+const bottomNavSource = read("mobile-app", "src", "components", "BottomNav.tsx");
+const designSource = read("mobile-app", "src", "theme", "webMobileDesign.ts");
+const packageJsonSource = read("mobile-app", "package.json");
 
 assert.match(homeSource, /user\.tabs/, "APK bottom nav uses /api/mobile/me tabs");
 assert.match(homeSource, /DashboardScreen/, "Owner dashboard screen is wired");
-assert.match(productCardSource, /mobileTheme\.imageSquare/, "Product card uses shared square image style");
+assert.match(bottomNavSource, /MobileTab/, "Bottom nav is driven by mobile API tab permissions");
+assert.match(designSource, /webMobileDesign/, "Native app has web mobile design map");
+assert.match(designSource, /berry: "#be185d"/, "Native design map mirrors web berry color");
+assert.match(productCardSource, /design\.imageSquare/, "Product card uses shared square image style");
+assert.match(productCardSource, /testID="picker-card-actions-max-3"/, "Picker card keeps max 3 worker actions");
 assert.match(pickerSource, /markPicked/, "Picker card has Picked action");
 assert.match(pickerSource, /setItems\(nextItems\)/, "APK has optimistic Picked flow");
 assert.match(packingSource, /packStatus: "PACKING"/, "APK has optimistic Pack flow");
 assert.ok(packingSource.indexOf("placeholder=\"FMPC0000000000\"") < packingSource.indexOf("Scan barcode"), "Packing manual search comes before scanner");
 assert.match(gallerySource, /getProductImages/, "Gallery fetches images from image screen only");
+assert.match(gallerySource, /design\.colors\.overlay/, "Gallery uses dark web-style lightbox background");
 assert.match(detailsSource, /getProductDetails/, "Details fetches product details from details screen only");
+assert.doesNotMatch(packageJsonSource, /react-native-webview/i, "Mobile app does not depend on WebView");
 
 function readFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -79,5 +88,6 @@ const mobileSource = readFiles(mobileRoot)
   .join("\n");
 
 assert.doesNotMatch(mobileSource, /DATABASE_URL|SESSION_SECRET|passwordHash|password salt/i, "Mobile app source does not contain backend secrets");
+assert.doesNotMatch(mobileSource, /from ["']react-native-webview["']|<WebView\b|WebView\s+from/i, "Mobile app source does not import or render WebView");
 
 console.log("Mobile app source tests passed.");

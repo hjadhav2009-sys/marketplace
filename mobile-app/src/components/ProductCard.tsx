@@ -1,6 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { MobilePackingSearchResult, MobilePickerGroup } from "../types/mobile";
-import { mobileTheme } from "../theme/mobileTheme";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 import { StatusPill } from "./StatusPill";
 import { WorkerButton } from "./WorkerButton";
 
@@ -51,7 +51,7 @@ export function PickerProductCard({ item, onImage, onDetails, onPicked, onProble
           {item.cacheStatus ? <StatusPill label={item.cacheStatus} tone="warn" /> : null}
         </View>
         <WorkerButton onPress={onPicked} loading={busy}>Picked</WorkerButton>
-        <View style={styles.actions}>
+        <View style={styles.actions} testID="picker-card-actions-max-3">
           <WorkerButton onPress={onDetails} variant="secondary" style={styles.actionButton}>Details</WorkerButton>
           <WorkerButton onPress={onProblem} variant="ghost" style={styles.actionButton}>Problem</WorkerButton>
         </View>
@@ -79,7 +79,7 @@ export function PackingProductCard({ item, onImage, onDetails, onPack, onProblem
           <StatusPill label={item.marketplace} />
         </View>
         <WorkerButton onPress={onPack} disabled={!item.canPack} loading={busy}>Pack</WorkerButton>
-        <View style={styles.actions}>
+        <View style={styles.actions} testID="packing-card-actions-max-3">
           <WorkerButton onPress={onDetails} variant="secondary" style={styles.actionButton}>Details</WorkerButton>
           <WorkerButton onPress={onProblem} variant="ghost" style={styles.actionButton}>Problem</WorkerButton>
         </View>
@@ -90,20 +90,20 @@ export function PackingProductCard({ item, onImage, onDetails, onPack, onProblem
 
 const styles = StyleSheet.create({
   card: {
-    ...mobileTheme.card,
+    ...design.card,
     overflow: "hidden"
   },
   imageWrap: {
-    ...mobileTheme.imageSquare
+    ...design.imageSquare
   },
   image: {
     height: "92%",
     width: "92%"
   },
   noImage: {
-    color: mobileTheme.colors.textMuted,
+    color: design.colors.textMuted,
     fontSize: 15,
-    fontWeight: "800"
+    fontWeight: design.text.weightBold
   },
   body: {
     gap: 12,
@@ -116,20 +116,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   sku: {
-    color: mobileTheme.colors.text,
+    color: design.colors.text,
     flex: 1,
     fontSize: 19,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   title: {
-    color: mobileTheme.colors.textSubtle,
+    color: design.colors.textSubtle,
     fontSize: 15,
     lineHeight: 21
   },
   meta: {
-    color: mobileTheme.colors.textMuted,
+    color: design.colors.textMuted,
     fontSize: 13,
-    fontWeight: "700"
+    fontWeight: design.text.weightMedium
   },
   row: {
     flexDirection: "row",

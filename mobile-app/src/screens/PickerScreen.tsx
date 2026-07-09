@@ -9,6 +9,7 @@ import type { MobilePickerGroup, MobileUser } from "../types/mobile";
 import { ProductGalleryScreen } from "./ProductGalleryScreen";
 import { ProductDetailsScreen } from "./ProductDetailsScreen";
 import { EmptyState } from "../components/EmptyState";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 let cachedPickerGroups: { at: number; groups: MobilePickerGroup[] } | null = null;
 
@@ -150,6 +151,7 @@ export function PickerScreen({ user }: { user: MobileUser }) {
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: design.colors.background,
     flex: 1,
     paddingHorizontal: 14
   },
@@ -160,14 +162,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   title: {
-    color: "#0f172a",
-    fontSize: 24,
-    fontWeight: "900"
+    color: design.colors.text,
+    fontSize: design.text.xl,
+    fontWeight: design.text.weightBlack
   },
   sub: {
-    color: "#64748b",
+    color: design.colors.textMuted,
     fontSize: 13,
-    fontWeight: "700"
+    fontWeight: design.text.weightMedium
   },
   refresh: {
     minHeight: 42,
@@ -178,33 +180,33 @@ const styles = StyleSheet.create({
     paddingBottom: 18
   },
   modalShade: {
-    backgroundColor: "rgba(15,23,42,0.45)",
+    backgroundColor: design.colors.overlaySoft,
     flex: 1,
     justifyContent: "flex-end"
   },
   modalCard: {
-    backgroundColor: "#ffffff",
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: design.colors.surface,
+    borderTopLeftRadius: design.radius.sheet,
+    borderTopRightRadius: design.radius.sheet,
     gap: 12,
     padding: 18
   },
   modalTitle: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 22,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   modalCopy: {
-    color: "#475569",
-    fontWeight: "800"
+    color: design.colors.textSubtle,
+    fontWeight: design.text.weightBold
   },
   input: {
-    backgroundColor: "#f8fafc",
-    borderColor: "#cbd5e1",
-    borderRadius: 14,
+    backgroundColor: design.colors.surfaceMuted,
+    borderColor: design.colors.borderStrong,
+    borderRadius: design.radius.lg,
     borderWidth: 1,
     fontSize: 16,
-    minHeight: 52,
+    minHeight: design.sizes.inputHeight,
     paddingHorizontal: 14
   }
 });

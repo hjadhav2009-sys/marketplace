@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { MobileTab } from "../types/mobile";
-import { mobileTheme } from "../theme/mobileTheme";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 const labels: Record<MobileTab, string> = {
   dashboard: "Home",
@@ -27,28 +27,28 @@ export function BottomNav({ tabs, activeTab, onChange }: { tabs: MobileTab[]; ac
 
 const styles = StyleSheet.create({
   nav: {
-    backgroundColor: mobileTheme.colors.surface,
-    borderTopColor: mobileTheme.colors.border,
-    borderTopWidth: 1,
+    ...design.bottomNav,
     flexDirection: "row",
-    gap: mobileTheme.spacing.sm,
-    padding: 10
+    gap: design.spacing.sm,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    paddingTop: 8
   },
   navItem: {
     alignItems: "center",
-    borderRadius: mobileTheme.radius.md,
+    borderRadius: design.radius.md,
     flex: 1,
     justifyContent: "center",
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: 4
   },
   navActive: {
-    backgroundColor: mobileTheme.colors.primary
+    backgroundColor: design.colors.primary
   },
   navText: {
-    color: mobileTheme.colors.textSubtle,
-    fontSize: mobileTheme.font.tiny,
-    fontWeight: "900"
+    color: design.colors.textSubtle,
+    fontSize: design.text.tiny,
+    fontWeight: design.text.weightBlack
   },
   navTextActive: {
     color: "#ffffff"

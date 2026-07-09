@@ -1,9 +1,10 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 export function LoadingState({ label = "Loading..." }: { label?: string }) {
   return (
     <View style={styles.wrap}>
-      <ActivityIndicator size="large" color="#0f172a" />
+      <ActivityIndicator size="large" color={design.colors.primary} />
       <Text style={styles.text}>{label}</Text>
     </View>
   );
@@ -17,8 +18,8 @@ const styles = StyleSheet.create({
     padding: 24
   },
   text: {
-    color: "#475569",
+    color: design.colors.textSubtle,
     fontSize: 15,
-    fontWeight: "700"
+    fontWeight: design.text.weightMedium
   }
 });

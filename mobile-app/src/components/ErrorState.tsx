@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 import { WorkerButton } from "./WorkerButton";
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
@@ -15,7 +16,7 @@ const styles = StyleSheet.create({
   wrap: {
     backgroundColor: "#fff7ed",
     borderColor: "#fed7aa",
-    borderRadius: 16,
+    borderRadius: design.radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 16
@@ -23,7 +24,7 @@ const styles = StyleSheet.create({
   title: {
     color: "#9a3412",
     fontSize: 16,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   message: {
     color: "#7c2d12",

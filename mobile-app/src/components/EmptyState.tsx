@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { mobileTheme } from "../theme/mobileTheme";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 import { WorkerButton } from "./WorkerButton";
 
 export function EmptyState({ title, message, actionLabel, onAction }: { title: string; message: string; actionLabel?: string; onAction?: () => void }) {
@@ -14,18 +14,18 @@ export function EmptyState({ title, message, actionLabel, onAction }: { title: s
 
 const styles = StyleSheet.create({
   empty: {
-    ...mobileTheme.card,
-    gap: mobileTheme.spacing.sm,
-    padding: mobileTheme.spacing.lg
+    ...design.card,
+    gap: design.spacing.sm,
+    padding: design.spacing.xl
   },
   title: {
-    color: mobileTheme.colors.text,
-    fontSize: mobileTheme.font.lg,
-    fontWeight: "900"
+    color: design.colors.text,
+    fontSize: design.text.lg,
+    fontWeight: design.text.weightBlack
   },
   message: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: mobileTheme.font.base,
+    color: design.colors.textMuted,
+    fontSize: design.text.base,
     lineHeight: 21
   }
 });

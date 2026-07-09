@@ -6,6 +6,7 @@ import type { MobileUser } from "../types/mobile";
 import { ErrorState } from "../components/ErrorState";
 import { StatusPill } from "../components/StatusPill";
 import { WorkerButton } from "../components/WorkerButton";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 type Props = {
   user: MobileUser | null;
@@ -86,68 +87,63 @@ export function AccountScreen({ user, serverUrl, onLogout, onChangeServer, onUse
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: design.colors.background,
     flex: 1,
     gap: 14,
     padding: 14
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 18,
-    borderWidth: 1,
+    ...design.card,
     gap: 12,
     padding: 16
   },
   title: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 24,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   name: {
-    color: "#334155",
+    color: design.colors.textSubtle,
     fontSize: 17,
-    fontWeight: "800"
+    fontWeight: design.text.weightBold
   },
   label: {
-    color: "#64748b",
+    color: design.colors.textMuted,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: design.text.weightBlack,
     textTransform: "uppercase"
   },
   value: {
-    color: "#334155",
+    color: design.colors.textSubtle,
     fontSize: 14,
-    fontWeight: "700"
+    fontWeight: design.text.weightMedium
   },
   message: {
-    color: "#166534",
+    color: design.colors.successText,
     fontSize: 14,
-    fontWeight: "800"
+    fontWeight: design.text.weightBold
   },
   sectionTitle: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 18,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   accounts: {
     gap: 10,
     paddingBottom: 20
   },
   accountCard: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 16,
-    borderWidth: 1,
+    ...design.card,
     gap: 4,
     padding: 14
   },
   accountName: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 16,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   empty: {
-    color: "#64748b",
+    color: design.colors.textMuted,
     fontSize: 14
   }
 });

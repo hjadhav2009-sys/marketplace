@@ -4,6 +4,7 @@ import { getProductImages } from "../api/mobileApi";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { WorkerButton } from "../components/WorkerButton";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 export function ProductGalleryScreen({ sku, onBack }: { sku: string; onBack: () => void }) {
   const [images, setImages] = useState<string[]>([]);
@@ -85,6 +86,7 @@ export function ProductGalleryScreen({ sku, onBack }: { sku: string; onBack: () 
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: design.colors.overlay,
     flex: 1,
     gap: 12,
     padding: 14
@@ -95,14 +97,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   title: {
-    color: "#0f172a",
+    color: design.colors.primaryText,
     fontSize: 24,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   sku: {
-    color: "#64748b",
+    color: design.colors.border,
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: design.text.weightBold
   },
   close: {
     minHeight: 42
@@ -110,9 +112,9 @@ const styles = StyleSheet.create({
   mainImage: {
     alignItems: "center",
     aspectRatio: 1,
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 18,
+    backgroundColor: "#111827",
+    borderColor: "#334155",
+    borderRadius: design.radius.md,
     borderWidth: 1,
     justifyContent: "center",
     overflow: "hidden"
@@ -122,8 +124,8 @@ const styles = StyleSheet.create({
     width: "94%"
   },
   noImage: {
-    color: "#64748b",
-    fontWeight: "800"
+    color: design.colors.border,
+    fontWeight: design.text.weightBold
   },
   controls: {
     flexDirection: "row",
@@ -136,15 +138,15 @@ const styles = StyleSheet.create({
   thumb: {
     alignItems: "center",
     aspectRatio: 1,
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 12,
+    backgroundColor: "#111827",
+    borderColor: "#334155",
+    borderRadius: design.radius.md,
     borderWidth: 1,
     justifyContent: "center",
-    width: 76
+    width: design.sizes.thumbnail
   },
   thumbActive: {
-    borderColor: "#0f172a",
+    borderColor: design.colors.primaryText,
     borderWidth: 2
   },
   thumbImage: {

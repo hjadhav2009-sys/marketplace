@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
-import { mobileTheme } from "../theme/mobileTheme";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 type Props = {
   children: ReactNode;
@@ -25,8 +25,8 @@ export function WorkerButton({ children, onPress, variant = "primary", disabled,
         style
       ]}
     >
-      {loading ? <ActivityIndicator color={variant === "secondary" || variant === "ghost" ? "#0f172a" : "#ffffff"} /> : null}
-      <Text style={[styles.text, (variant === "secondary" || variant === "ghost") && styles.darkText]}>{children}</Text>
+      {loading ? <ActivityIndicator color={variant === "ghost" ? design.colors.text : "#ffffff"} /> : null}
+      <Text style={[styles.text, variant === "ghost" && styles.ghostText]}>{children}</Text>
     </Pressable>
   );
 }
@@ -34,22 +34,22 @@ export function WorkerButton({ children, onPress, variant = "primary", disabled,
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: mobileTheme.radius.md,
+    borderRadius: design.radius.md,
     flexDirection: "row",
     gap: 8,
     justifyContent: "center",
-    minHeight: 48,
+    minHeight: design.sizes.buttonHeight,
     paddingHorizontal: 16,
     paddingVertical: 12
   },
   primary: {
-    backgroundColor: mobileTheme.colors.primary
+    backgroundColor: design.colors.berry
   },
   secondary: {
-    backgroundColor: mobileTheme.colors.border
+    backgroundColor: design.colors.primary
   },
   danger: {
-    backgroundColor: mobileTheme.colors.dangerStrong
+    backgroundColor: design.colors.dangerStrong
   },
   ghost: {
     backgroundColor: "transparent"
@@ -62,10 +62,10 @@ const styles = StyleSheet.create({
   },
   text: {
     color: "#ffffff",
-    fontSize: mobileTheme.font.md,
-    fontWeight: "800"
+    fontSize: design.text.md,
+    fontWeight: design.text.weightBlack
   },
-  darkText: {
-    color: mobileTheme.colors.text
+  ghostText: {
+    color: design.colors.text
   }
 });

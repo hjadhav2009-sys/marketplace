@@ -7,6 +7,7 @@ import { WorkerButton } from "../components/WorkerButton";
 import type { MobilePackingSearchResult, MobileUser } from "../types/mobile";
 import { ProductDetailsScreen } from "./ProductDetailsScreen";
 import { ProductGalleryScreen } from "./ProductGalleryScreen";
+import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 export function PackingScreen({ user }: { user: MobileUser }) {
   const inputRef = useRef<TextInput>(null);
@@ -183,43 +184,41 @@ export function PackingScreen({ user }: { user: MobileUser }) {
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: design.colors.background,
     flex: 1,
     paddingHorizontal: 14
   },
   searchCard: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e8f0",
-    borderRadius: 18,
-    borderWidth: 1,
+    ...design.card,
     gap: 12,
     marginTop: 12,
     padding: 14
   },
   title: {
-    color: "#0f172a",
-    fontSize: 24,
-    fontWeight: "900"
+    color: design.colors.text,
+    fontSize: design.text.xl,
+    fontWeight: design.text.weightBlack
   },
   sub: {
-    color: "#64748b",
+    color: design.colors.textMuted,
     fontSize: 13,
-    fontWeight: "700"
+    fontWeight: design.text.weightMedium
   },
   input: {
-    backgroundColor: "#f8fafc",
-    borderColor: "#cbd5e1",
-    borderRadius: 14,
+    backgroundColor: design.colors.surfaceMuted,
+    borderColor: design.colors.borderStrong,
+    borderRadius: design.radius.lg,
     borderWidth: 1,
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 18,
-    fontWeight: "800",
-    minHeight: 54,
+    fontWeight: design.text.weightBold,
+    minHeight: design.sizes.inputHeight,
     paddingHorizontal: 14
   },
   message: {
-    color: "#166534",
+    color: design.colors.successText,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: design.text.weightBold,
     paddingVertical: 10
   },
   list: {
@@ -228,8 +227,8 @@ const styles = StyleSheet.create({
     paddingTop: 12
   },
   sticky: {
-    backgroundColor: "#ffffff",
-    borderTopColor: "#e2e8f0",
+    backgroundColor: design.colors.surface,
+    borderTopColor: design.colors.border,
     borderTopWidth: 1,
     bottom: 0,
     flexDirection: "row",
@@ -240,24 +239,24 @@ const styles = StyleSheet.create({
     right: 0
   },
   modalShade: {
-    backgroundColor: "rgba(15,23,42,0.45)",
+    backgroundColor: design.colors.overlaySoft,
     flex: 1,
     justifyContent: "flex-end"
   },
   modalCard: {
-    backgroundColor: "#ffffff",
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: design.colors.surface,
+    borderTopLeftRadius: design.radius.sheet,
+    borderTopRightRadius: design.radius.sheet,
     gap: 12,
     padding: 18
   },
   modalTitle: {
-    color: "#0f172a",
+    color: design.colors.text,
     fontSize: 22,
-    fontWeight: "900"
+    fontWeight: design.text.weightBlack
   },
   modalCopy: {
-    color: "#475569",
-    fontWeight: "800"
+    color: design.colors.textSubtle,
+    fontWeight: design.text.weightBold
   }
 });

@@ -57,6 +57,13 @@ export function login(username: string, password: string) {
   });
 }
 
+export function changePassword(input: { currentPassword: string; newPassword: string; confirmPassword: string }) {
+  return apiRequest<{ ok: true; user: MobileUser }>("/api/mobile/auth/change-password", {
+    method: "POST",
+    body: input
+  });
+}
+
 export function logout() {
   return apiRequest<{ ok: true }>("/api/mobile/auth/logout", { method: "POST" });
 }

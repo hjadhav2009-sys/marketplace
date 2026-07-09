@@ -46,6 +46,7 @@ const pickerSource = read("mobile-app", "src", "screens", "PickerScreen.tsx");
 const packingSource = read("mobile-app", "src", "screens", "PackingScreen.tsx");
 const gallerySource = read("mobile-app", "src", "screens", "ProductGalleryScreen.tsx");
 const detailsSource = read("mobile-app", "src", "screens", "ProductDetailsScreen.tsx");
+const mobileClientSource = read("mobile-app", "src", "api", "client.ts");
 const bottomNavSource = read("mobile-app", "src", "components", "BottomNav.tsx");
 const appSource = read("mobile-app", "App.tsx");
 const headerSource = read("mobile-app", "src", "components", "AppHeader.tsx");
@@ -75,8 +76,11 @@ assert.match(designSource, /berry: "#be185d"/, "Native design map mirrors web be
 assert.match(productCardSource, /design\.imageSquare/, "Product card uses shared square image style");
 assert.match(productCardSource, /testID="picker-card-actions-max-3"/, "Picker card keeps max 3 worker actions");
 assert.match(pickerSource, /markPicked/, "Picker card has Picked action");
+assert.match(pickerSource, /cachedPickerGroups\.accountId === selectedAccountId/, "Picker cache is scoped by selected account");
+assert.match(pickerSource, /getPickerGroups\(selectedAccountId/, "Picker groups request uses selected account");
 assert.match(pickerSource, /setItems\(nextItems\)/, "APK has optimistic Picked flow");
 assert.match(packingSource, /packStatus: "PACKING"/, "APK has optimistic Pack flow");
+assert.match(packingSource, /searchPacking\(trimmed, selectedAccountId\)/, "Packing search uses selected account");
 assert.ok(packingSource.indexOf("placeholder=\"FMPC0000000000\"") < packingSource.indexOf("Scan barcode"), "Packing manual search comes before scanner");
 assert.match(gallerySource, /getProductImages/, "Gallery fetches images from image screen only");
 assert.match(gallerySource, /design\.colors\.overlay/, "Gallery uses dark web-style lightbox background");
@@ -89,8 +93,12 @@ assert.doesNotMatch(ownerUsersApiSource, /passwordHash|passwordSalt|salt/i, "Own
 assert.doesNotMatch(ownerSystemApiSource, /DATABASE_URL|SESSION_SECRET|process\.env/, "Owner system API does not expose environment secrets");
 assert.match(accountSwitchApiSource, /resolveMobileAccount/, "Mobile account switch validates account access server-side");
 assert.match(accountSwitchApiSource, /setSelectedAccount/, "Mobile account switch updates selected account cookie");
+assert.match(accountSwitchApiSource, /accountId: account\.account\.id/, "Mobile account switch persists selected account on user record");
+assert.match(accountSwitchApiSource, /serializeMobileUser\(updatedUser\)/, "Mobile account switch returns updated selected account");
 assert.match(accountScreenSource, /selectMobileAccount/, "APK Account screen can switch seller account natively");
 assert.match(accountScreenSource, /Switch to this account/, "APK Account screen exposes account switch action");
+assert.match(mobileClientSource, /SESSION_COOKIE_NAME = "mpp_session"/, "Mobile client only stores the auth session cookie");
+assert.match(mobileClientSource, /extractSessionCookie/, "Mobile client ignores non-session Set-Cookie values");
 
 function readFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

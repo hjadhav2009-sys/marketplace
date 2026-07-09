@@ -1,6 +1,8 @@
 import { getSessionCookie, saveSessionCookie } from "../storage/sessionStorage";
 import { getServerUrl } from "../storage/serverStorage";
 
+const SESSION_COOKIE_NAME = "mpp_session";
+
 type RequestOptions = {
   method?: "GET" | "POST";
   body?: unknown;
@@ -33,6 +35,19 @@ function toUserMessage(error: unknown) {
   return new MobileApiError("Server not reachable. Check URL and network.", "network_error", 0);
 }
 
+function extractSessionCookie(setCookie: string | null) {
+  if (!setCookie) {
+    return null;
+  }
+
+  const cookies = setCookie.split(/,(?=\s*[^;,=\s]+=[^;,]+)/);
+  const sessionCookie = cookies
+    .map((cookie) => cookie.trim().split(";")[0])
+    .find((cookie) => cookie.startsWith(`${SESSION_COOKIE_NAME}=`));
+
+  return sessionCookie ?? null;
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const baseUrl = await getServerUrl();
 
@@ -57,10 +72,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       signal: controller.signal
     });
 
-    const setCookie = response.headers.get("set-cookie");
+    const sessionCookie = extractSessionCookie(response.headers.get("set-cookie"));
 
-    if (setCookie) {
-      await saveSessionCookie(setCookie.split(";")[0]);
+    if (sessionCookie) {
+      await saveSessionCookie(sessionCookie);
     }
 
     const text = await response.text();

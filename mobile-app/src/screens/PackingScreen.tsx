@@ -10,6 +10,7 @@ import { ProductGalleryScreen } from "./ProductGalleryScreen";
 import { webMobileDesign as design } from "../theme/webMobileDesign";
 
 export function PackingScreen({ user }: { user: MobileUser }) {
+  const selectedAccountId = user.selectedAccount?.id ?? undefined;
   const inputRef = useRef<TextInput>(null);
   const [code, setCode] = useState("");
   const [results, setResults] = useState<MobilePackingSearchResult[]>([]);
@@ -35,7 +36,7 @@ export function PackingScreen({ user }: { user: MobileUser }) {
     setMessage(null);
 
     try {
-      const response = await searchPacking(trimmed);
+      const response = await searchPacking(trimmed, selectedAccountId);
       setResults(response.results);
       setMessage(response.results.length ? `${response.results.length} item(s) found.` : "No matching order found.");
     } catch (err) {
@@ -59,7 +60,7 @@ export function PackingScreen({ user }: { user: MobileUser }) {
     setResults((current) => current.map((item) => (item.canPack ? { ...item, canPack: false, packStatus: "PACKING" } : item)));
 
     try {
-      const response = await confirmPacking({ code: targetCode });
+      const response = await confirmPacking({ code: targetCode, accountId: selectedAccountId });
       setMessage(`Packed ${response.packedCount}. Skipped ${response.skippedCount}.`);
       setCode("");
       setResults([]);
@@ -80,7 +81,7 @@ export function PackingScreen({ user }: { user: MobileUser }) {
     setBusy(true);
 
     try {
-      await markPackingProblem({ orderId: problemOrder.orderId, reason });
+      await markPackingProblem({ orderId: problemOrder.orderId, reason, accountId: selectedAccountId });
       setProblemOrder(null);
       setReason("");
       setMessage("Problem saved.");

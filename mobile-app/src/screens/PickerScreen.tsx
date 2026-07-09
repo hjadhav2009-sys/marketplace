@@ -11,9 +11,10 @@ import { ProductDetailsScreen } from "./ProductDetailsScreen";
 import { EmptyState } from "../components/EmptyState";
 import { webMobileDesign as design } from "../theme/webMobileDesign";
 
-let cachedPickerGroups: { at: number; groups: MobilePickerGroup[] } | null = null;
+let cachedPickerGroups: { accountId: string | null; at: number; groups: MobilePickerGroup[] } | null = null;
 
 export function PickerScreen({ user }: { user: MobileUser }) {
+  const selectedAccountId = user.selectedAccount?.id ?? null;
   const [items, setItems] = useState<MobilePickerGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,20 +29,20 @@ export function PickerScreen({ user }: { user: MobileUser }) {
     setError(null);
 
     try {
-      if (cachedPickerGroups && Date.now() - cachedPickerGroups.at < 15_000) {
+      if (cachedPickerGroups && cachedPickerGroups.accountId === selectedAccountId && Date.now() - cachedPickerGroups.at < 15_000) {
         setItems(cachedPickerGroups.groups);
         setLoading(false);
       }
 
-      const response = await getPickerGroups();
-      cachedPickerGroups = { at: Date.now(), groups: response.groups };
+      const response = await getPickerGroups(selectedAccountId ?? undefined);
+      cachedPickerGroups = { accountId: selectedAccountId, at: Date.now(), groups: response.groups };
       setItems(response.groups);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Picker data failed to load.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedAccountId]);
 
   useEffect(() => {
     load();
@@ -61,7 +62,7 @@ export function PickerScreen({ user }: { user: MobileUser }) {
     setItems(nextItems);
 
     try {
-      await markPicked({ sku: item.sku, color: item.color, size: item.size });
+      await markPicked({ sku: item.sku, color: item.color, size: item.size, accountId: selectedAccountId ?? undefined });
       cachedPickerGroups = null;
       await load();
     } catch (err) {
@@ -80,7 +81,7 @@ export function PickerScreen({ user }: { user: MobileUser }) {
     setBusySku(problemItem.sku);
 
     try {
-      await markPickerProblem({ sku: problemItem.sku, color: problemItem.color, size: problemItem.size, reason });
+      await markPickerProblem({ sku: problemItem.sku, color: problemItem.color, size: problemItem.size, reason, accountId: selectedAccountId ?? undefined });
       setProblemItem(null);
       setReason("");
       await load();

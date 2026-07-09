@@ -55,6 +55,8 @@ const ownerImportsApiSource = read("app", "api", "mobile", "owner", "imports", "
 const ownerIssuesApiSource = read("app", "api", "mobile", "owner", "imports", "[jobId]", "issues", "route.ts");
 const ownerUsersApiSource = read("app", "api", "mobile", "owner", "users", "route.ts");
 const ownerSystemApiSource = read("app", "api", "mobile", "owner", "system", "route.ts");
+const accountSwitchApiSource = read("app", "api", "mobile", "accounts", "select", "route.ts");
+const accountScreenSource = read("mobile-app", "src", "screens", "AccountScreen.tsx");
 
 assert.match(homeSource, /user\.tabs/, "APK bottom nav uses /api/mobile/me tabs");
 assert.match(homeSource, /DashboardScreen/, "Owner dashboard screen is wired");
@@ -85,6 +87,10 @@ assert.match(ownerImportsApiSource, /take: pageSize/, "Owner mobile imports use 
 assert.doesNotMatch(ownerIssuesApiSource, /rawData:\s*true/, "Owner issue API does not return raw private issue data");
 assert.doesNotMatch(ownerUsersApiSource, /passwordHash|passwordSalt|salt/i, "Owner users API does not return password hashes or salts");
 assert.doesNotMatch(ownerSystemApiSource, /DATABASE_URL|SESSION_SECRET|process\.env/, "Owner system API does not expose environment secrets");
+assert.match(accountSwitchApiSource, /resolveMobileAccount/, "Mobile account switch validates account access server-side");
+assert.match(accountSwitchApiSource, /setSelectedAccount/, "Mobile account switch updates selected account cookie");
+assert.match(accountScreenSource, /selectMobileAccount/, "APK Account screen can switch seller account natively");
+assert.match(accountScreenSource, /Switch to this account/, "APK Account screen exposes account switch action");
 
 function readFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

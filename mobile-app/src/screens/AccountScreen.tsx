@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
-import { getMe, logout, testConnection } from "../api/mobileApi";
+import { getMe, logout, selectMobileAccount, testConnection } from "../api/mobileApi";
 import { clearSessionCookie } from "../storage/sessionStorage";
 import type { MobileUser } from "../types/mobile";
 import { ErrorState } from "../components/ErrorState";
@@ -53,6 +53,23 @@ export function AccountScreen({ user, serverUrl, onLogout, onChangeServer, onUse
     }
   }
 
+  async function switchAccount(accountId: string) {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await selectMobileAccount(accountId);
+      onUserRefresh(response.user);
+      const selected = response.user.selectedAccount;
+      setMessage(selected ? `Switched to ${selected.companyName ?? "Company"} / ${selected.marketplace} / ${selected.name}.` : "Account switched.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not switch account.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <View style={styles.wrap}>
       <View style={styles.card}>
@@ -74,9 +91,21 @@ export function AccountScreen({ user, serverUrl, onLogout, onChangeServer, onUse
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.accountCard}>
-            <Text style={styles.accountName}>{item.name}</Text>
-            <Text style={styles.value}>{item.companyName ?? "Company"} / {item.marketplace}</Text>
+            <View style={styles.accountHeader}>
+              <View style={styles.accountTitleWrap}>
+                <Text style={styles.accountName}>{item.name}</Text>
+                <Text style={styles.value}>{item.companyName ?? "Company"} / {item.marketplace}</Text>
+              </View>
+              {user?.selectedAccount?.id === item.id ? <StatusPill label="Selected" tone="good" /> : null}
+            </View>
             {item.code ? <Text style={styles.value}>Code {item.code}</Text> : null}
+            <WorkerButton
+              onPress={() => switchAccount(item.id)}
+              variant={user?.selectedAccount?.id === item.id ? "ghost" : "secondary"}
+              disabled={busy || user?.selectedAccount?.id === item.id}
+            >
+              {user?.selectedAccount?.id === item.id ? "Current account" : "Switch to this account"}
+            </WorkerButton>
           </View>
         )}
         ListEmptyComponent={<Text style={styles.empty}>No assigned account. Ask owner to assign one.</Text>}
@@ -134,8 +163,17 @@ const styles = StyleSheet.create({
   },
   accountCard: {
     ...design.card,
-    gap: 4,
+    gap: 10,
     padding: 14
+  },
+  accountHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between"
+  },
+  accountTitleWrap: {
+    flex: 1
   },
   accountName: {
     color: design.colors.text,

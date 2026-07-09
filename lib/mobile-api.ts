@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Account, Role, User } from "@prisma/client";
-import { getAvailableAccounts, getCurrentSessionState } from "@/lib/auth";
+import { getAvailableAccounts, getCurrentSessionState, getSelectedAccount } from "@/lib/auth";
 import { getMobilePermissions, getMobileTabs, type MobilePermissionSet } from "@/lib/mobile-permissions";
 import { getSafeClientIp, shouldTrustProxyHeaders, type RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
@@ -92,7 +92,8 @@ export function serializeMobileAccount(account: Account): MobileAccount {
 export async function serializeMobileUser(user: User): Promise<MobileUser> {
   const accounts = await getAvailableAccounts(user);
   const permissions = getMobilePermissions(user);
-  const selectedAccount = accounts.find((account) => account.id === user.accountId) ?? accounts[0] ?? null;
+  const cookieSelectedAccount = await getSelectedAccount(user);
+  const selectedAccount = accounts.find((account) => account.id === cookieSelectedAccount?.id) ?? accounts.find((account) => account.id === user.accountId) ?? accounts[0] ?? null;
 
   return {
     id: user.id,

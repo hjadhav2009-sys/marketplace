@@ -74,6 +74,13 @@ export function getMe() {
   return apiRequest<{ ok: true; user: MobileUser }>("/api/mobile/me");
 }
 
+export function selectMobileAccount(accountId: string) {
+  return apiRequest<{ ok: true; accountId: string; user: MobileUser }>("/api/mobile/accounts/select", {
+    method: "POST",
+    body: { accountId }
+  });
+}
+
 export function getOwnerDashboard() {
   return apiRequest<{
     ok: true;

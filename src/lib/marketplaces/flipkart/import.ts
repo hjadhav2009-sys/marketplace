@@ -4,6 +4,7 @@ import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { setImportJobBatch, updateImportJobProgress } from "@/src/lib/import-jobs/store";
+import { syncIdentifiersForImportedListings } from "@/src/lib/marking/identifiers";
 import {
   chunkFlipkartListingRows,
   dedupeFlipkartListingRows,
@@ -463,6 +464,7 @@ export async function importFlipkartListingRows(input: {
     }
   }
 
+  const identifierSync = await syncIdentifiersForImportedListings({ accountId: input.account.id, importedAt });
   await writeIssues(batch.id, missingImageIssues);
 
   const allIssues = [...issues, ...missingImageIssues];
@@ -511,6 +513,7 @@ export async function importFlipkartListingRows(input: {
       skippedRows,
       missingImageRows,
       inactiveListings,
+      syncedIdentifiers: identifierSync.syncedIdentifiers,
       errorRows: allIssues.length
     },
     request: input.request

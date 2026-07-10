@@ -20,6 +20,8 @@ const ownerLinks = [
   { href: "/problems", label: "Problems" },
   { href: "/reports", label: "Reports" },
   { href: "/owner/sku-mappings", label: "Listings" },
+  { href: "/owner/marking-library", label: "Marking Library" },
+  { href: "/owner/process-rules", label: "Process Rules" },
   { href: "/owner/accounts", label: "Accounts" },
   { href: "/owner/users", label: "Users" },
   { href: "/owner/system", label: "System" },
@@ -67,16 +69,15 @@ async function logoutAction() {
   redirect("/login");
 }
 
-function linksForRole(role: string) {
-  if (role === "OWNER") {
+function linksForUser(user: { role: string; canManageMarkingLibrary: boolean; canManageProcessRules: boolean }) {
+  if (user.role === "OWNER") {
     return ownerLinks;
   }
 
-  if (role === "PICKER") {
-    return pickerLinks;
-  }
-
-  return packerLinks;
+  const links = user.role === "PICKER" ? [...pickerLinks] : [...packerLinks];
+  if (user.canManageMarkingLibrary) links.splice(-1, 0, { href: "/owner/marking-library", label: "Marking Library" });
+  if (user.canManageProcessRules) links.splice(-1, 0, { href: "/owner/process-rules", label: "Process Rules" });
+  return links;
 }
 
 function mobileLinksForRole(role: string) {
@@ -94,11 +95,11 @@ function mobileLinksForRole(role: string) {
 export async function AppShell({ children, title }: AppShellProps) {
   const user = await requireUser();
   const account = await requireAccount(user);
-  const links = linksForRole(user.role);
+  const links = linksForUser(user);
   const accountName = account.accountDisplayName ?? account.name;
   const accountCode = account.accountCode ?? account.code;
   const mobileLinks = mobileLinksForRole(user.role);
-  const ownerMobileLinks = ownerLinks.filter((link) => link.href !== "/change-password");
+  const managementMobileLinks = (user.role === "OWNER" ? ownerLinks : links).filter((link) => link.href !== "/change-password");
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-950">
@@ -125,13 +126,13 @@ export async function AppShell({ children, title }: AppShellProps) {
             >
               Switch account
             </Link>
-            {user.role === "OWNER" ? (
+            {user.role === "OWNER" || user.canManageMarkingLibrary || user.canManageProcessRules ? (
               <details className="relative sm:hidden" data-owner-mobile-menu>
                 <summary className="list-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 shadow-sm">
                   Menu
                 </summary>
                 <div className="absolute right-0 mt-2 grid w-56 gap-1 rounded-md border border-slate-200 bg-white p-2 shadow-xl">
-                  {ownerMobileLinks.map((link) => (
+                  {managementMobileLinks.map((link) => (
                     <Link key={link.href} href={link.href} prefetch className="rounded-md px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
                       {link.label}
                     </Link>

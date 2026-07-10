@@ -19,6 +19,8 @@ prisma/dev.db-journal
 !tests/fixtures/**/*.txt
 storage/product-images/
 storage/import-jobs/
+storage/marking-library/
+storage/marking-temp/
 private-test-data/
 local-test-data/
 *.real.xlsx

@@ -4,6 +4,11 @@ export type MobilePermissionSet = {
   canPick: boolean;
   canPack: boolean;
   canReportProblem: boolean;
+  canMark: boolean;
+  canAssemble: boolean;
+  canManageMarkingLibrary: boolean;
+  canManageProcessRules: boolean;
+  canViewAllWork: boolean;
   canViewAssignedProblems: boolean;
   canViewDashboard: boolean;
   canImportOrders: boolean;
@@ -20,7 +25,7 @@ export type MobilePermissionSet = {
 
 export type MobileTab = "dashboard" | "work" | "picker" | "packing" | "problems" | "imports" | "reports" | "admin" | "account";
 
-type PermissionUser = Pick<User, "role" | "canPick" | "canPack" | "canReportProblem">;
+type PermissionUser = Pick<User, "role" | "canPick" | "canPack" | "canReportProblem"> & Partial<Pick<User, "canMark" | "canAssemble" | "canManageMarkingLibrary" | "canManageProcessRules" | "canViewAllWork">>;
 
 export function getMobilePermissions(user: PermissionUser): MobilePermissionSet {
   const isOwner = user.role === "OWNER";
@@ -32,6 +37,11 @@ export function getMobilePermissions(user: PermissionUser): MobilePermissionSet 
     canPick,
     canPack,
     canReportProblem,
+    canMark: isOwner || Boolean(user.canMark),
+    canAssemble: isOwner || Boolean(user.canAssemble),
+    canManageMarkingLibrary: isOwner || Boolean(user.canManageMarkingLibrary),
+    canManageProcessRules: isOwner || Boolean(user.canManageProcessRules),
+    canViewAllWork: isOwner || Boolean(user.canViewAllWork),
     canViewAssignedProblems: canReportProblem,
     canViewDashboard: isOwner,
     canImportOrders: isOwner,

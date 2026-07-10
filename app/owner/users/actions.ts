@@ -34,6 +34,11 @@ function parseUserForm(formData: FormData) {
   const canPick = role === "OWNER" || role === "PICKER" || formData.getAll("canPick").includes("on");
   const canPack = role === "OWNER" || role === "PACKER" || formData.getAll("canPack").includes("on");
   const canReportProblem = role === "OWNER" || formData.getAll("canReportProblem").includes("on");
+  const canMark = role === "OWNER" || formData.getAll("canMark").includes("on");
+  const canAssemble = role === "OWNER" || formData.getAll("canAssemble").includes("on");
+  const canManageMarkingLibrary = role === "OWNER" || formData.getAll("canManageMarkingLibrary").includes("on");
+  const canManageProcessRules = role === "OWNER" || formData.getAll("canManageProcessRules").includes("on");
+  const canViewAllWork = role === "OWNER" || formData.getAll("canViewAllWork").includes("on");
 
   if (!name || !username || !role || !/^[a-z0-9._-]{3,40}$/.test(username)) {
     return null;
@@ -51,6 +56,11 @@ function parseUserForm(formData: FormData) {
     canPick,
     canPack,
     canReportProblem,
+    canMark,
+    canAssemble,
+    canManageMarkingLibrary,
+    canManageProcessRules,
+    canViewAllWork,
     accountIds: uniqueAccountIds,
     accountId: uniqueAccountIds[0] ?? null
   };
@@ -121,6 +131,11 @@ export async function createUserAction(formData: FormData) {
         canPick: parsed.canPick,
         canPack: parsed.canPack,
         canReportProblem: parsed.canReportProblem,
+        canMark: parsed.canMark,
+        canAssemble: parsed.canAssemble,
+        canManageMarkingLibrary: parsed.canManageMarkingLibrary,
+        canManageProcessRules: parsed.canManageProcessRules,
+        canViewAllWork: parsed.canViewAllWork,
         accountId: parsed.accountId,
         active: parsed.active,
         passwordHash: hashPassword(password),
@@ -187,6 +202,11 @@ export async function updateUserAction(formData: FormData) {
         canPick: parsed.canPick,
         canPack: parsed.canPack,
         canReportProblem: parsed.canReportProblem,
+        canMark: parsed.canMark,
+        canAssemble: parsed.canAssemble,
+        canManageMarkingLibrary: parsed.canManageMarkingLibrary,
+        canManageProcessRules: parsed.canManageProcessRules,
+        canViewAllWork: parsed.canViewAllWork,
         accountId: parsed.accountId,
         active: parsed.active,
         assignedAccounts: {
@@ -207,6 +227,20 @@ export async function updateUserAction(formData: FormData) {
     metadata: { username: updatedUser.username, role: updatedUser.role, accountId: updatedUser.accountId },
     request
   });
+
+  const permissionFields = ["canPick", "canMark", "canAssemble", "canPack", "canReportProblem", "canManageMarkingLibrary", "canManageProcessRules", "canViewAllWork"] as const;
+  const changedPermissions = permissionFields.filter((field) => target[field] !== updatedUser[field]);
+  if (changedPermissions.length > 0) {
+    await recordAuditLog({
+      userId: owner.id,
+      accountId: account.id,
+      action: "USER_WORK_PERMISSION_CHANGED",
+      entityType: "User",
+      entityId: target.id,
+      metadata: { changedPermissions, enabled: changedPermissions.filter((field) => updatedUser[field]) },
+      request
+    });
+  }
 
   revalidatePath("/owner/users");
   redirect("/owner/users?updated=1");

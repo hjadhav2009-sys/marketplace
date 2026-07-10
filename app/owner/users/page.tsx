@@ -141,7 +141,7 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
             <AccountChecklist accounts={accounts} selectedIds={accounts[0]?.id ? [accounts[0].id] : []} />
           </div>
           <div className="md:col-span-2 xl:col-span-5">
-            <WorkerPermissionChecklist canPick canPack={false} canReportProblem />
+            <WorkerPermissionChecklist canPick canMark={false} canAssemble={false} canPack={false} canReportProblem canManageMarkingLibrary={false} canManageProcessRules={false} canViewAllWork={false} />
           </div>
           <TextField name="password" label="Temporary password" type="password" placeholder="At least 8 characters" />
           <label className="flex items-center gap-2 rounded-md bg-slate-50 p-3 text-sm font-semibold text-slate-700">
@@ -334,6 +334,11 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                         canPick={user.role === "OWNER" || user.role === "PICKER" || user.canPick}
                         canPack={user.role === "OWNER" || user.role === "PACKER" || user.canPack}
                         canReportProblem={user.role === "OWNER" || user.canReportProblem}
+                        canMark={user.role === "OWNER" || user.canMark}
+                        canAssemble={user.role === "OWNER" || user.canAssemble}
+                        canManageMarkingLibrary={user.role === "OWNER" || user.canManageMarkingLibrary}
+                        canManageProcessRules={user.role === "OWNER" || user.canManageProcessRules}
+                        canViewAllWork={user.role === "OWNER" || user.canViewAllWork}
                       />
                     </div>
                     <div className="md:col-span-2">
@@ -489,30 +494,45 @@ function AccountChecklist({
 function WorkerPermissionChecklist({
   canPick,
   canPack,
-  canReportProblem
+  canReportProblem,
+  canMark,
+  canAssemble,
+  canManageMarkingLibrary,
+  canManageProcessRules,
+  canViewAllWork
 }: {
   canPick: boolean;
   canPack: boolean;
   canReportProblem: boolean;
+  canMark: boolean;
+  canAssemble: boolean;
+  canManageMarkingLibrary: boolean;
+  canManageProcessRules: boolean;
+  canViewAllWork: boolean;
 }) {
   return (
     <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-3">
       <legend className="px-1 text-sm font-bold text-slate-700">Worker permissions</legend>
-      <div className="mt-2 grid gap-2 sm:grid-cols-3">
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <input name="canPick" type="checkbox" defaultChecked={canPick} className="h-4 w-4 rounded border-slate-300" />
-          Pick orders
-        </label>
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <input name="canPack" type="checkbox" defaultChecked={canPack} className="h-4 w-4 rounded border-slate-300" />
-          Pack / scan AWB
-        </label>
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <input name="canReportProblem" type="checkbox" defaultChecked={canReportProblem} className="h-4 w-4 rounded border-slate-300" />
-          Report problems
-        </label>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <PermissionToggle name="canPick" checked={canPick} label="Pick" description="Pick assigned order or consignment work." />
+        <PermissionToggle name="canMark" checked={canMark} label="Mark" description="Complete future marking work stages." />
+        <PermissionToggle name="canAssemble" checked={canAssemble} label="Assemble" description="Complete future assembly stages." />
+        <PermissionToggle name="canPack" checked={canPack} label="Pack" description="Search labels and pack ready work." />
+        <PermissionToggle name="canReportProblem" checked={canReportProblem} label="Report Problem" description="Report problems on assigned work." />
+        <PermissionToggle name="canManageMarkingLibrary" checked={canManageMarkingLibrary} label="Manage Marking Library" description="Manage assets only in assigned account context." />
+        <PermissionToggle name="canManageProcessRules" checked={canManageProcessRules} label="Manage Process Rules" description="Configure listing routes in assigned accounts." />
+        <PermissionToggle name="canViewAllWork" checked={canViewAllWork} label="View All Work" description="View account work beyond own assignments." />
       </div>
-      <p className="mt-2 text-xs text-slate-500">Tick both Pick and Pack for a multi-role worker. Owner role always has full access.</p>
+      <p className="mt-2 text-xs text-slate-500">Role names remain compatible. Permissions may be combined; Owner always has full server-side access.</p>
     </fieldset>
+  );
+}
+
+function PermissionToggle({ name, checked, label, description }: { name: string; checked: boolean; label: string; description: string }) {
+  return (
+    <label className="flex items-start gap-2 rounded-md bg-white p-2 text-sm text-slate-700 ring-1 ring-slate-200">
+      <input name={name} type="checkbox" defaultChecked={checked} className="mt-1 h-4 w-4 rounded border-slate-300" />
+      <span><span className="block font-bold">{label}</span><span className="block text-xs leading-4 text-slate-500">{description}</span></span>
+    </label>
   );
 }

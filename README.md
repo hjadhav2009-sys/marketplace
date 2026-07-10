@@ -2,6 +2,8 @@
 
 Multi-marketplace warehouse pick-and-pack app cloned from the working Meesho foundation.
 
+This application manages worker Pick / Mark / Assemble / Pack workflows. It is not inventory-management or ERP software and does not track physical available stock, valuation, receiving, QC, or marketplace stock updates.
+
 Current focus: Flipkart Pick & Pack.
 
 Future support: Meesho, Amazon, Myntra, and WooCommerce.
@@ -49,6 +51,12 @@ Do not commit real Meesho PDFs or real Flipkart order exports. Use sanitized sam
 Back up `.env` securely outside Git because it contains database connection and signing secrets.
 
 The repo ignores real PDF files, local SQLite databases, `node_modules`, `.next`, and `storage/product-images/`.
+
+## Marking And Workflow Foundation
+
+Owners can manage marking designs at `/owner/marking-library` and account-scoped product routes at `/owner/process-rules`. Files remain in ignored managed owner-PC storage, replacements create immutable versions, and one design can link explicitly to listings across multiple seller accounts. Exact identifiers are used before title fallback and ambiguous matches require owner choice.
+
+Phase 1 adds a dormant `WorkTask` foundation only. Existing order Picker and Packing behavior remains unchanged. See `docs/MARKING_LIBRARY.md`, `docs/WORKFLOW_ROADMAP.md`, `docs/MARKING_WORKER_FILE_DELIVERY.md`, and `docs/UNIVERSAL_WORK_SCAN_CONTRACT.md`.
 
 ## Marketplace Structure
 

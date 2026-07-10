@@ -88,34 +88,102 @@ enum Marketplace {
   OTHER
 }
 
+enum WorkSourceType {
+  ORDER
+  CONSIGNMENT
+}
+
+enum WorkStage {
+  PICK
+  MARK
+  ASSEMBLE
+  PACK
+}
+
+enum WorkTaskStatus {
+  LOCKED
+  READY
+  IN_PROGRESS
+  COMPLETED
+  PROBLEM
+  CANCELLED
+  SKIPPED
+}
+
+enum ProcessRoute {
+  PICK_PACK
+  PICK_MARK_PACK
+  PICK_ASSEMBLE_PACK
+  PICK_MARK_ASSEMBLE_PACK
+}
+
+enum AttachmentType {
+  MARKING_FILE
+  MARKING_PREVIEW
+  MARKING_REPORT
+  ASSEMBLY_GUIDE
+  ASSEMBLY_IMAGE
+  OTHER
+}
+
+enum IdentifierType {
+  SELLER_SKU
+  INTERNAL_SKU
+  FSN
+  LISTING_ID
+  LID
+  ASIN
+  FNSKU
+  EAN
+  UPC
+  GTIN
+  MODEL_NUMBER
+  BARCODE
+  EXTERNAL_ID
+}
+
 model User {
-  id                           String                 @id @default(cuid())
-  username                     String                 @unique
+  id                           String                    @id @default(cuid())
+  username                     String                    @unique
   passwordHash                 String
   name                         String
   role                         Role
-  active                       Boolean                @default(true)
-  canPick                      Boolean                @default(false)
-  canPack                      Boolean                @default(false)
-  canReportProblem             Boolean                @default(true)
-  mustChangePassword           Boolean                @default(false)
-  failedLoginCount             Int                    @default(0)
+  active                       Boolean                   @default(true)
+  canPick                      Boolean                   @default(false)
+  canPack                      Boolean                   @default(false)
+  canReportProblem             Boolean                   @default(true)
+  canMark                      Boolean                   @default(false)
+  canAssemble                  Boolean                   @default(false)
+  canManageMarkingLibrary      Boolean                   @default(false)
+  canManageProcessRules        Boolean                   @default(false)
+  canViewAllWork               Boolean                   @default(false)
+  mustChangePassword           Boolean                   @default(false)
+  failedLoginCount             Int                       @default(0)
   lockedUntil                  DateTime?
   lastLoginAt                  DateTime?
   lastLoginIp                  String?
   lastUserAgent                String?
   accountId                    String?
-  account                      Account?               @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  assignedAccounts             Account[]              @relation("UserAssignedAccounts")
-  passwordResetRequests        PasswordResetRequest[] @relation("PasswordResetTarget")
-  handledPasswordResetRequests PasswordResetRequest[] @relation("PasswordResetHandler")
-  uploadedBatches              UploadBatch[]          @relation("UploadedBatches")
-  scanLogs                     ScanLog[]              @relation("UserScanLogs")
-  problemOrders                ProblemOrder[]         @relation("ReportedProblems")
+  account                      Account?                  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  assignedAccounts             Account[]                 @relation("UserAssignedAccounts")
+  passwordResetRequests        PasswordResetRequest[]    @relation("PasswordResetTarget")
+  handledPasswordResetRequests PasswordResetRequest[]    @relation("PasswordResetHandler")
+  uploadedBatches              UploadBatch[]             @relation("UploadedBatches")
+  scanLogs                     ScanLog[]                 @relation("UserScanLogs")
+  problemOrders                ProblemOrder[]            @relation("ReportedProblems")
   sessions                     UserDeviceSession[]
   auditLogs                    AuditLog[]
-  createdAt                    DateTime               @default(now())
-  updatedAt                    DateTime               @updatedAt
+  markingAssetsCreated         MarkingAsset[]            @relation("MarkingAssetCreatedBy")
+  markingAssetsUpdated         MarkingAsset[]            @relation("MarkingAssetUpdatedBy")
+  markingFilesUploaded         MarkingAssetFile[]        @relation("MarkingAssetFileUploadedBy")
+  markingLinksCreated          MarkingAssetListingLink[] @relation("MarkingAssetLinkCreatedBy")
+  processRulesCreated          ProductProcessRule[]      @relation("ProcessRuleCreatedBy")
+  processRulesUpdated          ProductProcessRule[]      @relation("ProcessRuleUpdatedBy")
+  workTasksAssigned            WorkTask[]                @relation("WorkTaskAssignedUser")
+  workTasksStarted             WorkTask[]                @relation("WorkTaskStartedBy")
+  workTasksCompleted           WorkTask[]                @relation("WorkTaskCompletedBy")
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
 }
 
 model UserDeviceSession {
@@ -169,17 +237,17 @@ model AuditLog {
 }
 
 model Account {
-  id                  String               @id @default(cuid())
-  name                String               @unique
-  code                String               @unique
-  companyName         String               @default("Sullery")
-  marketplace         Marketplace          @default(FLIPKART)
+  id                  String                         @id @default(cuid())
+  name                String                         @unique
+  code                String                         @unique
+  companyName         String                         @default("Sullery")
+  marketplace         Marketplace                    @default(FLIPKART)
   accountDisplayName  String?
   accountCode         String?
-  active              Boolean              @default(true)
+  active              Boolean                        @default(true)
   notes               String?
   users               User[]
-  assignedUsers       User[]               @relation("UserAssignedAccounts")
+  assignedUsers       User[]                         @relation("UserAssignedAccounts")
   skuImageMappings    SkuImageMapping[]
   marketplaceListings MarketplaceListing[]
   uploadBatches       UploadBatch[]
@@ -188,8 +256,12 @@ model Account {
   scanLogs            ScanLog[]
   problemOrders       ProblemOrder[]
   auditLogs           AuditLog[]
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  listingIdentifiers  MarketplaceListingIdentifier[]
+  markingAssetLinks   MarkingAssetListingLink[]
+  processRules        ProductProcessRule[]
+  workTasks           WorkTask[]
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
 
   @@index([active])
   @@index([companyName])
@@ -230,9 +302,9 @@ model ImportJob {
 }
 
 model MarketplaceListing {
-  id                        String    @id @default(cuid())
+  id                        String                         @id @default(cuid())
   accountId                 String
-  account                   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account                   Account                        @relation(fields: [accountId], references: [id], onDelete: Cascade)
   marketplace               String
   sellerSkuId               String
   sku                       String
@@ -279,8 +351,11 @@ model MarketplaceListing {
   image1366Url10            String?
   mainImageUrl              String?
   lastImportedAt            DateTime?
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  createdAt                 DateTime                       @default(now())
+  updatedAt                 DateTime                       @updatedAt
+  identifiers               MarketplaceListingIdentifier[]
+  markingAssetLinks         MarkingAssetListingLink[]
+  processRules              ProductProcessRule[]
 
   @@unique([accountId, marketplace, sellerSkuId])
   @@index([accountId, marketplace])
@@ -288,6 +363,164 @@ model MarketplaceListing {
   @@index([accountId, marketplace, listingStatus])
   @@index([accountId, marketplace, mainImageUrl])
   @@index([lastImportedAt])
+}
+
+model MarketplaceListingIdentifier {
+  id                   String             @id @default(cuid())
+  accountId            String
+  account              Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  marketplaceListingId String
+  marketplaceListing   MarketplaceListing @relation(fields: [marketplaceListingId], references: [id], onDelete: Cascade)
+  marketplace          Marketplace
+  identifierType       IdentifierType
+  rawValue             String
+  normalizedValue      String
+  source               String             @default("LISTING_IMPORT")
+  active               Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([marketplaceListingId, identifierType, normalizedValue])
+  @@index([accountId, identifierType, normalizedValue])
+  @@index([marketplaceListingId, active])
+  @@index([accountId, marketplace, active])
+}
+
+model MarkingAsset {
+  id               String                    @id @default(cuid())
+  name             String
+  masterDesignId   String?                   @unique
+  description      String?
+  machineType      String?
+  softwareName     String?
+  material         String?
+  markingPosition  String?
+  markingWidthMm   Float?
+  markingHeightMm  Float?
+  powerSetting     Float?
+  speedSetting     Float?
+  frequencySetting Float?
+  passes           Int?
+  instructions     String?
+  settingsJson     String?
+  status           String                    @default("DRAFT")
+  active           Boolean                   @default(true)
+  createdByUserId  String?
+  createdByUser    User?                     @relation("MarkingAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUserId  String?
+  updatedByUser    User?                     @relation("MarkingAssetUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  files            MarkingAssetFile[]
+  listingLinks     MarkingAssetListingLink[]
+  processRules     ProductProcessRule[]
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@index([active, updatedAt])
+  @@index([status, active])
+}
+
+model MarkingAssetFile {
+  id                  String         @id @default(cuid())
+  markingAssetId      String
+  markingAsset        MarkingAsset   @relation(fields: [markingAssetId], references: [id], onDelete: Cascade)
+  attachmentType      AttachmentType
+  versionNumber       Int
+  originalFileName    String
+  managedRelativePath String
+  contentType         String
+  fileExtension       String
+  fileSizeBytes       Int
+  sha256              String
+  activeVersion       Boolean        @default(true)
+  uploadedByUserId    String?
+  uploadedByUser      User?          @relation("MarkingAssetFileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  createdAt           DateTime       @default(now())
+
+  @@unique([markingAssetId, attachmentType, versionNumber])
+  @@index([markingAssetId, attachmentType, activeVersion])
+  @@index([sha256])
+}
+
+model MarkingAssetListingLink {
+  id                     String             @id @default(cuid())
+  markingAssetId         String
+  markingAsset           MarkingAsset       @relation(fields: [markingAssetId], references: [id], onDelete: Cascade)
+  marketplaceListingId   String
+  marketplaceListing     MarketplaceListing @relation(fields: [marketplaceListingId], references: [id], onDelete: Cascade)
+  accountId              String
+  account                Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  marketplace            Marketplace
+  matchMethod            String
+  confidence             Float?
+  identifierSnapshotJson String?
+  active                 Boolean            @default(true)
+  createdByUserId        String?
+  createdByUser          User?              @relation("MarkingAssetLinkCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  @@unique([markingAssetId, marketplaceListingId])
+  @@index([marketplaceListingId, active])
+  @@index([accountId, active])
+}
+
+model ProductProcessRule {
+  id                   String             @id @default(cuid())
+  accountId            String
+  account              Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  marketplaceListingId String
+  marketplaceListing   MarketplaceListing @relation(fields: [marketplaceListingId], references: [id], onDelete: Cascade)
+  route                ProcessRoute
+  markingAssetId       String?
+  markingAsset         MarkingAsset?      @relation(fields: [markingAssetId], references: [id], onDelete: SetNull)
+  markingRequired      Boolean            @default(false)
+  assemblyRequired     Boolean            @default(false)
+  assemblyTitle        String?
+  assemblyInstructions String?
+  assemblyImageUrl     String?
+  active               Boolean            @default(true)
+  createdByUserId      String?
+  createdByUser        User?              @relation("ProcessRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUserId      String?
+  updatedByUser        User?              @relation("ProcessRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([accountId, active])
+  @@index([marketplaceListingId, active])
+  @@index([markingAssetId, active])
+}
+
+model WorkTask {
+  id                String         @id @default(cuid())
+  accountId         String
+  account           Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceType        WorkSourceType
+  orderId           String?
+  order             Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  consignmentLineId String?
+  stage             WorkStage
+  sequenceNumber    Int
+  requiredQuantity  Int
+  completedQuantity Int            @default(0)
+  status            WorkTaskStatus @default(LOCKED)
+  assignedUserId    String?
+  assignedUser      User?          @relation("WorkTaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  startedByUserId   String?
+  startedByUser     User?          @relation("WorkTaskStartedBy", fields: [startedByUserId], references: [id], onDelete: SetNull)
+  completedByUserId String?
+  completedByUser   User?          @relation("WorkTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  problemReason     String?
+  metadataJson      String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([accountId, status, stage])
+  @@index([assignedUserId, status, stage])
+  @@index([orderId, stage])
+  @@index([sourceType, consignmentLineId])
 }
 
 model SkuImageMapping {
@@ -385,6 +618,7 @@ model Order {
   oldPendingReviewNote   String?
   scanLogs               ScanLog[]
   problemOrders          ProblemOrder[]
+  workTasks              WorkTask[]
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 

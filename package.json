@@ -14,10 +14,12 @@
     "flipkart:dry-run": "tsx scripts/flipkart-dry-run.mjs",
     "flipkart:generate-performance-fixtures": "node scripts/generate-flipkart-performance-fixtures.mjs",
     "flipkart:perf-test": "tsx scripts/flipkart-perf-test.mjs",
+    "marking:backfill-identifiers": "tsx scripts/backfill-listing-identifiers.ts",
+    "test:marking-migration": "node scripts/marking-migration-smoke.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run lint && npm run test:validators",
-    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts && tsx tests/flipkart-parser.test.ts && tsx tests/flipkart-import-workflow.test.ts && tsx tests/import-job-progress.test.ts && tsx tests/mobile-app-source.test.ts",
+    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts && tsx tests/flipkart-parser.test.ts && tsx tests/flipkart-import-workflow.test.ts && tsx tests/import-job-progress.test.ts && tsx tests/marking-foundation.test.ts && tsx tests/mobile-app-source.test.ts",
     "db:seed": "prisma db seed",
     "db:migrate:prod": "prisma migrate deploy --schema prisma/schema.postgres.prisma"
   },

@@ -1,0 +1,13 @@
+{
+  "latestVersionName": "1.2.0",
+  "latestVersionCode": 12,
+  "minimumSupportedVersionCode": 10,
+  "mandatory": false,
+  "downloadUrl": "https://downloads.example.com/apps/marketplace-pick-pack-1.2.0.apk",
+  "sha256": "replace-with-64-character-sha256",
+  "releaseNotes": [
+    "Improved scanner",
+    "Faster packing search",
+    "Bug fixes"
+  ]
+}

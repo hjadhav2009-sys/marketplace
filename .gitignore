@@ -46,6 +46,10 @@ mobile-app/android/
 mobile-app/ios/
 mobile-app/dist/
 mobile-app/**/*.apk
+mobile-app/**/*.aab
+mobile-app/**/*.keystore
+mobile-app/**/keystore.properties
+config/mobile-app-release.local.json
 
 # misc
 .DS_Store

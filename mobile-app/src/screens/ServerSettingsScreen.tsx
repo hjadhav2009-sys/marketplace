@@ -1,35 +1,44 @@
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MobileApiError } from "../api/client";
-import { testConnection } from "../api/mobileApi";
-import { isValidServerUrl, saveServerUrl } from "../storage/serverStorage";
-import { ErrorState } from "../components/ErrorState";
-import { WorkerButton } from "../components/WorkerButton";
-import { webMobileDesign as design } from "../theme/webMobileDesign";
+import { NativeButton } from "../components/NativeButton";
+import { NativeErrorState } from "../components/NativeErrorState";
+import { testServerConnection } from "../services/connectionService";
+import { inspectServerUrl } from "../services/serverConfig";
+import { saveServerUrl } from "../storage/serverStorage";
+import { nativeShellTheme as theme } from "../theme/nativeShellTheme";
 
-type Props = {
-  currentUrl: string | null;
-  onSaved: (url: string) => void;
-};
+type Props = { currentUrl: string | null; onSaved: (url: string) => void; onCancel?: () => void };
 
-export function ServerSettingsScreen({ currentUrl, onSaved }: Props) {
+export function ServerSettingsScreen({ currentUrl, onSaved, onCancel }: Props) {
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState(currentUrl ?? "");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function saveOnly() {
-    setError(null);
+  async function validateAndConfirm() {
+    const result = inspectServerUrl(url);
 
-    if (!isValidServerUrl(url)) {
-      setError("Enter a URL like http://100.x.x.x:3001 or http://192.168.x.x:3001.");
-      return;
+    if (!result.normalized || result.kind === "invalid") {
+      setError("Enter a complete http:// or https:// server address without a path.");
+      return null;
     }
 
-    const saved = await saveServerUrl(url);
-    onSaved(saved);
+    if (result.kind === "unsafe-public-http") {
+      return await new Promise<string | null>((resolve) => {
+        Alert.alert(
+          "Public HTTP is unsafe",
+          "Use HTTPS, a private LAN address, or a Tailscale 100.x address. Save this address only if you understand the risk.",
+          [
+            { text: "Cancel", style: "cancel", onPress: () => resolve(null) },
+            { text: "Save anyway", style: "destructive", onPress: () => resolve(result.normalized) }
+          ]
+        );
+      });
+    }
+
+    return result.normalized;
   }
 
   async function testAndSave() {
@@ -38,26 +47,30 @@ export function ServerSettingsScreen({ currentUrl, onSaved }: Props) {
     setStatus(null);
 
     try {
-      const saved = await saveServerUrl(url);
-      await testConnection();
-      setStatus("Connected. Server URL saved.");
+      const normalized = await validateAndConfirm();
+      if (!normalized) return;
+      const result = await testServerConnection(normalized);
+      if (!result.ok) {
+        setError(result.reason === "timeout" ? "Server timed out. Check the owner PC and Tailscale." : "Server is not reachable from this phone.");
+        return;
+      }
+      const saved = await saveServerUrl(normalized);
+      setStatus("Connected. Opening the web application...");
       onSaved(saved);
-    } catch (err) {
-      const message = err instanceof MobileApiError ? err.message : "Server not reachable.";
-      setError(message);
+    } catch {
+      setError("The server address could not be saved.");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 20), paddingTop: Math.max(insets.top, 20) }]}>
-      <View style={styles.card}>
-        <Text style={styles.eyebrow}>Server setup</Text>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
+      <ScrollView contentContainerStyle={[styles.wrap, { paddingTop: Math.max(insets.top, 24), paddingBottom: Math.max(insets.bottom, 24) }]} keyboardShouldPersistTaps="handled">
+        <Text style={styles.eyebrow}>Native connection</Text>
         <Text style={styles.title}>Connect to owner PC</Text>
-        <Text style={styles.copy}>
-          Enter the local or Tailscale URL for the Marketplace Pick & Pack server. The Android app never connects to the database directly.
-        </Text>
+        <Text style={styles.copy}>Use an HTTPS domain, Tailscale address, or same-Wi-Fi private address. The APK never connects directly to the database.</Text>
+        <Text style={styles.label}>Server URL</Text>
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
@@ -67,56 +80,24 @@ export function ServerSettingsScreen({ currentUrl, onSaved }: Props) {
           style={styles.input}
           value={url}
         />
-        {error ? <ErrorState message={error} /> : null}
+        <Text style={styles.examples}>HTTPS: https://pack.example.com{"\n"}Tailscale: http://100.x.x.x:3001{"\n"}Local: http://192.168.x.x:3001</Text>
+        {error ? <NativeErrorState title="Connection failed" message={error} /> : null}
         {status ? <Text style={styles.status}>{status}</Text> : null}
-        <WorkerButton onPress={testAndSave} loading={busy}>Test connection</WorkerButton>
-        <WorkerButton onPress={saveOnly} variant="secondary">Save server URL</WorkerButton>
-      </View>
+        <NativeButton loading={busy} onPress={testAndSave}>Test, save and open</NativeButton>
+        {onCancel ? <NativeButton onPress={onCancel} variant="secondary">Cancel</NativeButton> : null}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: design.colors.background,
-    flex: 1,
-    justifyContent: "center",
-    padding: 20
-  },
-  card: {
-    ...design.card,
-    gap: 14,
-    padding: 20
-  },
-  eyebrow: {
-    color: design.colors.berry,
-    fontSize: 13,
-    fontWeight: design.text.weightBlack,
-    textTransform: "uppercase"
-  },
-  title: {
-    color: design.colors.text,
-    fontSize: design.text.hero,
-    fontWeight: design.text.weightBlack
-  },
-  copy: {
-    color: design.colors.textSubtle,
-    fontSize: 15,
-    lineHeight: 22
-  },
-  input: {
-    backgroundColor: design.colors.surfaceMuted,
-    borderColor: design.colors.borderStrong,
-    borderRadius: design.radius.lg,
-    borderWidth: 1,
-    color: design.colors.text,
-    fontSize: 16,
-    minHeight: design.sizes.inputHeight,
-    paddingHorizontal: 14
-  },
-  status: {
-    color: design.colors.successText,
-    fontSize: 14,
-    fontWeight: design.text.weightBold
-  }
+  flex: { flex: 1 },
+  wrap: { backgroundColor: theme.colors.background, flexGrow: 1, gap: 14, justifyContent: "center", paddingHorizontal: 20 },
+  eyebrow: { color: theme.colors.primary, fontSize: 13, fontWeight: "900", textTransform: "uppercase" },
+  title: { color: theme.colors.text, fontSize: 28, fontWeight: "900" },
+  copy: { color: theme.colors.muted, fontSize: 15, lineHeight: 22 },
+  label: { color: theme.colors.text, fontSize: 14, fontWeight: "800", marginTop: 4 },
+  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius, borderWidth: 1, color: theme.colors.text, fontSize: 16, minHeight: 52, paddingHorizontal: 14 },
+  examples: { color: theme.colors.muted, fontSize: 13, lineHeight: 20 },
+  status: { color: theme.colors.success, fontSize: 14, fontWeight: "800" }
 });

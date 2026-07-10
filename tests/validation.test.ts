@@ -1330,6 +1330,7 @@ assert.equal(
 assert.match(awbScannerComponent, /<details open[\s\S]*data-mobile-scanner-panel/, "Packing scanner is secondary and collapsible");
 assert.match(awbScannerComponent, /<Link[\s\S]*prefetch/, "Packing search suggestions prefetch scan-result pages");
 assert.match(awbScannerComponent, /directPackAction/, "AWB scanner accepts a direct Pack server action");
+assert.match(awbScannerComponent, /await import\("@zxing\/browser"\)/, "Browser barcode engine loads only when the browser scanner starts");
 assert.match(awbScannerComponent, /Pack now[\s\S]*Details[\s\S]*Problem/, "Packing search result cards expose Pack, Details, and Problem actions");
 assert.match(awbScannerComponent, /ProductImageGallery/, "Packing search result image opens gallery instead of navigating");
 assert.match(awbScannerComponent, /shouldAcceptScannerValue/, "Scanner has duplicate scan debounce helper");

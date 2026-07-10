@@ -1,87 +1,61 @@
-# Marketplace Pick Pack Mobile
+# Marketplace Pick & Pack Hybrid Android App
 
-Phase 1 Android worker prototype for Marketplace Pick & Pack.
+The Android app is an Expo SDK 54 hybrid shell. It keeps one persistent `react-native-webview` instance for the complete Next.js application and adds native Android scanner, safe-area, connection, update, and settings screens around it.
 
-## Architecture
+The APK never connects directly to SQLite or PostgreSQL. It contains no database URL, session secret, password hash, salt, database file, or owner credential. Login and every owner/worker permission remain enforced by the Next.js backend.
 
-- This is a native React Native / Expo app. It does not use WebView.
-- The native UI is expected to match the existing web mobile worker UI: compact header, bottom navigation, square product images, picker cards, packing search, and dark product gallery.
-- The Android app talks only to the existing Next.js mobile API.
-- The database stays on the owner PC.
-- The APK does not contain `DATABASE_URL`, `SESSION_SECRET`, password hashes, salts, `.env`, database files, or admin secrets.
-- Login sends username/password to the API. The server verifies the password and returns a secure web session cookie.
-- Worker data is scoped by role and assigned account on the server.
+## Start The Owner PC Server
 
-## Start Backend On Owner PC
-
-From the main repo:
+Use a production build for daily warehouse work:
 
 ```powershell
+cd E:\marketplace1\marketplace
 $env:DATABASE_URL="file:./dev.db"
-$env:SESSION_SECRET="local-test-secret-change-me"
-$env:NEXT_PUBLIC_APP_URL="http://localhost:3001"
+$env:SESSION_SECRET="use-a-long-private-production-secret"
+$env:NEXT_PUBLIC_APP_URL="http://100.x.x.x:3001"
 $env:NEXT_PUBLIC_APP_NAME="Marketplace Pick & Pack"
-npm.cmd run dev -- --host 0.0.0.0 --port 3001
+npm.cmd run build
+npm.cmd start -- --hostname 0.0.0.0 --port 3001
 ```
 
-Allow Node.js through Windows Firewall on the Private network.
+Do not use `npm run dev` for daily worker performance.
 
-## Server URL In Android App
+## Connect Android
 
-Same Wi-Fi example:
+Enter one server URL in the native setup screen:
 
-```text
-http://192.168.x.x:3001
-```
+- HTTPS domain: `https://pack.example.com`
+- Tailscale: `http://100.x.x.x:3001`
+- Same Wi-Fi: `http://192.168.x.x:3001`
 
-Tailscale example:
+HTTPS through Cloudflare Tunnel is recommended for production. Tailscale is the private backup. Public router port forwarding is not recommended.
 
-```text
-http://100.x.x.x:3001
-```
+## Native Scanner
 
-For different Wi-Fi networks, use Tailscale or ZeroTier private IP. Plain router port-forwarding is not recommended.
+The web packing page detects the APK and requests the native Expo Camera scanner through a strict `postMessage` bridge. The scanned value is JSON-escaped, returned to the existing packing form, and searched automatically. Scanning never auto-packs an order.
 
-## Scanner Flow
+## Files And Downloads
 
-The native camera scanner reads the barcode locally and sends the scanned value to:
+Android's system file picker supplies `.xlsx`, `.csv`, `.pdf`, and `.txt` files to existing web upload inputs without broad storage permission. Same-origin downloads remain in the WebView where possible. The first release uses the Android browser/system handler as a fallback for downloads that the WebView cannot complete; authenticated download behavior must be verified on the target Android version.
 
-```text
-GET /api/mobile/packing/search?code=<scanned-value>
-```
-
-The Pack button calls:
-
-```text
-POST /api/mobile/packing/confirm
-```
-
-Native scanning avoids the browser HTTPS camera limitation in local HTTP mode.
-
-## Install And Run
+## Expo Development
 
 ```powershell
-cd mobile-app
-npm install
-npm run start
+cd E:\marketplace1\marketplace\mobile-app
+npm.cmd install
+$env:EXPO_PACKAGER_HOSTNAME="100.x.x.x"
+npx.cmd expo start --clear --lan --port 8082
 ```
 
-To run on Android during development:
+Open `exp://100.x.x.x:8082` in Expo Go. Expo Go can test the WebView and scanner, but final downloads, Android back behavior, and update installation must also be tested in a development/debug build.
+
+## Version And Build
 
 ```powershell
-npm run android
+npm.cmd run version:patch
+npx.cmd expo prebuild --platform android --clean
+cd android
+gradlew.bat assembleDebug
 ```
 
-To build a local debug APK when Android SDK is installed:
-
-```powershell
-npm run build:android:debug
-```
-
-Expected APK path after a native Android build:
-
-```text
-mobile-app/android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-Do not commit APK binaries, `node_modules`, generated native build folders, screenshots, or real warehouse data.
+Expected debug output: `android/app/build/outputs/apk/debug/app-debug.apk`. Do not commit APKs, AABs, generated native folders, signing keys, build output, screenshots, or private warehouse data.

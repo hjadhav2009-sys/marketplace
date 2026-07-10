@@ -1,9 +1,9 @@
 "use client";
 
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeAwb, isValidAwb } from "@/lib/awb";
+import { isMarketplaceNativeApp, listenForNativeScanResult, requestNativeScanner } from "@/lib/native-app-bridge";
 import { ProductImageGallery } from "./ProductImageGallery";
 import { SubmitButton } from "./SubmitButton";
 
@@ -15,6 +15,10 @@ type AwbBarcodeScannerProps = {
 
 type BarcodeResult = {
   getText: () => string;
+};
+
+type ScannerControls = {
+  stop: () => void;
 };
 
 type AwbSuggestion = {
@@ -120,7 +124,7 @@ function cameraStateLabel(state: "idle" | "starting" | "scanning" | "found" | "o
 
 export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbBarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const controlsRef = useRef<IScannerControls | null>(null);
+  const controlsRef = useRef<ScannerControls | null>(null);
   const hiddenFormRef = useRef<HTMLFormElement | null>(null);
   const hiddenAwbRef = useRef<HTMLInputElement | null>(null);
   const manualAwbRef = useRef<HTMLInputElement | null>(null);
@@ -133,6 +137,7 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
   const [manualAwb, setManualAwb] = useState(defaultAwb ?? "");
   const [suggestions, setSuggestions] = useState<AwbSuggestion[]>([]);
   const [suggestionState, setSuggestionState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [nativeApp, setNativeApp] = useState(false);
 
   const stopVideoTracks = useCallback(() => {
     const stream = videoRef.current?.srcObject;
@@ -211,7 +216,7 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
     };
   }, [manualAwb]);
 
-  function submitDetectedAwb(awb: string) {
+  const submitDetectedAwb = useCallback((awb: string) => {
     setDetectedAwb(awb);
     setCameraState("opening");
     stopScanner();
@@ -220,7 +225,24 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
       hiddenAwbRef.current.value = awb;
       hiddenFormRef.current.requestSubmit();
     }
-  }
+  }, [stopScanner]);
+
+  useEffect(() => {
+    const runningNative = isMarketplaceNativeApp();
+    setNativeApp(runningNative);
+
+    if (!runningNative) return;
+
+    return listenForNativeScanResult(({ code }) => {
+      const awb = normalizeAwb(code);
+      if (!isValidAwb(awb)) {
+        setError("The scanned barcode did not look like a valid Tracking ID / AWB. Enter it manually.");
+        return;
+      }
+      setManualAwb(awb);
+      submitDetectedAwb(awb);
+    });
+  }, [submitDetectedAwb]);
 
   async function startScanner() {
     setError(null);
@@ -239,6 +261,7 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
 
     try {
       setCameraState("starting");
+      const { BrowserMultiFormatReader } = await import("@zxing/browser");
       const reader = new BrowserMultiFormatReader();
       const callback = (result: BarcodeResult | undefined) => {
         if (!result) {
@@ -318,7 +341,16 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-      <details open className="rounded-md border border-slate-200 bg-slate-950 p-4 text-white shadow-sm sm:p-5" data-mobile-scanner-panel>
+      {nativeApp ? (
+        <section className="rounded-md border border-pink-200 bg-pink-50 p-4 shadow-sm" data-native-scanner-launcher>
+          <h2 className="text-lg font-black text-slate-950">Native label scanner</h2>
+          <p className="mt-1 text-sm leading-5 text-slate-600">Uses the Android camera and returns the code directly to this packing search.</p>
+          <button type="button" onClick={() => requestNativeScanner()} className="mt-4 min-h-12 w-full rounded-md bg-berry px-5 py-3 text-base font-bold text-white">
+            Scan with Android camera
+          </button>
+        </section>
+      ) : null}
+      <details open={!nativeApp} className="rounded-md border border-slate-200 bg-slate-950 p-4 text-white shadow-sm sm:p-5" data-mobile-scanner-panel>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 lg:cursor-default">
           <span>
             <span className="block text-lg font-black lg:text-xl">Camera scanner</span>

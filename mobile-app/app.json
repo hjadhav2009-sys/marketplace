@@ -3,6 +3,7 @@
     "name": "Marketplace Pick Pack",
     "slug": "marketplace-pick-pack",
     "version": "0.1.0",
+    "scheme": "marketplacepickpack",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
@@ -10,21 +11,43 @@
     ],
     "android": {
       "package": "com.sullery.marketplacepickpack",
+      "versionCode": 1,
       "permissions": [
         "INTERNET",
         "CAMERA",
         "VIBRATE"
       ]
     },
+    "androidStatusBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content",
+      "translucent": false
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content"
+    },
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    },
     "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Marketplace Pick & Pack to scan shipping label barcodes."
+        }
+      ],
       [
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": true,
+            "enableProguardInReleaseBuilds": true
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

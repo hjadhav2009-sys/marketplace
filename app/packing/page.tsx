@@ -1,7 +1,9 @@
 import { AppShell } from "@/components/AppShell";
 import { AwbBarcodeScanner } from "@/components/AwbBarcodeScanner";
 import { PageHeader } from "@/components/PageHeader";
+import { UniversalScannerPanel } from "@/components/UniversalScannerPanel";
 import { requireAccount, requireUser } from "@/lib/auth";
+import { hasWorkPermission } from "@/lib/work-permissions";
 import { getLatestImportedBatch, getPackingDashboard } from "@/lib/data";
 import { directPackFromSearchAction, moveOldPendingToReviewAction, searchAwbAction } from "./actions";
 
@@ -13,11 +15,15 @@ type PackingPageProps = {
     q?: string;
     oldPendingReviewed?: string;
     directPacked?: string;
+    intent?: string;
+    accountId?: string;
+    scanSuccess?: string;
+    scanError?: string;
   }>;
 };
 
 export default async function PackingAwbPage({ searchParams }: PackingPageProps) {
-  const user = await requireUser(["OWNER", "PACKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
   const [dashboard, latestBatch] = await Promise.all([
     getPackingDashboard(account.id),
@@ -32,8 +38,8 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
         title="Scan or search Tracking ID / AWB"
         description="Scan the label or type the last 5 to 8 Tracking ID / AWB characters."
       />
-
-      <AwbBarcodeScanner action={searchAwbAction} directPackAction={directPackFromSearchAction} defaultAwb={params?.q} />
+      <UniversalScannerPanel actorUserId={user.id} query={params?.q} intent={params?.intent === "PICK" || params?.intent === "MARK" || params?.intent === "PACK" ? params.intent : "ANY"} accountId={params?.accountId} success={params?.scanSuccess} error={params?.scanError} actionPath="/packing"/>
+      {hasWorkPermission(user,"canPack")?<details className="mt-5 rounded-md border bg-white p-4"><summary className="cursor-pointer font-black">Customer Order Packing</summary><div className="mt-4"><AwbBarcodeScanner action={searchAwbAction} directPackAction={directPackFromSearchAction} defaultAwb={params?.q} /></div></details>:null}
 
       <section className="mt-4 flex gap-2 overflow-x-auto pb-1">
         <span className="whitespace-nowrap rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">

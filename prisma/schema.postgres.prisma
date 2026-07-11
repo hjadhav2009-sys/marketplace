@@ -461,6 +461,7 @@ model MarketplaceListingIdentifier {
 
   @@unique([marketplaceListingId, identifierType, normalizedValue])
   @@index([accountId, identifierType, normalizedValue])
+  @@index([identifierType, normalizedValue, accountId])
   @@index([marketplaceListingId, active])
   @@index([accountId, marketplace, active])
 }
@@ -892,6 +893,12 @@ model Order {
   @@index([accountId, status])
   @@index([accountId, oldPendingReviewStatus])
   @@index([accountId, importedAt, packStatus])
+  @@index([awb, accountId])
+  @@index([trackingId, accountId])
+  @@index([orderNo, accountId])
+  @@index([shipmentId, accountId])
+  @@index([orderItemId, accountId])
+  @@index([sku, accountId])
 }
 
 model ScanLog {

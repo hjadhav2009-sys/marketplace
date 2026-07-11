@@ -16,6 +16,7 @@ type AppShellProps = {
 const ownerLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/work", label: "Work" },
+  { href: "/work/scan", label: "Scan" },
   { href: "/owner/uploads/new", label: "Import" },
   { href: "/owner/imports", label: "Imports" },
   { href: "/picker", label: "Pick" },
@@ -58,11 +59,11 @@ function linksForUser(user: NavigationUser) {
   }
 
   const links = [];
-  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canPack")) links.push({ href: "/work", label: "Work" });
+  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canPack")) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan / Pack" });
   if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Order Pick" }, { href: "/work/consignments/pick", label: "Consignment Pick" });
   if (hasWorkPermission(user, "canMark")) links.push({ href: "/work/marking", label: "Marking" });
   if (hasWorkPermission(user, "canPack")) links.push({ href: "/packing", label: "Order Pack" }, { href: "/work/consignments/pack", label: "Consignment Pack" });
-  if (hasWorkPermission(user, "canReportProblem")) links.push({ href: "/work/problems", label: "Work Problems" });
+  if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Work Problems" });
   if (hasWorkPermission(user, "canViewConsignments") || hasWorkPermission(user, "canImportConsignments") || hasWorkPermission(user, "canManageConsignments")) links.push({ href: "/owner/consignments", label: "Consignments" });
   if (hasWorkPermission(user, "canManageMarkingLibrary")) links.push({ href: "/owner/marking-library", label: "Marking Library" });
   if (hasWorkPermission(user, "canManageProcessRules")) links.push({ href: "/owner/process-rules", label: "Process Rules" });
@@ -73,10 +74,9 @@ function linksForUser(user: NavigationUser) {
 function mobileLinksForUser(user: NavigationUser) {
   if (user.role === "OWNER") return [];
   const links = [];
-  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canPack")) links.push({ href: "/work", label: "Work" });
+  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canPack")) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan" });
   if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Pick" });
-  if (hasWorkPermission(user, "canPack")) links.push({ href: "/packing", label: "Pack" });
-  if (hasWorkPermission(user, "canReportProblem")) links.push({ href: "/work/problems", label: "Problems" });
+  if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Problems" });
   links.push({ href: "/accounts", label: "Account" });
   return links;
 }

@@ -66,6 +66,12 @@ Owners can open `/owner/consignments` to upload a Flipkart Consignment Details C
 
 Phase 2 activates only Ready-made (`PICK_PACK`) and Marking (`PICK_MARK_PACK`) routes. Existing customer Order Picker and Packing remain unchanged. See [Flipkart consignment import](docs/FLIPKART_CONSIGNMENT_IMPORT.md) and [task activation](docs/CONSINGMENT_TASK_ACTIVATION.md).
 
+## Universal Work Scanner
+
+Workers can use `/work/scan` or the Universal Scan section of `/packing` to find exact active customer-order and consignment Pick/Mark/Pack work across every authorized seller account. Owners search all active accounts; workers search assigned active accounts plus their compatible legacy primary account. Scanning is lookup-only, multiple matches stay separate, and each explicit action is re-authorized without switching the selected account.
+
+See [scanner workflow](docs/UNIVERSAL_WORK_SCANNER.md), [authorization](docs/CROSS_ACCOUNT_WORK_AUTHORIZATION.md), [performance](docs/UNIVERSAL_SCANNER_PERFORMANCE.md), and [QA](docs/QA_PHASE_4_UNIVERSAL_SCANNER.md). This remains a workflow system, not inventory or ERP software.
+
 ## Marketplace Structure
 
 ```text

@@ -59,7 +59,7 @@ export async function getWorkHubCounts(user: User, accountId: string, client: Cl
     const problemVisibility:Prisma.WorkTaskWhereInput=accountWide?{}:{OR:[{assignedUserId:user.id},{problemReportedByUserId:user.id}]};
     const completedVisibility:Prisma.WorkTaskWhereInput=accountWide?{}:{completedByUserId:user.id};
     const [ready,inProgress,mine,problems,completedToday]=await Promise.all([
-      client.workTask.count({where:{...base,status:"READY",...readyVisibility}}),client.workTask.count({where:{...base,status:"IN_PROGRESS",...inProgressVisibility}}),client.workTask.count({where:{...base,assignedUserId:user.id,status:{in:["READY","IN_PROGRESS"]}}}),client.workTask.count({where:{...base,status:"PROBLEM",...problemVisibility}}),client.workTask.count({where:{...base,status:"COMPLETED",completedAt:{gte:today},...completedVisibility}})
+      client.workTask.count({where:{...base,status:"READY",...readyVisibility}}),client.workTask.count({where:{...base,status:"IN_PROGRESS",...inProgressVisibility}}),client.workTask.count({where:{...base,assignedUserId:user.id,status:{in:["READY","IN_PROGRESS"]}}}),client.workTask.count({where:{...base,status:"PROBLEM",...problemVisibility}}),client.workTask.count({where:{accountId,sourceType:"CONSIGNMENT",stage,status:"COMPLETED",completedAt:{gte:today},...completedVisibility}})
     ]);result[stage]={ready,inProgress,mine,problems,completedToday};
   }return result;
 }

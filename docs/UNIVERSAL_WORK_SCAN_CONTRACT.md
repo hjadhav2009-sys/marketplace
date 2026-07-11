@@ -1,18 +1,19 @@
-# Future Universal Work Scan Contract
+# Universal Work Scan Contract
 
-This is a resolver contract only. No universal scanner route or page is activated in Phase 1.
+Phase 4 activates this contract at `/work/scan` and in the Universal Scan section of `/packing`.
 
 Input:
 
 ```json
-{ "code": "FAKE-CODE-001", "currentUserId": "user_fake", "selectedAccountId": "account_fake" }
+{ "code": "FAKE-CODE-001", "actorUserId": "user_fake", "accountId": "optional_account_fake", "intent": "ANY", "limit": 25 }
 ```
 
 Candidate output:
 
 ```json
 {
-  "sourceType": "ORDER",
+  "candidateKey": "task:task_fake",
+  "sourceType": "CONSIGNMENT_TASK",
   "sourceId": "source_fake",
   "taskId": "task_fake",
   "stage": "MARK",
@@ -21,12 +22,13 @@ Candidate output:
   "accountName": "Test Account",
   "marketplace": "FLIPKART",
   "productTitle": "Fake Product",
-  "imageUrl": null,
-  "primaryIdentifier": "FAKE-CODE-001",
+  "productImageUrl": null,
+  "matchType": "SELLER_SKU",
   "requiredQuantity": 1,
   "completedQuantity": 0,
-  "nextAction": "Open marking task"
+  "remainingQuantity": 1,
+  "canAct": true
 }
 ```
 
-The resolver searches assigned active accounts only; owner may search all active accounts. It uses indexed exact identifiers before any title aid, returns multiple cards for multiple active matches, excludes completed work from actionable results, and never changes status from a scan alone. The worker must explicitly accept an action. The target is fast exact lookup at large listing/task counts.
+The resolver searches all authorized active accounts without changing the selected account. It uses indexed exact identifiers, returns multiple cards for multiple active matches, excludes completed work from actionable results, and never changes status from a scan alone. Every explicit action re-authorizes the target account and source on the server.

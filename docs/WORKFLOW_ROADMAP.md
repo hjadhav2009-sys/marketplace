@@ -26,13 +26,17 @@ Implemented owner-side Flipkart consignment CSV/ZIP intake, safe supporting-file
 
 Implemented the worker Work Hub, Consignment Picker, Marking, Consignment Packing, stage-scoped exact search, atomic assignment claims, idempotent quantity progress, task problems, private marking-file delivery, and line/batch completion reconciliation. Search never mutates work.
 
+## Phase 4: Universal Cross-account Scanner
+
+Implemented one exact, lookup-only scanner for customer orders and active consignment Pick/Mark/Pack tasks across every authorized active seller account. `/work/scan` and `/packing` reuse the same resolver and cards. Multiple matches remain separate, completed work is non-actionable, and every explicit action re-authorizes its account and source.
+
 ## Later Phases
 
 - Customer order: Pick, Assemble, Pack.
 - Consignment: Pick, Mark, Pack.
 - Optional: Pick, Mark, Assemble, Pack.
-- Universal cross-order and cross-account scan resolver.
 - Authenticated Windows Worker Agent and temporary file delivery.
+- Product Variant and Product Design identity mapping.
 - Optional reviewed EngravingBrain protocol integration without sharing its database.
 
 Inventory balances, branch/warehouse stock, receiving, QC, stock deductions, valuation, reservations, in-transit inventory, and marketplace stock updates are explicitly excluded.

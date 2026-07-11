@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync,readFileSync,readdirSync,rmSync } from "node:fs";
 import { join,resolve } from "node:path";
-const root=process.cwd(),tmp=resolve(root,".codex-tmp"),migrations=resolve(root,"prisma","migrations"),latest="20260711000400_workflow_request_isolation";mkdirSync(tmp,{recursive:true});const entries=readdirSync(migrations,{withFileTypes:true}).filter((e)=>e.isDirectory()).map((e)=>e.name).sort();
+const root=process.cwd(),tmp=resolve(root,".codex-tmp"),migrations=resolve(root,"prisma","migrations"),latest="20260711000400_workflow_request_isolation";mkdirSync(tmp,{recursive:true});const allEntries=readdirSync(migrations,{withFileTypes:true}).filter((e)=>e.isDirectory()).map((e)=>e.name).sort(),entries=allEntries.slice(0,allEntries.indexOf(latest)+1);
 function apply(db,name){db.exec(readFileSync(join(migrations,name,"migration.sql"),"utf8"));}function open(name){const file=resolve(tmp,name);rmSync(file,{force:true});const db=new DatabaseSync(file);db.exec("PRAGMA foreign_keys=ON;");return{db,file};}
 const fresh=open("workflow-fresh.db");for(const name of entries)apply(fresh.db,name);assert.ok(fresh.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='WorkActionLog'").get());fresh.db.close();
 const old=open("workflow-existing.db");for(const name of entries.filter((name)=>name!==latest))apply(old.db,name);old.db.exec(`

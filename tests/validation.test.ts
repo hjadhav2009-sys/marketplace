@@ -1383,8 +1383,8 @@ assert.match(packingPage, /Today ready[\s\S]*Old pending[\s\S]*Problems/, "Packi
 assert.match(packingPage, /Move old pending to review/, "Owner can move old pending work into a review-only flow");
 assert.match(packingPage, /directPackFromSearchAction/, "Packing page wires direct Pack action into search suggestions");
 assert.match(packingActions, /writeScanLogLater[\s\S]*redirect\(`\/packing\/\$\{encodeURIComponent\(matchedOrder\.awb\)\}`\)/, "Packing search redirects before scan logging can block order opening");
-assert.match(packingActions, /directPackFromSearchAction[\s\S]*buildConfirmPackedOrderWhere[\s\S]*updateMany/, "Direct Pack uses the shared READY-only packing scope");
-assert.match(packingActions, /buildConfirmPackedOrderWhere/, "Direct Pack skips already packed and problem items through the shared READY-only helper");
+assert.match(packingActions, /directPackFromSearchAction[\s\S]*packCustomerOrderShipmentSafely/, "Direct Pack uses the shared safe shipment service");
+assert.doesNotMatch(packingActions, /buildConfirmPackedOrderWhere/, "Direct Pack cannot use the legacy shipment mutation helper");
 assert.match(packingActions, /oldPendingReviewStatus: "IN_REVIEW"/, "Old pending review action creates a durable review state");
 assert.match(packingActions, /OLD_PENDING_REVIEW_CREATED/, "Old pending review queue creation is audited");
 assert.match(packingActions, /redirect\(`\/owner\/old-pending\?moved=\$\{oldPendingCount\}`\)/, "Old pending move action opens the review queue");
@@ -1535,8 +1535,8 @@ assert.match(mobilePackingSearchRoute, /getMobilePermissionAccountContext\(reque
 assert.equal(mobilePackingSearchRoute.indexOf("trackingId: code") < mobilePackingSearchRoute.indexOf("awb: code"), true, "Mobile packing search checks Tracking ID before AWB");
 assert.match(mobilePackingSearchRoute, /canPack: order\.packStatus === "READY"/, "Mobile packing search exposes pack eligibility");
 assert.doesNotMatch(mobilePackingSearchRoute, /productDescription|allSpecifications|description/, "Mobile packing search returns compact fields only");
-assert.match(mobilePackingConfirmRoute, /buildConfirmPackedOrderWhere[\s\S]*PACKED[\s\S]*skippedCount/, "Mobile packing confirm packs ready scope and reports skipped rows");
-assert.match(mobilePackingConfirmRoute, /MOBILE_ORDER_PACKED/, "Mobile packing confirm writes audit log action");
+assert.match(mobilePackingConfirmRoute, /packCustomerOrderShipmentSafely[\s\S]*skippedCount/, "Mobile packing confirm uses the shared safe shipment service");
+assert.doesNotMatch(mobilePackingConfirmRoute, /buildConfirmPackedOrderWhere/, "Mobile packing cannot use the legacy mutation helper");
 assert.match(mobilePackingProblemRoute, /packStatus === "PACKED"[\s\S]*already_packed/, "Mobile packing problem refuses already packed rows");
 assert.match(mobileProductImagesRoute, /buildListingImageGallery[\s\S]*mainImageUrl[\s\S]*gallery/, "Mobile product images route returns safe gallery data");
 assert.doesNotMatch(mobileProductImagesRoute, /description|allSpecifications|productHighlights/, "Mobile product images route excludes heavy listing details");

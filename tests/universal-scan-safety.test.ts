@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { applyUniversalCandidateAction } from "../src/lib/workflow/universal-actions";
 import { canViewCustomerOrderProblem, highestPriorityIdentifierType, resolveUniversalWork } from "../src/lib/workflow/universal-resolver";
+import { packCustomerOrderShipmentSafely } from "../src/lib/workflow/order-pack-scope";
 
 const tempDirectory = resolve(process.cwd(), ".codex-tmp");
 mkdirSync(tempDirectory, { recursive: true });
@@ -38,7 +39,10 @@ const order = (id: string, trackingId: string, pickStatus: "READY" | "PICKED" | 
 });
 
 try {
-  await db.account.create({ data: { id: "account", name: "Fake Account", code: "FAKE", companyName: "Fake Company", marketplace: "FLIPKART", active: true } });
+  await db.account.createMany({ data: [
+    { id: "account", name: "Fake Account", code: "FAKE", companyName: "Fake Company", marketplace: "FLIPKART", active: true },
+    { id: "removed-account", name: "Removed Account", code: "REMOVED", companyName: "Fake Company", marketplace: "FLIPKART", active: true }
+  ] });
   await db.user.createMany({ data: [
     { id: "owner", username: "owner", passwordHash: "fake", name: "Owner", role: "OWNER", active: true, accountId: "account" },
     { id: "worker", username: "worker", passwordHash: "fake", name: "Worker", role: "PICKER", active: true, accountId: "account", canPick: true, canPack: true, canMark: true },
@@ -47,6 +51,7 @@ try {
     { id: "packer", username: "packer", passwordHash: "fake", name: "Packer", role: "PACKER", active: true, accountId: "account", canPack: true },
     { id: "viewer", username: "viewer", passwordHash: "fake", name: "Viewer", role: "PICKER", active: true, accountId: "account", canViewAllWork: true }
   ] });
+  await db.user.update({ where: { id: "worker" }, data: { assignedAccounts: { connect: { id: "removed-account" } } } });
   await db.uploadBatch.create({ data: { id: "upload", accountId: "account", fileName: "fake.csv" } });
   await db.order.createMany({ data: [
     order("group-a", "TRACK-GROUP", "PICKED", "READY", 1),
@@ -59,6 +64,8 @@ try {
     order("partial-a", "TRACK-PARTIAL", "PICKED", "READY"),
     order("partial-b", "TRACK-PARTIAL", "PICKED", "PACKED"),
     order("concurrent-a", "TRACK-CONCURRENT", "PICKED", "READY"),
+    order("detail-a", "TRACK-DETAIL", "PICKED", "READY", 2),
+    order("detail-b", "TRACK-DETAIL", "PICKED", "READY", 3),
     order("same-sku-a", "TRACK-SAME-A", "READY", "READY"),
     { ...order("same-sku-b", "TRACK-SAME-B", "READY", "READY"), sku: "SKU-same-sku-a" },
     order("problem-visible", "TRACK-VISIBLE", "PROBLEM", "PROBLEM")
@@ -79,17 +86,17 @@ try {
   assert.equal(await db.scanLog.count({ where: { order: { trackingId: "TRACK-GROUP" } } }), 3, "Scan logs exist only for packed rows");
   const groupAudit = await db.auditLog.findFirstOrThrow({ where: { action: "UNIVERSAL_ORDER_PACKED", entityId: groupCandidates[0].sourceId } });
   const groupMetadata = JSON.parse(groupAudit.metadata ?? "{}") as Record<string, unknown>;
-  assert.equal(groupMetadata.shipmentCount, 3);
+  assert.equal(groupMetadata.packedRowCount, 3);
   assert.equal(groupMetadata.totalQuantity, 6);
   assert.equal(String(groupMetadata.trackingIdMasked).includes("TRACK-GROUP"), false, "Audit masks Tracking ID");
 
   const mixed = await resolveUniversalWork({ actorUserId: "worker", code: "TRACK-MIXED", intent: "PACK" }, db);
   assert.equal(mixed.candidates.filter((candidate) => candidate.actionType === "ORDER_PACK").length, 1);
   assert.equal(mixed.candidates.find((candidate) => candidate.actionType === "ORDER_PACK")?.unpickedItemCount, 1);
-  await assert.rejects(() => applyUniversalCandidateAction({ actorUserId: "worker", accountId: "account", sourceId: "mixed-a", action: "ORDER_PACK", expectedStatus: "READY", clientRequestId: "mixed-pack" }, db), /still waiting for picking/i);
+  await assert.rejects(() => packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "account", orderId: "mixed-a", source: "packing-search-card" }, db), /still waiting for picking/i);
   assert.equal(await db.order.count({ where: { trackingId: "TRACK-MIXED", packStatus: "PACKED" } }), 0, "Mixed shipment packs no rows");
 
-  await assert.rejects(() => applyUniversalCandidateAction({ actorUserId: "worker", accountId: "account", sourceId: "problem-a", action: "ORDER_PACK", expectedStatus: "READY", clientRequestId: "problem-pack" }, db), /problem work/i);
+  await assert.rejects(() => packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "account", orderId: "problem-a", source: "packing-search-card" }, db), /problem work/i);
   assert.equal(await db.order.count({ where: { trackingId: "TRACK-PROBLEM", packStatus: "PACKED" } }), 0, "Problem shipment packs no rows");
 
   const partial = await applyUniversalCandidateAction({ actorUserId: "worker", accountId: "account", sourceId: "partial-a", action: "ORDER_PACK", expectedStatus: "READY", clientRequestId: "partial-pack" }, db);
@@ -97,13 +104,34 @@ try {
   assert.equal(partial.updatedCount, 1, "Already packed siblings remain untouched");
   assert.equal(await db.scanLog.count({ where: { order: { trackingId: "TRACK-PARTIAL" } } }), 1);
 
+  const detailResult = await packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "account", orderId: "detail-a", source: "packing-detail" }, db);
+  assert.equal(detailResult.packedCount, 2, "Packing detail uses shipment-wide safe packing");
+  assert.equal(detailResult.totalQuantity, 5);
+  const detailReplay = await packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "account", orderId: "detail-a", source: "packing-detail" }, db);
+  assert.equal(detailReplay.idempotent, true, "Fully packed shipment is idempotent");
+
+  const universalPackedCount = groupedResult.updatedCount;
+  assert.equal(universalPackedCount, 3);
+  await db.order.createMany({ data: [order("legacy-a", "TRACK-LEGACY", "PICKED", "READY", 1), order("legacy-b", "TRACK-LEGACY", "PICKED", "READY", 2), order("legacy-c", "TRACK-LEGACY", "PICKED", "READY", 3)] });
+  const legacyResult = await packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "account", orderId: "legacy-a", source: "packing-search-card" }, db);
+  assert.equal(legacyResult.packedCount, universalPackedCount, "Universal and legacy paths produce identical shipment results");
+
   const concurrent = await Promise.allSettled([
-    applyUniversalCandidateAction({ actorUserId: "worker", accountId: "account", sourceId: "concurrent-a", action: "ORDER_PACK", expectedStatus: "READY", clientRequestId: "concurrent-1" }, db),
+    packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "account", orderId: "concurrent-a", source: "packing-search-card", clientRequestId: "concurrent-legacy" }, db),
     applyUniversalCandidateAction({ actorUserId: "worker", accountId: "account", sourceId: "concurrent-a", action: "ORDER_PACK", expectedStatus: "READY", clientRequestId: "concurrent-2" }, db)
   ]);
   assert.ok(concurrent.some((result) => result.status === "fulfilled"));
   assert.equal(await db.order.count({ where: { id: "concurrent-a", packStatus: "PACKED" } }), 1);
   assert.equal(await db.scanLog.count({ where: { orderId: "concurrent-a" } }), 1, "Concurrent pack mutates and logs once");
+
+  await db.uploadBatch.create({ data: { id: "removed-upload", accountId: "removed-account", fileName: "fake.csv" } });
+  await db.order.createMany({ data: [
+    { ...order("removed-pick", "TRACK-REMOVED-PICK", "READY", "READY"), accountId: "removed-account", batchId: "removed-upload" },
+    { ...order("removed-pack", "TRACK-REMOVED-PACK", "PICKED", "READY"), accountId: "removed-account", batchId: "removed-upload" }
+  ] });
+  await db.user.update({ where: { id: "worker" }, data: { assignedAccounts: { disconnect: { id: "removed-account" } } } });
+  await assert.rejects(() => applyUniversalCandidateAction({ actorUserId: "worker", accountId: "removed-account", sourceId: "removed-pick", action: "ORDER_PICK", expectedStatus: "READY", clientRequestId: "removed-pick" }, db), /no longer assigned/i);
+  await assert.rejects(() => packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "removed-account", orderId: "removed-pack", source: "packing-detail" }, db), /not assigned/i);
 
   const sameSku = await resolveUniversalWork({ actorUserId: "worker", code: "SKU-same-sku-a", intent: "PICK" }, db);
   const pickCandidates = sameSku.candidates.filter((candidate) => candidate.actionType === "ORDER_PICK");

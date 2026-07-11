@@ -20,6 +20,7 @@ type ScanResultPageProps = {
   searchParams?: Promise<{
     packed?: string;
     problem?: string;
+    packError?: string;
   }>;
 };
 
@@ -72,6 +73,12 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
       ) : query?.packed ? (
         <div className="mb-5 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-700">
           Order marked as packed.
+        </div>
+      ) : null}
+
+      {query?.packError ? (
+        <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {query.packError}
         </div>
       ) : null}
 

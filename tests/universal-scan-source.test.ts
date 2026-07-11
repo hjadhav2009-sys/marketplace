@@ -14,6 +14,9 @@ const scanInput = read("components/UniversalScanInput.tsx");
 const scanActions = read("app/work/scan/actions.ts");
 const markingRoute = read("app/work/tasks/[taskId]/marking-file/route.ts");
 const packScope = read("src/lib/workflow/order-pack-scope.ts");
+const packingActions = read("app/packing/actions.ts");
+const packingDetailActions = read("app/packing/[awb]/actions.ts");
+const mobilePackingAction = read("app/api/mobile/packing/confirm/route.ts");
 
 assert.match(resolver, /getAuthorizedWorkAccounts/);
 assert.match(resolver, /resolveUniversalWork/);
@@ -34,9 +37,16 @@ assert.match(packing, /data-customer-order-packing/, "Legacy customer packing is
 assert.match(packing, /canUseScanner[\s\S]*redirect\(roleHomePath/, "Users without scanner permissions are rejected");
 assert.match(actions, /getAuthorizedWorkAccounts/);
 assert.match(actions, /This account is no longer assigned to you/);
-assert.match(actions, /resolveOrderPackScope[\s\S]*assertOrderPackScopeEligible/);
-assert.match(actions, /changed\.count !== shipmentIds\.length/, "Shipment mutation rejects stale partial updates");
+assert.match(actions, /ORDER_PICK[\s\S]*\$transaction[\s\S]*getAuthorizedWorkAccounts/, "Order Pick re-authorizes inside its transaction");
+assert.match(actions, /packCustomerOrderShipmentSafely/);
 assert.match(packScope, /unpickedCount[\s\S]*problemCount[\s\S]*packable/);
+assert.match(packScope, /assertWorkerAccountAccess[\s\S]*\$transaction[\s\S]*assertWorkerAccountAccess/, "Packing re-authorizes before and inside its transaction");
+assert.match(packScope, /resolveOrderPackScope[\s\S]*assertOrderPackScopeEligible[\s\S]*verifiedOrderIds/);
+assert.match(packScope, /update\.count !== verifiedOrderIds\.length/, "Shared service rejects stale partial updates");
+for (const mutationSource of [actions, packingActions, packingDetailActions, mobilePackingAction]) {
+  assert.match(mutationSource, /packCustomerOrderShipmentSafely/, "Every customer packing mutation uses the safe service");
+  assert.doesNotMatch(mutationSource, /buildConfirmPackedOrderWhere/, "No packing mutation uses the legacy scope helper");
+}
 assert.match(scanActions, /if\(error\)params\.set\("q",code\)/, "Only failed actions preserve the scanned code");
 assert.match(scanInput, /selectOnMount[\s\S]*input\.select\(\)/, "Failed scans select existing text for replacement");
 assert.match(scanInput, /onFocus=\{\(event\) => event\.currentTarget\.select\(\)\}/, "Focused scan text is replaceable by hardware input");

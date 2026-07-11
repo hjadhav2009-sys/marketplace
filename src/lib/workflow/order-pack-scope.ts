@@ -1,4 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { hasWorkPermission } from "@/lib/work-permissions";
+import { assertWorkerAccountAccess } from "./worker-access";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -72,4 +75,89 @@ export function assertOrderPackScopeEligible(scope: Awaited<ReturnType<typeof re
 export function maskOperationalCode(value: string | null | undefined) {
   if (!value) return null;
   return value.length <= 4 ? value : `...${value.slice(-4)}`;
+}
+
+export type CustomerOrderPackSource = "universal-scan" | "packing-search-card" | "packing-detail" | "mobile-api";
+
+function auditActionForSource(source: CustomerOrderPackSource) {
+  if (source === "universal-scan") return "UNIVERSAL_ORDER_PACKED";
+  if (source === "mobile-api") return "MOBILE_ORDER_PACKED";
+  return "ORDER_PACKED";
+}
+
+export async function packCustomerOrderShipmentSafely(
+  input: {
+    actorUserId: string;
+    accountId: string;
+    orderId: string;
+    expectedStatus?: string;
+    source: CustomerOrderPackSource;
+    clientRequestId?: string;
+  },
+  client: PrismaClient = prisma
+) {
+  const initialAccess = await assertWorkerAccountAccess(input.actorUserId, input.accountId, client);
+  if (!hasWorkPermission(initialAccess.user, "canPack")) throw new Error("Order packing permission is required.");
+
+  return client.$transaction(async (tx) => {
+    const access = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
+    if (!hasWorkPermission(access.user, "canPack")) throw new Error("Order packing permission is required.");
+
+    const scope = await resolveOrderPackScope({ accountId: input.accountId, orderId: input.orderId }, tx);
+    if (scope.shipmentOrders.length === 0) {
+      return { packedCount: 0, skippedCount: 0, scopedCount: 0, totalQuantity: 0, idempotent: true };
+    }
+    if (input.expectedStatus && scope.primaryOrder.packStatus !== input.expectedStatus) {
+      throw new Error("Order changed; scan again before acting.");
+    }
+    assertOrderPackScopeEligible(scope);
+
+    const verifiedOrderIds = scope.shipmentOrders.map((order) => order.id);
+    const update = await tx.order.updateMany({
+      where: {
+        id: { in: verifiedOrderIds },
+        accountId: input.accountId,
+        pickStatus: "PICKED",
+        packStatus: "READY",
+        status: { not: "PROBLEM" }
+      },
+      data: { status: "PACKED", packStatus: "PACKED", packedAt: new Date() }
+    });
+    if (update.count !== verifiedOrderIds.length) throw new Error("Shipment changed; scan again before packing.");
+
+    await tx.scanLog.createMany({
+      data: scope.shipmentOrders.map((order) => ({
+        accountId: input.accountId,
+        orderId: order.id,
+        awb: order.trackingId ?? order.awb,
+        outcome: "PACKED" as const,
+        scannedById: access.user.id,
+        note: `Customer order packed from ${input.source}.`
+      }))
+    });
+    await tx.auditLog.create({
+      data: {
+        userId: access.user.id,
+        accountId: input.accountId,
+        action: auditActionForSource(input.source),
+        entityType: "OrderShipment",
+        entityId: scope.primaryOrder.id,
+        metadata: JSON.stringify({
+          source: input.source,
+          packedRowCount: update.count,
+          totalQuantity: scope.totalQuantity,
+          trackingIdMasked: maskOperationalCode(scope.primaryOrder.trackingId),
+          clientRequestId: input.clientRequestId?.slice(0, 160) || undefined
+        })
+      }
+    });
+
+    return {
+      packedCount: update.count,
+      skippedCount: 0,
+      scopedCount: verifiedOrderIds.length,
+      totalQuantity: scope.totalQuantity,
+      idempotent: false
+    };
+  });
 }

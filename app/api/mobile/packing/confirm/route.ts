@@ -1,16 +1,14 @@
 import { revalidatePath } from "next/cache";
 import { normalizeAwb } from "@/lib/awb";
-import { recordAuditLog } from "@/lib/audit";
-import { buildConfirmPackedOrderWhere } from "@/lib/operations/packing";
 import {
   getMobilePermissionAccountContext,
-  getMobileRequestMeta,
   mobileError,
   mobileJson,
   readMobileJsonBody
 } from "@/lib/mobile-api";
 import { startMobileTiming } from "@/lib/mobile-timing";
 import { prisma } from "@/lib/prisma";
+import { packCustomerOrderShipmentSafely } from "@/src/lib/workflow/order-pack-scope";
 
 export async function POST(request: Request) {
   const done = startMobileTiming("/api/mobile/packing/confirm");
@@ -52,71 +50,13 @@ export async function POST(request: Request) {
     return mobileError("not_found", "No order found for packing.", 404);
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const scopeWhere =
-      target.marketplace === "FLIPKART" && target.trackingId
-        ? {
-            accountId: context.account.id,
-            marketplace: "FLIPKART",
-            trackingId: target.trackingId
-          }
-        : {
-            id: target.id,
-            accountId: context.account.id
-          };
-    const scopedOrders = await tx.order.findMany({
-      where: scopeWhere,
-      select: {
-        id: true,
-        awb: true,
-        trackingId: true,
-        packStatus: true
-      }
-    });
-    const readyOrders = scopedOrders.filter((order) => order.packStatus === "READY");
-    const update = await tx.order.updateMany({
-      where: buildConfirmPackedOrderWhere(target, context.account.id),
-      data: {
-        status: "PACKED",
-        packStatus: "PACKED",
-        packedAt: new Date()
-      }
-    });
-
-    if (readyOrders.length > 0 && update.count > 0) {
-      await tx.scanLog.createMany({
-        data: readyOrders.map((order) => ({
-          accountId: context.account.id,
-          orderId: order.id,
-          awb: order.trackingId ?? order.awb,
-          outcome: "PACKED",
-          scannedById: context.user.id,
-          note: readyOrders.length > 1 ? "Mobile app confirmed Flipkart shipment as packed." : "Mobile app confirmed order as packed."
-        }))
-      });
-    }
-
-    return {
-      packedCount: update.count,
-      skippedCount: Math.max(0, scopedOrders.length - update.count),
-      scopedCount: scopedOrders.length
-    };
-  });
-
-  await recordAuditLog({
-    userId: context.user.id,
-    accountId: context.account.id,
-    action: "MOBILE_ORDER_PACKED",
-    entityType: "Order",
-    entityId: target.id,
-    metadata: {
-      awb: target.awb,
-      trackingId: target.trackingId,
-      packedCount: result.packedCount,
-      skippedCount: result.skippedCount
-    },
-    request: getMobileRequestMeta(request)
-  });
+  let result: Awaited<ReturnType<typeof packCustomerOrderShipmentSafely>>;
+  try {
+    result = await packCustomerOrderShipmentSafely({ actorUserId: context.user.id, accountId: context.account.id, orderId: target.id, source: "mobile-api", clientRequestId: String(body.data.clientRequestId ?? "") });
+  } catch (cause) {
+    done({ status: 409 });
+    return mobileError("packing_blocked", cause instanceof Error ? cause.message : "Packing is not available for this shipment.", 409);
+  }
 
   revalidatePath("/packing");
   revalidatePath("/picker");

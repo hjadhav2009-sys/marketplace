@@ -5,10 +5,10 @@ import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { normalizeAwb } from "@/lib/awb";
 import { searchOrdersByAwbFragment } from "@/lib/data";
-import { buildConfirmPackedOrderWhere } from "@/lib/operations/packing";
 import { buildWorkQueueOrderWhere } from "@/lib/operations/work-queue";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
+import { packCustomerOrderShipmentSafely } from "@/src/lib/workflow/order-pack-scope";
 
 function writeScanLogLater(input: {
   accountId: string;
@@ -120,7 +120,6 @@ export async function moveOldPendingToReviewAction() {
 export async function directPackFromSearchAction(formData: FormData) {
   const user = await requireUser(["OWNER", "PACKER"]);
   const account = await requireAccount(user);
-  const request = await getRequestMeta();
   const orderId = String(formData.get("orderId") ?? "");
   const returnQuery = normalizeAwb(formData.get("returnQuery"));
 
@@ -128,79 +127,19 @@ export async function directPackFromSearchAction(formData: FormData) {
     redirect("/packing?error=invalid");
   }
 
-  const order = await prisma.order.findFirst({
-    where: {
-      id: orderId,
-      accountId: account.id
-    },
-    select: {
-      id: true,
-      accountId: true,
-      awb: true,
-      marketplace: true,
-      trackingId: true,
-      packStatus: true
-    }
-  });
-
-  if (!order) {
-    redirect("/packing?error=invalid");
+  let packedCount = 0;
+  let packError: string | null = null;
+  try {
+    const result = await packCustomerOrderShipmentSafely({ actorUserId: user.id, accountId: account.id, orderId, source: "packing-search-card" });
+    packedCount = result.packedCount;
+  } catch (cause) {
+    packError = cause instanceof Error ? cause.message : "Packing failed. Scan again.";
   }
 
-  const packedCount = await prisma.$transaction(async (tx) => {
-    const shipmentWhere = buildConfirmPackedOrderWhere(order, account.id);
-    const shipmentOrders = await tx.order.findMany({
-      where: shipmentWhere,
-      select: {
-        id: true,
-        awb: true,
-        trackingId: true
-      }
-    });
-
-    if (shipmentOrders.length === 0) {
-      return 0;
-    }
-
-    const update = await tx.order.updateMany({
-      where: shipmentWhere,
-      data: {
-        status: "PACKED",
-        packStatus: "PACKED",
-        packedAt: new Date()
-      }
-    });
-
-    if (update.count === 0) {
-      return 0;
-    }
-
-    await tx.scanLog.createMany({
-      data: shipmentOrders.map((shipmentOrder) => ({
-        accountId: account.id,
-        orderId: shipmentOrder.id,
-        awb: shipmentOrder.trackingId ?? shipmentOrder.awb,
-        outcome: "PACKED",
-        scannedById: user.id,
-        note: shipmentOrders.length > 1 ? "Direct pack confirmed Flipkart shipment from search." : "Direct pack confirmed order from search."
-      }))
-    });
-
-    return update.count;
-  });
-
-  if (packedCount > 0) {
-    await recordAuditLog({
-      userId: user.id,
-      accountId: account.id,
-      action: "ORDER_PACKED",
-      entityType: "Order",
-      entityId: order.id,
-      metadata: { awb: order.awb, trackingId: order.trackingId, packedCount, source: "packing-search-card" },
-      request
-    });
+  if (packError) {
+    const params = new URLSearchParams({ scanError: packError, intent: "PACK" });
+    if (returnQuery) params.set("q", returnQuery);
+    redirect(`/packing?${params}`);
   }
-
-  const searchParam = returnQuery ? `&q=${encodeURIComponent(returnQuery)}` : "";
-  redirect(`/packing?directPacked=${packedCount || "already"}${searchParam}`);
+  redirect(`/packing?directPacked=${packedCount || "already"}`);
 }

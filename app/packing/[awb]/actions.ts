@@ -4,15 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
-import { buildConfirmPackedOrderWhere, canConfirmPacked } from "@/lib/operations/packing";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { problemOrderSchema } from "@/lib/validators";
+import { packCustomerOrderShipmentSafely } from "@/src/lib/workflow/order-pack-scope";
 
 export async function confirmPackedAction(formData: FormData) {
   const user = await requireUser(["OWNER", "PACKER"]);
   const account = await requireAccount(user);
-  const request = await getRequestMeta();
   const orderId = String(formData.get("orderId") ?? "");
 
   const order = await prisma.order.findFirst({
@@ -26,60 +25,21 @@ export async function confirmPackedAction(formData: FormData) {
     redirect("/packing?error=invalid");
   }
 
-  if (!canConfirmPacked(order)) {
+  if (order.packStatus === "PACKED") {
     redirect(`/packing/${encodeURIComponent(order.awb)}?packed=already`);
   }
 
-  const packed = await prisma.$transaction(async (tx) => {
-    const shipmentWhere = buildConfirmPackedOrderWhere(order, account.id);
-    const shipmentOrders = await tx.order.findMany({
-      where: shipmentWhere,
-      select: {
-        id: true,
-        awb: true,
-        trackingId: true
-      }
-    });
-    const update = await tx.order.updateMany({
-      where: shipmentWhere,
-      data: {
-        status: "PACKED",
-        packStatus: "PACKED",
-        packedAt: new Date()
-      }
-    });
-
-    if (update.count === 0) {
-      return false;
-    }
-
-    await tx.scanLog.createMany({
-      data: shipmentOrders.map((shipmentOrder) => ({
-        accountId: account.id,
-        orderId: shipmentOrder.id,
-        awb: shipmentOrder.trackingId ?? shipmentOrder.awb,
-        outcome: "PACKED",
-        scannedById: user.id,
-        note: shipmentOrders.length > 1 ? "Packer confirmed Flipkart shipment as packed." : "Packer confirmed order as packed."
-      }))
-    });
-
-    return true;
-  });
-
-  if (!packed) {
+  let result: Awaited<ReturnType<typeof packCustomerOrderShipmentSafely>> | null = null;
+  let packError: string | null = null;
+  try {
+    result = await packCustomerOrderShipmentSafely({ actorUserId: user.id, accountId: account.id, orderId: order.id, source: "packing-detail" });
+  } catch (cause) {
+    packError = cause instanceof Error ? cause.message : "Packing failed. Scan again.";
+  }
+  if (packError) redirect(`/packing/${encodeURIComponent(order.awb)}?packError=${encodeURIComponent(packError)}`);
+  if (!result?.packedCount) {
     redirect(`/packing/${encodeURIComponent(order.awb)}?packed=already`);
   }
-
-  await recordAuditLog({
-    userId: user.id,
-    accountId: account.id,
-    action: "ORDER_PACKED",
-    entityType: "Order",
-    entityId: order.id,
-    metadata: { awb: order.awb, trackingId: order.trackingId },
-    request
-  });
 
   revalidatePath("/picker");
   revalidatePath("/packing");

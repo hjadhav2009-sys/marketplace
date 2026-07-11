@@ -12,6 +12,7 @@ export function canConfirmPacked(order: { packStatus: PackStatus }) {
   return order.packStatus === "READY";
 }
 
+/** @deprecated Read-only scope compatibility only. Packing mutations must use packCustomerOrderShipmentSafely. */
 export function buildConfirmPackedOrderWhere(order: { id: string; marketplace?: string | null; trackingId?: string | null }, accountId: string) {
   return order.marketplace === "FLIPKART" && order.trackingId
     ? {

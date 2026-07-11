@@ -24,7 +24,7 @@ assert.match(resolver, /resolveUniversalWork/);
 assert.doesNotMatch(resolver, /contains:/, "Scan resolver must not use fuzzy contains matching");
 assert.match(resolver, /take:\s*limit \* 4/, "Resolver result loading is bounded");
 assert.match(resolver, /WORK_TASK_ID/);
-assert.match(resolver, /markingFileAvailable/);
+assert.doesNotMatch(resolver, /markingFileAvailable/, "Worker candidates do not advertise marking-file delivery");
 assert.match(resolver, /CUSTOMER_ORDER_SHIPMENT/);
 assert.match(resolver, /assignedTasks[\s\S]*generalTasks[\s\S]*new Map/, "Assigned exact tasks are queried and merged before final bounding");
 assert.match(resolver, /FNSKU[\s\S]*SELLER_SKU[\s\S]*FSN[\s\S]*ASIN[\s\S]*LISTING_ID/, "Identifier ranking is explicit");
@@ -52,7 +52,8 @@ for (const mutationSource of [actions, packingActions, packingDetailActions, mob
 assert.match(scanActions, /if\(error\)params\.set\("q",code\)/, "Only failed actions preserve the scanned code");
 assert.match(scanInput, /selectOnMount[\s\S]*input\.select\(\)/, "Failed scans select existing text for replacement");
 assert.match(scanInput, /onFocus=\{\(event\) => event\.currentTarget\.select\(\)\}/, "Focused scan text is replaceable by hardware input");
-assert.match(panel, /Open preview[\s\S]*Download marking file/);
+assert.doesNotMatch(panel, /Open preview|Download marking file/, "Worker scanner cards do not offer marking-file delivery");
+assert.match(panel, /Master Design ID|Marking instructions/, "Worker scanner cards retain operational marking guidance");
 assert.doesNotMatch(panel, /managedRelativePath/);
 assert.match(markingRoute, /assertWorkerAccountAccess\(user\.id,taskAccount\.accountId\)/, "Marking downloads re-authorize the task account");
 assert.match(shell, /canManageConsignments|canViewAllWork/);

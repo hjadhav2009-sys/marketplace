@@ -183,6 +183,10 @@ enum ConsignmentStatus {
 enum ConsignmentLineMatchStatus {
   EXACT_SKU
   EXACT_FSN
+  EXACT_FNSKU
+  EXACT_ASIN
+  EXACT_EXTERNAL_ID
+  EXACT_BARCODE
   EXACT_MULTIPLE
   IDENTIFIER_CONFLICT
   NOT_FOUND
@@ -196,6 +200,11 @@ enum ConsignmentImportFileType {
   LABEL_REQUIREMENTS
   QUALITY_CHECK_REFERENCE
   README
+  AMAZON_SHIPMENT
+  AMAZON_ALL_LISTINGS
+  AMAZON_CATEGORY_CATALOG
+  AMAZON_PRODUCT_CATALOG
+  AMAZON_SUPPORTING
   UNKNOWN_SUPPORTING
 }
 
@@ -696,6 +705,10 @@ model ConsignmentLine {
   productNameSource    String?
   sellerSkuSource      String?
   fsnSource            String?
+  asinSource           String?
+  fnskuSource          String?
+  externalIdSource     String?
+  barcodeSource        String?
   brandSource          String?
   sizeSource           String?
   colorSource          String?
@@ -722,6 +735,11 @@ model ConsignmentLine {
   sellerSkuSnapshot    String?
   fsnSnapshot          String?
   listingIdSnapshot    String?
+  asinSnapshot         String?
+  fnskuSnapshot        String?
+  externalIdSnapshot   String?
+  barcodeSnapshot      String?
+  catalogSnapshotJson  String?
   activated            Boolean                    @default(false)
   completedAt          DateTime?
   completedByUserId    String?
@@ -736,6 +754,12 @@ model ConsignmentLine {
   @@index([consignmentBatchId, processRoute])
   @@index([consignmentBatchId, completedAt])
   @@index([marketplaceListingId])
+  @@index([accountId, asinSnapshot])
+  @@index([accountId, fnskuSnapshot])
+  @@index([accountId, externalIdSnapshot])
+  @@index([accountId, sellerSkuSnapshot])
+  @@index([consignmentBatchId, asinSnapshot])
+  @@index([consignmentBatchId, fnskuSnapshot])
 }
 
 model ConsignmentImportFile {

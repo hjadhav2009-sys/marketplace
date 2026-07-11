@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
 import { getWorkTaskCapabilities, userCanViewAllConsignmentWork } from "./worker-access";
-import { getOrderAssemblyPackingGate } from "./order-assembly";
+import { canOfferManualAssemblyDiversion, getOrderAssemblyPackingGate } from "./order-assembly";
 import { parseOrderAssemblyMetadata } from "./order-assembly-metadata";
 import type { OrderAssemblyPolicy } from "./order-assembly-policy";
 
@@ -64,10 +64,10 @@ export type UniversalWorkCandidate = {
   markingPasses?: number | null;
   markingInstructions?: string | null;
   markingPreviewAvailable?: boolean;
-  markingFileAvailable?: boolean;
   assemblyTitle?: string | null;
   assemblyInstructions?: string | null;
   assemblySource?: string | null;
+  assemblyInstructionsRequired?: boolean;
   canAct: boolean;
   readOnlyReason?: string | null;
 };
@@ -272,12 +272,11 @@ export async function resolveUniversalWork(
     consignmentLine: {
       select: {
         id: true, rowNumber: true, marketplaceListingId: true, sellerSkuSnapshot: true, sellerSkuSource: true, fsnSnapshot: true, fsnSource: true,
-        listingIdSnapshot: true, productTitleSnapshot: true, productNameSource: true, productImageSnapshot: true,
+        listingIdSnapshot: true, asinSnapshot: true, asinSource: true, fnskuSnapshot: true, fnskuSource: true, externalIdSnapshot: true, productTitleSnapshot: true, productNameSource: true, productImageSnapshot: true,
         markingAsset: {
           select: {
             name: true, masterDesignId: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true,
-            speedSetting: true, frequencySetting: true, passes: true, instructions: true,
-            files: { where: { activeVersion: true, attachmentType: { in: ["MARKING_FILE", "MARKING_PREVIEW"] } }, select: { attachmentType: true, originalFileName: true } }
+            speedSetting: true, frequencySetting: true, passes: true, instructions: true
           }
         },
         consignmentBatch: { select: { externalConsignmentNumber: true } }
@@ -339,9 +338,10 @@ export async function resolveUniversalWork(
         const assignedElsewhere = Boolean(assemblyTask.assignedUserId && assemblyTask.assignedUserId !== scope.user.id && scope.user.role !== "OWNER");
         const canAct = canAssemble && !assignedElsewhere && assemblyTask.status !== "PROBLEM";
         candidates.push({ ...common, candidateKey: `order-assembly:${assemblyTask.id}`, sourceId: assemblyTask.id, taskId: assemblyTask.id, actionType: canAct ? "ORDER_ASSEMBLY" : "ORDER_WAITING_ASSEMBLY", sourceLabel: assemblyTask.status === "PROBLEM" ? "Assembly problem" : "Order Assembly", displayReference: order.trackingId ?? order.awb, taskReference: shortTaskReference(assemblyTask.id), stage: "ASSEMBLE", status: assemblyTask.status, requiredQuantity: assemblyTask.requiredQuantity, completedQuantity: assemblyTask.completedQuantity, remainingQuantity: assemblyTask.requiredQuantity - assemblyTask.completedQuantity, assignedUserId: assemblyTask.assignedUserId, assemblyTitle: metadata?.assemblyTitle ?? "Assembly instructions unavailable", assemblyInstructions: metadata?.assemblyInstructions ?? "Ask an owner to correct this task.", assemblySource: metadata?.source ?? null, canAct, readOnlyReason: assemblyTask.status === "PROBLEM" ? "Assembly has a reported problem." : assignedElsewhere ? "Assembly is assigned to another worker." : canAssemble ? null : "Waiting for an assembly worker." });
-      } else if (assemblyState?.state === "REQUIRED_NO_TASK" || assemblyPolicy?.state === "ASSEMBLY_REQUIRED") {
+      } else if (canOfferManualAssemblyDiversion(assemblyState?.state)) {
         const canSend = hasWorkPermission(scope.user, "canPack");
-        candidates.push({ ...common, candidateKey: `order:${order.id}:send-assembly`, actionType: "ORDER_SEND_TO_ASSEMBLY", sourceLabel: "Assembly required", status: "WAITING_FOR_ASSEMBLY", canAct: canSend, readOnlyReason: canSend ? null : "Waiting for a packer to send this order to assembly." });
+        const requiredByRule = assemblyPolicy?.state === "ASSEMBLY_REQUIRED";
+        candidates.push({ ...common, candidateKey: `order:${order.id}:send-assembly`, actionType: "ORDER_SEND_TO_ASSEMBLY", sourceLabel: requiredByRule ? "Assembly required" : "Manual assembly option", status: requiredByRule ? "WAITING_FOR_ASSEMBLY" : "READY", assemblyInstructionsRequired: !requiredByRule, canAct: canSend, readOnlyReason: canSend ? null : "A pack-authorized worker may send this order to assembly." });
       }
     }
     if (!wantsPack || !hasWorkPermission(scope.user, "canPack")) continue;
@@ -403,8 +403,6 @@ export async function resolveUniversalWork(
     else if (!matchType && line.listingIdSnapshot && [code, upper].includes(line.listingIdSnapshot)) matchType = "LISTING_ID";
     else if (!matchType && line.consignmentBatch.externalConsignmentNumber === code) matchType = "CONSIGNMENT_NUMBER";
     const asset = line.markingAsset;
-    const markingFile = asset?.files.find((file) => file.attachmentType === "MARKING_FILE");
-    const markingPreview = asset?.files.find((file) => file.attachmentType === "MARKING_PREVIEW");
     candidates.push({
       candidateKey: `task:${task.id}`,
       sourceType: "CONSIGNMENT_TASK",
@@ -427,6 +425,8 @@ export async function resolveUniversalWork(
       sellerSku: line.sellerSkuSnapshot ?? line.sellerSkuSource,
       fsn: line.fsnSnapshot ?? line.fsnSource,
       listingId: line.listingIdSnapshot,
+      asin: line.asinSnapshot ?? line.asinSource,
+      fnsku: line.fnskuSnapshot ?? line.fnskuSource,
       stage: task.stage,
       status: task.status,
       requiredQuantity: task.requiredQuantity,
@@ -444,8 +444,6 @@ export async function resolveUniversalWork(
       markingFrequency: asset?.frequencySetting,
       markingPasses: asset?.passes,
       markingInstructions: asset?.instructions,
-      markingPreviewAvailable: task.stage === "MARK" ? Boolean(markingPreview) : undefined,
-      markingFileAvailable: task.stage === "MARK" ? Boolean(markingFile) : undefined,
       canAct,
       readOnlyReason: canAct ? null : task.status === "PROBLEM" ? "Problem requires review." : "Task is assigned to another worker or you lack stage permission."
     });

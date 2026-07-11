@@ -163,7 +163,7 @@ export async function importFlipkartConsignmentDraft(input: {
       where: { accountId: account.id, id: { in: selectedIds } },
       select: {
         id: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true,
-        processRules: { where: { active: true }, take: 1, select: { id: true, route: true, markingAssetId: true, markingAsset: { select: { id: true, active: true, files: { where: { attachmentType: "MARKING_FILE", activeVersion: true }, take: 1, select: { id: true } } } } } }
+        processRules: { where: { active: true }, take: 1, select: { id: true, route: true, markingAssetId: true, markingAsset: { select: { id: true, active: true, masterDesignId: true, instructions: true, files: { where: { attachmentType: "MARKING_FILE", activeVersion: true }, take: 1, select: { id: true } } } } } }
       }
     });
     const listingMap = new Map(listings.map((listing) => [listing.id, listing]));
@@ -192,7 +192,9 @@ export async function importFlipkartConsignmentDraft(input: {
       });
       if (item.decision.warning) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: item.decision.status, severity: item.decision.status === "EXACT_SKU" || item.decision.status === "EXACT_FSN" ? "WARNING" : "ERROR", message: item.decision.warning, safeDataJson: "candidates" in item.decision ? JSON.stringify({ listingIds: item.decision.candidates.map((candidate) => candidate.id) }) : undefined });
       if (listing && !rule) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MISSING_PROCESS_RULE", severity: "ERROR", message: "Matched listing has no active process rule." });
-      if (rule?.route === "PICK_MARK_PACK" && (!rule.markingAsset?.active || !rule.markingAsset.files.length)) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MISSING_MARKING_FILE", severity: "ERROR", message: "Marking route requires an active marking asset and active marking file." });
+      if (rule?.route === "PICK_MARK_PACK" && !rule.markingAsset?.active) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_ASSET_MISSING", severity: "ERROR", message: "Marking route requires an active linked marking asset." });
+      if (rule?.route === "PICK_MARK_PACK" && rule.markingAsset?.active && !rule.markingAsset.instructions?.trim() && !rule.markingAsset.masterDesignId?.trim()) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_INSTRUCTIONS_MISSING", severity: "ERROR", message: "Marking route requires instructions or a Master Design ID." });
+      if (rule?.route === "PICK_MARK_PACK" && rule.markingAsset?.files.length) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_FILE_STORED_FUTURE_USE", severity: "INFO", message: "A marking file is stored in the owner library for future integration; worker download is not required." });
       if (rule && rule.route !== "PICK_PACK" && rule.route !== "PICK_MARK_PACK") issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "UNSUPPORTED_ROUTE", severity: "ERROR", message: "Assembly routes are not activated for Flipkart consignments in Phase 2." });
     }
     for (const issue of parsed.issues) issues.push({ consignmentBatchId: batchId, consignmentLineId: issue.rowNumber ? lineIds.get(issue.rowNumber) : undefined, rowNumber: issue.rowNumber, issueType: issue.issueType, severity: issue.severity, message: issue.message, safeDataJson: issue.safeData ? JSON.stringify(issue.safeData) : undefined });

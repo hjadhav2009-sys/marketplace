@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { PrismaClient } from "@prisma/client";
+import { matchAmazonConsignmentRows } from "../src/lib/consignments/amazon/matching";
+import type { AmazonConsignmentSourceRow } from "../src/lib/consignments/amazon/types";
+
+const root=resolve(process.cwd(),".codex-tmp");mkdirSync(root,{recursive:true});const file=resolve(root,"amazon-matching.db");rmSync(file,{force:true});const sqlite=new DatabaseSync(file);sqlite.exec("PRAGMA foreign_keys=ON;");for(const name of readdirSync(resolve(process.cwd(),"prisma/migrations"),{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>entry.name).sort())sqlite.exec(readFileSync(join(process.cwd(),"prisma/migrations",name,"migration.sql"),"utf8"));sqlite.close();
+const db=new PrismaClient({datasourceUrl:`file:${file.replace(/\\/g,"/")}`});
+const row=(values:Partial<AmazonConsignmentSourceRow>):AmazonConsignmentSourceRow=>({rowNumber:2,shipmentId:"SHIP-FAKE",shipmentName:"Fake",destinationText:null,sellerSku:null,fnsku:null,asin:null,externalId:null,ean:null,upc:null,gtin:null,requiredQuantity:1,productTitle:null,brand:null,category:null,subCategory:null,material:null,color:null,size:null,modelNumber:null,description:null,bulletPoints:[],mainImageUrl:null,imageUrls:[],listingStatus:null,sourceFileId:null,sourceSheet:"Fake",sourceProfile:"SHIPMENT",...values});
+try {
+ await db.account.createMany({data:[{id:"amazon-a",name:"Amazon A",code:"AMA",companyName:"Fake",marketplace:"AMAZON",active:true},{id:"amazon-b",name:"Amazon B",code:"AMB",companyName:"Fake",marketplace:"AMAZON",active:true},{id:"flipkart-a",name:"Flipkart A",code:"FKA",companyName:"Fake",marketplace:"FLIPKART",active:true}]});
+ await db.marketplaceListing.createMany({data:[{id:"listing-a",accountId:"amazon-a",marketplace:"AMAZON",sellerSkuId:"SKU-A",sku:"SKU-A",productTitle:"Exact product"},{id:"listing-c",accountId:"amazon-a",marketplace:"AMAZON",sellerSkuId:"SKU-C",sku:"SKU-C",productTitle:"Conflicting product"},{id:"listing-b",accountId:"amazon-b",marketplace:"AMAZON",sellerSkuId:"SKU-A",sku:"SKU-A"},{id:"listing-f",accountId:"flipkart-a",marketplace:"FLIPKART",sellerSkuId:"SKU-A",sku:"SKU-A"}]});
+ const identifiers=(listing:string,account:string,marketplace:"AMAZON"|"FLIPKART",values:Array<["FNSKU"|"SELLER_SKU"|"ASIN"|"EXTERNAL_ID"|"EAN",string]>)=>values.map(([identifierType,value])=>({accountId:account,marketplaceListingId:listing,marketplace,identifierType,rawValue:value,normalizedValue:value}));
+ await db.marketplaceListingIdentifier.createMany({data:[...identifiers("listing-a","amazon-a","AMAZON",[["FNSKU","FNSKU-A"],["SELLER_SKU","SKU-A"],["ASIN","B000000001"],["EXTERNAL_ID","EXT-A"],["EAN","1234567890123"]]),...identifiers("listing-c","amazon-a","AMAZON",[["FNSKU","FNSKU-C"],["SELLER_SKU","SKU-C"],["ASIN","B000000003"]]),...identifiers("listing-b","amazon-b","AMAZON",[["FNSKU","FNSKU-A"],["SELLER_SKU","SKU-A"]]),...identifiers("listing-f","flipkart-a","FLIPKART",[["FNSKU","FNSKU-A"],["SELLER_SKU","SKU-A"]])]});
+ const [fnsku,sku,asin,external,barcode]=await matchAmazonConsignmentRows("amazon-a",[row({fnsku:"FNSKU-A"}),row({sellerSku:"SKU-A"}),row({asin:"B000000001"}),row({externalId:"EXT-A"}),row({ean:"1234567890123"})],db);assert.deepEqual([fnsku.decision.status,sku.decision.status,asin.decision.status,external.decision.status,barcode.decision.status],["EXACT_FNSKU","EXACT_SKU","EXACT_ASIN","EXACT_EXTERNAL_ID","EXACT_BARCODE"]);
+ const priority=(await matchAmazonConsignmentRows("amazon-a",[row({fnsku:"FNSKU-A",sellerSku:"SKU-A",asin:"B000000001"})],db))[0];assert.equal(priority.decision.status,"EXACT_FNSKU");
+ const conflict=(await matchAmazonConsignmentRows("amazon-a",[row({fnsku:"FNSKU-A",sellerSku:"SKU-C"})],db))[0];assert.equal(conflict.decision.status,"IDENTIFIER_CONFLICT");
+ const scoped=(await matchAmazonConsignmentRows("amazon-a",[row({fnsku:"FNSKU-A"})],db))[0];assert.equal(scoped.decision.listing?.id,"listing-a","Other accounts and marketplaces are excluded");
+ const title=(await matchAmazonConsignmentRows("amazon-a",[row({productTitle:"Exact product"})],db))[0];assert.equal(title.decision.status,"NOT_FOUND","Titles are never automatic identifiers");
+ await db.marketplaceListingIdentifier.create({data:{accountId:"amazon-a",marketplaceListingId:"listing-c",marketplace:"AMAZON",identifierType:"FNSKU",rawValue:"FNSKU-A",normalizedValue:"FNSKU-A"}});const duplicate=(await matchAmazonConsignmentRows("amazon-a",[row({fnsku:"FNSKU-A"})],db))[0];assert.equal(duplicate.decision.status,"EXACT_MULTIPLE");
+} finally { await db.$disconnect();rmSync(file,{force:true}); }
+console.log("Amazon exact, prioritized, account-scoped matching tests passed.");

@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const root=process.cwd(); const tempRoot=resolve(root,".codex-tmp"); const migrationsRoot=resolve(root,"prisma","migrations"); const latest="20260711000200_flipkart_consignment_activation"; mkdirSync(tempRoot,{recursive:true});
+const root=process.cwd(); const tempRoot=resolve(root,".codex-tmp"); const migrationsRoot=resolve(root,"prisma","migrations"); const latest="20260712000100_amazon_consignment_enrichment"; mkdirSync(tempRoot,{recursive:true});
 const allEntries=readdirSync(migrationsRoot,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>entry.name).sort();const entries=allEntries.slice(0,allEntries.indexOf(latest)+1);
 function apply(db,name){db.exec(readFileSync(join(migrationsRoot,name,"migration.sql"),"utf8"));}
 function open(name){const file=resolve(tempRoot,name);rmSync(file,{force:true});const db=new DatabaseSync(file);db.exec("PRAGMA foreign_keys=ON;");return{db,file};}
@@ -16,7 +16,7 @@ function seedBase(db){
  INSERT INTO "Order" ("id","accountId","uploadBatchId","awb","sku","quantity","orderNumber","createdAt","updatedAt") VALUES ('order_fake','acct_fake','upload_fake','FAKE-AWB','SKU-FAKE',1,'FAKE-ORDER',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
  `);
 }
-const fresh=open("consignment-fresh-smoke.db"); for(const name of entries)apply(fresh.db,name); for(const table of ["ConsignmentBatch","ConsignmentLine","ConsignmentImportFile","ConsignmentImportIssue"])assert.ok(fresh.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table),`Fresh migration creates ${table}`); fresh.db.close();
+const fresh=open("consignment-fresh-smoke.db"); for(const name of entries)apply(fresh.db,name); for(const table of ["ConsignmentBatch","ConsignmentLine","ConsignmentImportFile","ConsignmentImportIssue"])assert.ok(fresh.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table),`Fresh migration creates ${table}`);const freshColumns=new Set(fresh.db.prepare("PRAGMA table_info('ConsignmentLine')").all().map((row)=>row.name));for(const column of ["asinSource","fnskuSource","externalIdSource","barcodeSource","asinSnapshot","fnskuSnapshot","externalIdSnapshot","barcodeSnapshot","catalogSnapshotJson"])assert.ok(freshColumns.has(column),`Fresh migration creates ${column}`);fresh.db.close();
 
 const existing=open("consignment-existing-smoke.db"); for(const name of entries.filter((name)=>name!==latest))apply(existing.db,name); seedBase(existing.db); apply(existing.db,latest);
 existing.db.exec(`
@@ -35,4 +35,5 @@ assert.throws(()=>existing.db.exec(task("'task_same_sequence','acct_fake','CONSI
 const order=existing.db.prepare("SELECT pickStatus,packStatus FROM 'Order' WHERE id='order_fake'").get();assert.equal(order.pickStatus,"READY");assert.equal(order.packStatus,"READY");
 assert.equal(existing.db.prepare("SELECT count(*) count FROM WorkTask WHERE orderId IS NOT NULL").get().count,0,"No old Order task was created");
 const permissions=existing.db.prepare("SELECT canViewConsignments,canImportConsignments,canManageConsignments FROM User WHERE id='user_fake'").get();assert.deepEqual([...Object.values(permissions)],[0,0,0],"Existing users receive safe permission defaults");
+const preserved=existing.db.prepare("SELECT sellerSkuSource,asinSnapshot,fnskuSnapshot,catalogSnapshotJson FROM ConsignmentLine WHERE id='line_fake'").get();assert.equal(preserved.sellerSkuSource,null);assert.equal(preserved.asinSnapshot,null);assert.equal(preserved.fnskuSnapshot,null);assert.equal(preserved.catalogSnapshotJson,null,"Migration does not invent Amazon data for old Flipkart lines");
 existing.db.close(); rmSync(fresh.file,{force:true});rmSync(existing.file,{force:true}); console.log("Consignment migration smoke tests passed for fresh and existing-style SQLite databases.");

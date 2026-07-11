@@ -38,6 +38,7 @@ type AwbSuggestion = {
   packStatus: string;
   canPack: boolean;
   assemblyState?: string;
+  canOfferManualAssembly?: boolean;
   packBlockedReason?: string;
   listingTitle?: string | null;
   listingId?: string | null;
@@ -512,7 +513,7 @@ export function AwbBarcodeScanner({ action, directPackAction, sendAssemblyAction
                             Pack now
                           </SubmitButton>
                         </form> : <p className="rounded-md bg-amber-50 p-2 text-xs font-bold text-amber-900">{suggestion.packBlockedReason ?? "Not ready to pack"}</p>}
-                        {suggestion.pickStatus === "PICKED" && !["COMPLETED", "SKIPPED", "READY", "IN_PROGRESS", "PROBLEM"].includes(suggestion.assemblyState ?? "") ? (
+                        {suggestion.pickStatus === "PICKED" && suggestion.canOfferManualAssembly ? (
                           <details className="rounded-md border p-2 text-xs">
                             <summary className="cursor-pointer font-bold">Send to Assembly</summary>
                             <form action={sendAssemblyAction} className="mt-2 grid gap-2">

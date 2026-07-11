@@ -14,7 +14,7 @@ import { buildListingImageGallery } from "@/lib/product-image";
 import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { confirmPackedAction, reportProblemFromScanAction } from "./actions";
 import { sendOrderToAssemblyAction } from "@/app/work/assembly/actions";
-import { getOrderAssemblyPackingGate } from "@/src/lib/workflow/order-assembly";
+import { canOfferManualAssemblyDiversion, getOrderAssemblyPackingGate } from "@/src/lib/workflow/order-assembly";
 
 type ScanResultPageProps = {
   params: Promise<{
@@ -285,10 +285,10 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
               <div className="mt-3 grid gap-3">
                 {scopedItems.map((item) => {
                   const state = assemblyStateByOrder.get(item.id);
-                  const active = state && !["NO_RULE", "READY_MADE"].includes(state.state);
+                  const canOfferDiversion = canOfferManualAssemblyDiversion(state?.state);
                   return <div key={item.id} className="rounded-md bg-slate-50 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2"><p className="break-words font-bold">{item.sku} / Qty {item.qty}</p><span className="rounded-full bg-white px-2 py-1 text-xs font-bold ring-1 ring-slate-200">{state?.state.replaceAll("_", " ") ?? "No assembly task"}</span></div>
-                    {item.pickStatus === "PICKED" && !active ? <details className="mt-2"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-berry">Send to Assembly</summary><form action={sendOrderToAssemblyAction} className="grid gap-2 sm:grid-cols-2"><input type="hidden" name="orderId" value={item.id}/><input type="hidden" name="returnPath" value={`/packing/${encodeURIComponent(order.awb)}`}/><input type="hidden" name="clientRequestId" value={`packing-detail:${item.id}`}/><input name="manualTitle" maxLength={160} placeholder="Assembly title (optional)" className="min-h-11 rounded-md border px-3"/><input name="manualImageUrl" maxLength={2048} placeholder="Optional safe image URL" className="min-h-11 rounded-md border px-3"/><textarea name="manualInstructions" maxLength={2000} placeholder="Instructions required when no valid rule exists" className="min-h-24 rounded-md border p-3 sm:col-span-2"/><SubmitButton pendingText="Sending..." className="sm:col-span-2">Send to Assembly</SubmitButton></form></details> : null}
+                    {item.pickStatus === "PICKED" && canOfferDiversion ? <details className="mt-2"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-berry">Send to Assembly</summary><form action={sendOrderToAssemblyAction} className="grid gap-2 sm:grid-cols-2"><input type="hidden" name="orderId" value={item.id}/><input type="hidden" name="returnPath" value={`/packing/${encodeURIComponent(order.awb)}`}/><input type="hidden" name="clientRequestId" value={`packing-detail:${item.id}`}/><input name="manualTitle" maxLength={160} placeholder="Assembly title (optional)" className="min-h-11 rounded-md border px-3"/><input name="manualImageUrl" maxLength={2048} placeholder="Optional safe image URL" className="min-h-11 rounded-md border px-3"/><textarea name="manualInstructions" maxLength={2000} placeholder="Instructions required when no valid rule exists" className="min-h-24 rounded-md border p-3 sm:col-span-2"/><SubmitButton pendingText="Sending..." className="sm:col-span-2">Send to Assembly</SubmitButton></form></details> : null}
                     {state && !state.allowed ? <p className="mt-2 text-sm font-semibold text-amber-800">{state.message}</p> : null}
                   </div>;
                 })}

@@ -12,8 +12,8 @@ export const WORK_TASK_INCLUDE = {
   problemReportedBy: { select: { id: true, name: true } },
   actionLogs: { where: { action: "TASK_PROBLEM_REPORTED" as const }, orderBy: { createdAt: "desc" as const }, take: 1, select: { note: true } },
   consignmentLine: { include: {
-    consignmentBatch: { select: { id: true, displayName: true, externalConsignmentNumber: true, status: true } },
-    markingAsset: { include: { files: { where: { activeVersion: true }, select: { id: true, attachmentType: true, originalFileName: true } } } },
+    consignmentBatch: { select: { id: true, displayName: true, externalConsignmentNumber: true, marketplace: true, status: true } },
+    markingAsset: true,
     workTasks: { select: { id: true, stage: true, status: true, sequenceNumber: true }, orderBy: { sequenceNumber: "asc" as const } }
   } }
 } satisfies Prisma.WorkTaskInclude;
@@ -40,7 +40,7 @@ export type WorkerQueueTask = Awaited<ReturnType<typeof getWorkerTaskQueue>>["ta
 
 async function exactListingIds(accountId:string, code:string|undefined, client:Client) {
   if(!code?.trim()) return [];
-  const types=["SELLER_SKU","INTERNAL_SKU","FSN","LISTING_ID","LID","EAN","UPC","GTIN","BARCODE"] as const;
+  const types=["SELLER_SKU","INTERNAL_SKU","FSN","LISTING_ID","LID","FNSKU","ASIN","EXTERNAL_ID","EAN","UPC","GTIN","MODEL_NUMBER","BARCODE"] as const;
   const ors=types.flatMap((type)=>{const normalized=normalizeListingIdentifier(type,code);return normalized?[{identifierType:type,normalizedValue:normalized}]:[];});
   if(!ors.length)return [];
   const rows=await client.marketplaceListingIdentifier.findMany({where:{accountId,active:true,OR:ors},select:{marketplaceListingId:true},take:200});

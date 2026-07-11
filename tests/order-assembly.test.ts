@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { normalizeListingIdentifier } from "../src/lib/marking/identifiers";
 import { markCustomerOrdersPickedSafely } from "../src/lib/workflow/order-picking";
-import { claimOrderAssemblyTask, completeOrderAssemblyTask, getOrderAssemblyPackingGate, reportOrderAssemblyProblem, resolveOrderAssemblyProblem, sendOrderToAssembly, skipOrderAssemblyTask } from "../src/lib/workflow/order-assembly";
+import { canOfferManualAssemblyDiversion, claimOrderAssemblyTask, completeOrderAssemblyTask, getOrderAssemblyPackingGate, reportOrderAssemblyProblem, resolveOrderAssemblyProblem, sendOrderToAssembly, skipOrderAssemblyTask } from "../src/lib/workflow/order-assembly";
 import { parseOrderAssemblyMetadata } from "../src/lib/workflow/order-assembly-metadata";
 import { resolveOrderAssemblyPolicy } from "../src/lib/workflow/order-assembly-policy";
 import { packCustomerOrderShipmentSafely } from "../src/lib/workflow/order-pack-scope";
@@ -54,9 +54,11 @@ try {
   assert.equal((await resolveOrderAssemblyPolicy(unsupportedPolicyOrder, db)).state, "UNSUPPORTED_ROUTE");
   assert.equal((await resolveOrderAssemblyPolicy(order("policy-none", "NO-RULE-SKU"), db)).state, "NO_RULE");
   assert.equal((await resolveOrderAssemblyPolicy(order("policy-ambiguous", "ASSEMBLY-SKU"), db)).state, "AMBIGUOUS_LISTING");
+  for (const state of ["NO_RULE", "READY_MADE", "REQUIRED_NO_TASK", "AMBIGUOUS_LISTING"] as const) assert.equal(canOfferManualAssemblyDiversion(state), true);
+  for (const state of ["READY", "IN_PROGRESS", "PROBLEM", "COMPLETED", "SKIPPED", "LOCKED", "CANCELLED", "UNSUPPORTED_ROUTE", "INVALID_RULE"] as const) assert.equal(canOfferManualAssemblyDiversion(state), false);
 
   await db.marketplaceListingIdentifier.delete({ where: { id: "identifier-ambiguous" } });
-  await db.order.createMany({ data: [order("auto", "ASSEMBLY-SKU"), order("ready", "READY-SKU"), order("manual", "NO-RULE-SKU", "PICKED"), order("problem", "NO-RULE-PROBLEM", "PICKED"), order("ship-a", "ASSEMBLY-SKU", "PICKED", "TRACK-SHIP"), order("ship-b", "READY-SKU", "PICKED", "TRACK-SHIP")] });
+  await db.order.createMany({ data: [order("auto", "ASSEMBLY-SKU"), order("ready", "READY-SKU"), order("manual", "NO-RULE-SKU", "PICKED"), order("problem", "NO-RULE-PROBLEM", "PICKED"), order("concurrent-claim", "NO-RULE-CLAIM", "PICKED"), order("concurrent-complete", "NO-RULE-COMPLETE", "PICKED"), order("concurrent-problem", "NO-RULE-PROBLEM-REPLAY", "PICKED"), order("ship-a", "ASSEMBLY-SKU", "PICKED", "TRACK-SHIP"), order("ship-b", "READY-SKU", "PICKED", "TRACK-SHIP")] });
 
   const picked = await markCustomerOrdersPickedSafely({ actorUserId: "picker", accountId: "account", where: { id: { in: ["auto", "ready"] } }, source: "picker-card", expectedStatus: "READY" }, db);
   assert.equal(picked.updatedCount, 2);
@@ -78,6 +80,20 @@ try {
   await completeOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, expectedStatus: "IN_PROGRESS", clientRequestId: "complete-a" }, db);
   const completeReplay = await completeOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, expectedStatus: "IN_PROGRESS", clientRequestId: "complete-a" }, db);
   assert.equal(completeReplay.idempotent, true);
+
+  const claimTask=(await sendOrderToAssembly({actorUserId:"packer",accountId:"account",orderId:"concurrent-claim",manualInstructions:"Fake concurrent claim."},db)).task;
+  const claims=await Promise.all([claimOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:claimTask.id,clientRequestId:"claim-same"},db),claimOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:claimTask.id,clientRequestId:"claim-same"},db)]);
+  assert.equal(claims.filter((result)=>!result.idempotent).length,1);assert.ok(claims.every((result)=>result.status==="IN_PROGRESS"));
+  const completeTask=(await sendOrderToAssembly({actorUserId:"packer",accountId:"account",orderId:"concurrent-complete",manualInstructions:"Fake concurrent completion."},db)).task;
+  const completions=await Promise.all([completeOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:completeTask.id,expectedStatus:"READY",clientRequestId:"complete-same"},db),completeOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:completeTask.id,expectedStatus:"READY",clientRequestId:"complete-same"},db)]);
+  assert.equal(completions.filter((result)=>!result.idempotent).length,1);assert.ok(completions.every((result)=>result.status==="COMPLETED"));
+  const concurrentProblemTask=(await sendOrderToAssembly({actorUserId:"packer",accountId:"account",orderId:"concurrent-problem",manualInstructions:"Fake concurrent problem."},db)).task;
+  const problemInput={actorUserId:"assembler-a",accountId:"account",taskId:concurrentProblemTask.id,expectedStatus:"READY",reason:"PART_MISSING",note:"Fake missing part",clientRequestId:"problem-same"};
+  const reports=await Promise.all([reportOrderAssemblyProblem(problemInput,db),reportOrderAssemblyProblem(problemInput,db)]);
+  assert.equal(reports.filter((result)=>!result.idempotent).length,1);assert.ok(reports.every((result)=>result.status==="PROBLEM"));
+  await assert.rejects(()=>reportOrderAssemblyProblem({...problemInput,note:"Changed replay payload"},db),/different payload/i);
+  await assert.rejects(()=>reportOrderAssemblyProblem({...problemInput,actorUserId:"assembler-b"},db),/another worker/i);
+  await db.user.update({where:{id:"assembler-a"},data:{active:false}});await assert.rejects(()=>reportOrderAssemblyProblem(problemInput,db),/inactive|unavailable|access/i);await db.user.update({where:{id:"assembler-a"},data:{active:true}});
 
   const problemTask = (await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "problem", manualInstructions: "Fake problem task." }, db)).task;
   await reportOrderAssemblyProblem({ actorUserId: "assembler-a", accountId: "account", taskId: problemTask.id, expectedStatus: "READY", reason: "PART_MISSING", note: "Fake part missing", clientRequestId: "problem-1" }, db);

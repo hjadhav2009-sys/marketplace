@@ -1,5 +1,9 @@
 # Universal Work Scanner
 
+Amazon exact lookup includes Seller SKU, FNSKU, ASIN, External ID, EAN, UPC, GTIN, consignment number, and task reference. Identical codes in different marketplaces/accounts remain separate cards. Scanning is lookup-only; an authorized worker must explicitly choose Pick, Mark, or Pack.
+
+Mark candidates show operational instructions and settings but no marking-file download/open controls. Owner library files and private storage paths are not included in scanner payloads.
+
 Open `/work/scan` or the Universal Scan section at `/packing`.
 
 1. Scan or enter an AWB, Tracking ID, order code, SKU, FSN, listing ID, barcode, consignment number, or supported work-task ID.

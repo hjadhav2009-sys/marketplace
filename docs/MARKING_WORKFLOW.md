@@ -1,7 +1,7 @@
 # Marking Workflow
 
-`/work/marking` is available to active users with `canMark` in the selected account. Cards show the immutable listing snapshot, marking settings, current work quantity, preview, and file availability.
+`/work/marking` is available to active users with `canMark` in the selected account. Cards show immutable Flipkart or Amazon product identity, image, route, quantity progress, Master Design ID, instructions, machine settings, assignment, and problem state. Full catalog details and up to ten images load on `/work/marking/[taskId]`.
 
-Preview and file requests go through `/work/tasks/[taskId]/marking-file`. The server rechecks authentication, account assignment, MARK permission, task assignment, active asset, listing link, and active file. Files are streamed with private no-store caching and `nosniff`; managed paths are never returned. Downloads and previews are recorded in `WorkActionLog`.
+Worker cards do not offer marking-file open/download controls in Phase 6. The owner marking library, stored versions, and secure task-scoped route remain preserved for future use; managed paths are never returned.
 
-The owner copy remains private. An authenticated Windows Worker Agent and automatic temporary-file cleanup remain later work.
+The owner copy remains private. EngravingBrain, Worker Agent delivery, temporary files, hash verification, and cleanup automation remain later optional work.

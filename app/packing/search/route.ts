@@ -3,7 +3,7 @@ import { requireAccount, requireUser } from "@/lib/auth";
 import { normalizeAwb } from "@/lib/awb";
 import { searchOrdersByAwbFragment } from "@/lib/data";
 import { hasWorkPermission } from "@/lib/work-permissions";
-import { getOrderAssemblyPackingGate } from "@/src/lib/workflow/order-assembly";
+import { canOfferManualAssemblyDiversion, getOrderAssemblyPackingGate } from "@/src/lib/workflow/order-assembly";
 
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -38,6 +38,7 @@ export async function GET(request: Request) {
       packStatus: order.packStatus,
       canPack: order.pickStatus === "PICKED" && assemblyByOrder.get(order.id)?.allowed !== false,
       assemblyState: assemblyByOrder.get(order.id)?.state,
+      canOfferManualAssembly: canOfferManualAssemblyDiversion(assemblyByOrder.get(order.id)?.state),
       packBlockedReason: order.pickStatus !== "PICKED" ? "Order must be picked before packing." : assemblyByOrder.get(order.id)?.message,
       listingTitle: order.listingTitle,
       listingId: order.listingId,

@@ -235,3 +235,9 @@ Consignment quantities are workflow quantities only. No inventory balance, reser
 Ready-made orders continue through Pick then Pack. Listings configured as `PICK_ASSEMBLE_PACK` create one selected-account Assembly task after Pick; packing is blocked until that task is completed or owner-skipped. Packers can also divert a picked exceptional order with explicit manual instructions. Open `/work/assembly` for the worker queue and see [Customer Order Assembly](docs/CUSTOMER_ORDER_ASSEMBLY.md) and [Packing Gate](docs/ORDER_ASSEMBLY_PACKING_GATE.md).
 
 Assembly is intentionally simple workflow tracking. It does not add BOM, parts stock, manufacturing operations, stock deductions, QC, costing, or ERP behavior. Phase 5 does not modify the Android/mobile app.
+
+## Amazon Consignments
+
+Amazon seller accounts can import bounded CSV, TSV/TXT, XLSX, XLSM, or ZIP shipment/listing/catalog reports through the existing owner consignment pages. The app classifies content from headers, enriches the account-scoped listing master, matches FNSKU then Seller SKU, ASIN, External ID, and barcodes, and requires explicit owner activation before creating shared Pick/Mark/Pack tasks. See [Amazon Import](docs/AMAZON_CONSIGNMENT_IMPORT.md), [Matching](docs/AMAZON_LISTING_MATCHING.md), [Catalog Enrichment](docs/AMAZON_CATALOG_ENRICHMENT.md), and [Activation](docs/AMAZON_CONSIGNMENT_ACTIVATION.md).
+
+Worker marking cards now focus on product/design identity, instructions, settings, and quantity progress. Worker file download/open automation is postponed; the private owner marking library remains preserved. Never commit real Amazon reports, extracted catalog archives, private images, databases, or managed storage.

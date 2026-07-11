@@ -21,9 +21,10 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
   const batch = await client.consignmentBatch.findFirst({
     where: { id: batchId, accountId },
     include: { lines: { orderBy: { rowNumber: "asc" }, include: {
-      marketplaceListing: { select: { id: true, accountId: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true } },
+      marketplaceListing: { select: { id: true, accountId: true, marketplace: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true, identifiers: { where: { active: true }, select: { identifierType: true, rawValue: true } } } },
       processRule: { select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, markingAssetId: true } },
-      markingAsset: { select: { id: true, active: true, listingLinks: { where: { active: true }, select: { accountId: true, marketplaceListingId: true } }, files: { where: { attachmentType: "MARKING_FILE", activeVersion: true }, take: 1, select: { id: true } } } }
+      markingAsset: { select: { id: true, active: true, masterDesignId: true, instructions: true, listingLinks: { where: { active: true }, select: { accountId: true, marketplaceListingId: true } } } },
+      issues: { where: { issueType: "MARKING_IMAGE_MISSING" }, select: { resolved: true } }
     } } }
   });
   if (!batch) return { batch: null, problems: [{ code: "NOT_FOUND", message: "Consignment is not available in the selected account." }] as ActivationProblem[] };
@@ -31,12 +32,15 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
   for (const line of batch.lines) {
     const identify = { lineId: line.id, rowNumber: line.rowNumber };
     if (line.accountId !== accountId || line.marketplaceListing?.accountId !== accountId) problems.push({ ...identify, code: "ACCOUNT_MISMATCH", message: "Line and listing must belong to the selected account." });
+    if (line.marketplaceListing && line.marketplaceListing.marketplace !== batch.marketplace) problems.push({ ...identify, code: "MARKETPLACE_MISMATCH", message: "Line listing must belong to the consignment marketplace." });
     if (!Number.isSafeInteger(line.requiredQuantity) || line.requiredQuantity <= 0) problems.push({ ...identify, code: "INVALID_QUANTITY", message: "Required quantity must be a positive whole number." });
-    if (!line.marketplaceListing || !["EXACT_SKU", "EXACT_FSN", "OWNER_SELECTED"].includes(line.matchStatus)) problems.push({ ...identify, code: "MISSING_LISTING", message: "Select one account listing before activation." });
+    if (!line.marketplaceListing || !["EXACT_SKU", "EXACT_FSN", "EXACT_FNSKU", "EXACT_ASIN", "EXACT_EXTERNAL_ID", "EXACT_BARCODE", "OWNER_SELECTED"].includes(line.matchStatus)) problems.push({ ...identify, code: "MISSING_LISTING", message: "Select one account listing before activation." });
     if (!routeSupported(line.processRoute)) problems.push({ ...identify, code: "MISSING_ROUTE", message: "Select Ready-made or Marking route before activation." });
     if (!line.processRule?.active || line.processRule.accountId !== line.accountId || line.processRule.marketplaceListingId !== line.marketplaceListingId || line.processRule.route !== line.processRoute) problems.push({ ...identify, code: "STALE_RULE", message: "Save an active account-scoped process rule matching this listing and route." });
     const markingLinked = line.markingAsset?.listingLinks.some((link) => link.accountId === line.accountId && link.marketplaceListingId === line.marketplaceListingId);
-    if (line.processRoute === "PICK_MARK_PACK" && (!line.markingAsset?.active || !markingLinked || !line.markingAsset.files.length || line.processRule?.markingAssetId !== line.markingAssetId)) problems.push({ ...identify, code: "MISSING_MARKING_FILE", message: "Marking route requires an active linked marking asset and marking file." });
+    if (line.processRoute === "PICK_MARK_PACK" && (!line.markingAsset?.active || !markingLinked || line.processRule?.markingAssetId !== line.markingAssetId)) problems.push({ ...identify, code: "MARKING_ASSET_MISSING", message: "Marking route requires an active linked marking asset." });
+    if (line.processRoute === "PICK_MARK_PACK" && line.markingAsset && !line.markingAsset.instructions?.trim() && !line.markingAsset.masterDesignId?.trim()) problems.push({ ...identify, code: "MARKING_INSTRUCTIONS_MISSING", message: "Marking route requires instructions or a Master Design ID." });
+    if (line.processRoute === "PICK_MARK_PACK" && !line.marketplaceListing?.mainImageUrl && !line.productImageSnapshot && !line.issues.some((issue) => issue.resolved)) problems.push({ ...identify, code: "MARKING_IMAGE_MISSING", message: "Review and acknowledge the missing product image before activation." });
   }
   if (!batch.lines.length) problems.push({ code: "NO_LINES", message: "Consignment has no valid lines." });
   return { batch, problems };
@@ -45,6 +49,7 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
 async function writeSnapshotChunk(tx: Transaction, lines: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"]) {
   const ids = lines.map((line) => line.id);
   const cases = <T>(get: (line: typeof lines[number]) => T) => Prisma.join(lines.map((line) => Prisma.sql`WHEN ${line.id} THEN ${get(line)}`), " ");
+  const identifier=(line:typeof lines[number],type:string)=>line.marketplaceListing?.identifiers.find((item)=>item.identifierType===type)?.rawValue??null;
   await tx.$executeRaw(Prisma.sql`UPDATE "ConsignmentLine" SET
     "activated" = true,
     "productTitleSnapshot" = CASE "id" ${cases((line) => line.marketplaceListing?.productTitle ?? line.productNameSource)} ELSE "productTitleSnapshot" END,
@@ -52,6 +57,10 @@ async function writeSnapshotChunk(tx: Transaction, lines: NonNullable<Awaited<Re
     "sellerSkuSnapshot" = CASE "id" ${cases((line) => line.marketplaceListing?.sellerSkuId ?? line.sellerSkuSource)} ELSE "sellerSkuSnapshot" END,
     "fsnSnapshot" = CASE "id" ${cases((line) => line.marketplaceListing?.fsn ?? line.fsnSource)} ELSE "fsnSnapshot" END,
     "listingIdSnapshot" = CASE "id" ${cases((line) => line.marketplaceListing?.listingId ?? null)} ELSE "listingIdSnapshot" END
+    ,"asinSnapshot" = CASE "id" ${cases((line) => identifier(line,"ASIN") ?? line.asinSource)} ELSE "asinSnapshot" END
+    ,"fnskuSnapshot" = CASE "id" ${cases((line) => identifier(line,"FNSKU") ?? line.fnskuSource)} ELSE "fnskuSnapshot" END
+    ,"externalIdSnapshot" = CASE "id" ${cases((line) => identifier(line,"EXTERNAL_ID") ?? line.externalIdSource)} ELSE "externalIdSnapshot" END
+    ,"barcodeSnapshot" = CASE "id" ${cases((line) => identifier(line,"EAN") ?? identifier(line,"UPC") ?? identifier(line,"GTIN") ?? line.barcodeSource)} ELSE "barcodeSnapshot" END
     WHERE "id" IN (${Prisma.join(ids)})`);
 }
 

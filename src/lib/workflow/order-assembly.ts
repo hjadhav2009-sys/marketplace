@@ -16,6 +16,11 @@ export const ORDER_ASSEMBLY_PROBLEM_CATEGORIES = [
   "ASSEMBLY_FAILED", "DAMAGED_PRODUCT", "QUANTITY_MISMATCH", "OTHER"
 ] as const;
 
+const MANUAL_DIVERSION_STATES = new Set(["NO_RULE", "READY_MADE", "REQUIRED_NO_TASK", "AMBIGUOUS_LISTING"]);
+export function canOfferManualAssemblyDiversion(state: string | null | undefined) {
+  return MANUAL_DIVERSION_STATES.has(state ?? "NO_RULE");
+}
+
 function fingerprint(value: Record<string, unknown>) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -124,11 +129,28 @@ async function orderAssemblyTaskForMutation(tx: Transaction, input: { taskId: st
 
 async function replay(tx: Transaction, input: { taskId: string; actorUserId: string; requestKind: WorkRequestKind; clientRequestId?: string; requestFingerprint?: string }) {
   if (!input.clientRequestId) return null;
-  const log = await tx.workActionLog.findFirst({ where: { taskId: input.taskId, actorUserId: input.actorUserId, requestKind: input.requestKind, clientRequestId: input.clientRequestId } });
+  const log = await tx.workActionLog.findFirst({ where: { taskId: input.taskId, clientRequestId: input.clientRequestId }, orderBy: { createdAt: "asc" } });
   if (!log) return null;
+  if (log.actorUserId !== input.actorUserId) throw new Error("Request ID was already used by another worker.");
+  const expectedAction = input.requestKind === "CLAIM" ? "TASK_CLAIMED" : input.requestKind === "COMPLETE" ? "TASK_COMPLETED" : input.requestKind === "REPORT_PROBLEM" ? "TASK_PROBLEM_REPORTED" : null;
+  if (!expectedAction || log.requestKind !== input.requestKind || log.action !== expectedAction) throw new Error("Request ID was already used for a different action.");
   const metadata = log.metadataJson ? JSON.parse(log.metadataJson) as { requestFingerprint?: string } : {};
   if (input.requestFingerprint && metadata.requestFingerprint !== input.requestFingerprint) throw new Error("Request ID was already used with a different payload.");
-  return { taskId: input.taskId, status: log.action === "TASK_COMPLETED" ? "COMPLETED" as const : "IN_PROGRESS" as const, idempotent: true };
+  const status = log.action === "TASK_COMPLETED" ? "COMPLETED" as const : log.action === "TASK_PROBLEM_REPORTED" ? "PROBLEM" as const : "IN_PROGRESS" as const;
+  return { taskId: input.taskId, status, idempotent: true };
+}
+
+async function recoverAssemblyReplay<T>(input: { clientRequestId?: string; mutate: () => Promise<T>; replay: () => Promise<T | null> }) {
+  try { return await input.mutate(); }
+  catch (error) {
+    if (!input.clientRequestId) throw error;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const prior = await input.replay();
+      if (prior) return prior;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw error;
+  }
 }
 
 async function actionLog(tx: Transaction, input: { taskId: string; accountId: string; actorUserId: string; action: "TASK_CLAIMED" | "TASK_COMPLETED" | "TASK_PROBLEM_REPORTED" | "TASK_PROBLEM_RESOLVED" | "TASK_REASSIGNED" | "TASK_UNASSIGNED"; requestKind: WorkRequestKind; clientRequestId?: string; note?: string; metadata?: Record<string, unknown> }) {
@@ -136,7 +158,7 @@ async function actionLog(tx: Transaction, input: { taskId: string; accountId: st
 }
 
 export async function claimOrderAssemblyTask(input: { taskId: string; accountId: string; actorUserId: string; clientRequestId?: string }, client: Client = prisma) {
-  return client.$transaction(async (tx) => {
+  return recoverAssemblyReplay({ clientRequestId: input.clientRequestId, mutate: () => client.$transaction(async (tx) => {
     const { user, task } = await orderAssemblyTaskForMutation(tx, input);
     if (!hasWorkPermission(user, "canAssemble")) throw new Error("Assembly permission is required.");
     const prior = await replay(tx, { ...input, requestKind: "CLAIM" }); if (prior) return prior;
@@ -147,12 +169,16 @@ export async function claimOrderAssemblyTask(input: { taskId: string; accountId:
     if (changed.count !== 1) throw new Error("This assembly task was taken by another worker.");
     await actionLog(tx, { ...input, action: "TASK_CLAIMED", requestKind: "CLAIM" });
     return { taskId: task.id, status: "IN_PROGRESS" as const, idempotent: false };
-  });
+  }), replay: () => client.$transaction(async (tx) => {
+    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
+    if (!hasWorkPermission(user, "canAssemble")) throw new Error("Assembly permission is required.");
+    return replay(tx, { ...input, taskId: task.id, requestKind: "CLAIM" });
+  }) });
 }
 
 export async function completeOrderAssemblyTask(input: { taskId: string; accountId: string; actorUserId: string; expectedStatus: string; clientRequestId?: string }, client: Client = prisma) {
   const requestFingerprint = fingerprint({ expectedStatus: input.expectedStatus });
-  return client.$transaction(async (tx) => {
+  return recoverAssemblyReplay({ clientRequestId: input.clientRequestId, mutate: () => client.$transaction(async (tx) => {
     const { user, task } = await orderAssemblyTaskForMutation(tx, input);
     if (!hasWorkPermission(user, "canAssemble")) throw new Error("Assembly permission is required.");
     const prior = await replay(tx, { ...input, requestKind: "COMPLETE", requestFingerprint }); if (prior) return prior;
@@ -165,13 +191,17 @@ export async function completeOrderAssemblyTask(input: { taskId: string; account
     await actionLog(tx, { ...input, action: "TASK_COMPLETED", requestKind: "COMPLETE", metadata: { requestFingerprint } });
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_COMPLETED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ orderId: task.orderId, quantity: task.requiredQuantity }) } });
     return { taskId: task.id, status: "COMPLETED" as const, idempotent: false };
-  });
+  }), replay: () => client.$transaction(async (tx) => {
+    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
+    if (!hasWorkPermission(user, "canAssemble")) throw new Error("Assembly permission is required.");
+    return replay(tx, { ...input, taskId: task.id, requestKind: "COMPLETE", requestFingerprint });
+  }) });
 }
 
 export async function reportOrderAssemblyProblem(input: { taskId: string; accountId: string; actorUserId: string; reason: string; note?: string; expectedStatus: string; clientRequestId?: string }, client: Client = prisma) {
   if (!(ORDER_ASSEMBLY_PROBLEM_CATEGORIES as readonly string[]).includes(input.reason)) throw new Error("Select a valid assembly problem reason.");
   const requestFingerprint = fingerprint({ reason: input.reason, note: input.note?.trim() || null, expectedStatus: input.expectedStatus });
-  return client.$transaction(async (tx) => {
+  return recoverAssemblyReplay({ clientRequestId: input.clientRequestId, mutate: () => client.$transaction(async (tx) => {
     const { user, task } = await orderAssemblyTaskForMutation(tx, input);
     if (!hasWorkPermission(user, "canAssemble") || (user.role !== "OWNER" && !user.canReportProblem)) throw new Error("Assembly problem reporting permission is required.");
     const prior = await replay(tx, { ...input, requestKind: "REPORT_PROBLEM", requestFingerprint }); if (prior) return prior;
@@ -181,7 +211,11 @@ export async function reportOrderAssemblyProblem(input: { taskId: string; accoun
     if (changed.count !== 1) throw new Error("Assembly changed; refresh before reporting a problem.");
     await actionLog(tx, { ...input, action: "TASK_PROBLEM_REPORTED", requestKind: "REPORT_PROBLEM", note: input.note, metadata: { requestFingerprint, reason: input.reason } });
     return { taskId: task.id, status: "PROBLEM" as const, idempotent: false };
-  });
+  }), replay: () => client.$transaction(async (tx) => {
+    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
+    if (!hasWorkPermission(user, "canAssemble") || (user.role !== "OWNER" && !user.canReportProblem)) throw new Error("Assembly problem reporting permission is required.");
+    return replay(tx, { ...input, taskId: task.id, requestKind: "REPORT_PROBLEM", requestFingerprint });
+  }) });
 }
 
 export async function resolveOrderAssemblyProblem(input: { taskId: string; accountId: string; actorUserId: string; resolutionNote: string; clientRequestId?: string }, client: Client = prisma) {

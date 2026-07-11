@@ -25,7 +25,7 @@ Implemented owner-side Flipkart consignment CSV/ZIP intake, safe supporting-file
 
 ## Phase 3: Consignment Worker Flow
 
-Implemented the worker Work Hub, Consignment Picker, Marking, Consignment Packing, stage-scoped exact search, atomic assignment claims, idempotent quantity progress, task problems, private marking-file delivery, and line/batch completion reconciliation. Search never mutates work.
+Implemented the worker Work Hub, Consignment Picker, Marking, Consignment Packing, stage-scoped exact search, atomic assignment claims, idempotent quantity progress, task problems, and line/batch completion reconciliation. Search never mutates work.
 
 ## Phase 4: Universal Cross-account Scanner
 
@@ -35,12 +35,15 @@ Implemented one exact, lookup-only scanner for customer orders and active consig
 
 Implemented exact process-rule resolution, immutable Assembly task snapshots, automatic task creation after Pick, manual diversion, assignment/problem/owner-skip controls, an Assembly queue, scanner integration, and a shipment-wide transactional packing gate. This is task workflow only and introduces no inventory or manufacturing subsystem.
 
-## Later Phases
+## Phase 6: Amazon Consignment And Rich Marking Cards
 
-- Consignment: Pick, Mark, Pack.
-- Optional: Pick, Mark, Assemble, Pack.
-- Authenticated Windows Worker Agent and temporary file delivery.
-- Product Variant and Product Design identity mapping.
-- Optional reviewed EngravingBrain protocol integration without sharing its database.
+Implemented bounded Amazon CSV/TSV/XLSX/XLSM/ZIP classification, account-scoped listing/catalog enrichment, exact FNSKU/SKU/ASIN/external/barcode matching, owner preview and activation, immutable catalog snapshots, shared Pick/Mark/Pack tasks, Amazon scanner identifiers, and rich marking details. Worker marking-file delivery is postponed while the owner library remains preserved.
+
+## Next Phases
+
+- Phase 7: performance and complete website/backend QA.
+- Phase 8: fully native React Native/Expo app, without WebView.
+- Final: Android release APK after Expo testing.
+- Future optional: reviewed EngravingBrain protocol and authenticated Worker Agent.
 
 Inventory balances, branch/warehouse stock, receiving, QC, stock deductions, valuation, reservations, in-transit inventory, and marketplace stock updates are explicitly excluded.

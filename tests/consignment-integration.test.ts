@@ -39,11 +39,11 @@ try {
  const snapshot=await db.consignmentLine.findUniqueOrThrow({where:{id:"line-a"}});assert.equal(snapshot.productTitleSnapshot,"Fake Product A");assert.equal(snapshot.sellerSkuSnapshot,"SKU-A");
  assert.equal(await db.workTask.count({where:{sourceType:"ORDER"}}),0,"No customer Order WorkTasks were created");
  const second=await activateConsignmentBatch({batchId:"batch-a",accountId:"acct-a",actorUserId:"owner-fake"},db);assert.equal(second.alreadyActive,true);assert.equal(second.taskCount,2);
- await db.markingAsset.create({data:{id:"asset-no-file",name:"Fake Marking",status:"ACTIVE",active:true}});
+ await db.markingAsset.create({data:{id:"asset-no-file",name:"Fake Marking",status:"ACTIVE",active:true,instructions:"Use the fake operational settings."}});
  const markRule=await db.productProcessRule.create({data:{id:"rule-c",accountId:"acct-a",marketplaceListingId:"listing-c",route:"PICK_MARK_PACK",markingRequired:true,markingAssetId:"asset-no-file",active:true}});
  await db.consignmentBatch.create({data:{id:"batch-mark",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-MARK",displayName:"Fake Mark",status:"READY_TO_ACTIVATE",sourceFileName:"fake.csv",sourceFileSha256:"sha-mark"}});
  await db.consignmentLine.create({data:{id:"line-mark",consignmentBatchId:"batch-mark",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",fsnSource:"FSN-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU",processRoute:"PICK_MARK_PACK",processRuleId:markRule.id,markingAssetId:"asset-no-file"}});
- const markValidation=await validateConsignmentActivation("batch-mark","acct-a",db);assert.ok(markValidation.problems.some((problem)=>problem.code==="MISSING_MARKING_FILE"));
- await assert.rejects(()=>activateConsignmentBatch({batchId:"batch-mark",accountId:"acct-a",actorUserId:"owner-fake"},db),/marking/i);
+ const markValidation=await validateConsignmentActivation("batch-mark","acct-a",db);assert.ok(!markValidation.problems.some((problem)=>problem.code==="MISSING_MARKING_FILE"),"A worker marking file is not required in Phase 6");
+ assert.ok(markValidation.problems.some((problem)=>problem.code==="MARKING_IMAGE_MISSING"),"Missing product image still requires explicit owner review");
 } finally { await db.$disconnect(); rmSync(file,{force:true}); }
 console.log("Consignment temporary-database integration tests passed.");

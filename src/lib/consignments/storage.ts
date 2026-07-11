@@ -9,7 +9,7 @@ export const CONSIGNMENT_ZIP_MAX_EXTRACTED_BYTES = Number(process.env.CONSIGNMEN
 export const CONSIGNMENT_ZIP_MAX_ENTRIES = Number(process.env.CONSIGNMENT_ZIP_MAX_ENTRIES ?? 100);
 export const CONSIGNMENT_ZIP_MAX_ENTRY_NAME = 240;
 
-const ALLOWED = new Set([".csv", ".zip", ".txt"]);
+const ALLOWED = new Set([".csv", ".tsv", ".zip", ".txt", ".xlsx", ".xlsm"]);
 const BLOCKED = new Set([".exe", ".com", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jse", ".msi", ".scr", ".dll", ".lnk", ".reg", ".apk", ".aab"]);
 
 export function consignmentStorageRoot() {
@@ -24,7 +24,7 @@ export function sanitizeConsignmentFileName(value: string) {
 export function validateConsignmentUpload(file: Pick<File, "name" | "size">) {
   const extension = path.extname(file.name).toLowerCase();
   if (!file.size) throw new Error("Consignment file is empty.");
-  if (!ALLOWED.has(extension) || BLOCKED.has(extension)) throw new Error("Upload a CSV, ZIP, or TXT file.");
+  if (!ALLOWED.has(extension) || BLOCKED.has(extension)) throw new Error("Upload a CSV, TSV, TXT, XLSX, XLSM, or ZIP file.");
   const limit = extension === ".zip" ? CONSIGNMENT_ZIP_MAX_BYTES : CONSIGNMENT_CSV_MAX_BYTES;
   if (file.size > limit) throw new Error(`Consignment ${extension.slice(1).toUpperCase()} exceeds the configured upload limit.`);
   return extension;

@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { requireWorkPermission } from "@/lib/work-permissions";
 import { importFlipkartConsignmentDraft } from "@/src/lib/consignments/import-service";
+import { importAmazonConsignmentDraft } from "@/src/lib/consignments/amazon/import-service";
 import { resolveExistingConsignmentPath } from "@/src/lib/consignments/storage";
 import { setActiveProcessRule } from "@/src/lib/marking/process-rules";
 import { activateConsignmentBatch, validateConsignmentActivation } from "@/src/lib/workflow/task-store";
@@ -42,18 +43,19 @@ async function refreshReviewState(batchId: string, accountId: string) {
 export async function uploadConsignmentAction(formData: FormData) {
   const user = await requireConsignmentAccess("import");
   const account = await requireAccount(user);
-  const file = formData.get("file");
-  if (!(file instanceof File)) redirect("/owner/consignments/new?error=file");
+  const files = formData.getAll("file").filter((item): item is File => item instanceof File && item.size > 0);
+  const file = files[0];
+  if (!file) redirect("/owner/consignments/new?error=file");
   try {
-    const result = await importFlipkartConsignmentDraft({
+    const common = {
       accountId: account.id,
       user,
       externalConsignmentNumber: value(formData, "externalConsignmentNumber", 100),
       displayName: value(formData, "displayName", 160),
       destinationText: value(formData, "destinationText", 500),
-      file,
       request: await getRequestMeta()
-    });
+    };
+    const result = account.marketplace === "AMAZON" ? await importAmazonConsignmentDraft({ ...common, files }) : await importFlipkartConsignmentDraft({ ...common, file });
     redirect(`/owner/consignments/${result.batchId}/review`);
   } catch (error) {
     redirect(`/owner/consignments/new?error=${encodeURIComponent(error instanceof Error ? error.message : "Import failed.")}`);
@@ -64,12 +66,14 @@ async function reparseFromManagedFile(input: { batchId: string; fileName: string
   const batch = await prisma.consignmentBatch.findFirst({ where: { id: input.batchId, accountId: input.accountId, status: { in: ["DRAFT", "PARSING", "REVIEW_REQUIRED", "READY_TO_ACTIVATE", "FAILED"] } } });
   if (!batch) throw new Error("Draft consignment is not available for reparse.");
   const data = await readFile(await resolveExistingConsignmentPath(input.managedRelativePath));
-  return importFlipkartConsignmentDraft({ accountId: input.accountId, user: input.user, externalConsignmentNumber: batch.externalConsignmentNumber, displayName: batch.displayName, destinationText: batch.destinationText ?? undefined, file: new File([data], input.fileName), existingBatchId: batch.id, request: await getRequestMeta() });
+  const file = new File([data], input.fileName);
+  const common = { accountId: input.accountId, user: input.user, externalConsignmentNumber: batch.externalConsignmentNumber, displayName: batch.displayName, destinationText: batch.destinationText ?? undefined, existingBatchId: batch.id, request: await getRequestMeta() };
+  return batch.marketplace === "AMAZON" ? importAmazonConsignmentDraft({ ...common, files: [file] }) : importFlipkartConsignmentDraft({ ...common, file });
 }
 
 export async function selectConsignmentMainFileAction(formData: FormData) {
   const user = await requireWorkPermission("canManageConsignments"); const account = await requireAccount(user); const batchId = value(formData, "batchId", 80); const fileId = value(formData, "fileId", 80);
-  const file = await prisma.consignmentImportFile.findFirst({ where: { id: fileId, consignmentBatchId: batchId, consignmentBatch: { accountId: account.id }, fileType: "CONSIGNMENT_DETAILS", managedRelativePath: { not: null } } });
+  const file = await prisma.consignmentImportFile.findFirst({ where: { id: fileId, consignmentBatchId: batchId, consignmentBatch: { accountId: account.id }, fileType: { in: ["CONSIGNMENT_DETAILS", "AMAZON_SHIPMENT"] }, managedRelativePath: { not: null } } });
   if (!file?.managedRelativePath) redirect(`/owner/consignments/${batchId}?error=file`);
   try { await reparseFromManagedFile({ batchId, fileName: file.originalFileName, managedRelativePath: file.managedRelativePath, user, accountId: account.id }); redirect(`/owner/consignments/${batchId}/review`); }
   catch (error) { redirect(`/owner/consignments/${batchId}?error=${encodeURIComponent(error instanceof Error ? error.message : "Reparse failed.")}`); }
@@ -88,7 +92,7 @@ export async function replaceConsignmentSourceAction(formData: FormData) {
   if (!(file instanceof File)) redirect(`/owner/consignments/${batchId}?error=file`);
   const batch = await prisma.consignmentBatch.findFirst({ where: { id: batchId, accountId: account.id, status: { in: ["DRAFT", "REVIEW_REQUIRED", "READY_TO_ACTIVATE", "FAILED"] } } });
   if (!batch) redirect(`/owner/consignments/${batchId}?error=not-replaceable`);
-  try { await importFlipkartConsignmentDraft({ accountId: account.id, user, externalConsignmentNumber: batch.externalConsignmentNumber, displayName: batch.displayName, destinationText: batch.destinationText ?? undefined, file, existingBatchId: batch.id, request: await getRequestMeta() }); redirect(`/owner/consignments/${batchId}/review`); }
+  try { const common={accountId:account.id,user,externalConsignmentNumber:batch.externalConsignmentNumber,displayName:batch.displayName,destinationText:batch.destinationText??undefined,existingBatchId:batch.id,request:await getRequestMeta()}; if(batch.marketplace==="AMAZON")await importAmazonConsignmentDraft({...common,files:[file]});else await importFlipkartConsignmentDraft({...common,file}); redirect(`/owner/consignments/${batchId}/review`); }
   catch (error) { redirect(`/owner/consignments/${batchId}?error=${encodeURIComponent(error instanceof Error ? error.message : "Replacement failed.")}`); }
 }
 
@@ -100,7 +104,7 @@ export async function selectConsignmentListingAction(formData: FormData) {
   const batchId = value(formData, "batchId", 80);
   const [line, listing] = await Promise.all([
     prisma.consignmentLine.findFirst({ where: { id: lineId, consignmentBatchId: batchId, accountId: account.id, activated: false }, select: { id: true } }),
-    prisma.marketplaceListing.findFirst({ where: { id: listingId, accountId: account.id }, include: { processRules: { where: { active: true }, take: 1 } } })
+    prisma.marketplaceListing.findFirst({ where: { id: listingId, accountId: account.id, marketplace: account.marketplace }, include: { processRules: { where: { active: true }, take: 1 } } })
   ]);
   if (!line || !listing) redirect(`/owner/consignments/${batchId}/review?error=forbidden`);
   const rule = listing.processRules[0];
@@ -134,7 +138,7 @@ export async function setConsignmentRouteAction(formData: FormData) {
   try {
     const rule = await setActiveProcessRule({ accountId: account.id, marketplaceListingId: line.marketplaceListingId, route, markingAssetId: route === "PICK_MARK_PACK" ? value(formData, "markingAssetId", 80) || null : null, actorUserId: user.id });
     await prisma.consignmentLine.updateMany({ where: { accountId: account.id, consignmentBatchId: batchId, marketplaceListingId: line.marketplaceListingId, activated: false }, data: { processRoute: rule.route, processRuleId: rule.id, markingAssetId: rule.markingAssetId } });
-    await prisma.consignmentImportIssue.updateMany({ where: { consignmentBatchId: batchId, consignmentLine: { marketplaceListingId: line.marketplaceListingId }, issueType: { in: ["MISSING_PROCESS_RULE", "UNSUPPORTED_ROUTE", "MISSING_MARKING_FILE"] }, resolved: false }, data: { resolved: true, resolvedAt: new Date(), resolvedByUserId: user.id } });
+    await prisma.consignmentImportIssue.updateMany({ where: { consignmentBatchId: batchId, consignmentLine: { marketplaceListingId: line.marketplaceListingId }, issueType: { in: ["MISSING_PROCESS_RULE", "UNSUPPORTED_ROUTE", "MISSING_MARKING_FILE", "MARKING_ASSET_MISSING", "MARKING_INSTRUCTIONS_MISSING"] }, resolved: false }, data: { resolved: true, resolvedAt: new Date(), resolvedByUserId: user.id } });
     await recordAuditLog({ userId: user.id, accountId: account.id, action: "CONSIGNMENT_ROUTE_SELECTED", entityType: "ConsignmentLine", entityId: line.id, metadata: { batchId, route, markingAssetId: rule.markingAssetId }, request: await getRequestMeta() });
     await refreshReviewState(batchId, account.id);
     revalidatePath(`/owner/consignments/${batchId}/review`);

@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="grid animate-pulse gap-4 lg:grid-cols-2"><div className="aspect-square rounded-md bg-slate-200"/><div className="space-y-3"><div className="h-12 rounded-md bg-slate-200"/><div className="h-64 rounded-md bg-slate-200"/></div></div>;}

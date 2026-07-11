@@ -1,0 +1,19 @@
+import path from "node:path";
+import yauzl, { type Entry, type ZipFile } from "yauzl";
+import { parseAmazonBuffer } from "./parser";
+import type { AmazonParsedFile } from "./types";
+
+export const AMAZON_ZIP_MAX_ENTRIES=100;
+export const AMAZON_ZIP_MAX_COMPRESSED_BYTES=50*1024*1024;
+export const AMAZON_ZIP_MAX_UNCOMPRESSED_BYTES=150*1024*1024;
+export const AMAZON_ZIP_MAX_SINGLE_ENTRY_BYTES=25*1024*1024;
+export const AMAZON_ZIP_MAX_DEPTH=4;
+const SUPPORTED=new Set([".csv",".tsv",".txt",".xlsx",".xlsm"]);
+const BLOCKED=new Set([".exe",".com",".bat",".cmd",".ps1",".vbs",".js",".jse",".msi",".scr",".dll",".lnk",".reg",".apk",".aab",".zip",".rar",".7z",".tar",".gz"]);
+
+export type AmazonArchiveEntry={entryName:string;data:Buffer;parsed:AmazonParsedFile};
+function openZip(buffer:Buffer){return new Promise<ZipFile>((resolve,reject)=>yauzl.fromBuffer(buffer,{lazyEntries:true,validateEntrySizes:true,decodeStrings:true},(error,zip)=>error||!zip?reject(error??new Error("Could not open Amazon ZIP.")):resolve(zip)));}
+export function validateAmazonArchiveEntryName(value:string){const normalized=value.normalize("NFKC").replace(/\\/g,"/");const parts=normalized.split("/");if(!normalized||normalized.length>240||normalized.startsWith("/")||/^[a-z]:/i.test(normalized)||parts.some((part)=>part===".."||part===".")||parts.length>AMAZON_ZIP_MAX_DEPTH)throw new Error("Amazon ZIP contains an unsafe entry path.");const extension=path.extname(normalized).toLowerCase();if(BLOCKED.has(extension)||!SUPPORTED.has(extension))throw new Error("Amazon ZIP contains a blocked, nested archive, or unsupported entry.");return normalized;}
+function readEntry(zip:ZipFile,entry:Entry){return new Promise<Buffer>((resolve,reject)=>zip.openReadStream(entry,(error,stream)=>{if(error||!stream){reject(error??new Error("Could not read Amazon ZIP entry."));return;}const chunks:Buffer[]=[];let bytes=0;stream.on("data",(chunk:Buffer)=>{bytes+=chunk.length;if(bytes>AMAZON_ZIP_MAX_SINGLE_ENTRY_BYTES||bytes>entry.uncompressedSize)stream.destroy(new Error("Amazon ZIP entry exceeds its size limit."));else chunks.push(chunk);});stream.on("error",reject);stream.on("end",()=>resolve(Buffer.concat(chunks)));}));}
+
+export async function inspectAmazonConsignmentZip(buffer:Buffer){if(buffer.length>AMAZON_ZIP_MAX_COMPRESSED_BYTES)throw new Error("Amazon ZIP exceeds the configured compressed-size limit.");const zip=await openZip(buffer);return new Promise<{entries:AmazonArchiveEntry[];shipmentCandidates:AmazonArchiveEntry[]}>((resolve,reject)=>{const entries:AmazonArchiveEntry[]=[];let count=0,total=0,settled=false;const fail=(error:unknown)=>{if(!settled){settled=true;zip.close();reject(error);}};zip.on("error",fail);zip.on("entry",async(entry:Entry)=>{try{if(/\/$/.test(entry.fileName)||entry.fileName.split(/[\\/]/).some((part)=>part.startsWith(".")||part==="__MACOSX")){zip.readEntry();return;}count+=1;if(count>AMAZON_ZIP_MAX_ENTRIES)throw new Error("Amazon ZIP has too many entries.");if((entry.generalPurposeBitFlag&1)!==0)throw new Error("Encrypted Amazon ZIP entries are not supported.");const unixMode=(entry.externalFileAttributes>>>16)&0xffff;if((unixMode&0o170000)===0o120000)throw new Error("Amazon ZIP symlink entries are not supported.");if(entry.uncompressedSize>AMAZON_ZIP_MAX_SINGLE_ENTRY_BYTES)throw new Error("Amazon ZIP entry exceeds the configured size limit.");total+=entry.uncompressedSize;if(total>AMAZON_ZIP_MAX_UNCOMPRESSED_BYTES)throw new Error("Amazon ZIP extracted content exceeds the configured limit.");const entryName=validateAmazonArchiveEntryName(entry.fileName);const data=await readEntry(zip,entry);const parsed=await parseAmazonBuffer(data,entryName);entries.push({entryName,data,parsed});zip.readEntry();}catch(error){fail(error);}});zip.on("end",()=>{if(settled)return;settled=true;resolve({entries,shipmentCandidates:entries.filter((entry)=>entry.parsed.fileType==="AMAZON_SHIPMENT")});});zip.readEntry();});}

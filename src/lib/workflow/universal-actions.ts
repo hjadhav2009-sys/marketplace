@@ -19,12 +19,15 @@ export async function applyUniversalCandidateAction(input: {
   expectedQuantity?: number;
   expectedStatus?: string;
   clientRequestId: string;
+  manualTitle?: string;
+  manualInstructions?: string;
+  manualImageUrl?: string;
 }, client: Client = prisma) {
   if (!UNIVERSAL_ACTIONS.has(input.action) || !input.clientRequestId.trim()) throw new Error("Universal action request is invalid.");
   const scope = await getAuthorizedWorkAccounts(input.actorUserId, client);
   if (!scope.accounts.some((account) => account.id === input.accountId)) throw new Error("This account is no longer assigned to you.");
 
-  if (input.action === "ASSEMBLY_SEND") return sendOrderToAssembly({ actorUserId: input.actorUserId, accountId: input.accountId, orderId: input.sourceId, clientRequestId: input.clientRequestId }, client);
+  if (input.action === "ASSEMBLY_SEND") return sendOrderToAssembly({ actorUserId: input.actorUserId, accountId: input.accountId, orderId: input.sourceId, manualTitle: input.manualTitle, manualInstructions: input.manualInstructions, manualImageUrl: input.manualImageUrl, clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_CLAIM") return claimOrderAssemblyTask({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_COMPLETE") return completeOrderAssemblyTask({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_PROBLEM") return reportOrderAssemblyProblem({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", reason: "OTHER", note: "Reported from universal scanner.", clientRequestId: input.clientRequestId }, client);

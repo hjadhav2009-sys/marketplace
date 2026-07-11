@@ -1403,9 +1403,9 @@ assert.match(skuExportRoute, /cache_status/, "Full SKU export includes cache sta
 assert.match(skuExportRoute, /product_name[\s\S]*color[\s\S]*size/, "Full SKU export includes auto-filled metadata");
 assert.match(skuExportRoute, /safeSpreadsheetValue/, "SKU mapping XLSX exports neutralize formula-like values");
 assert.match(appShell, /\{ href: "\/dashboard", label: "Dashboard" \}/, "Owner navigation uses /dashboard as the dashboard link");
-assert.match(appShell, /const pickerLinks = \[[\s\S]*\/picker[\s\S]*\/change-password[\s\S]*\]/, "Picker navigation stays worker-only");
-assert.doesNotMatch(sourceBetween(appShell, "const pickerLinks", "const packerLinks"), /\/owner/, "Picker navigation does not show owner management links");
-assert.doesNotMatch(sourceBetween(appShell, "const packerLinks", "async function logoutAction"), /\/owner/, "Packer navigation does not show owner management links");
+assert.match(appShell, /hasWorkPermission\(user, "canPick"\)[\s\S]*href: "\/picker"/, "Picker navigation derives from permission with legacy role fallback");
+assert.match(appShell, /hasWorkPermission\(user, "canPack"\)[\s\S]*href: "\/packing"/, "Packing navigation derives from permission with legacy role fallback");
+assert.match(appShell, /function linksForUser[\s\S]*if \(user\.role === "OWNER"\)[\s\S]*return ownerLinks[\s\S]*hasWorkPermission/, "Owner management links remain separate while workers may combine operational permissions");
 assert.match(appNavComponent, /usePathname/, "Top navigation can style the active route");
 assert.match(appNavComponent, /prefetch/, "Top navigation prefetches common route links");
 assert.match(appNavComponent, /data-mobile-bottom-nav/, "Mobile bottom navigation exists");

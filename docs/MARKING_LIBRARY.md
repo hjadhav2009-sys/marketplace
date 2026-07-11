@@ -28,3 +28,7 @@ Changing a rule does not alter existing order state in Phase 1. Current picker a
 ## Permissions
 
 Owners have all capabilities through server-side bypass. Workers may independently receive Pick, Mark, Assemble, Pack, Report Problem, Manage Marking Library, Manage Process Rules, and View All Work permissions. Assigned accounts continue to restrict worker data.
+
+## Metadata Validation
+
+Asset status is limited to `DRAFT`, `ACTIVE`, or `ARCHIVED`. Names cannot be blank; settings must be valid JSON; passes must be a positive whole number up to 1000; dimensions are non-negative; power is capped at 100, speed at 100000, and frequency at 1000. Optional machine values may remain unset.

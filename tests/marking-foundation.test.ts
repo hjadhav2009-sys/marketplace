@@ -12,7 +12,7 @@ import { actionableScanCandidate, prepareUniversalScanCode } from "../src/lib/wo
 
 const root = process.cwd();
 const read = (...parts: string[]) => readFileSync(join(root, ...parts), "utf8");
-const permissionDefaults = { canPick: false, canMark: false, canAssemble: false, canPack: false, canReportProblem: false, canManageMarkingLibrary: false, canManageProcessRules: false, canViewAllWork: false };
+const permissionDefaults = { canPick: false, canMark: false, canAssemble: false, canPack: false, canReportProblem: false, canManageMarkingLibrary: false, canManageProcessRules: false, canViewAllWork: false, canViewConsignments: false, canImportConsignments: false, canManageConsignments: false };
 
 assert.equal(hasWorkPermission({ role: "OWNER", ...permissionDefaults }, "canManageMarkingLibrary"), true, "Owner bypass grants marking management");
 assert.equal(hasWorkPermission({ role: "PACKER", ...permissionDefaults, canManageMarkingLibrary: true }, "canManageMarkingLibrary"), true, "Explicit marking manager permission works");

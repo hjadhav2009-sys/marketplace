@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import type { User } from "@prisma/client";
 import { AppNav, MobileBottomNav } from "@/components/AppNav";
 import { clearSession, requireAccount, requireUser, roleHomePath } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { getRequestMeta } from "@/lib/request-context";
+import { hasWorkPermission } from "@/lib/work-permissions";
 
 type AppShellProps = {
   children: ReactNode;
@@ -22,33 +24,11 @@ const ownerLinks = [
   { href: "/owner/sku-mappings", label: "Listings" },
   { href: "/owner/marking-library", label: "Marking Library" },
   { href: "/owner/process-rules", label: "Process Rules" },
+  { href: "/owner/consignments", label: "Consignments" },
   { href: "/owner/accounts", label: "Accounts" },
   { href: "/owner/users", label: "Users" },
   { href: "/owner/system", label: "System" },
   { href: "/change-password", label: "Password" }
-];
-
-const pickerLinks = [
-  { href: "/picker", label: "Pick" },
-  { href: "/change-password", label: "Password" }
-];
-
-const packerLinks = [
-  { href: "/packing", label: "Pack" },
-  { href: "/problems", label: "Problems" },
-  { href: "/change-password", label: "Password" }
-];
-
-const pickerMobileLinks = [
-  { href: "/picker", label: "Pick" },
-  { href: "/problems", label: "Problems" },
-  { href: "/accounts", label: "Account" }
-];
-
-const packerMobileLinks = [
-  { href: "/packing", label: "Pack" },
-  { href: "/problems", label: "Problems" },
-  { href: "/accounts", label: "Account" }
 ];
 
 async function logoutAction() {
@@ -69,27 +49,32 @@ async function logoutAction() {
   redirect("/login");
 }
 
-function linksForUser(user: { role: string; canManageMarkingLibrary: boolean; canManageProcessRules: boolean }) {
+type NavigationUser = Pick<User, "role" | "canPick" | "canPack" | "canReportProblem" | "canMark" | "canAssemble" | "canManageMarkingLibrary" | "canManageProcessRules" | "canViewAllWork" | "canViewConsignments" | "canImportConsignments" | "canManageConsignments">;
+
+function linksForUser(user: NavigationUser) {
   if (user.role === "OWNER") {
     return ownerLinks;
   }
 
-  const links = user.role === "PICKER" ? [...pickerLinks] : [...packerLinks];
-  if (user.canManageMarkingLibrary) links.splice(-1, 0, { href: "/owner/marking-library", label: "Marking Library" });
-  if (user.canManageProcessRules) links.splice(-1, 0, { href: "/owner/process-rules", label: "Process Rules" });
+  const links = [];
+  if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Pick" });
+  if (hasWorkPermission(user, "canPack")) links.push({ href: "/packing", label: "Pack" });
+  if (hasWorkPermission(user, "canReportProblem")) links.push({ href: "/problems", label: "Problems" });
+  if (hasWorkPermission(user, "canViewConsignments") || hasWorkPermission(user, "canImportConsignments") || hasWorkPermission(user, "canManageConsignments")) links.push({ href: "/owner/consignments", label: "Consignments" });
+  if (hasWorkPermission(user, "canManageMarkingLibrary")) links.push({ href: "/owner/marking-library", label: "Marking Library" });
+  if (hasWorkPermission(user, "canManageProcessRules")) links.push({ href: "/owner/process-rules", label: "Process Rules" });
+  links.push({ href: "/change-password", label: "Password" });
   return links;
 }
 
-function mobileLinksForRole(role: string) {
-  if (role === "PICKER") {
-    return pickerMobileLinks;
-  }
-
-  if (role === "PACKER") {
-    return packerMobileLinks;
-  }
-
-  return [];
+function mobileLinksForUser(user: NavigationUser) {
+  if (user.role === "OWNER") return [];
+  const links = [];
+  if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Pick" });
+  if (hasWorkPermission(user, "canPack")) links.push({ href: "/packing", label: "Pack" });
+  if (hasWorkPermission(user, "canReportProblem")) links.push({ href: "/problems", label: "Problems" });
+  links.push({ href: "/accounts", label: "Account" });
+  return links;
 }
 
 export async function AppShell({ children, title }: AppShellProps) {
@@ -98,7 +83,7 @@ export async function AppShell({ children, title }: AppShellProps) {
   const links = linksForUser(user);
   const accountName = account.accountDisplayName ?? account.name;
   const accountCode = account.accountCode ?? account.code;
-  const mobileLinks = mobileLinksForRole(user.role);
+  const mobileLinks = mobileLinksForUser(user);
   const managementMobileLinks = (user.role === "OWNER" ? ownerLinks : links).filter((link) => link.href !== "/change-password");
 
   return (
@@ -126,7 +111,7 @@ export async function AppShell({ children, title }: AppShellProps) {
             >
               Switch account
             </Link>
-            {user.role === "OWNER" || user.canManageMarkingLibrary || user.canManageProcessRules ? (
+            {user.role === "OWNER" || user.canManageMarkingLibrary || user.canManageProcessRules || user.canViewConsignments || user.canImportConsignments || user.canManageConsignments ? (
               <details className="relative sm:hidden" data-owner-mobile-menu>
                 <summary className="list-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 shadow-sm">
                   Menu

@@ -29,7 +29,8 @@ function openTemporary(name) {
   return { db, file };
 }
 
-const entries = migrationEntries();
+const allEntries = migrationEntries();
+const entries = allEntries.slice(0, allEntries.indexOf(latestName) + 1);
 assert.ok(entries.includes(latestName), "Latest marking migration exists");
 
 const fresh = openTemporary("marking-fresh-smoke.db");

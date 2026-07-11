@@ -15,12 +15,26 @@ function text(formData: FormData, name: string, max = 4000) {
   return String(formData.get(name) ?? "").normalize("NFKC").trim().slice(0, max) || null;
 }
 
-function number(formData: FormData, name: string) {
+function number(formData: FormData, name: string, options: { min?: number; max?: number; integer?: boolean } = {}) {
   const value = String(formData.get(name) ?? "").trim();
   if (!value) return null;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${name} must be a non-negative number.`);
+  const min = options.min ?? 0;
+  if (!Number.isFinite(parsed) || parsed < min || (options.max !== undefined && parsed > options.max) || (options.integer && !Number.isInteger(parsed))) {
+    throw new Error(`${name} is outside the supported range.`);
+  }
   return parsed;
+}
+
+function settingsJson(formData: FormData) {
+  const raw = text(formData, "settingsJson", 8000);
+  if (!raw) return null;
+  try {
+    JSON.parse(raw);
+    return JSON.stringify(JSON.parse(raw));
+  } catch {
+    throw new Error("Settings JSON must be valid JSON.");
+  }
 }
 
 async function accessibleAsset(user: Awaited<ReturnType<typeof requireWorkPermission>>, accountId: string, assetId: string) {
@@ -47,10 +61,14 @@ export async function updateMarkingAssetAction(formData: FormData) {
   if (!assetId || !(await accessibleAsset(user, account.id, assetId))) redirect("/owner/marking-library?error=forbidden");
 
   try {
+    const name = text(formData, "name", 160);
+    if (!name) throw new Error("Asset name is required.");
+    const status = text(formData, "status", 40) ?? "DRAFT";
+    if (!["DRAFT", "ACTIVE", "ARCHIVED"].includes(status)) throw new Error("Unsupported marking asset status.");
     const asset = await prisma.markingAsset.update({
       where: { id: assetId },
       data: {
-        name: text(formData, "name", 160) ?? "",
+        name,
         masterDesignId: normalizeMasterDesignId(text(formData, "masterDesignId", 80)),
         description: text(formData, "description"),
         machineType: text(formData, "machineType", 120),
@@ -59,13 +77,13 @@ export async function updateMarkingAssetAction(formData: FormData) {
         markingPosition: text(formData, "markingPosition", 160),
         markingWidthMm: number(formData, "markingWidthMm"),
         markingHeightMm: number(formData, "markingHeightMm"),
-        powerSetting: number(formData, "powerSetting"),
-        speedSetting: number(formData, "speedSetting"),
-        frequencySetting: number(formData, "frequencySetting"),
-        passes: number(formData, "passes"),
+        powerSetting: number(formData, "powerSetting", { max: 100 }),
+        speedSetting: number(formData, "speedSetting", { max: 100000 }),
+        frequencySetting: number(formData, "frequencySetting", { max: 1000 }),
+        passes: number(formData, "passes", { min: 1, max: 1000, integer: true }),
         instructions: text(formData, "instructions", 8000),
-        settingsJson: text(formData, "settingsJson", 8000),
-        status: text(formData, "status", 40) ?? "DRAFT",
+        settingsJson: settingsJson(formData),
+        status,
         updatedByUserId: user.id
       }
     });

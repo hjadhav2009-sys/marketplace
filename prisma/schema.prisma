@@ -141,6 +141,42 @@ enum IdentifierType {
   EXTERNAL_ID
 }
 
+enum ConsignmentStatus {
+  DRAFT
+  PARSING
+  REVIEW_REQUIRED
+  READY_TO_ACTIVATE
+  ACTIVATING
+  ACTIVE
+  COMPLETED
+  PROBLEM
+  CANCELLED
+  FAILED
+}
+
+enum ConsignmentLineMatchStatus {
+  EXACT_SKU
+  EXACT_FSN
+  EXACT_MULTIPLE
+  IDENTIFIER_CONFLICT
+  NOT_FOUND
+  INVALID
+}
+
+enum ConsignmentImportFileType {
+  CONSIGNMENT_DETAILS
+  LABEL_REQUIREMENTS
+  QUALITY_CHECK_REFERENCE
+  README
+  UNKNOWN_SUPPORTING
+}
+
+enum ConsignmentIssueSeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
 model User {
   id                           String                    @id @default(cuid())
   username                     String                    @unique
@@ -156,6 +192,9 @@ model User {
   canManageMarkingLibrary      Boolean                   @default(false)
   canManageProcessRules        Boolean                   @default(false)
   canViewAllWork               Boolean                   @default(false)
+  canViewConsignments          Boolean                   @default(false)
+  canImportConsignments        Boolean                   @default(false)
+  canManageConsignments        Boolean                   @default(false)
   mustChangePassword           Boolean                   @default(false)
   failedLoginCount             Int                       @default(0)
   lockedUntil                  DateTime?
@@ -181,6 +220,9 @@ model User {
   workTasksAssigned            WorkTask[]                @relation("WorkTaskAssignedUser")
   workTasksStarted             WorkTask[]                @relation("WorkTaskStartedBy")
   workTasksCompleted           WorkTask[]                @relation("WorkTaskCompletedBy")
+  consignmentsCreated          ConsignmentBatch[]        @relation("ConsignmentCreatedBy")
+  consignmentsActivated        ConsignmentBatch[]        @relation("ConsignmentActivatedBy")
+  consignmentIssuesResolved    ConsignmentImportIssue[]  @relation("ConsignmentIssueResolvedBy")
   createdAt                    DateTime                  @default(now())
   updatedAt                    DateTime                  @updatedAt
 }
@@ -259,6 +301,8 @@ model Account {
   markingAssetLinks   MarkingAssetListingLink[]
   processRules        ProductProcessRule[]
   workTasks           WorkTask[]
+  consignmentBatches  ConsignmentBatch[]
+  consignmentLines    ConsignmentLine[]
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
 
@@ -355,6 +399,7 @@ model MarketplaceListing {
   identifiers               MarketplaceListingIdentifier[]
   markingAssetLinks         MarkingAssetListingLink[]
   processRules              ProductProcessRule[]
+  consignmentLines          ConsignmentLine[]
 
   @@unique([accountId, marketplace, sellerSkuId])
   @@index([accountId, marketplace])
@@ -411,6 +456,7 @@ model MarkingAsset {
   files            MarkingAssetFile[]
   listingLinks     MarkingAssetListingLink[]
   processRules     ProductProcessRule[]
+  consignmentLines ConsignmentLine[]
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 
@@ -482,6 +528,7 @@ model ProductProcessRule {
   createdByUser        User?              @relation("ProcessRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   updatedByUserId      String?
   updatedByUser        User?              @relation("ProcessRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  consignmentLines     ConsignmentLine[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -491,35 +538,166 @@ model ProductProcessRule {
 }
 
 model WorkTask {
-  id                String         @id @default(cuid())
+  id                String           @id @default(cuid())
   accountId         String
-  account           Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account           Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
   sourceType        WorkSourceType
   orderId           String?
-  order             Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  order             Order?           @relation(fields: [orderId], references: [id], onDelete: Restrict)
   consignmentLineId String?
+  consignmentLine   ConsignmentLine? @relation(fields: [consignmentLineId], references: [id], onDelete: Restrict)
   stage             WorkStage
   sequenceNumber    Int
   requiredQuantity  Int
-  completedQuantity Int            @default(0)
-  status            WorkTaskStatus @default(LOCKED)
+  completedQuantity Int              @default(0)
+  status            WorkTaskStatus   @default(LOCKED)
   assignedUserId    String?
-  assignedUser      User?          @relation("WorkTaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  assignedUser      User?            @relation("WorkTaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
   startedByUserId   String?
-  startedByUser     User?          @relation("WorkTaskStartedBy", fields: [startedByUserId], references: [id], onDelete: SetNull)
+  startedByUser     User?            @relation("WorkTaskStartedBy", fields: [startedByUserId], references: [id], onDelete: SetNull)
   completedByUserId String?
-  completedByUser   User?          @relation("WorkTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  completedByUser   User?            @relation("WorkTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
   startedAt         DateTime?
   completedAt       DateTime?
   problemReason     String?
   metadataJson      String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
+  @@unique([orderId, stage])
+  @@unique([orderId, sequenceNumber])
+  @@unique([consignmentLineId, stage])
+  @@unique([consignmentLineId, sequenceNumber])
   @@index([accountId, status, stage])
   @@index([assignedUserId, status, stage])
   @@index([orderId, stage])
   @@index([sourceType, consignmentLineId])
+}
+
+model ConsignmentBatch {
+  id                        String                   @id @default(cuid())
+  accountId                 String
+  account                   Account                  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  marketplace               Marketplace              @default(FLIPKART)
+  externalConsignmentNumber String
+  displayName               String
+  destinationText           String?
+  status                    ConsignmentStatus        @default(DRAFT)
+  sourceFileName            String
+  sourceFileSha256          String
+  sourceUploadRelativePath  String?
+  totalSourceRows           Int                      @default(0)
+  totalValidLines           Int                      @default(0)
+  totalRequiredQuantity     Int                      @default(0)
+  matchedLines              Int                      @default(0)
+  unmatchedLines            Int                      @default(0)
+  ambiguousLines            Int                      @default(0)
+  conflictLines             Int                      @default(0)
+  markingLines              Int                      @default(0)
+  readyMadeLines            Int                      @default(0)
+  activatedAt               DateTime?
+  activatedByUserId         String?
+  activatedByUser           User?                    @relation("ConsignmentActivatedBy", fields: [activatedByUserId], references: [id], onDelete: SetNull)
+  createdByUserId           String?
+  createdByUser             User?                    @relation("ConsignmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  lines                     ConsignmentLine[]
+  files                     ConsignmentImportFile[]
+  issues                    ConsignmentImportIssue[]
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  @@unique([accountId, marketplace, externalConsignmentNumber])
+  @@index([accountId, status, createdAt])
+  @@index([accountId, sourceFileSha256])
+}
+
+model ConsignmentLine {
+  id                   String                     @id @default(cuid())
+  consignmentBatchId   String
+  consignmentBatch     ConsignmentBatch           @relation(fields: [consignmentBatchId], references: [id], onDelete: Cascade)
+  accountId            String
+  account              Account                    @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  rowNumber            Int
+  productNameSource    String?
+  sellerSkuSource      String?
+  fsnSource            String?
+  brandSource          String?
+  sizeSource           String?
+  colorSource          String?
+  modelIdSource        String?
+  requiredQuantity     Int
+  costPriceReference   Float?
+  lengthCmReference    Float?
+  breadthCmReference   Float?
+  heightCmReference    Float?
+  weightKgReference    Float?
+  marketplaceListingId String?
+  marketplaceListing   MarketplaceListing?        @relation(fields: [marketplaceListingId], references: [id], onDelete: SetNull)
+  matchStatus          ConsignmentLineMatchStatus
+  matchIdentifierType  IdentifierType?
+  matchIdentifierValue String?
+  matchMessage         String?
+  processRoute         ProcessRoute?
+  processRuleId        String?
+  processRule          ProductProcessRule?        @relation(fields: [processRuleId], references: [id], onDelete: SetNull)
+  markingAssetId       String?
+  markingAsset         MarkingAsset?              @relation(fields: [markingAssetId], references: [id], onDelete: SetNull)
+  productTitleSnapshot String?
+  productImageSnapshot String?
+  sellerSkuSnapshot    String?
+  fsnSnapshot          String?
+  listingIdSnapshot    String?
+  activated            Boolean                    @default(false)
+  workTasks            WorkTask[]
+  issues               ConsignmentImportIssue[]
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+
+  @@unique([consignmentBatchId, rowNumber])
+  @@index([accountId, matchStatus])
+  @@index([consignmentBatchId, processRoute])
+  @@index([marketplaceListingId])
+}
+
+model ConsignmentImportFile {
+  id                  String                    @id @default(cuid())
+  consignmentBatchId  String
+  consignmentBatch    ConsignmentBatch          @relation(fields: [consignmentBatchId], references: [id], onDelete: Cascade)
+  fileType            ConsignmentImportFileType
+  originalFileName    String
+  managedRelativePath String?
+  fileSizeBytes       Int
+  sha256              String
+  entryName           String?
+  parsed              Boolean                   @default(false)
+  rowCount            Int                       @default(0)
+  notes               String?
+  createdAt           DateTime                  @default(now())
+
+  @@index([consignmentBatchId, fileType])
+  @@index([sha256])
+}
+
+model ConsignmentImportIssue {
+  id                 String                   @id @default(cuid())
+  consignmentBatchId String
+  consignmentBatch   ConsignmentBatch         @relation(fields: [consignmentBatchId], references: [id], onDelete: Cascade)
+  consignmentLineId  String?
+  consignmentLine    ConsignmentLine?         @relation(fields: [consignmentLineId], references: [id], onDelete: Cascade)
+  rowNumber          Int?
+  issueType          String
+  severity           ConsignmentIssueSeverity
+  message            String
+  safeDataJson       String?
+  resolved           Boolean                  @default(false)
+  resolvedByUserId   String?
+  resolvedByUser     User?                    @relation("ConsignmentIssueResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  resolvedAt         DateTime?
+  createdAt          DateTime                 @default(now())
+
+  @@index([consignmentBatchId, severity, resolved])
+  @@index([consignmentLineId])
+  @@index([issueType, createdAt])
 }
 
 model SkuImageMapping {

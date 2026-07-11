@@ -10,11 +10,14 @@ export type WorkPermission =
   | "canReportProblem"
   | "canManageMarkingLibrary"
   | "canManageProcessRules"
-  | "canViewAllWork";
+  | "canViewAllWork"
+  | "canViewConsignments"
+  | "canImportConsignments"
+  | "canManageConsignments";
 
 export type WorkPermissionUser = Pick<
   User,
-  "role" | "canPick" | "canMark" | "canAssemble" | "canPack" | "canReportProblem" | "canManageMarkingLibrary" | "canManageProcessRules" | "canViewAllWork"
+  "role" | "canPick" | "canMark" | "canAssemble" | "canPack" | "canReportProblem" | "canManageMarkingLibrary" | "canManageProcessRules" | "canViewAllWork" | "canViewConsignments" | "canImportConsignments" | "canManageConsignments"
 >;
 
 export function hasWorkPermission(user: WorkPermissionUser, permission: WorkPermission) {

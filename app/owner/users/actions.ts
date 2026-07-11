@@ -39,6 +39,9 @@ function parseUserForm(formData: FormData) {
   const canManageMarkingLibrary = role === "OWNER" || formData.getAll("canManageMarkingLibrary").includes("on");
   const canManageProcessRules = role === "OWNER" || formData.getAll("canManageProcessRules").includes("on");
   const canViewAllWork = role === "OWNER" || formData.getAll("canViewAllWork").includes("on");
+  const canViewConsignments = role === "OWNER" || formData.getAll("canViewConsignments").includes("on");
+  const canImportConsignments = role === "OWNER" || formData.getAll("canImportConsignments").includes("on");
+  const canManageConsignments = role === "OWNER" || formData.getAll("canManageConsignments").includes("on");
 
   if (!name || !username || !role || !/^[a-z0-9._-]{3,40}$/.test(username)) {
     return null;
@@ -61,6 +64,9 @@ function parseUserForm(formData: FormData) {
     canManageMarkingLibrary,
     canManageProcessRules,
     canViewAllWork,
+    canViewConsignments,
+    canImportConsignments,
+    canManageConsignments,
     accountIds: uniqueAccountIds,
     accountId: uniqueAccountIds[0] ?? null
   };
@@ -136,6 +142,9 @@ export async function createUserAction(formData: FormData) {
         canManageMarkingLibrary: parsed.canManageMarkingLibrary,
         canManageProcessRules: parsed.canManageProcessRules,
         canViewAllWork: parsed.canViewAllWork,
+        canViewConsignments: parsed.canViewConsignments,
+        canImportConsignments: parsed.canImportConsignments,
+        canManageConsignments: parsed.canManageConsignments,
         accountId: parsed.accountId,
         active: parsed.active,
         passwordHash: hashPassword(password),
@@ -207,6 +216,9 @@ export async function updateUserAction(formData: FormData) {
         canManageMarkingLibrary: parsed.canManageMarkingLibrary,
         canManageProcessRules: parsed.canManageProcessRules,
         canViewAllWork: parsed.canViewAllWork,
+        canViewConsignments: parsed.canViewConsignments,
+        canImportConsignments: parsed.canImportConsignments,
+        canManageConsignments: parsed.canManageConsignments,
         accountId: parsed.accountId,
         active: parsed.active,
         assignedAccounts: {
@@ -228,7 +240,7 @@ export async function updateUserAction(formData: FormData) {
     request
   });
 
-  const permissionFields = ["canPick", "canMark", "canAssemble", "canPack", "canReportProblem", "canManageMarkingLibrary", "canManageProcessRules", "canViewAllWork"] as const;
+  const permissionFields = ["canPick", "canMark", "canAssemble", "canPack", "canReportProblem", "canManageMarkingLibrary", "canManageProcessRules", "canViewAllWork", "canViewConsignments", "canImportConsignments", "canManageConsignments"] as const;
   const changedPermissions = permissionFields.filter((field) => target[field] !== updatedUser[field]);
   if (changedPermissions.length > 0) {
     await recordAuditLog({

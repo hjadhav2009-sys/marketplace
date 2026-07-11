@@ -32,6 +32,9 @@ export type MobilePermissionSet = {
   canManageMarkingLibrary: boolean;
   canManageProcessRules: boolean;
   canViewAllWork: boolean;
+  canViewConsignments: boolean;
+  canImportConsignments: boolean;
+  canManageConsignments: boolean;
   canViewAssignedProblems: boolean;
   canViewDashboard: boolean;
   canImportOrders: boolean;

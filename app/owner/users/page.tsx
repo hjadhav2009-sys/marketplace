@@ -141,7 +141,7 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
             <AccountChecklist accounts={accounts} selectedIds={accounts[0]?.id ? [accounts[0].id] : []} />
           </div>
           <div className="md:col-span-2 xl:col-span-5">
-            <WorkerPermissionChecklist canPick canMark={false} canAssemble={false} canPack={false} canReportProblem canManageMarkingLibrary={false} canManageProcessRules={false} canViewAllWork={false} />
+            <WorkerPermissionChecklist canPick canMark={false} canAssemble={false} canPack={false} canReportProblem canManageMarkingLibrary={false} canManageProcessRules={false} canViewAllWork={false} canViewConsignments={false} canImportConsignments={false} canManageConsignments={false} />
           </div>
           <TextField name="password" label="Temporary password" type="password" placeholder="At least 8 characters" />
           <label className="flex items-center gap-2 rounded-md bg-slate-50 p-3 text-sm font-semibold text-slate-700">
@@ -339,6 +339,9 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                         canManageMarkingLibrary={user.role === "OWNER" || user.canManageMarkingLibrary}
                         canManageProcessRules={user.role === "OWNER" || user.canManageProcessRules}
                         canViewAllWork={user.role === "OWNER" || user.canViewAllWork}
+                        canViewConsignments={user.role === "OWNER" || user.canViewConsignments}
+                        canImportConsignments={user.role === "OWNER" || user.canImportConsignments}
+                        canManageConsignments={user.role === "OWNER" || user.canManageConsignments}
                       />
                     </div>
                     <div className="md:col-span-2">
@@ -499,7 +502,10 @@ function WorkerPermissionChecklist({
   canAssemble,
   canManageMarkingLibrary,
   canManageProcessRules,
-  canViewAllWork
+  canViewAllWork,
+  canViewConsignments,
+  canImportConsignments,
+  canManageConsignments
 }: {
   canPick: boolean;
   canPack: boolean;
@@ -509,6 +515,9 @@ function WorkerPermissionChecklist({
   canManageMarkingLibrary: boolean;
   canManageProcessRules: boolean;
   canViewAllWork: boolean;
+  canViewConsignments: boolean;
+  canImportConsignments: boolean;
+  canManageConsignments: boolean;
 }) {
   return (
     <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -522,6 +531,9 @@ function WorkerPermissionChecklist({
         <PermissionToggle name="canManageMarkingLibrary" checked={canManageMarkingLibrary} label="Manage Marking Library" description="Manage assets only in assigned account context." />
         <PermissionToggle name="canManageProcessRules" checked={canManageProcessRules} label="Manage Process Rules" description="Configure listing routes in assigned accounts." />
         <PermissionToggle name="canViewAllWork" checked={canViewAllWork} label="View All Work" description="View account work beyond own assignments." />
+        <PermissionToggle name="canViewConsignments" checked={canViewConsignments} label="View Consignments" description="View consignment batches in assigned accounts." />
+        <PermissionToggle name="canImportConsignments" checked={canImportConsignments} label="Import Consignments" description="Upload and parse Flipkart consignment drafts." />
+        <PermissionToggle name="canManageConsignments" checked={canManageConsignments} label="Manage Consignments" description="Resolve mappings, choose routes, cancel drafts, and activate work." />
       </div>
       <p className="mt-2 text-xs text-slate-500">Role names remain compatible. Permissions may be combined; Owner always has full server-side access.</p>
     </fieldset>

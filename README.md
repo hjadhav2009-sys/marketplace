@@ -58,6 +58,14 @@ Owners can manage marking designs at `/owner/marking-library` and account-scoped
 
 Phase 1 adds a dormant `WorkTask` foundation only. Existing order Picker and Packing behavior remains unchanged. See `docs/MARKING_LIBRARY.md`, `docs/WORKFLOW_ROADMAP.md`, `docs/MARKING_WORKER_FILE_DELIVERY.md`, and `docs/UNIVERSAL_WORK_SCAN_CONTRACT.md`.
 
+## Flipkart Consignment Preview And Activation
+
+Owners can open `/owner/consignments` to upload a Flipkart Consignment Details CSV or a bounded ZIP containing the main CSV and optional Labels, Quality Check reference, and README files. Files are detected by headers/content and stored privately under ignored managed storage.
+
+`Quantity Sent` means required worker processing quantity, never physical stock. The preview matches Seller SKU and FSN against the selected account, requires explicit resolution for conflicts or ambiguity, proposes Product Process Rules, and creates no tasks until an authorized owner or manager clicks **Activate Consignment**.
+
+Phase 2 activates only Ready-made (`PICK_PACK`) and Marking (`PICK_MARK_PACK`) routes. Existing customer Order Picker and Packing remain unchanged. See [Flipkart consignment import](docs/FLIPKART_CONSIGNMENT_IMPORT.md) and [task activation](docs/CONSINGMENT_TASK_ACTIVATION.md).
+
 ## Marketplace Structure
 
 ```text

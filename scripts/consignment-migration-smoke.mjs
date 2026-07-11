@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root=process.cwd(); const tempRoot=resolve(root,".codex-tmp"); const migrationsRoot=resolve(root,"prisma","migrations"); const latest="20260711000200_flipkart_consignment_activation"; mkdirSync(tempRoot,{recursive:true});
-const entries=readdirSync(migrationsRoot,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>entry.name).sort();
+const allEntries=readdirSync(migrationsRoot,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>entry.name).sort();const entries=allEntries.slice(0,allEntries.indexOf(latest)+1);
 function apply(db,name){db.exec(readFileSync(join(migrationsRoot,name,"migration.sql"),"utf8"));}
 function open(name){const file=resolve(tempRoot,name);rmSync(file,{force:true});const db=new DatabaseSync(file);db.exec("PRAGMA foreign_keys=ON;");return{db,file};}
 function seedBase(db){

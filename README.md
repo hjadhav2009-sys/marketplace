@@ -217,3 +217,9 @@ Free-first daily setup: Windows PC + Supabase + Cloudflare Tunnel remains a vali
 ```text
 scripts\windows\start-meesho-app.bat
 ```
+
+## Consignment Worker Flow
+
+Activated Flipkart consignments are processed from `/work`: Consignment Pick, optional Marking, and Consignment Pack. Work is selected-account scoped, claimed atomically, quantity guarded, retry-idempotent, and recorded in `WorkActionLog`. Final PACK completion reconciles line and batch completion. See [Consignment Picking](docs/CONSIGNMENT_PICKING.md), [Marking Workflow](docs/MARKING_WORKFLOW.md), [Consignment Packing](docs/CONSIGNMENT_PACKING.md), [Assignment](docs/WORK_TASK_ASSIGNMENT.md), and [Problems](docs/WORK_TASK_PROBLEMS.md).
+
+Consignment quantities are workflow quantities only. No inventory balance, reservation, deduction, receiving, valuation, or marketplace stock update is introduced. The universal scanner and authenticated Worker Agent remain later phases.

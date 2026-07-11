@@ -85,6 +85,10 @@ export async function importFlipkartConsignmentDraft(input: {
   const data = Buffer.from(await input.file.arrayBuffer());
   if (data.byteLength !== input.file.size) throw new Error("Upload size changed while reading.");
   const sourceSha256 = createHash("sha256").update(data).digest("hex");
+  if (input.existingBatchId) {
+    const protectedDuplicate = await prisma.consignmentBatch.findFirst({ where: { id: { not: input.existingBatchId }, accountId: account.id, sourceFileSha256: sourceSha256, status: { in: ["ACTIVE", "COMPLETED"] } }, select: { id: true, status: true } });
+    if (protectedDuplicate) throw new Error(`This source is already used by ${protectedDuplicate.id} (${protectedDuplicate.status}).`);
+  }
   const duplicate = input.existingBatchId ? null : await prisma.consignmentBatch.findFirst({
     where: { accountId: account.id, marketplace: "FLIPKART", OR: [{ externalConsignmentNumber }, { sourceFileSha256: sourceSha256 }] },
     select: { id: true, status: true }
@@ -119,7 +123,11 @@ export async function importFlipkartConsignmentDraft(input: {
 
   try {
     const rawStored = await storeConsignmentBuffer({ batchId, area: "source", originalName: input.file.name, data });
-    await prisma.consignmentBatch.update({ where: { id: batchId }, data: { sourceUploadRelativePath: rawStored.managedRelativePath } });
+    await prisma.$transaction([
+      prisma.consignmentImportFile.updateMany({ where: { consignmentBatchId: batchId, fileType: "SOURCE_UPLOAD", isCurrentSource: true }, data: { isCurrentSource: false, supersededAt: new Date() } }),
+      prisma.consignmentImportFile.create({ data: { consignmentBatchId: batchId, fileType: "SOURCE_UPLOAD", originalFileName: rawStored.originalFileName, managedRelativePath: rawStored.managedRelativePath, fileSizeBytes: rawStored.fileSizeBytes, sha256: rawStored.sha256, parsed: false, isCurrentSource: true, rowCount: 0, notes: input.existingBatchId ? "Replacement source version" : "Original source version" } }),
+      prisma.consignmentBatch.update({ where: { id: batchId }, data: { sourceUploadRelativePath: rawStored.managedRelativePath } })
+    ]);
     await recordAuditLog({ userId: input.user.id, accountId: account.id, action: "CONSIGNMENT_FILE_UPLOADED", entityType: "ConsignmentBatch", entityId: batchId, metadata: { safeFileName: rawStored.originalFileName, sha256: rawStored.sha256, fileSizeBytes: rawStored.fileSizeBytes }, request: input.request });
     let mainName = rawStored.originalFileName;
     let mainData: Buffer<ArrayBufferLike> = data;

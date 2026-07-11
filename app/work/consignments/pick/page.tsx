@@ -1,0 +1,1 @@
+import { WorkerQueuePage } from "../../WorkerQueuePage"; export default function Page({searchParams}:{searchParams:Promise<{page?:string;q?:string;status?:string;success?:string;error?:string}>}){return <WorkerQueuePage stage="PICK" title="Consignment Picking" description="Claim ready products and record picked work quantity." searchParams={searchParams}/>;}

@@ -110,6 +110,20 @@ enum WorkTaskStatus {
   SKIPPED
 }
 
+enum WorkActionType {
+  TASK_CLAIMED
+  TASK_STARTED
+  TASK_PROGRESS_SET
+  TASK_INCREMENTED
+  TASK_COMPLETED
+  TASK_PROBLEM_REPORTED
+  TASK_PROBLEM_RESOLVED
+  MARKING_FILE_DOWNLOADED
+  MARKING_PREVIEW_OPENED
+  TASK_UNASSIGNED
+  TASK_REASSIGNED
+}
+
 enum ProcessRoute {
   PICK_PACK
   PICK_MARK_PACK
@@ -162,9 +176,11 @@ enum ConsignmentLineMatchStatus {
   IDENTIFIER_CONFLICT
   NOT_FOUND
   INVALID
+  OWNER_SELECTED
 }
 
 enum ConsignmentImportFileType {
+  SOURCE_UPLOAD
   CONSIGNMENT_DETAILS
   LABEL_REQUIREMENTS
   QUALITY_CHECK_REFERENCE
@@ -221,8 +237,13 @@ model User {
   workTasksAssigned            WorkTask[]                @relation("WorkTaskAssignedUser")
   workTasksStarted             WorkTask[]                @relation("WorkTaskStartedBy")
   workTasksCompleted           WorkTask[]                @relation("WorkTaskCompletedBy")
+  workTaskProblemsReported     WorkTask[]                @relation("WorkTaskProblemReportedBy")
+  workTaskProblemsResolved     WorkTask[]                @relation("WorkTaskProblemResolvedBy")
+  workActionLogs               WorkActionLog[]           @relation("WorkActionActor")
   consignmentsCreated          ConsignmentBatch[]        @relation("ConsignmentCreatedBy")
   consignmentsActivated        ConsignmentBatch[]        @relation("ConsignmentActivatedBy")
+  consignmentsCompleted        ConsignmentBatch[]        @relation("ConsignmentCompletedBy")
+  consignmentLinesCompleted    ConsignmentLine[]         @relation("ConsignmentLineCompletedBy")
   consignmentIssuesResolved    ConsignmentImportIssue[]  @relation("ConsignmentIssueResolvedBy")
   createdAt                    DateTime                  @default(now())
   updatedAt                    DateTime                  @updatedAt
@@ -302,6 +323,7 @@ model Account {
   markingAssetLinks   MarkingAssetListingLink[]
   processRules        ProductProcessRule[]
   workTasks           WorkTask[]
+  workActionLogs      WorkActionLog[]
   consignmentBatches  ConsignmentBatch[]
   consignmentLines    ConsignmentLine[]
   createdAt           DateTime                       @default(now())
@@ -539,31 +561,40 @@ model ProductProcessRule {
 }
 
 model WorkTask {
-  id                String           @id @default(cuid())
-  accountId         String
-  account           Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  sourceType        WorkSourceType
-  orderId           String?
-  order             Order?           @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  consignmentLineId String?
-  consignmentLine   ConsignmentLine? @relation(fields: [consignmentLineId], references: [id], onDelete: Restrict)
-  stage             WorkStage
-  sequenceNumber    Int
-  requiredQuantity  Int
-  completedQuantity Int              @default(0)
-  status            WorkTaskStatus   @default(LOCKED)
-  assignedUserId    String?
-  assignedUser      User?            @relation("WorkTaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
-  startedByUserId   String?
-  startedByUser     User?            @relation("WorkTaskStartedBy", fields: [startedByUserId], references: [id], onDelete: SetNull)
-  completedByUserId String?
-  completedByUser   User?            @relation("WorkTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
-  startedAt         DateTime?
-  completedAt       DateTime?
-  problemReason     String?
-  metadataJson      String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                      String           @id @default(cuid())
+  accountId               String
+  account                 Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceType              WorkSourceType
+  orderId                 String?
+  order                   Order?           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  consignmentLineId       String?
+  consignmentLine         ConsignmentLine? @relation(fields: [consignmentLineId], references: [id], onDelete: Restrict)
+  stage                   WorkStage
+  sequenceNumber          Int
+  requiredQuantity        Int
+  completedQuantity       Int              @default(0)
+  status                  WorkTaskStatus   @default(LOCKED)
+  assignedUserId          String?
+  assignedUser            User?            @relation("WorkTaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  startedByUserId         String?
+  startedByUser           User?            @relation("WorkTaskStartedBy", fields: [startedByUserId], references: [id], onDelete: SetNull)
+  completedByUserId       String?
+  completedByUser         User?            @relation("WorkTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  startedAt               DateTime?
+  completedAt             DateTime?
+  problemReason           String?
+  problemReportedAt       DateTime?
+  problemReportedByUserId String?
+  problemReportedBy       User?            @relation("WorkTaskProblemReportedBy", fields: [problemReportedByUserId], references: [id], onDelete: SetNull)
+  problemResolutionNote   String?
+  problemResolvedAt       DateTime?
+  problemResolvedByUserId String?
+  problemResolvedBy       User?            @relation("WorkTaskProblemResolvedBy", fields: [problemResolvedByUserId], references: [id], onDelete: SetNull)
+  statusBeforeProblem     WorkTaskStatus?
+  metadataJson            String?
+  actionLogs              WorkActionLog[]
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 
   @@unique([orderId, stage])
   @@unique([orderId, sequenceNumber])
@@ -573,6 +604,31 @@ model WorkTask {
   @@index([assignedUserId, status, stage])
   @@index([orderId, stage])
   @@index([sourceType, consignmentLineId])
+  @@index([accountId, sourceType, stage, status])
+  @@index([accountId, assignedUserId, stage, status])
+  @@index([consignmentLineId, stage, status])
+}
+
+model WorkActionLog {
+  id              String         @id @default(cuid())
+  accountId       String
+  account         Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  taskId          String
+  task            WorkTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actorUserId     String
+  actorUser       User           @relation("WorkActionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  action          WorkActionType
+  quantityBefore  Int?
+  quantityAfter   Int?
+  clientRequestId String?
+  note            String?
+  metadataJson    String?
+  createdAt       DateTime       @default(now())
+
+  @@unique([taskId, clientRequestId])
+  @@index([accountId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([actorUserId, createdAt])
 }
 
 model ConsignmentBatch {
@@ -599,6 +655,9 @@ model ConsignmentBatch {
   activatedAt               DateTime?
   activatedByUserId         String?
   activatedByUser           User?                    @relation("ConsignmentActivatedBy", fields: [activatedByUserId], references: [id], onDelete: SetNull)
+  completedAt               DateTime?
+  completedByUserId         String?
+  completedByUser           User?                    @relation("ConsignmentCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
   createdByUserId           String?
   createdByUser             User?                    @relation("ConsignmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   lines                     ConsignmentLine[]
@@ -649,6 +708,9 @@ model ConsignmentLine {
   fsnSnapshot          String?
   listingIdSnapshot    String?
   activated            Boolean                    @default(false)
+  completedAt          DateTime?
+  completedByUserId    String?
+  completedByUser      User?                      @relation("ConsignmentLineCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
   workTasks            WorkTask[]
   issues               ConsignmentImportIssue[]
   createdAt            DateTime                   @default(now())
@@ -657,6 +719,7 @@ model ConsignmentLine {
   @@unique([consignmentBatchId, rowNumber])
   @@index([accountId, matchStatus])
   @@index([consignmentBatchId, processRoute])
+  @@index([consignmentBatchId, completedAt])
   @@index([marketplaceListingId])
 }
 
@@ -671,6 +734,8 @@ model ConsignmentImportFile {
   sha256              String
   entryName           String?
   parsed              Boolean                   @default(false)
+  isCurrentSource     Boolean                   @default(false)
+  supersededAt        DateTime?
   rowCount            Int                       @default(0)
   notes               String?
   createdAt           DateTime                  @default(now())

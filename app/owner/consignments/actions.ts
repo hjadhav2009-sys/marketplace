@@ -104,7 +104,7 @@ export async function selectConsignmentListingAction(formData: FormData) {
   ]);
   if (!line || !listing) redirect(`/owner/consignments/${batchId}/review?error=forbidden`);
   const rule = listing.processRules[0];
-  await prisma.consignmentLine.update({ where: { id: line.id }, data: { marketplaceListingId: listing.id, matchStatus: "EXACT_SKU", matchIdentifierType: "SELLER_SKU", matchIdentifierValue: listing.sellerSkuId, matchMessage: "Listing selected by owner.", processRoute: rule?.route ?? null, processRuleId: rule?.id ?? null, markingAssetId: rule?.markingAssetId ?? null } });
+  await prisma.consignmentLine.update({ where: { id: line.id }, data: { marketplaceListingId: listing.id, matchStatus: "OWNER_SELECTED", matchIdentifierType: "SELLER_SKU", matchIdentifierValue: listing.sellerSkuId, matchMessage: "Listing selected by owner.", processRoute: rule?.route ?? null, processRuleId: rule?.id ?? null, markingAssetId: rule?.markingAssetId ?? null } });
   await prisma.consignmentImportIssue.updateMany({ where: { consignmentLineId: line.id, issueType: { in: ["NOT_FOUND", "EXACT_MULTIPLE", "IDENTIFIER_CONFLICT"] }, resolved: false }, data: { resolved: true, resolvedAt: new Date(), resolvedByUserId: user.id } });
   await recordAuditLog({ userId: user.id, accountId: account.id, action: "CONSIGNMENT_LISTING_MATCH_SELECTED", entityType: "ConsignmentLine", entityId: line.id, metadata: { batchId, listingId: listing.id }, request: await getRequestMeta() });
   await refreshReviewState(batchId, account.id);
@@ -167,6 +167,8 @@ export async function resolveConsignmentIssueAction(formData: FormData) {
   const issueId = value(formData, "issueId", 80);
   await prisma.consignmentImportIssue.updateMany({ where: { id: issueId, consignmentBatchId: batchId, consignmentBatch: { accountId: account.id } }, data: { resolved: true, resolvedAt: new Date(), resolvedByUserId: user.id } });
   await recordAuditLog({ userId: user.id, accountId: account.id, action: "CONSIGNMENT_ISSUE_RESOLVED", entityType: "ConsignmentImportIssue", entityId: issueId, metadata: { batchId }, request: await getRequestMeta() });
+  await refreshReviewState(batchId, account.id);
+  revalidatePath(`/owner/consignments/${batchId}/review`);
   revalidatePath(`/owner/consignments/${batchId}/issues`);
 }
 

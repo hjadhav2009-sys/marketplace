@@ -24,14 +24,14 @@ Implemented owner-side Flipkart consignment CSV/ZIP intake, safe supporting-file
 
 ## Phase 3: Consignment Worker Flow
 
-Build the worker Consignment Picker, Marking, and Consignment Packing screens on activated task plans. Add universal scan lookup without mutating on scan, assignment/claim behavior, problem resolution, and worker progress reporting using the guarded transition core.
+Implemented the worker Work Hub, Consignment Picker, Marking, Consignment Packing, stage-scoped exact search, atomic assignment claims, idempotent quantity progress, task problems, private marking-file delivery, and line/batch completion reconciliation. Search never mutates work.
 
 ## Later Phases
 
 - Customer order: Pick, Assemble, Pack.
 - Consignment: Pick, Mark, Pack.
 - Optional: Pick, Mark, Assemble, Pack.
-- Universal scan resolver and worker UI.
+- Universal cross-order and cross-account scan resolver.
 - Authenticated Windows Worker Agent and temporary file delivery.
 - Optional reviewed EngravingBrain protocol integration without sharing its database.
 

@@ -1,30 +1,444 @@
 import { performance } from "node:perf_hooks";
-import type { Prisma, PrismaClient, WorkStage } from "@prisma/client";
+import type { Prisma, PrismaClient, User, WorkStage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
 import { getWorkTaskCapabilities, userCanViewAllConsignmentWork } from "./worker-access";
 
-type Client=PrismaClient|Prisma.TransactionClient;
-export type UniversalScanIntent="ANY"|"PICK"|"MARK"|"PACK";
-export type UniversalWorkCandidate={candidateKey:string;sourceType:"CUSTOMER_ORDER"|"CONSIGNMENT_TASK";actionType:"ORDER_PICK"|"ORDER_PACK"|"CONSIGNMENT_PICK"|"CONSIGNMENT_MARK"|"CONSIGNMENT_PACK"|"PROBLEM"|"READ_ONLY";sourceId:string;taskId?:string;orderId?:string;consignmentLineId?:string;accountId:string;accountName:string;marketplace:string;matchType:string;matchedIdentifierMasked?:string;productTitle:string|null;productImageUrl:string|null;sellerSku:string|null;awb?:string|null;trackingId?:string|null;orderNumber?:string|null;fsn?:string|null;listingId?:string|null;asin?:string|null;fnsku?:string|null;stage?:WorkStage;status:string;requiredQuantity:number;completedQuantity:number;remainingQuantity:number;assignedUserId?:string|null;assignedUserName?:string|null;markingFileAvailable?:boolean;canAct:boolean;readOnlyReason?:string|null};
+type Client = PrismaClient | Prisma.TransactionClient;
+export type UniversalScanIntent = "ANY" | "PICK" | "MARK" | "PACK";
 
-const IDENTIFIER_TYPES=["SELLER_SKU","INTERNAL_SKU","FSN","LISTING_ID","LID","ASIN","FNSKU","EAN","UPC","GTIN","BARCODE","EXTERNAL_ID"] as const;
+export type UniversalWorkCandidate = {
+  candidateKey: string;
+  sourceType: "CUSTOMER_ORDER" | "CUSTOMER_ORDER_SHIPMENT" | "CONSIGNMENT_TASK";
+  actionType: "ORDER_PICK" | "ORDER_PACK" | "CONSIGNMENT_PICK" | "CONSIGNMENT_MARK" | "CONSIGNMENT_PACK" | "PROBLEM" | "READ_ONLY";
+  sourceId: string;
+  taskId?: string;
+  orderId?: string;
+  consignmentLineId?: string;
+  accountId: string;
+  accountName: string;
+  marketplace: string;
+  sourceLabel: string;
+  displayReference: string;
+  taskReference?: string;
+  consignmentNumber?: string;
+  itemReference?: string;
+  matchType: string;
+  matchedIdentifierMasked?: string;
+  productTitle: string | null;
+  productImageUrl: string | null;
+  productSummary?: string;
+  sellerSku: string | null;
+  awb?: string | null;
+  trackingId?: string | null;
+  orderNumber?: string | null;
+  shipmentId?: string | null;
+  fsn?: string | null;
+  listingId?: string | null;
+  asin?: string | null;
+  fnsku?: string | null;
+  stage?: WorkStage;
+  status: string;
+  requiredQuantity: number;
+  completedQuantity: number;
+  remainingQuantity: number;
+  shipmentItemCount?: number;
+  shipmentTotalQuantity?: number;
+  pickedItemCount?: number;
+  unpickedItemCount?: number;
+  productCount?: number;
+  assignedUserId?: string | null;
+  assignedUserName?: string | null;
+  markingMasterDesignId?: string | null;
+  markingAssetName?: string | null;
+  markingPosition?: string | null;
+  markingWidthMm?: number | null;
+  markingHeightMm?: number | null;
+  markingPower?: number | null;
+  markingSpeed?: number | null;
+  markingFrequency?: number | null;
+  markingPasses?: number | null;
+  markingInstructions?: string | null;
+  markingPreviewAvailable?: boolean;
+  markingFileAvailable?: boolean;
+  canAct: boolean;
+  readOnlyReason?: string | null;
+};
 
-export function normalizeUniversalScanCode(value:string){const normalized=value.normalize("NFKC").trim();if(!normalized)throw new Error("Enter or scan a code.");if(normalized.length>160||/[\u0000-\u001F\u007F]/.test(normalized))throw new Error("Scanned code is invalid.");return normalized;}
-function mask(value:string){return value.length<=4?value:`...${value.slice(-4)}`;}
+export const LISTING_IDENTIFIER_PRIORITY = [
+  "FNSKU",
+  "SELLER_SKU",
+  "FSN",
+  "ASIN",
+  "LISTING_ID",
+  "LID",
+  "EAN",
+  "UPC",
+  "GTIN",
+  "BARCODE",
+  "INTERNAL_SKU",
+  "EXTERNAL_ID"
+] as const;
 
-export async function getAuthorizedWorkAccounts(actorUserId:string,client:Client=prisma){const user=await client.user.findUnique({where:{id:actorUserId},include:{assignedAccounts:{where:{active:true},select:{id:true,name:true,accountDisplayName:true,marketplace:true,active:true}},account:{select:{id:true,name:true,accountDisplayName:true,marketplace:true,active:true}}}});if(!user?.active)throw new Error("Worker account is unavailable.");const accounts=user.role==="OWNER"?await client.account.findMany({where:{active:true},select:{id:true,name:true,accountDisplayName:true,marketplace:true,active:true},orderBy:[{marketplace:"asc"},{name:"asc"}]}):[...user.assignedAccounts,...(user.account?.active?[user.account]:[])];return{user,accounts:[...new Map(accounts.map((account)=>[account.id,account])).values()]};}
+const MATCH_PRIORITY = ["AWB", "TRACKING_ID", ...LISTING_IDENTIFIER_PRIORITY, "ORDER_NUMBER", "SHIPMENT_ID", "ORDER_ITEM_ID", "WORK_TASK_ID", "CONSIGNMENT_NUMBER"];
 
-function orderMatchType(order:{awb:string;trackingId:string|null;orderNo:string;shipmentId:string|null;orderItemId:string|null;sku:string},code:string){const upper=code.toUpperCase();if(order.awb.toUpperCase()===upper)return"AWB";if(order.trackingId?.toUpperCase()===upper)return"TRACKING_ID";if(order.orderNo.toUpperCase()===upper)return"ORDER_NUMBER";if(order.shipmentId?.toUpperCase()===upper)return"SHIPMENT_ID";if(order.orderItemId?.toUpperCase()===upper)return"ORDER_ITEM_ID";return order.sku.toUpperCase()===upper?"SELLER_SKU":"EXACT";}
-function taskAction(stage:WorkStage,status:string){if(status==="PROBLEM")return"PROBLEM" as const;if(stage==="PICK")return"CONSIGNMENT_PICK" as const;if(stage==="MARK")return"CONSIGNMENT_MARK" as const;if(stage==="PACK")return"CONSIGNMENT_PACK" as const;return"READ_ONLY" as const;}
-const MATCH_PRIORITY=["AWB","TRACKING_ID","FNSKU","SELLER_SKU","FSN","ASIN","LISTING_ID","LID","EAN","UPC","GTIN","BARCODE","ORDER_NUMBER","SHIPMENT_ID","ORDER_ITEM_ID","WORK_TASK_ID"];
-function matchRank(matchType:string){const index=MATCH_PRIORITY.indexOf(matchType);return index<0?MATCH_PRIORITY.length:index;}
+export function normalizeUniversalScanCode(value: string) {
+  const normalized = value.normalize("NFKC").trim();
+  if (!normalized) throw new Error("Enter or scan a code.");
+  if (normalized.length > 160 || /[\u0000-\u001F\u007F]/.test(normalized)) throw new Error("Scanned code is invalid.");
+  return normalized;
+}
 
-export async function resolveUniversalWork(input:{actorUserId:string;code:string;accountId?:string;intent?:UniversalScanIntent;includeCompleted?:boolean;limit?:number},client:Client=prisma){const started=performance.now();const code=normalizeUniversalScanCode(input.code);const intent=input.intent??"ANY";const limit=Math.min(Math.max(input.limit??25,1),50);const scope=await getAuthorizedWorkAccounts(input.actorUserId,client);let accounts=scope.accounts;if(input.accountId){if(!accounts.some((account)=>account.id===input.accountId))throw new Error("Selected account is outside your work access.");accounts=accounts.filter((account)=>account.id===input.accountId);}const accountIds=accounts.map((account)=>account.id);if(!accountIds.length)return{normalizedInput:code,searchedAccountCount:0,exactMatch:true,candidates:[],completedMatchCount:0,durationMs:Math.round(performance.now()-started)};const accountMap=new Map(accounts.map((account)=>[account.id,account]));const upper=code.toUpperCase();const orderWhere:Prisma.OrderWhereInput={accountId:{in:accountIds},OR:[{awb:code},{awb:upper},{trackingId:code},{trackingId:upper},{orderNo:code},{orderNo:upper},{shipmentId:code},{shipmentId:upper},{orderItemId:code},{orderItemId:upper},{sku:code},{sku:upper}]};const normalizedOr=IDENTIFIER_TYPES.flatMap((identifierType)=>{const normalizedValue=normalizeListingIdentifier(identifierType,code);return normalizedValue?[{identifierType,normalizedValue}]:[];});
- const [orders,identifierRows]=await Promise.all([client.order.findMany({where:{...orderWhere,packStatus:{not:"PACKED"}},select:{id:true,accountId:true,marketplace:true,shipmentId:true,orderItemId:true,fsn:true,trackingId:true,awb:true,sku:true,qty:true,orderNo:true,productDescription:true,imageUrl:true,pickStatus:true,packStatus:true,status:true},take:limit*4,orderBy:{importedAt:"desc"}}),client.marketplaceListingIdentifier.findMany({where:{accountId:{in:accountIds},active:true,OR:normalizedOr},select:{marketplaceListingId:true,identifierType:true,normalizedValue:true},take:limit*8})]);
- const listingIds=[...new Set(identifierRows.map((row)=>row.marketplaceListingId))];const taskLineMatch:Prisma.ConsignmentLineWhereInput={completedAt:null,consignmentBatch:{status:{in:["ACTIVE","PROBLEM"]}},OR:[...(listingIds.length?[{marketplaceListingId:{in:listingIds}}]:[]),{sellerSkuSnapshot:{equals:code}},{sellerSkuSnapshot:{equals:upper}},{fsnSnapshot:{equals:code}},{fsnSnapshot:{equals:upper}},{listingIdSnapshot:{equals:code}},{listingIdSnapshot:{equals:upper}},{consignmentBatch:{externalConsignmentNumber:{equals:code}}}]};const taskWhere:Prisma.WorkTaskWhereInput={accountId:{in:accountIds},sourceType:"CONSIGNMENT",stage:intent==="ANY"?{in:["PICK","MARK","PACK"]}:intent,status:{in:["READY","IN_PROGRESS","PROBLEM"]},OR:[{id:code},{consignmentLine:taskLineMatch}]};
- const tasks=await client.workTask.findMany({where:taskWhere,select:{id:true,accountId:true,stage:true,status:true,requiredQuantity:true,completedQuantity:true,assignedUserId:true,assignedUser:{select:{name:true}},problemReportedByUserId:true,consignmentLine:{select:{id:true,marketplaceListingId:true,sellerSkuSnapshot:true,sellerSkuSource:true,fsnSnapshot:true,fsnSource:true,listingIdSnapshot:true,productTitleSnapshot:true,productNameSource:true,productImageSnapshot:true,markingAsset:{select:{files:{where:{attachmentType:"MARKING_FILE",activeVersion:true},take:1,select:{id:true}}}},consignmentBatch:{select:{externalConsignmentNumber:true}}}}},take:limit*4,orderBy:[{status:"asc"},{updatedAt:"asc"}]});
- const candidates:UniversalWorkCandidate[]=[];const canSeeProblems=scope.user.role==="OWNER"||hasWorkPermission(scope.user,"canReportProblem")||hasWorkPermission(scope.user,"canManageConsignments")||hasWorkPermission(scope.user,"canViewAllWork");for(const order of orders){const account=accountMap.get(order.accountId);if(!account)continue;const wantsPick=intent==="ANY"||intent==="PICK";const wantsPack=intent==="ANY"||intent==="PACK";const common={sourceType:"CUSTOMER_ORDER" as const,sourceId:order.id,orderId:order.id,accountId:order.accountId,accountName:account.accountDisplayName??account.name,marketplace:order.marketplace,matchType:orderMatchType(order,code),matchedIdentifierMasked:mask(code),productTitle:order.productDescription,productImageUrl:order.imageUrl,sellerSku:order.sku,awb:order.awb,trackingId:order.trackingId,orderNumber:order.orderNo,fsn:order.fsn,requiredQuantity:order.qty,completedQuantity:0,remainingQuantity:order.qty};if(intent!=="MARK"&&(order.status==="PROBLEM"||order.pickStatus==="PROBLEM"||order.packStatus==="PROBLEM")&&canSeeProblems)candidates.push({...common,candidateKey:`order:${order.id}:problem`,actionType:"PROBLEM",status:"PROBLEM",canAct:false,readOnlyReason:"Problem requires review."});else{if(wantsPick&&order.pickStatus==="READY"&&order.packStatus!=="PACKED"&&hasWorkPermission(scope.user,"canPick"))candidates.push({...common,candidateKey:`order:${order.id}:pick`,actionType:"ORDER_PICK",status:order.pickStatus,canAct:true});if(wantsPack&&order.packStatus==="READY"&&order.pickStatus==="PICKED"&&hasWorkPermission(scope.user,"canPack"))candidates.push({...common,candidateKey:`order:${order.id}:pack`,actionType:"ORDER_PACK",status:order.packStatus,canAct:true});}}
- for(const task of tasks){const line=task.consignmentLine,account=accountMap.get(task.accountId);if(!line||!account)continue;const visibleProblem=task.status!=="PROBLEM"||userCanViewAllConsignmentWork(scope.user)||task.assignedUserId===scope.user.id||task.problemReportedByUserId===scope.user.id;if(!visibleProblem)continue;const caps=getWorkTaskCapabilities(scope.user,task);const canAct=task.status==="PROBLEM"?false:caps.canProgress;candidates.push({candidateKey:`task:${task.id}`,sourceType:"CONSIGNMENT_TASK",actionType:canAct?taskAction(task.stage,task.status):task.status==="PROBLEM"?"PROBLEM":"READ_ONLY",sourceId:task.id,taskId:task.id,consignmentLineId:line.id,accountId:task.accountId,accountName:account.accountDisplayName??account.name,marketplace:String(account.marketplace),matchType:task.id===code?"WORK_TASK_ID":listingIds.includes(line.marketplaceListingId??"")?identifierRows.find((row)=>row.marketplaceListingId===line.marketplaceListingId)?.identifierType??"EXACT_IDENTIFIER":"SNAPSHOT_OR_CONSIGNMENT",matchedIdentifierMasked:mask(code),productTitle:line.productTitleSnapshot??line.productNameSource,productImageUrl:line.productImageSnapshot,sellerSku:line.sellerSkuSnapshot??line.sellerSkuSource,fsn:line.fsnSnapshot??line.fsnSource,listingId:line.listingIdSnapshot,stage:task.stage,status:task.status,requiredQuantity:task.requiredQuantity,completedQuantity:task.completedQuantity,remainingQuantity:task.requiredQuantity-task.completedQuantity,assignedUserId:task.assignedUserId,assignedUserName:task.assignedUser?.name,markingFileAvailable:task.stage==="MARK"?Boolean(line.markingAsset?.files.length):undefined,canAct,readOnlyReason:canAct?null:task.status==="PROBLEM"?"Problem requires review.":"Task is assigned to another worker or you lack stage permission."});}
- const completedOrders=await client.order.count({where:{...orderWhere,packStatus:"PACKED"}});const completedTasks=await client.workTask.count({where:{accountId:{in:accountIds},sourceType:"CONSIGNMENT",status:"COMPLETED",stage:intent==="ANY"?{in:["PICK","MARK","PACK"]}:intent,OR:[{id:code},{consignmentLine:{OR:[...(listingIds.length?[{marketplaceListingId:{in:listingIds}}]:[]),{sellerSkuSnapshot:{in:[code,upper]}},{fsnSnapshot:{in:[code,upper]}},{listingIdSnapshot:{in:[code,upper]}},{consignmentBatch:{externalConsignmentNumber:code}}]}}]}});const rank=(candidate:UniversalWorkCandidate)=>[candidate.canAct?0:1,candidate.assignedUserId===scope.user.id?0:1,String(matchRank(candidate.matchType)).padStart(2,"0"),candidate.status==="READY"?0:1,candidate.candidateKey].join("|");candidates.sort((a,b)=>rank(a).localeCompare(rank(b)));return{normalizedInput:code,searchedAccountCount:accounts.length,exactMatch:true,candidates:candidates.slice(0,limit),completedMatchCount:completedOrders+completedTasks,durationMs:Math.round(performance.now()-started)};}
+function mask(value: string) {
+  return value.length <= 4 ? value : `...${value.slice(-4)}`;
+}
+
+function identifierRank(identifierType: string) {
+  const index = LISTING_IDENTIFIER_PRIORITY.indexOf(identifierType as (typeof LISTING_IDENTIFIER_PRIORITY)[number]);
+  return index < 0 ? LISTING_IDENTIFIER_PRIORITY.length : index;
+}
+
+export function highestPriorityIdentifierType(rows: Array<{ identifierType: string }>) {
+  return [...rows].sort((left, right) => identifierRank(left.identifierType) - identifierRank(right.identifierType) || left.identifierType.localeCompare(right.identifierType))[0]?.identifierType;
+}
+
+export async function getAuthorizedWorkAccounts(actorUserId: string, client: Client = prisma) {
+  const user = await client.user.findUnique({
+    where: { id: actorUserId },
+    include: {
+      assignedAccounts: { where: { active: true }, select: { id: true, name: true, accountDisplayName: true, marketplace: true, active: true } },
+      account: { select: { id: true, name: true, accountDisplayName: true, marketplace: true, active: true } }
+    }
+  });
+  if (!user?.active) throw new Error("Worker account is unavailable.");
+  const accounts = user.role === "OWNER"
+    ? await client.account.findMany({ where: { active: true }, select: { id: true, name: true, accountDisplayName: true, marketplace: true, active: true }, orderBy: [{ marketplace: "asc" }, { name: "asc" }] })
+    : [...user.assignedAccounts, ...(user.account?.active ? [user.account] : [])];
+  return { user, accounts: [...new Map(accounts.map((account) => [account.id, account])).values()] };
+}
+
+export function canViewCustomerOrderProblem(
+  user: Pick<User, "id" | "role" | "canPack" | "canViewAllWork">,
+  problem: { reportedByIds: string[] }
+) {
+  return user.role === "OWNER" || user.role === "PACKER" || user.canPack || user.canViewAllWork || problem.reportedByIds.includes(user.id);
+}
+
+function orderMatchType(order: { awb: string; trackingId: string | null; orderNo: string; shipmentId: string | null; orderItemId: string | null; sku: string }, code: string) {
+  const upper = code.toUpperCase();
+  if (order.awb.toUpperCase() === upper) return "AWB";
+  if (order.trackingId?.toUpperCase() === upper) return "TRACKING_ID";
+  if (order.orderNo.toUpperCase() === upper) return "ORDER_NUMBER";
+  if (order.shipmentId?.toUpperCase() === upper) return "SHIPMENT_ID";
+  if (order.orderItemId?.toUpperCase() === upper) return "ORDER_ITEM_ID";
+  return order.sku.toUpperCase() === upper ? "SELLER_SKU" : "EXACT";
+}
+
+function taskAction(stage: WorkStage, status: string) {
+  if (status === "PROBLEM") return "PROBLEM" as const;
+  if (stage === "PICK") return "CONSIGNMENT_PICK" as const;
+  if (stage === "MARK") return "CONSIGNMENT_MARK" as const;
+  if (stage === "PACK") return "CONSIGNMENT_PACK" as const;
+  return "READ_ONLY" as const;
+}
+
+function matchRank(matchType: string) {
+  const index = MATCH_PRIORITY.indexOf(matchType);
+  return index < 0 ? MATCH_PRIORITY.length : index;
+}
+
+function shortTaskReference(taskId: string) {
+  return `Task ${taskId.slice(-8)}`;
+}
+
+function summarize(values: Array<string | null | undefined>, max = 3) {
+  const unique = [...new Set(values.filter((value): value is string => Boolean(value)))];
+  if (!unique.length) return null;
+  return unique.length <= max ? unique.join(", ") : `${unique.slice(0, max).join(", ")} +${unique.length - max} more`;
+}
+
+function shipmentKey(order: { accountId: string; marketplace: string; trackingId: string | null }) {
+  return order.marketplace === "FLIPKART" && order.trackingId ? `${order.accountId}\u0000${order.trackingId}` : null;
+}
+
+export async function resolveUniversalWork(
+  input: { actorUserId: string; code: string; accountId?: string; intent?: UniversalScanIntent; includeCompleted?: boolean; limit?: number },
+  client: Client = prisma
+) {
+  const started = performance.now();
+  const code = normalizeUniversalScanCode(input.code);
+  const intent = input.intent ?? "ANY";
+  const limit = Math.min(Math.max(input.limit ?? 25, 1), 50);
+  const scope = await getAuthorizedWorkAccounts(input.actorUserId, client);
+  let accounts = scope.accounts;
+  if (input.accountId) {
+    if (!accounts.some((account) => account.id === input.accountId)) throw new Error("Selected account is outside your work access.");
+    accounts = accounts.filter((account) => account.id === input.accountId);
+  }
+  const accountIds = accounts.map((account) => account.id);
+  if (!accountIds.length) return { normalizedInput: code, searchedAccountCount: 0, exactMatch: true, candidates: [], completedMatchCount: 0, durationMs: Math.round(performance.now() - started) };
+
+  const accountMap = new Map(accounts.map((account) => [account.id, account]));
+  const upper = code.toUpperCase();
+  const orderWhere: Prisma.OrderWhereInput = {
+    accountId: { in: accountIds },
+    OR: [{ awb: code }, { awb: upper }, { trackingId: code }, { trackingId: upper }, { orderNo: code }, { orderNo: upper }, { shipmentId: code }, { shipmentId: upper }, { orderItemId: code }, { orderItemId: upper }, { sku: code }, { sku: upper }]
+  };
+  const normalizedOr = LISTING_IDENTIFIER_PRIORITY.flatMap((identifierType) => {
+    const normalizedValue = normalizeListingIdentifier(identifierType, code);
+    return normalizedValue ? [{ identifierType, normalizedValue }] : [];
+  });
+
+  const [orders, identifierRows] = await Promise.all([
+    client.order.findMany({
+      where: { ...orderWhere, packStatus: { not: "PACKED" } },
+      select: {
+        id: true, accountId: true, marketplace: true, shipmentId: true, orderItemId: true, fsn: true, trackingId: true, awb: true, sku: true, qty: true, orderNo: true,
+        productDescription: true, imageUrl: true, pickStatus: true, packStatus: true, status: true,
+        problemOrders: { where: { status: "OPEN" }, select: { reportedById: true } }
+      },
+      take: limit * 4,
+      orderBy: [{ importedAt: "desc" }, { id: "asc" }]
+    }),
+    client.marketplaceListingIdentifier.findMany({
+      where: { accountId: { in: accountIds }, active: true, OR: normalizedOr },
+      select: { marketplaceListingId: true, identifierType: true, normalizedValue: true },
+      take: limit * 8,
+      orderBy: [{ marketplaceListingId: "asc" }, { identifierType: "asc" }]
+    })
+  ]);
+
+  const trackedShipments = [...new Map(orders.map((order) => [shipmentKey(order), order]).filter((entry): entry is [string, typeof orders[number]] => Boolean(entry[0]))).values()];
+  const shipmentOrders = trackedShipments.length
+    ? await client.order.findMany({
+        where: {
+          packStatus: { not: "PACKED" },
+          OR: trackedShipments.map((order) => ({ accountId: order.accountId, marketplace: "FLIPKART", trackingId: order.trackingId }))
+        },
+        select: {
+          id: true, accountId: true, marketplace: true, shipmentId: true, orderItemId: true, fsn: true, trackingId: true, awb: true, sku: true, qty: true, orderNo: true,
+          productDescription: true, imageUrl: true, pickStatus: true, packStatus: true, status: true
+        },
+        orderBy: [{ accountId: "asc" }, { trackingId: "asc" }, { id: "asc" }]
+      })
+    : [];
+  const shipmentMap = new Map<string, typeof shipmentOrders>();
+  for (const order of shipmentOrders) {
+    const key = shipmentKey(order);
+    if (key) shipmentMap.set(key, [...(shipmentMap.get(key) ?? []), order]);
+  }
+
+  const listingIds = [...new Set(identifierRows.map((row) => row.marketplaceListingId))];
+  const taskLineMatch: Prisma.ConsignmentLineWhereInput = {
+    completedAt: null,
+    consignmentBatch: { status: { in: ["ACTIVE", "PROBLEM"] } },
+    OR: [
+      ...(listingIds.length ? [{ marketplaceListingId: { in: listingIds } }] : []),
+      { sellerSkuSnapshot: { in: [code, upper] } },
+      { fsnSnapshot: { in: [code, upper] } },
+      { listingIdSnapshot: { in: [code, upper] } },
+      { consignmentBatch: { externalConsignmentNumber: code } }
+    ]
+  };
+  const taskWhere: Prisma.WorkTaskWhereInput = {
+    accountId: { in: accountIds },
+    sourceType: "CONSIGNMENT",
+    stage: intent === "ANY" ? { in: ["PICK", "MARK", "PACK"] } : intent,
+    status: { in: ["READY", "IN_PROGRESS", "PROBLEM"] },
+    OR: [{ id: code }, { consignmentLine: taskLineMatch }]
+  };
+  const taskSelect = {
+    id: true, accountId: true, stage: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true,
+    assignedUser: { select: { name: true } }, problemReportedByUserId: true,
+    consignmentLine: {
+      select: {
+        id: true, rowNumber: true, marketplaceListingId: true, sellerSkuSnapshot: true, sellerSkuSource: true, fsnSnapshot: true, fsnSource: true,
+        listingIdSnapshot: true, productTitleSnapshot: true, productNameSource: true, productImageSnapshot: true,
+        markingAsset: {
+          select: {
+            name: true, masterDesignId: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true,
+            speedSetting: true, frequencySetting: true, passes: true, instructions: true,
+            files: { where: { activeVersion: true, attachmentType: { in: ["MARKING_FILE", "MARKING_PREVIEW"] } }, select: { attachmentType: true, originalFileName: true } }
+          }
+        },
+        consignmentBatch: { select: { externalConsignmentNumber: true } }
+      }
+    }
+  } satisfies Prisma.WorkTaskSelect;
+  const [assignedTasks, generalTasks] = await Promise.all([
+    client.workTask.findMany({ where: { ...taskWhere, assignedUserId: scope.user.id }, select: taskSelect, take: limit, orderBy: [{ status: "asc" }, { updatedAt: "asc" }, { id: "asc" }] }),
+    client.workTask.findMany({ where: taskWhere, select: taskSelect, take: limit * 4, orderBy: [{ status: "asc" }, { updatedAt: "asc" }, { id: "asc" }] })
+  ]);
+  const tasks = [...new Map([...assignedTasks, ...generalTasks].map((task) => [task.id, task])).values()];
+
+  const candidates: UniversalWorkCandidate[] = [];
+  const groupedPackKeys = new Set<string>();
+  for (const order of orders) {
+    const account = accountMap.get(order.accountId);
+    if (!account) continue;
+    const wantsPick = intent === "ANY" || intent === "PICK";
+    const wantsPack = intent === "ANY" || intent === "PACK";
+    const isProblem = order.status === "PROBLEM" || order.pickStatus === "PROBLEM" || order.packStatus === "PROBLEM";
+    const common = {
+      sourceType: "CUSTOMER_ORDER" as const,
+      sourceId: order.id,
+      orderId: order.id,
+      accountId: order.accountId,
+      accountName: account.accountDisplayName ?? account.name,
+      marketplace: order.marketplace,
+      sourceLabel: "Customer order",
+      displayReference: order.trackingId ?? order.awb ?? order.orderNo,
+      matchType: orderMatchType(order, code),
+      matchedIdentifierMasked: mask(code),
+      productTitle: order.productDescription,
+      productImageUrl: order.imageUrl,
+      sellerSku: order.sku,
+      awb: order.awb,
+      trackingId: order.trackingId,
+      orderNumber: order.orderNo,
+      shipmentId: order.shipmentId,
+      fsn: order.fsn,
+      requiredQuantity: order.qty,
+      completedQuantity: 0,
+      remainingQuantity: order.qty
+    };
+    const reportedByIds = order.problemOrders.map((problem) => problem.reportedById).filter((id): id is string => Boolean(id));
+    if (intent !== "MARK" && isProblem && canViewCustomerOrderProblem(scope.user, { reportedByIds })) {
+      candidates.push({ ...common, candidateKey: `order:${order.id}:problem`, actionType: "PROBLEM", status: "PROBLEM", canAct: false, readOnlyReason: "Problem requires review." });
+    }
+    if (!isProblem && wantsPick && order.pickStatus === "READY" && order.packStatus !== "PACKED" && hasWorkPermission(scope.user, "canPick")) {
+      candidates.push({ ...common, candidateKey: `order:${order.id}:pick`, actionType: "ORDER_PICK", status: order.pickStatus, canAct: true });
+    }
+    if (!wantsPack || !hasWorkPermission(scope.user, "canPack")) continue;
+
+    const key = shipmentKey(order);
+    if (key) {
+      if (groupedPackKeys.has(key)) continue;
+      groupedPackKeys.add(key);
+      const shipment = shipmentMap.get(key) ?? [order];
+      const problemCount = shipment.filter((item) => item.status === "PROBLEM" || item.pickStatus === "PROBLEM" || item.packStatus === "PROBLEM").length;
+      const unpickedCount = shipment.filter((item) => item.pickStatus !== "PICKED").length;
+      const pickedItemCount = shipment.length - unpickedCount;
+      const totalQuantity = shipment.reduce((total, item) => total + item.qty, 0);
+      const packable = problemCount === 0 && unpickedCount === 0 && shipment.every((item) => item.packStatus === "READY");
+      const products = [...new Set(shipment.map((item) => item.sku))];
+      candidates.push({
+        ...common,
+        sourceType: "CUSTOMER_ORDER_SHIPMENT",
+        candidateKey: `order-shipment:${order.accountId}:${order.trackingId}`,
+        actionType: "ORDER_PACK",
+        sourceLabel: "Flipkart shipment",
+        displayReference: order.trackingId ?? order.awb,
+        productSummary: summarize(shipment.map((item) => item.productDescription ?? item.sku)) ?? undefined,
+        orderNumber: summarize(shipment.map((item) => item.orderNo)),
+        awb: summarize(shipment.map((item) => item.awb)),
+        shipmentId: summarize(shipment.map((item) => item.shipmentId)),
+        status: packable ? "READY" : problemCount ? "PROBLEM" : "WAITING_FOR_PICK",
+        requiredQuantity: totalQuantity,
+        completedQuantity: shipment.filter((item) => item.pickStatus === "PICKED").reduce((total, item) => total + item.qty, 0),
+        remainingQuantity: shipment.filter((item) => item.pickStatus !== "PICKED").reduce((total, item) => total + item.qty, 0),
+        shipmentItemCount: shipment.length,
+        shipmentTotalQuantity: totalQuantity,
+        pickedItemCount,
+        unpickedItemCount: unpickedCount,
+        productCount: products.length,
+        canAct: packable,
+        readOnlyReason: problemCount ? "Shipment contains problem work." : unpickedCount ? `Shipment cannot be packed: ${unpickedCount} item(s) are still waiting for picking.` : packable ? null : "Shipment changed; scan again before packing."
+      });
+    } else if (!isProblem) {
+      const packable = order.packStatus === "READY" && order.pickStatus === "PICKED";
+      candidates.push({ ...common, candidateKey: `order:${order.id}:pack`, actionType: "ORDER_PACK", status: packable ? "READY" : "WAITING_FOR_PICK", canAct: packable, readOnlyReason: packable ? null : "Order must be picked before packing." });
+    }
+  }
+
+  for (const task of tasks) {
+    const line = task.consignmentLine;
+    const account = accountMap.get(task.accountId);
+    if (!line || !account) continue;
+    const visibleProblem = task.status !== "PROBLEM" || userCanViewAllConsignmentWork(scope.user) || task.assignedUserId === scope.user.id || task.problemReportedByUserId === scope.user.id;
+    if (!visibleProblem) continue;
+    const capabilities = getWorkTaskCapabilities(scope.user, task);
+    const canAct = task.status === "PROBLEM" ? false : capabilities.canProgress;
+    const matchingRows = identifierRows.filter((row) => row.marketplaceListingId === line.marketplaceListingId);
+    let matchType = highestPriorityIdentifierType(matchingRows);
+    if (task.id === code) matchType = "WORK_TASK_ID";
+    else if (!matchType && line.sellerSkuSnapshot && [code, upper].includes(line.sellerSkuSnapshot)) matchType = "SELLER_SKU";
+    else if (!matchType && line.fsnSnapshot && [code, upper].includes(line.fsnSnapshot)) matchType = "FSN";
+    else if (!matchType && line.listingIdSnapshot && [code, upper].includes(line.listingIdSnapshot)) matchType = "LISTING_ID";
+    else if (!matchType && line.consignmentBatch.externalConsignmentNumber === code) matchType = "CONSIGNMENT_NUMBER";
+    const asset = line.markingAsset;
+    const markingFile = asset?.files.find((file) => file.attachmentType === "MARKING_FILE");
+    const markingPreview = asset?.files.find((file) => file.attachmentType === "MARKING_PREVIEW");
+    candidates.push({
+      candidateKey: `task:${task.id}`,
+      sourceType: "CONSIGNMENT_TASK",
+      actionType: canAct ? taskAction(task.stage, task.status) : task.status === "PROBLEM" ? "PROBLEM" : "READ_ONLY",
+      sourceId: task.id,
+      taskId: task.id,
+      consignmentLineId: line.id,
+      accountId: task.accountId,
+      accountName: account.accountDisplayName ?? account.name,
+      marketplace: String(account.marketplace),
+      sourceLabel: task.status === "PROBLEM" ? "Problem - read only" : `Consignment ${task.stage[0]}${task.stage.slice(1).toLowerCase()}`,
+      displayReference: line.consignmentBatch.externalConsignmentNumber,
+      consignmentNumber: line.consignmentBatch.externalConsignmentNumber,
+      taskReference: shortTaskReference(task.id),
+      itemReference: `Row ${line.rowNumber}`,
+      matchType: matchType ?? "SNAPSHOT_OR_CONSIGNMENT",
+      matchedIdentifierMasked: mask(code),
+      productTitle: line.productTitleSnapshot ?? line.productNameSource,
+      productImageUrl: line.productImageSnapshot,
+      sellerSku: line.sellerSkuSnapshot ?? line.sellerSkuSource,
+      fsn: line.fsnSnapshot ?? line.fsnSource,
+      listingId: line.listingIdSnapshot,
+      stage: task.stage,
+      status: task.status,
+      requiredQuantity: task.requiredQuantity,
+      completedQuantity: task.completedQuantity,
+      remainingQuantity: task.requiredQuantity - task.completedQuantity,
+      assignedUserId: task.assignedUserId,
+      assignedUserName: task.assignedUser?.name,
+      markingMasterDesignId: asset?.masterDesignId,
+      markingAssetName: asset?.name,
+      markingPosition: asset?.markingPosition,
+      markingWidthMm: asset?.markingWidthMm,
+      markingHeightMm: asset?.markingHeightMm,
+      markingPower: asset?.powerSetting,
+      markingSpeed: asset?.speedSetting,
+      markingFrequency: asset?.frequencySetting,
+      markingPasses: asset?.passes,
+      markingInstructions: asset?.instructions,
+      markingPreviewAvailable: task.stage === "MARK" ? Boolean(markingPreview) : undefined,
+      markingFileAvailable: task.stage === "MARK" ? Boolean(markingFile) : undefined,
+      canAct,
+      readOnlyReason: canAct ? null : task.status === "PROBLEM" ? "Problem requires review." : "Task is assigned to another worker or you lack stage permission."
+    });
+  }
+
+  const [completedOrders, completedTasks] = await Promise.all([
+    client.order.count({ where: { ...orderWhere, packStatus: "PACKED" } }),
+    client.workTask.count({
+      where: {
+        accountId: { in: accountIds }, sourceType: "CONSIGNMENT", status: "COMPLETED", stage: intent === "ANY" ? { in: ["PICK", "MARK", "PACK"] } : intent,
+        OR: [{ id: code }, { consignmentLine: { OR: [...(listingIds.length ? [{ marketplaceListingId: { in: listingIds } }] : []), { sellerSkuSnapshot: { in: [code, upper] } }, { fsnSnapshot: { in: [code, upper] } }, { listingIdSnapshot: { in: [code, upper] } }, { consignmentBatch: { externalConsignmentNumber: code } }] } }]
+      }
+    })
+  ]);
+  const rank = (candidate: UniversalWorkCandidate) => [
+    candidate.assignedUserId === scope.user.id ? 0 : 1,
+    candidate.canAct ? 0 : 1,
+    String(matchRank(candidate.matchType)).padStart(2, "0"),
+    candidate.status === "READY" ? 0 : 1,
+    candidate.candidateKey
+  ].join("|");
+  candidates.sort((left, right) => rank(left).localeCompare(rank(right)));
+  return {
+    normalizedInput: code,
+    searchedAccountCount: accounts.length,
+    exactMatch: true,
+    candidates: candidates.slice(0, limit),
+    completedMatchCount: completedOrders + completedTasks,
+    durationMs: Math.round(performance.now() - started)
+  };
+}

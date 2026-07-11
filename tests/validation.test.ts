@@ -1091,6 +1091,7 @@ const reportsHelper = readFileSync(join(repoRoot, "lib", "reports.ts"), "utf8");
 const problemsPage = readFileSync(join(repoRoot, "app", "problems", "page.tsx"), "utf8");
 const problemsActions = readFileSync(join(repoRoot, "app", "problems", "actions.ts"), "utf8");
 const pickerActions = readFileSync(join(repoRoot, "app", "picker", "[sku]", "actions.ts"), "utf8");
+const orderPickingService = readFileSync(join(repoRoot, "src", "lib", "workflow", "order-picking.ts"), "utf8");
 const pickerDetailsRoute = readFileSync(join(repoRoot, "app", "picker", "details", "route.ts"), "utf8");
 const dashboardPage = readFileSync(join(repoRoot, "app", "dashboard", "page.tsx"), "utf8");
 const ownerPage = readFileSync(join(repoRoot, "app", "owner", "page.tsx"), "utf8");
@@ -1296,7 +1297,7 @@ assert.match(pickerProductCardComponent, /Details[\s\S]*ProductDetailsDrawer/, "
 assert.doesNotMatch(pickerProductCardComponent, /href=.*picker\/\$\{/, "Picker card image/details controls do not navigate to the SKU page");
 assert.match(productDetailsDrawerComponent, /fetch\(detailsUrl/, "Product details drawer fetches heavy detail data only after opening");
 assert.match(pickerDetailsRoute, /getSkuDetail/, "Picker details drawer route reuses the full SKU detail query");
-assert.match(pickerActions, /markSkuGroupPickedInlineAction[\s\S]*return \{ ok: true, updatedRows: result\.count \}/, "Direct picker card action returns picked result without redirecting");
+assert.match(pickerActions, /markSkuGroupPickedInlineAction[\s\S]*return \{ ok: true, updatedRows: result\.updatedCount \}/, "Direct picker card action returns picked result without redirecting");
 assert.match(pickerActions, /markSkuGroupProblemInlineAction[\s\S]*return \{ ok: true, affectedOrders: orders\.length/, "Direct picker problem action returns problem result without redirecting");
 assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
 assert.match(pickerDetailPage, /mapping\?\.cachedImageUrl/, "Picker detail uses cached image URL first");
@@ -1529,7 +1530,8 @@ assert.match(mobileLogoutRoute, /clearSession/, "Mobile logout clears server ses
 assert.match(mobilePickerGroupsRoute, /getMobilePermissionAccountContext\(request, "canPick"\)/, "Mobile picker groups require canPick permission");
 assert.doesNotMatch(mobilePickerGroupsRoute, /productDescription|allSpecifications|description/, "Mobile picker groups omit heavy/private listing fields");
 assert.match(mobilePickerGroupsRoute, /pendingCount[\s\S]*pickedCount[\s\S]*problemCount[\s\S]*mainImageUrl[\s\S]*cacheStatus/, "Mobile picker groups return compact worker fields");
-assert.match(mobilePickerPickedRoute, /pickStatus: "READY"[\s\S]*packStatus: "READY"[\s\S]*pickStatus: "PICKED"/, "Mobile mark-picked updates only ready picker rows");
+assert.match(mobilePickerPickedRoute, /markCustomerOrdersPickedSafely/, "Mobile mark-picked uses the shared picking service");
+assert.match(orderPickingService, /pickStatus === "READY"[\s\S]*packStatus === "READY"[\s\S]*pickStatus: "PICKED"/, "Shared picking service updates only ready picker rows");
 assert.match(mobilePickerProblemRoute, /pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"[\s\S]*MOBILE_PICK_PROBLEM_CREATED|MOBILE_PICK_PROBLEM_CREATED[\s\S]*pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"/, "Mobile picker problem marks grouped items problem");
 assert.match(mobilePackingSearchRoute, /getMobilePermissionAccountContext\(request, "canPack"\)/, "Mobile packing search requires canPack permission");
 assert.equal(mobilePackingSearchRoute.indexOf("trackingId: code") < mobilePackingSearchRoute.indexOf("awb: code"), true, "Mobile packing search checks Tracking ID before AWB");

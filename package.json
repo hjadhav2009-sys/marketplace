@@ -24,11 +24,12 @@
     "workflow:test": "tsx tests/workflow-worker.test.ts && tsx tests/workflow-stream.test.ts && tsx tests/workflow-hardening.test.ts",
     "workflow:benchmark": "tsx scripts/workflow-activation-benchmark.ts",
     "universal-scan:test": "tsx tests/universal-scan.test.ts && tsx tests/universal-scan-safety.test.ts && tsx tests/universal-scan-source.test.ts",
+    "assembly:test": "tsx tests/order-assembly.test.ts && tsx tests/order-assembly-source.test.ts",
     "universal-scan:benchmark": "tsx scripts/universal-scan-benchmark.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run lint && npm run test:validators",
-    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts && tsx tests/flipkart-parser.test.ts && tsx tests/flipkart-import-workflow.test.ts && tsx tests/import-job-progress.test.ts && tsx tests/marking-foundation.test.ts && tsx tests/consignment-parser.test.ts && tsx tests/consignment-foundation.test.ts && tsx tests/consignment-integration.test.ts && tsx tests/workflow-worker.test.ts && tsx tests/workflow-stream.test.ts && tsx tests/workflow-hardening.test.ts && tsx tests/universal-scan-source.test.ts && tsx tests/mobile-app-source.test.ts",
+    "test:validators": "tsx tests/validation.test.ts && tsx tests/meesho-parser.test.ts && tsx tests/flipkart-parser.test.ts && tsx tests/flipkart-import-workflow.test.ts && tsx tests/import-job-progress.test.ts && tsx tests/marking-foundation.test.ts && tsx tests/consignment-parser.test.ts && tsx tests/consignment-foundation.test.ts && tsx tests/consignment-integration.test.ts && tsx tests/workflow-worker.test.ts && tsx tests/workflow-stream.test.ts && tsx tests/workflow-hardening.test.ts && tsx tests/universal-scan-source.test.ts && tsx tests/order-assembly-source.test.ts && tsx tests/mobile-app-source.test.ts",
     "db:seed": "prisma db seed",
     "db:migrate:prod": "prisma migrate deploy --schema prisma/schema.postgres.prisma"
   },

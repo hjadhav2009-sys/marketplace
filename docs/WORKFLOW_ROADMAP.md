@@ -4,7 +4,8 @@ Marketplace Pick & Pack is a worker workflow system, not an ERP or inventory pro
 
 ## Current Live Flow
 
-- Customer order: Pick, then Pack.
+- Ready-made customer order: Pick, then Pack.
+- Assembly-required customer order: Pick, Assembly task, then Pack.
 - Existing `Order` pick/pack statuses remain authoritative.
 
 ## Phase 1 Foundation
@@ -30,9 +31,12 @@ Implemented the worker Work Hub, Consignment Picker, Marking, Consignment Packin
 
 Implemented one exact, lookup-only scanner for customer orders and active consignment Pick/Mark/Pack tasks across every authorized active seller account. `/work/scan` and `/packing` reuse the same resolver and cards. Multiple matches remain separate, completed work is non-actionable, and every explicit action re-authorizes its account and source.
 
+## Phase 5: Simple Customer Order Assembly
+
+Implemented exact process-rule resolution, immutable Assembly task snapshots, automatic task creation after Pick, manual diversion, assignment/problem/owner-skip controls, an Assembly queue, scanner integration, and a shipment-wide transactional packing gate. This is task workflow only and introduces no inventory or manufacturing subsystem.
+
 ## Later Phases
 
-- Customer order: Pick, Assemble, Pack.
 - Consignment: Pick, Mark, Pack.
 - Optional: Pick, Mark, Assemble, Pack.
 - Authenticated Windows Worker Agent and temporary file delivery.

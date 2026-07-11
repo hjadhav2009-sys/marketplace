@@ -1,14 +1,12 @@
 import { revalidatePath } from "next/cache";
-import { recordAuditLog } from "@/lib/audit";
 import { decodePickerDimension } from "@/lib/operations/picking";
 import {
   getMobilePermissionAccountContext,
-  getMobileRequestMeta,
   mobileError,
   mobileJson,
   readMobileJsonBody
 } from "@/lib/mobile-api";
-import { prisma } from "@/lib/prisma";
+import { markCustomerOrdersPickedSafely } from "@/src/lib/workflow/order-picking";
 
 export async function POST(request: Request) {
   const body = await readMobileJsonBody(request);
@@ -31,34 +29,8 @@ export async function POST(request: Request) {
 
   const color = decodePickerDimension(String(body.data.color ?? ""));
   const size = decodePickerDimension(String(body.data.size ?? ""));
-  const result = await prisma.order.updateMany({
-    where: {
-      accountId: context.account.id,
-      sku,
-      color: color === undefined ? undefined : color,
-      size: size === undefined ? undefined : size,
-      pickStatus: "READY",
-      packStatus: "READY"
-    },
-    data: {
-      pickStatus: "PICKED"
-    }
-  });
-
-  await recordAuditLog({
-    userId: context.user.id,
-    accountId: context.account.id,
-    action: "MOBILE_SKU_GROUP_PICKED",
-    entityType: "Order",
-    metadata: {
-      sku,
-      color,
-      size,
-      updatedRows: result.count
-    },
-    request: getMobileRequestMeta(request)
-  });
+  const result = await markCustomerOrdersPickedSafely({ actorUserId: context.user.id, accountId: context.account.id, where: { sku, color: color === undefined ? undefined : color, size: size === undefined ? undefined : size }, source: "mobile-api", clientRequestId: String(body.data.clientRequestId ?? "") });
 
   revalidatePath("/picker");
-  return mobileJson({ ok: true, updatedRows: result.count });
+  return mobileJson({ ok: true, updatedRows: result.updatedCount, assemblyTasksCreated: result.assemblyTaskCount });
 }

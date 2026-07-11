@@ -1,17 +1,20 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
-import { requireAccount, requireUser } from "@/lib/auth";
+import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { hasWorkPermission } from "@/lib/work-permissions";
 import { getOrderWithImage } from "@/lib/data";
 import { formatDateTime } from "@/lib/format";
 import { packingResultLabel } from "@/lib/operations/packing";
 import { buildListingImageGallery } from "@/lib/product-image";
 import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { confirmPackedAction, reportProblemFromScanAction } from "./actions";
+import { sendOrderToAssemblyAction } from "@/app/work/assembly/actions";
+import { getOrderAssemblyPackingGate } from "@/src/lib/workflow/order-assembly";
 
 type ScanResultPageProps = {
   params: Promise<{
@@ -21,12 +24,15 @@ type ScanResultPageProps = {
     packed?: string;
     problem?: string;
     packError?: string;
+    assemblySuccess?: string;
+    assemblyError?: string;
   }>;
 };
 
 export default async function ScanResultPage({ params, searchParams }: ScanResultPageProps) {
-  const user = await requireUser(["OWNER", "PACKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
   const { awb: encodedAwb } = await params;
   const awb = decodeURIComponent(encodedAwb);
   const result = await getOrderWithImage(account.id, awb);
@@ -38,9 +44,16 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
 
   const { order, mapping, listing } = result;
   const shipmentItems = result.shipmentItems;
+  const scopedItems = shipmentItems.length > 0 ? shipmentItems : [order];
+  const assemblyGate = await getOrderAssemblyPackingGate({
+    accountId: account.id,
+    orders: scopedItems.map((item) => ({ id: item.id, accountId: account.id, sku: item.sku, productDescription: item.productDescription, imageUrl: item.imageUrl }))
+  });
+  const assemblyStateByOrder = new Map(assemblyGate.states.map((state) => [state.orderId, state]));
   const displayScanId = order.trackingId ?? order.awb;
   const scanLabel = order.trackingId ? "Tracking ID" : "AWB";
-  const canPack = order.packStatus === "READY";
+  const allPicked = scopedItems.every((item) => item.pickStatus === "PICKED");
+  const canPack = order.packStatus === "READY" && allPicked && assemblyGate.allowed;
   const canReportProblem = order.packStatus === "READY";
   const openProblem = order.problemOrders[0];
   const imageUrl = mapping?.cachedImageUrl ?? null;
@@ -81,6 +94,11 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
           {query.packError}
         </div>
       ) : null}
+
+      {query?.assemblySuccess ? <div className="mb-5 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800">{query.assemblySuccess}</div> : null}
+      {query?.assemblyError ? <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{query.assemblyError}</div> : null}
+      {!allPicked && order.packStatus === "READY" ? <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">Shipment cannot be packed while one or more items are waiting for picking.</div> : null}
+      {!assemblyGate.allowed ? <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">{assemblyGate.blocker?.message}</div> : null}
 
       {query?.problem === "existing" ? (
         <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
@@ -256,6 +274,24 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
                     <p className="text-sm font-bold text-berry">Qty {item.qty}</p>
                   </div>
                 ))}
+              </div>
+            </div>
+          ) : null}
+
+          {order.packStatus === "READY" ? (
+            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="font-semibold text-slate-950">Assembly</h3>
+              <p className="mt-1 text-sm text-slate-600">Send only the applicable picked item. Packing stays blocked until every required assembly task is completed or skipped by an owner.</p>
+              <div className="mt-3 grid gap-3">
+                {scopedItems.map((item) => {
+                  const state = assemblyStateByOrder.get(item.id);
+                  const active = state && !["NO_RULE", "READY_MADE"].includes(state.state);
+                  return <div key={item.id} className="rounded-md bg-slate-50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2"><p className="break-words font-bold">{item.sku} / Qty {item.qty}</p><span className="rounded-full bg-white px-2 py-1 text-xs font-bold ring-1 ring-slate-200">{state?.state.replaceAll("_", " ") ?? "No assembly task"}</span></div>
+                    {item.pickStatus === "PICKED" && !active ? <details className="mt-2"><summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-berry">Send to Assembly</summary><form action={sendOrderToAssemblyAction} className="grid gap-2 sm:grid-cols-2"><input type="hidden" name="orderId" value={item.id}/><input type="hidden" name="returnPath" value={`/packing/${encodeURIComponent(order.awb)}`}/><input type="hidden" name="clientRequestId" value={`packing-detail:${item.id}`}/><input name="manualTitle" maxLength={160} placeholder="Assembly title (optional)" className="min-h-11 rounded-md border px-3"/><input name="manualImageUrl" maxLength={2048} placeholder="Optional safe image URL" className="min-h-11 rounded-md border px-3"/><textarea name="manualInstructions" maxLength={2000} placeholder="Instructions required when no valid rule exists" className="min-h-24 rounded-md border p-3 sm:col-span-2"/><SubmitButton pendingText="Sending..." className="sm:col-span-2">Send to Assembly</SubmitButton></form></details> : null}
+                    {state && !state.allowed ? <p className="mt-2 text-sm font-semibold text-amber-800">{state.message}</p> : null}
+                  </div>;
+                })}
               </div>
             </div>
           ) : null}

@@ -10,6 +10,7 @@ import { SubmitButton } from "./SubmitButton";
 type AwbBarcodeScannerProps = {
   action: (formData: FormData) => void | Promise<void>;
   directPackAction: (formData: FormData) => void | Promise<void>;
+  sendAssemblyAction: (formData: FormData) => void | Promise<void>;
   defaultAwb?: string;
 };
 
@@ -33,7 +34,11 @@ type AwbSuggestion = {
   color?: string | null;
   qty: number;
   courier?: string | null;
+  pickStatus: string;
   packStatus: string;
+  canPack: boolean;
+  assemblyState?: string;
+  packBlockedReason?: string;
   listingTitle?: string | null;
   listingId?: string | null;
   listingCategory?: string | null;
@@ -122,7 +127,7 @@ function cameraStateLabel(state: "idle" | "starting" | "scanning" | "found" | "o
   return state === "stopped" ? "Stopped" : "Ready";
 }
 
-export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbBarcodeScannerProps) {
+export function AwbBarcodeScanner({ action, directPackAction, sendAssemblyAction, defaultAwb }: AwbBarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<ScannerControls | null>(null);
   const hiddenFormRef = useRef<HTMLFormElement | null>(null);
@@ -500,13 +505,25 @@ export function AwbBarcodeScanner({ action, directPackAction, defaultAwb }: AwbB
                         </div>
                       </div>
                       <div className="col-span-2 grid gap-2 sm:col-span-1 sm:w-28">
-                        <form action={directPackAction}>
+                        {suggestion.canPack ? <form action={directPackAction}>
                           <input type="hidden" name="orderId" value={suggestion.id} />
                           <input type="hidden" name="returnQuery" value={normalizeAwb(manualAwb)} />
                           <SubmitButton pendingText="Packing..." className="w-full min-h-10 px-3 py-2 text-sm">
                             Pack now
                           </SubmitButton>
-                        </form>
+                        </form> : <p className="rounded-md bg-amber-50 p-2 text-xs font-bold text-amber-900">{suggestion.packBlockedReason ?? "Not ready to pack"}</p>}
+                        {suggestion.pickStatus === "PICKED" && !["COMPLETED", "SKIPPED", "READY", "IN_PROGRESS", "PROBLEM"].includes(suggestion.assemblyState ?? "") ? (
+                          <details className="rounded-md border p-2 text-xs">
+                            <summary className="cursor-pointer font-bold">Send to Assembly</summary>
+                            <form action={sendAssemblyAction} className="mt-2 grid gap-2">
+                              <input type="hidden" name="orderId" value={suggestion.id}/><input type="hidden" name="returnPath" value="/packing"/><input type="hidden" name="clientRequestId" value={`packing-search:${suggestion.id}`}/>
+                              <input name="manualTitle" maxLength={160} placeholder="Assembly title (optional)" className="min-h-10 rounded-md border px-2"/>
+                              <textarea name="manualInstructions" maxLength={2000} placeholder="Instructions required when no process rule exists" className="min-h-20 rounded-md border p-2"/>
+                              <input name="manualImageUrl" maxLength={2048} placeholder="Optional image URL" className="min-h-10 rounded-md border px-2"/>
+                              <SubmitButton pendingText="Sending..." variant="secondary">Send</SubmitButton>
+                            </form>
+                          </details>
+                        ) : null}
                         <Link href={detailsHref} prefetch className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800">
                           Details
                         </Link>

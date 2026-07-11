@@ -6,6 +6,9 @@ import { requireAccount, requireUser } from "@/lib/auth";
 import { getLatestImportedBatch, getSkuGroups } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
 import { normalizeWorkQueueFilter } from "@/lib/operations/work-queue";
+import { hasWorkPermission } from "@/lib/work-permissions";
+import { roleHomePath } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 type PickerSkuGroupsPageProps = {
   searchParams?: Promise<{
@@ -38,8 +41,9 @@ const workFilters = [
 ];
 
 export default async function PickerSkuGroupsPage({ searchParams }: PickerSkuGroupsPageProps) {
-  const user = await requireUser(["OWNER", "PICKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPick")) redirect(roleHomePath(user.role));
   const params = await searchParams;
   const activeWork = normalizeWorkQueueFilter(params?.work);
   const activeFilter = params?.filter ?? (activeWork === "problems" ? "problem" : "pending");

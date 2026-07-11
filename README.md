@@ -229,3 +229,9 @@ scripts\windows\start-meesho-app.bat
 Activated Flipkart consignments are processed from `/work`: Consignment Pick, optional Marking, and Consignment Pack. Work is selected-account scoped, claimed atomically, quantity guarded, retry-idempotent, and recorded in `WorkActionLog`. Final PACK completion reconciles line and batch completion. See [Consignment Picking](docs/CONSIGNMENT_PICKING.md), [Marking Workflow](docs/MARKING_WORKFLOW.md), [Consignment Packing](docs/CONSIGNMENT_PACKING.md), [Assignment](docs/WORK_TASK_ASSIGNMENT.md), and [Problems](docs/WORK_TASK_PROBLEMS.md).
 
 Consignment quantities are workflow quantities only. No inventory balance, reservation, deduction, receiving, valuation, or marketplace stock update is introduced. The universal scanner and authenticated Worker Agent remain later phases.
+
+## Customer Order Assembly
+
+Ready-made orders continue through Pick then Pack. Listings configured as `PICK_ASSEMBLE_PACK` create one selected-account Assembly task after Pick; packing is blocked until that task is completed or owner-skipped. Packers can also divert a picked exceptional order with explicit manual instructions. Open `/work/assembly` for the worker queue and see [Customer Order Assembly](docs/CUSTOMER_ORDER_ASSEMBLY.md) and [Packing Gate](docs/ORDER_ASSEMBLY_PACKING_GATE.md).
+
+Assembly is intentionally simple workflow tracking. It does not add BOM, parts stock, manufacturing operations, stock deductions, QC, costing, or ERP behavior. Phase 5 does not modify the Android/mobile app.

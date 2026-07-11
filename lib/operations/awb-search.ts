@@ -49,8 +49,8 @@ function rank(value: AwbSearchSuggestion["matchType"]) {
   return 2;
 }
 
-export function findAwbSearchMatches(input: {
-  candidates: AwbSearchCandidate[];
+export function findAwbSearchMatches<T extends AwbSearchCandidate>(input: {
+  candidates: T[];
   accountId: string;
   query: string;
   limit?: number;
@@ -58,7 +58,7 @@ export function findAwbSearchMatches(input: {
   const query = normalizeAwb(input.query);
 
   if (query.length < 5) {
-    return [] as AwbSearchSuggestion[];
+    return [] as Array<T & Pick<AwbSearchSuggestion, "matchType" | "matchedField">>;
   }
 
   return input.candidates
@@ -68,12 +68,12 @@ export function findAwbSearchMatches(input: {
       const awbType = matchType(normalizeAwb(candidate.awb), query);
 
       if (trackingType) {
-        return { ...candidate, matchType: trackingType, matchedField: "TRACKING_ID" } satisfies AwbSearchSuggestion;
+        return { ...candidate, matchType: trackingType, matchedField: "TRACKING_ID" } as T & Pick<AwbSearchSuggestion, "matchType" | "matchedField">;
       }
 
-      return awbType ? ({ ...candidate, matchType: awbType, matchedField: "AWB" } satisfies AwbSearchSuggestion) : null;
+      return awbType ? ({ ...candidate, matchType: awbType, matchedField: "AWB" } as T & Pick<AwbSearchSuggestion, "matchType" | "matchedField">) : null;
     })
-    .filter((candidate): candidate is AwbSearchSuggestion => Boolean(candidate))
+    .filter((candidate): candidate is T & Pick<AwbSearchSuggestion, "matchType" | "matchedField"> => Boolean(candidate))
     .sort((left, right) => rank(left.matchType) - rank(right.matchType) || left.awb.localeCompare(right.awb))
     .slice(0, input.limit ?? 10);
 }

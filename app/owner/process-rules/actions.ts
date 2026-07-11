@@ -28,9 +28,9 @@ export async function setProcessRuleAction(formData: FormData) {
       marketplaceListingId: listingId,
       route,
       markingAssetId: value(formData, "markingAssetId", 80),
-      assemblyTitle: value(formData, "assemblyTitle", 240),
-      assemblyInstructions: value(formData, "assemblyInstructions"),
-      assemblyImageUrl: value(formData, "assemblyImageUrl", 1000),
+      assemblyTitle: value(formData, "assemblyTitle", 160),
+      assemblyInstructions: value(formData, "assemblyInstructions", 2000),
+      assemblyImageUrl: value(formData, "assemblyImageUrl", 2048),
       actorUserId: user.id
     });
     await recordAuditLog({ userId: user.id, accountId: account.id, action: existingRule ? "PROCESS_RULE_UPDATED" : "PROCESS_RULE_CREATED", entityType: "ProductProcessRule", entityId: rule.id, metadata: { marketplaceListingId: listingId, route, replacedRuleId: existingRule?.id ?? null }, request });

@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
-import { requireAccount, requireUser } from "@/lib/auth";
+import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { hasWorkPermission } from "@/lib/work-permissions";
 import { getSkuDetail } from "@/lib/data";
 import { encodePickerDimension } from "@/lib/operations/picking";
 import { buildListingImageGallery } from "@/lib/product-image";
@@ -27,8 +28,9 @@ type PickerSkuDetailPageProps = {
 };
 
 export default async function PickerSkuDetailPage({ params, searchParams }: PickerSkuDetailPageProps) {
-  const user = await requireUser(["OWNER", "PICKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPick")) redirect(roleHomePath(user.role));
   const { sku: encodedSku } = await params;
   const query = await searchParams;
   const sku = decodeURIComponent(encodedSku);

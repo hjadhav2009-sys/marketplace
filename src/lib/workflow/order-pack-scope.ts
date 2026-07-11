@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { assertWorkerAccountAccess } from "./worker-access";
+import { assertOrderAssemblyPackingEligible } from "./order-assembly";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -11,6 +12,7 @@ const orderPackScopeSelect = {
   marketplace: true,
   trackingId: true,
   awb: true,
+  sku: true,
   qty: true,
   pickStatus: true,
   packStatus: true,
@@ -111,6 +113,7 @@ export async function packCustomerOrderShipmentSafely(
       throw new Error("Order changed; scan again before acting.");
     }
     assertOrderPackScopeEligible(scope);
+    await assertOrderAssemblyPackingEligible({ accountId: input.accountId, orders: scope.shipmentOrders }, tx);
 
     const verifiedOrderIds = scope.shipmentOrders.map((order) => order.id);
     const update = await tx.order.updateMany({

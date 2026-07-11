@@ -7,6 +7,7 @@ import { hasWorkPermission } from "@/lib/work-permissions";
 import { getLatestImportedBatch, getPackingDashboard } from "@/lib/data";
 import { redirect } from "next/navigation";
 import { directPackFromSearchAction, moveOldPendingToReviewAction, searchAwbAction } from "./actions";
+import { sendOrderToAssemblyAction } from "@/app/work/assembly/actions";
 
 type PackingPageProps = {
   searchParams?: Promise<{
@@ -28,6 +29,7 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
   const canUseScanner = user.role === "OWNER"
     || hasWorkPermission(user, "canPick")
     || hasWorkPermission(user, "canMark")
+    || hasWorkPermission(user, "canAssemble")
     || hasWorkPermission(user, "canPack")
     || hasWorkPermission(user, "canViewAllWork")
     || hasWorkPermission(user, "canManageConsignments");
@@ -51,7 +53,7 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
       <UniversalScannerPanel
         actorUserId={user.id}
         query={params?.q}
-        intent={params?.intent === "PICK" || params?.intent === "MARK" || params?.intent === "PACK" ? params.intent : "ANY"}
+        intent={params?.intent === "PICK" || params?.intent === "MARK" || params?.intent === "ASSEMBLE" || params?.intent === "PACK" ? params.intent : "ANY"}
         accountId={params?.accountId}
         success={params?.scanSuccess}
         error={params?.scanError}
@@ -62,7 +64,7 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
         <section className="mt-5 space-y-4" data-customer-order-packing>
           <details className="rounded-md border bg-white p-4">
             <summary className="cursor-pointer font-black">Customer Order Packing</summary>
-            <div className="mt-4"><AwbBarcodeScanner action={searchAwbAction} directPackAction={directPackFromSearchAction} defaultAwb={params?.q} /></div>
+            <div className="mt-4"><AwbBarcodeScanner action={searchAwbAction} directPackAction={directPackFromSearchAction} sendAssemblyAction={sendOrderToAssemblyAction} defaultAwb={params?.q} /></div>
           </details>
 
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -74,6 +76,8 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
             <span className="whitespace-nowrap rounded-full bg-white px-3 py-2 text-sm font-semibold text-berry ring-1 ring-pink-200">All pending {dashboard.pendingCount}</span>
             <span className="whitespace-nowrap rounded-full bg-white px-3 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">Old pending {dashboard.oldPendingCount}</span>
             <span className="whitespace-nowrap rounded-full bg-white px-3 py-2 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">Problems {dashboard.problemCount}</span>
+            <span className="whitespace-nowrap rounded-full bg-white px-3 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">Waiting assembly {dashboard.waitingAssemblyCount}</span>
+            <span className="whitespace-nowrap rounded-full bg-white px-3 py-2 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">Assembly problems {dashboard.assemblyProblemCount}</span>
           </div>
 
           {user.role === "OWNER" && dashboard.oldPendingCount > 0 ? (

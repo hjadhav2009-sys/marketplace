@@ -7,6 +7,8 @@ import { recordAuditLog } from "@/lib/audit";
 import { decodePickerDimension, pickerDetailPath } from "@/lib/operations/picking";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
+import { hasWorkPermission } from "@/lib/work-permissions";
+import { markCustomerOrdersPickedSafely } from "@/src/lib/workflow/order-picking";
 
 function groupWhere(accountId: string, formData: FormData) {
   const sku = String(formData.get("sku") ?? "").trim();
@@ -34,79 +36,31 @@ function groupWhere(accountId: string, formData: FormData) {
 }
 
 export async function markSkuGroupPickedAction(formData: FormData) {
-  const user = await requireUser(["OWNER", "PICKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
-  const request = await getRequestMeta();
+  if (!hasWorkPermission(user, "canPick")) redirect("/dashboard");
   const group = groupWhere(account.id, formData);
-
-  const result = await prisma.order.updateMany({
-    where: {
-      ...group.where,
-      pickStatus: "READY",
-      packStatus: "READY"
-    },
-    data: {
-      pickStatus: "PICKED"
-    }
-  });
-
-  await recordAuditLog({
-    userId: user.id,
-    accountId: account.id,
-    action: "SKU_GROUP_PICKED",
-    entityType: "Order",
-    metadata: {
-      sku: group.sku,
-      color: group.color,
-      size: group.size,
-      updatedRows: result.count
-    },
-    request
-  });
+  const result = await markCustomerOrdersPickedSafely({ actorUserId: user.id, accountId: account.id, where: group.where, source: "picker-group" });
 
   revalidatePath("/picker");
-  redirect(`${pickerDetailPath(group.sku, group.color, group.size)}&picked=${result.count > 0 ? "1" : "already"}`);
+  redirect(`${pickerDetailPath(group.sku, group.color, group.size)}&picked=${result.updatedCount > 0 ? "1" : "already"}`);
 }
 
 export async function markSkuGroupPickedInlineAction(formData: FormData) {
-  const user = await requireUser(["OWNER", "PICKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
-  const request = await getRequestMeta();
+  if (!hasWorkPermission(user, "canPick")) return { ok: false, updatedRows: 0 };
   const group = groupWhere(account.id, formData);
-
-  const result = await prisma.order.updateMany({
-    where: {
-      ...group.where,
-      pickStatus: "READY",
-      packStatus: "READY"
-    },
-    data: {
-      pickStatus: "PICKED"
-    }
-  });
-
-  await recordAuditLog({
-    userId: user.id,
-    accountId: account.id,
-    action: "SKU_GROUP_PICKED",
-    entityType: "Order",
-    metadata: {
-      sku: group.sku,
-      color: group.color,
-      size: group.size,
-      updatedRows: result.count,
-      source: "picker-card"
-    },
-    request
-  });
+  const result = await markCustomerOrdersPickedSafely({ actorUserId: user.id, accountId: account.id, where: group.where, source: "picker-card" });
 
   revalidatePath("/picker");
-  return { ok: true, updatedRows: result.count };
+  return { ok: true, updatedRows: result.updatedCount };
 }
 
 export async function markSkuGroupProblemAction(formData: FormData) {
-  const user = await requireUser(["OWNER", "PICKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPick")) redirect("/dashboard");
   const request = await getRequestMeta();
   const group = groupWhere(account.id, formData);
   const reason = String(formData.get("reason") ?? "").trim();
@@ -183,8 +137,9 @@ export async function markSkuGroupProblemAction(formData: FormData) {
 }
 
 export async function markSkuGroupProblemInlineAction(formData: FormData) {
-  const user = await requireUser(["OWNER", "PICKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPick")) return { ok: false, error: "Picking permission is required." };
   const request = await getRequestMeta();
   const group = groupWhere(account.id, formData);
   const reason = String(formData.get("reason") ?? "").trim();

@@ -17,9 +17,9 @@ export function processRouteRequirements(route: ProcessRoute) {
 }
 
 export function validateProcessRule(input: ProcessRuleInput) {
-  const assemblyTitle = input.assemblyTitle?.normalize("NFKC").trim().slice(0, 240) || null;
-  const assemblyInstructions = input.assemblyInstructions?.normalize("NFKC").trim().slice(0, 8000) || null;
-  const assemblyImageUrl = input.assemblyImageUrl?.normalize("NFKC").trim().slice(0, 1000) || null;
+  const assemblyTitle = input.assemblyTitle?.normalize("NFKC").trim().slice(0, 160) || null;
+  const assemblyInstructions = input.assemblyInstructions?.normalize("NFKC").trim().slice(0, 2000) || null;
+  const assemblyImageUrl = input.assemblyImageUrl?.normalize("NFKC").trim().slice(0, 2048) || null;
   const requirements = processRouteRequirements(input.route);
   if (requirements.markingRequired && !input.markingAssetId) return { valid: false as const, message: "Select a marking asset for this route." };
   if (!requirements.markingRequired && input.markingAssetId) return { valid: false as const, message: "Ready-made or assembly-only routes cannot keep a marking asset." };

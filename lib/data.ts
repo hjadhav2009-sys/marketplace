@@ -1,4 +1,4 @@
-import type { Account } from "@prisma/client";
+import type { Account, Prisma } from "@prisma/client";
 import { cachedProductImageUrl } from "./image-cache";
 import { findAwbSearchMatches } from "./operations/awb-search";
 import { buildPickerSkuGroups, decodePickerDimension, filterPickerSkuGroups, paginatePickerSkuGroups } from "./operations/picking";
@@ -469,12 +469,15 @@ export async function getSkuDetail(
 
 export async function getPackingDashboard(accountId: string) {
   const startOfDay = startOfWorkDay();
+  const assemblyBlocked: Prisma.WorkTaskListRelationFilter = { none: { sourceType: "ORDER", stage: "ASSEMBLE", status: { in: ["LOCKED", "READY", "IN_PROGRESS", "PROBLEM", "CANCELLED"] } } };
 
-  const [todayReadyCount, oldPendingCount, packedTodayCount, problemCount] = await withDevTiming("packing dashboard", () => Promise.all([
+  const [todayReadyCount, oldPendingCount, packedTodayCount, problemCount, waitingAssemblyCount, assemblyProblemCount] = await withDevTiming("packing dashboard", () => Promise.all([
     prisma.order.count({
       where: {
         accountId,
+        pickStatus: "PICKED",
         packStatus: "READY",
+        workTasks: assemblyBlocked,
         importedAt: {
           gte: startOfDay
         }
@@ -483,7 +486,9 @@ export async function getPackingDashboard(accountId: string) {
     prisma.order.count({
       where: {
         accountId,
+        pickStatus: "PICKED",
         packStatus: "READY",
+        workTasks: assemblyBlocked,
         importedAt: {
           lt: startOfDay
         }
@@ -503,7 +508,9 @@ export async function getPackingDashboard(accountId: string) {
         accountId,
         OR: [{ pickStatus: "PROBLEM" }, { packStatus: "PROBLEM" }, { status: "PROBLEM" }]
       }
-    })
+    }),
+    prisma.workTask.count({ where: { accountId, sourceType: "ORDER", stage: "ASSEMBLE", status: { in: ["LOCKED", "READY", "IN_PROGRESS"] } } }),
+    prisma.workTask.count({ where: { accountId, sourceType: "ORDER", stage: "ASSEMBLE", status: "PROBLEM" } })
   ]), 500);
 
   return {
@@ -511,7 +518,9 @@ export async function getPackingDashboard(accountId: string) {
     oldPendingCount,
     pendingCount: todayReadyCount + oldPendingCount,
     packedTodayCount,
-    problemCount
+    problemCount,
+    waitingAssemblyCount,
+    assemblyProblemCount
   };
 }
 
@@ -540,6 +549,7 @@ export async function searchOrdersByAwbFragment(accountId: string, query: string
       qty: true,
       color: true,
       courier: true,
+      pickStatus: true,
       packStatus: true,
       createdAt: true
     } as const;
@@ -699,6 +709,7 @@ export async function getOrderWithImage(accountId: string, awb: string) {
       paymentType: true,
       city: true,
       state: true,
+      pickStatus: true,
       packStatus: true,
       packedAt: true,
       account: {
@@ -835,6 +846,9 @@ export async function getOrderWithImage(accountId: string, awb: string) {
               sku: true,
               qty: true,
               productDescription: true,
+              imageUrl: true,
+              pickStatus: true,
+              status: true,
               packStatus: true
             },
             orderBy: { sku: "asc" }

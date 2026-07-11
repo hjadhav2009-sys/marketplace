@@ -2,13 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { recordAuditLog } from "@/lib/audit";
-import { requireAccount, requireUser } from "@/lib/auth";
+import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
 import { normalizeAwb } from "@/lib/awb";
 import { searchOrdersByAwbFragment } from "@/lib/data";
 import { buildWorkQueueOrderWhere } from "@/lib/operations/work-queue";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { packCustomerOrderShipmentSafely } from "@/src/lib/workflow/order-pack-scope";
+import { hasWorkPermission } from "@/lib/work-permissions";
 
 function writeScanLogLater(input: {
   accountId: string;
@@ -22,8 +23,9 @@ function writeScanLogLater(input: {
 }
 
 export async function searchAwbAction(formData: FormData) {
-  const user = await requireUser(["OWNER", "PACKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
   const query = normalizeAwb(formData.get("awb"));
 
   if (query.length < 5) {
@@ -118,8 +120,9 @@ export async function moveOldPendingToReviewAction() {
 }
 
 export async function directPackFromSearchAction(formData: FormData) {
-  const user = await requireUser(["OWNER", "PACKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
   const orderId = String(formData.get("orderId") ?? "");
   const returnQuery = normalizeAwb(formData.get("returnQuery"));
 

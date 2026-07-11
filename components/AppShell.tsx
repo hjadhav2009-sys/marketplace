@@ -17,6 +17,7 @@ const ownerLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/work", label: "Work" },
   { href: "/work/scan", label: "Scan" },
+  { href: "/work/assembly", label: "Assembly" },
   { href: "/owner/uploads/new", label: "Import" },
   { href: "/owner/imports", label: "Imports" },
   { href: "/picker", label: "Pick" },
@@ -59,9 +60,10 @@ function linksForUser(user: NavigationUser) {
   }
 
   const links = [];
-  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canPack")) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan / Pack" });
+  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canAssemble") || hasWorkPermission(user, "canPack") || user.canViewAllWork) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan / Pack" });
   if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Order Pick" }, { href: "/work/consignments/pick", label: "Consignment Pick" });
   if (hasWorkPermission(user, "canMark")) links.push({ href: "/work/marking", label: "Marking" });
+  if (hasWorkPermission(user, "canAssemble") || user.canViewAllWork) links.push({ href: "/work/assembly", label: "Assembly" });
   if (hasWorkPermission(user, "canPack")) links.push({ href: "/packing", label: "Order Pack" }, { href: "/work/consignments/pack", label: "Consignment Pack" });
   if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Work Problems" });
   if (hasWorkPermission(user, "canViewConsignments") || hasWorkPermission(user, "canImportConsignments") || hasWorkPermission(user, "canManageConsignments")) links.push({ href: "/owner/consignments", label: "Consignments" });
@@ -74,7 +76,7 @@ function linksForUser(user: NavigationUser) {
 function mobileLinksForUser(user: NavigationUser) {
   if (user.role === "OWNER") return [];
   const links = [];
-  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canPack")) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan" });
+  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canAssemble") || hasWorkPermission(user, "canPack") || user.canViewAllWork) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan" });
   if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Pick" });
   if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Problems" });
   links.push({ href: "/accounts", label: "Account" });

@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="space-y-3 animate-pulse"><div className="h-20 rounded-md bg-slate-200"/><div className="h-64 rounded-md bg-slate-200"/><div className="h-64 rounded-md bg-slate-200"/></div>;}

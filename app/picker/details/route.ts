@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { getSkuDetail } from "@/lib/data";
+import { hasWorkPermission } from "@/lib/work-permissions";
 
 export async function GET(request: Request) {
-  const user = await requireUser(["OWNER", "PICKER"]);
+  const user = await requireUser();
   const account = await requireAccount(user);
+  if (!hasWorkPermission(user, "canPick")) return NextResponse.json({ error: "Picking permission required." }, { status: 403 });
   const url = new URL(request.url);
   const sku = url.searchParams.get("sku")?.trim();
 

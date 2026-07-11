@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, type PrismaClient, type ProcessRoute, type WorkActionType } from "@prisma/client";
+import { Prisma, type PrismaClient, type ProcessRoute, type WorkActionType, type WorkRequestKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildTaskPlan } from "./tasks";
-import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutateStage } from "./worker-access";
+import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutateStage, userCanResolveConsignmentProblems } from "./worker-access";
 
 type Transaction = Prisma.TransactionClient;
 type Client = PrismaClient;
@@ -92,29 +92,43 @@ async function taskForMutation(tx: Transaction, input: { taskId: string; account
   return { user, task };
 }
 
-async function duplicateResult(tx: Transaction, taskId: string, clientRequestId?: string) {
-  if (!clientRequestId) return null;
-  const log = await tx.workActionLog.findUnique({ where: { taskId_clientRequestId: { taskId, clientRequestId } } });
-  return log ? { completedQuantity: log.quantityAfter ?? log.quantityBefore ?? 0, completed: log.action === "TASK_COMPLETED", idempotent: true } : null;
+const REPLAY_ACTIONS: Record<WorkRequestKind, WorkActionType[]> = {
+  CLAIM: ["TASK_CLAIMED"], INCREMENT: ["TASK_INCREMENTED", "TASK_COMPLETED"], SET_PROGRESS: ["TASK_PROGRESS_SET", "TASK_COMPLETED"], COMPLETE: ["TASK_COMPLETED"], REPORT_PROBLEM: ["TASK_PROBLEM_REPORTED"], RESOLVE_PROBLEM: ["TASK_PROBLEM_RESOLVED"], REASSIGN: ["TASK_REASSIGNED"], UNASSIGN: ["TASK_UNASSIGNED"], BULK_ASSIGN: ["TASK_REASSIGNED", "TASK_UNASSIGNED"]
+};
+
+async function duplicateResult(tx: Transaction, input: { taskId: string; actorUserId: string; requestKind: WorkRequestKind; clientRequestId?: string }) {
+  if (!input.clientRequestId) return null;
+  const log = await tx.workActionLog.findFirst({ where: { taskId: input.taskId, clientRequestId: input.clientRequestId }, orderBy: { createdAt: "asc" } });
+  if (!log) return null;
+  if (log.actorUserId !== input.actorUserId) throw new Error("Request ID was already used by another worker.");
+  if (log.requestKind !== input.requestKind || !REPLAY_ACTIONS[input.requestKind].includes(log.action)) throw new Error("Request ID was already used for a different action.");
+  return { completedQuantity: log.quantityAfter ?? log.quantityBefore ?? 0, completed: log.action === "TASK_COMPLETED", idempotent: true };
 }
 
-async function logAction(tx: Transaction, input: { accountId: string; taskId: string; actorUserId: string; action: WorkActionType; before?: number; after?: number; clientRequestId?: string; note?: string; metadata?: Record<string, unknown> }) {
-  return tx.workActionLog.create({ data: { accountId: input.accountId, taskId: input.taskId, actorUserId: input.actorUserId, action: input.action, quantityBefore: input.before, quantityAfter: input.after, clientRequestId: input.clientRequestId || null, note: input.note?.slice(0, 1000) || null, metadataJson: input.metadata ? JSON.stringify(input.metadata) : null } });
+async function logAction(tx: Transaction, input: { accountId: string; taskId: string; actorUserId: string; action: WorkActionType; requestKind?: WorkRequestKind; before?: number; after?: number; clientRequestId?: string; note?: string; metadata?: Record<string, unknown> }) {
+  return tx.workActionLog.create({ data: { accountId: input.accountId, taskId: input.taskId, actorUserId: input.actorUserId, action: input.action, requestKind: input.clientRequestId ? input.requestKind : null, quantityBefore: input.before, quantityAfter: input.after, clientRequestId: input.clientRequestId || null, note: input.note?.slice(0, 1000) || null, metadataJson: input.metadata ? JSON.stringify(input.metadata) : null } });
 }
 
 export async function claimWorkTask(input: { taskId: string; accountId: string; actorUserId: string; clientRequestId?: string }, client: Client = prisma) {
-  return client.$transaction(async (tx) => {
-    const prior = await duplicateResult(tx, input.taskId, input.clientRequestId); if (prior) return prior;
+  const mutate=()=>client.$transaction(async (tx) => {
     const { user, task } = await taskForMutation(tx, input);
     if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
+    const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind: "CLAIM", clientRequestId: input.clientRequestId }); if (prior) return prior;
     if (!["READY", "IN_PROGRESS"].includes(task.status)) throw new Error("Task cannot be claimed.");
     if (!task.assignedUserId) {
       const claimed = await tx.workTask.updateMany({ where: { id: task.id, assignedUserId: null, status: task.status }, data: { assignedUserId: user.id, status: "IN_PROGRESS", startedAt: task.startedAt ?? new Date(), startedByUserId: task.startedByUserId ?? user.id } });
       if (claimed.count !== 1) throw new Error("This work was taken by another worker.");
-      await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_CLAIMED", before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId });
+      await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_CLAIMED", requestKind: "CLAIM", before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId });
     }
     return { completedQuantity: task.completedQuantity, completed: false, idempotent: Boolean(task.assignedUserId) };
   });
+  try{return await mutate();}catch(error){
+    if(!input.clientRequestId)throw error;
+    for(let attempt=0;attempt<3;attempt++){
+      const replay=await client.$transaction(async(tx)=>{const{user,task}=await taskForMutation(tx,input);if(task.assignedUserId&&task.assignedUserId!==user.id&&user.role!=="OWNER")throw new Error("This work was taken by another worker.");return duplicateResult(tx,{taskId:task.id,actorUserId:user.id,requestKind:"CLAIM",clientRequestId:input.clientRequestId});});
+      if(replay)return replay;if(attempt<2)await new Promise((resolve)=>setTimeout(resolve,10));
+    }throw error;
+  }
 }
 
 export async function recalculateConsignmentCompletion(tx: Transaction, input: { batchId: string; actorUserId: string; completedLineId?: string }) {
@@ -133,42 +147,57 @@ export async function recalculateConsignmentCompletion(tx: Transaction, input: {
   } else if (batch.status === "PROBLEM") await tx.consignmentBatch.update({ where: { id: batch.id }, data: { status: "ACTIVE" } });
 }
 
-export async function setWorkTaskProgress(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; targetQuantity: number; clientRequestId?: string; action?: "set" | "increment" }, client: Client = prisma) {
+export async function setWorkTaskProgress(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; targetQuantity: number; clientRequestId?: string; action?: "set" | "increment"; requestKind?: "INCREMENT" | "SET_PROGRESS" | "COMPLETE" }, client: Client = prisma) {
   if (![input.expectedQuantity, input.targetQuantity].every(Number.isSafeInteger) || input.expectedQuantity < 0 || input.targetQuantity < 0) throw new Error("Work quantity must be a non-negative whole number.");
-  return client.$transaction(async (tx) => {
-    const prior = await duplicateResult(tx, input.taskId, input.clientRequestId); if (prior) return prior;
+  const requestKind = input.requestKind ?? (input.action === "increment" ? "INCREMENT" : "SET_PROGRESS");
+  const mutate = () => client.$transaction(async (tx) => {
     const { user, task } = await taskForMutation(tx, input);
     const line = task.consignmentLine;
     if (!line) throw new Error("Task source line is unavailable.");
+    if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
+    const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId }); if (prior) return prior;
     if (task.status === "COMPLETED" && input.targetQuantity === task.requiredQuantity) return { completedQuantity: task.completedQuantity, completed: true, idempotent: true };
     if (!["READY", "IN_PROGRESS"].includes(task.status)) throw new Error("Task cannot advance from its current status.");
     if (task.completedQuantity !== input.expectedQuantity) throw new Error("Work changed; refresh before updating.");
     if (input.targetQuantity < task.completedQuantity || input.targetQuantity > task.requiredQuantity) throw new Error("Completed quantity is outside the allowed range.");
-    if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
     const assignedUserId = task.assignedUserId ?? user.id;
     const nextStatus = input.targetQuantity === task.requiredQuantity ? "COMPLETED" : "IN_PROGRESS";
     const updated = await tx.workTask.updateMany({ where: { id: task.id, status: task.status, completedQuantity: task.completedQuantity, assignedUserId: task.assignedUserId }, data: { assignedUserId, completedQuantity: input.targetQuantity, status: nextStatus, startedAt: task.startedAt ?? new Date(), startedByUserId: task.startedByUserId ?? user.id, completedAt: nextStatus === "COMPLETED" ? new Date() : null, completedByUserId: nextStatus === "COMPLETED" ? user.id : null } });
     if (updated.count !== 1) throw new Error(task.assignedUserId ? "Work changed; refresh before updating." : "This work was taken by another worker.");
     if (!task.assignedUserId) await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_CLAIMED", before: task.completedQuantity, after: task.completedQuantity });
     const action: WorkActionType = nextStatus === "COMPLETED" ? "TASK_COMPLETED" : input.action === "increment" ? "TASK_INCREMENTED" : "TASK_PROGRESS_SET";
-    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action, before: task.completedQuantity, after: input.targetQuantity, clientRequestId: input.clientRequestId });
+    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action, requestKind, before: task.completedQuantity, after: input.targetQuantity, clientRequestId: input.clientRequestId });
     if (nextStatus === "COMPLETED") {
       await unlockNextTask(tx, task.consignmentLineId!, task.sequenceNumber);
       await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id, completedLineId: task.stage === "PACK" ? line.id : undefined });
     }
     return { completedQuantity: input.targetQuantity, completed: nextStatus === "COMPLETED", idempotent: false };
   });
+  try { return await mutate(); }
+  catch (error) {
+    if (!input.clientRequestId) throw error;
+    for (let attempt=0;attempt<3;attempt++) {
+      const replay = await client.$transaction(async (tx) => {
+        const { user, task } = await taskForMutation(tx, input);
+        if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
+        return duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId });
+      });
+      if (replay) return replay;
+      if (attempt<2) await new Promise((resolve)=>setTimeout(resolve,10));
+    }
+    throw error;
+  }
 }
 
 export function incrementWorkTaskProgress(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; increment: number; clientRequestId?: string }, client: Client = prisma) {
   if (!Number.isSafeInteger(input.increment) || input.increment <= 0) throw new Error("Increment must be a positive whole number.");
-  return setWorkTaskProgress({ ...input, targetQuantity: input.expectedQuantity + input.increment, action: "increment" }, client);
+  return setWorkTaskProgress({ ...input, targetQuantity: input.expectedQuantity + input.increment, action: "increment", requestKind: "INCREMENT" }, client);
 }
 
 export async function completeWorkTask(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; clientRequestId?: string }, client: Client = prisma) {
   const task = await client.workTask.findFirst({ where: { id: input.taskId, accountId: input.accountId }, select: { requiredQuantity: true } });
   if (!task) throw new Error("Task is unavailable.");
-  return setWorkTaskProgress({ ...input, targetQuantity: task.requiredQuantity, action: "set" }, client);
+  return setWorkTaskProgress({ ...input, targetQuantity: task.requiredQuantity, action: "set", requestKind: "COMPLETE" }, client);
 }
 
 export function claimAndIncrementWorkTask(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; increment: number; clientRequestId: string }, client: Client = prisma) {
@@ -180,16 +209,16 @@ const PROBLEM_CATEGORIES = new Set(["PRODUCT_NOT_FOUND","WRONG_PRODUCT","QUANTIT
 export async function reportWorkTaskProblem(input: { taskId: string; accountId: string; actorUserId: string; reason: string; note?: string; expectedQuantity: number; clientRequestId?: string }, client: Client = prisma) {
   if (!PROBLEM_CATEGORIES.has(input.reason)) throw new Error("Select a valid problem reason.");
   return client.$transaction(async (tx) => {
-    const prior = await duplicateResult(tx, input.taskId, input.clientRequestId); if (prior) return prior;
     const { user, task } = await taskForMutation(tx, input);
     if (user.role !== "OWNER" && !user.canReportProblem) throw new Error("Problem reporting permission is required.");
     const line = task.consignmentLine;
     if (!line) throw new Error("Task source line is unavailable.");
-    if (!["READY","IN_PROGRESS"].includes(task.status) || task.completedQuantity !== input.expectedQuantity) throw new Error("Task changed; refresh before reporting a problem.");
     if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
+    const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind: "REPORT_PROBLEM", clientRequestId: input.clientRequestId }); if (prior) return prior;
+    if (!["READY","IN_PROGRESS"].includes(task.status) || task.completedQuantity !== input.expectedQuantity) throw new Error("Task changed; refresh before reporting a problem.");
     const changed = await tx.workTask.updateMany({ where: { id: task.id, status: task.status, completedQuantity: task.completedQuantity, assignedUserId: task.assignedUserId }, data: { statusBeforeProblem: task.status, status: "PROBLEM", assignedUserId: task.assignedUserId ?? user.id, problemReason: input.reason, problemReportedAt: new Date(), problemReportedByUserId: user.id, problemResolutionNote: null, problemResolvedAt: null, problemResolvedByUserId: null } });
     if (changed.count !== 1) throw new Error("Task changed; refresh before reporting a problem.");
-    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_PROBLEM_REPORTED", before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId, note: input.note, metadata: { reason: input.reason } });
+    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_PROBLEM_REPORTED", requestKind: "REPORT_PROBLEM", before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId, note: input.note, metadata: { reason: input.reason } });
     await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id });
     return { completedQuantity: task.completedQuantity, completed: false, idempotent: false };
   });
@@ -198,34 +227,37 @@ export async function reportWorkTaskProblem(input: { taskId: string; accountId: 
 export async function resolveWorkTaskProblem(input: { taskId: string; accountId: string; actorUserId: string; resolutionNote: string; clientRequestId?: string }, client: Client = prisma) {
   if (!input.resolutionNote.trim()) throw new Error("Resolution note is required.");
   return client.$transaction(async (tx) => {
-    const prior = await duplicateResult(tx, input.taskId, input.clientRequestId); if (prior) return prior;
     const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
-    if (!userCanManageConsignmentTasks(user) && !user.canViewAllWork) throw new Error("Consignment management permission is required.");
-    const task = await tx.workTask.findFirst({ where: { id: input.taskId, accountId: input.accountId, sourceType: "CONSIGNMENT", status: "PROBLEM" }, include: { consignmentLine: { select: { accountId: true, consignmentBatchId: true } } } });
+    if (!userCanResolveConsignmentProblems(user)) throw new Error("Consignment problem resolution permission is required.");
+    const task = await tx.workTask.findFirst({ where: { id: input.taskId, accountId: input.accountId, sourceType: "CONSIGNMENT" }, include: { consignmentLine: { select: { accountId: true, consignmentBatchId: true } } } });
     if (!task?.consignmentLine || task.consignmentLine.accountId !== input.accountId) throw new Error("Problem task is unavailable.");
+    const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind: "RESOLVE_PROBLEM", clientRequestId: input.clientRequestId }); if (prior) return prior;
+    if (task.status !== "PROBLEM") throw new Error("Problem task is unavailable.");
     const restored = task.completedQuantity > 0 ? "IN_PROGRESS" : "READY";
     await tx.workTask.update({ where: { id: task.id }, data: { status: restored, problemResolutionNote: input.resolutionNote.trim().slice(0, 1000), problemResolvedAt: new Date(), problemResolvedByUserId: user.id } });
-    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_PROBLEM_RESOLVED", before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId, note: input.resolutionNote });
+    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_PROBLEM_RESOLVED", requestKind: "RESOLVE_PROBLEM", before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId, note: input.resolutionNote });
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "CONSIGNMENT_TASK_PROBLEM_RESOLVED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ restoredStatus: restored }) } });
     await recalculateConsignmentCompletion(tx, { batchId: task.consignmentLine.consignmentBatchId, actorUserId: user.id });
     return { completedQuantity: task.completedQuantity, completed: false, idempotent: false };
   });
 }
 
-export async function reassignWorkTask(input: { taskId: string; accountId: string; actorUserId: string; assignedUserId: string | null }, client: Client = prisma) {
+export async function reassignWorkTask(input: { taskId: string; accountId: string; actorUserId: string; assignedUserId: string | null; clientRequestId?: string }, client: Client = prisma) {
   return client.$transaction(async (tx) => {
     const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
     if (!userCanManageConsignmentTasks(user)) throw new Error("Consignment management permission is required.");
     const task = await tx.workTask.findFirst({ where: { id: input.taskId, accountId: input.accountId, sourceType: "CONSIGNMENT", status: { in: ["LOCKED","READY","IN_PROGRESS","PROBLEM"] } } });
     if (!task) throw new Error("Task is unavailable.");
+    const requestKind = input.assignedUserId ? "REASSIGN" as const : "UNASSIGN" as const;
+    const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId }); if (prior) return { assignedUserId: input.assignedUserId, idempotent: true };
     if (input.assignedUserId) {
       const target = await assertWorkerAccountAccess(input.assignedUserId, input.accountId, tx);
       if (!userCanMutateStage(target.user, task.stage)) throw new Error("Selected worker lacks this stage permission.");
     }
     const before = task.assignedUserId;
     await tx.workTask.update({ where: { id: task.id }, data: { assignedUserId: input.assignedUserId } });
-    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: input.assignedUserId ? "TASK_REASSIGNED" : "TASK_UNASSIGNED", metadata: { previousUserId: before, assignedUserId: input.assignedUserId } });
-    return { assignedUserId: input.assignedUserId };
+    await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: input.assignedUserId ? "TASK_REASSIGNED" : "TASK_UNASSIGNED", requestKind, clientRequestId: input.clientRequestId, metadata: { previousUserId: before, assignedUserId: input.assignedUserId } });
+    return { assignedUserId: input.assignedUserId, idempotent: false };
   });
 }
 
@@ -233,7 +265,7 @@ export function unassignWorkTask(input: { taskId: string; accountId: string; act
   return reassignWorkTask({ ...input, assignedUserId: null }, client);
 }
 
-export async function reassignConsignmentStage(input: { batchId: string; accountId: string; actorUserId: string; stage: "PICK" | "MARK" | "PACK"; assignedUserId: string | null }, client: Client = prisma) {
+export async function reassignConsignmentStage(input: { batchId: string; accountId: string; actorUserId: string; stage: "PICK" | "MARK" | "PACK"; assignedUserId: string | null; clientRequestId?: string }, client: Client = prisma) {
   return client.$transaction(async (tx) => {
     const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
     if (!userCanManageConsignmentTasks(user)) throw new Error("Consignment management permission is required.");
@@ -243,9 +275,14 @@ export async function reassignConsignmentStage(input: { batchId: string; account
     }
     const tasks = await tx.workTask.findMany({ where: { accountId: input.accountId, sourceType: "CONSIGNMENT", stage: input.stage, consignmentLine: { consignmentBatchId: input.batchId }, status: { in: ["LOCKED", "READY", "IN_PROGRESS", "PROBLEM"] } }, select: { id: true, assignedUserId: true } });
     if (!tasks.length) return { count: 0 };
+    if (input.clientRequestId) {
+      const replays=await Promise.all(tasks.map((task)=>duplicateResult(tx,{taskId:task.id,actorUserId:user.id,requestKind:"BULK_ASSIGN",clientRequestId:input.clientRequestId})));
+      if(replays.every(Boolean))return{count:tasks.length,idempotent:true};
+      if(replays.some(Boolean))throw new Error("Request ID was only partially recorded; refresh before retrying.");
+    }
     await tx.workTask.updateMany({ where: { id: { in: tasks.map((task) => task.id) } }, data: { assignedUserId: input.assignedUserId } });
-    await tx.workActionLog.createMany({ data: tasks.map((task) => ({ accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: input.assignedUserId ? "TASK_REASSIGNED" as const : "TASK_UNASSIGNED" as const, metadataJson: JSON.stringify({ previousUserId: task.assignedUserId, assignedUserId: input.assignedUserId, bulkStage: input.stage }) })) });
-    return { count: tasks.length };
+    await tx.workActionLog.createMany({ data: tasks.map((task) => ({ accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: input.assignedUserId ? "TASK_REASSIGNED" as const : "TASK_UNASSIGNED" as const,requestKind:input.clientRequestId?"BULK_ASSIGN" as const:null,clientRequestId:input.clientRequestId||null, metadataJson: JSON.stringify({ previousUserId: task.assignedUserId, assignedUserId: input.assignedUserId, bulkStage: input.stage }) })) });
+    return { count: tasks.length,idempotent:false };
   });
 }
 

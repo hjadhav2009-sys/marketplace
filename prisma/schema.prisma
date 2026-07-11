@@ -123,6 +123,18 @@ enum WorkActionType {
   TASK_REASSIGNED
 }
 
+enum WorkRequestKind {
+  CLAIM
+  INCREMENT
+  SET_PROGRESS
+  COMPLETE
+  REPORT_PROBLEM
+  RESOLVE_PROBLEM
+  REASSIGN
+  UNASSIGN
+  BULK_ASSIGN
+}
+
 enum ProcessRoute {
   PICK_PACK
   PICK_MARK_PACK
@@ -605,26 +617,29 @@ model WorkTask {
   @@index([sourceType, consignmentLineId])
   @@index([accountId, sourceType, stage, status])
   @@index([accountId, assignedUserId, stage, status])
+  @@index([accountId, stage, status, completedAt])
   @@index([consignmentLineId, stage, status])
 }
 
 model WorkActionLog {
-  id              String         @id @default(cuid())
+  id              String           @id @default(cuid())
   accountId       String
-  account         Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
   taskId          String
-  task            WorkTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task            WorkTask         @relation(fields: [taskId], references: [id], onDelete: Cascade)
   actorUserId     String
-  actorUser       User           @relation("WorkActionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorUser       User             @relation("WorkActionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
   action          WorkActionType
   quantityBefore  Int?
   quantityAfter   Int?
   clientRequestId String?
+  requestKind     WorkRequestKind?
   note            String?
   metadataJson    String?
-  createdAt       DateTime       @default(now())
+  createdAt       DateTime         @default(now())
 
-  @@unique([taskId, clientRequestId])
+  @@unique([taskId, actorUserId, requestKind, clientRequestId])
+  @@index([taskId, clientRequestId])
   @@index([accountId, createdAt])
   @@index([taskId, createdAt])
   @@index([actorUserId, createdAt])

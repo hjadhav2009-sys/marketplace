@@ -32,3 +32,18 @@ export function userCanMutateStage(user: Pick<User, "role" | "canPick" | "canMar
 export function userCanManageConsignmentTasks(user: Pick<User, "role" | "canManageConsignments">) {
   return user.role === "OWNER" || user.canManageConsignments;
 }
+
+export function userCanViewAllConsignmentWork(user: Pick<User, "role" | "canViewAllWork" | "canManageConsignments">) {
+  return user.role === "OWNER" || user.canViewAllWork || user.canManageConsignments;
+}
+
+export function userCanResolveConsignmentProblems(user: Pick<User, "role" | "canManageConsignments">) {
+  return user.role === "OWNER" || user.canManageConsignments;
+}
+
+export function getWorkTaskCapabilities(user: Pick<User, "id" | "role" | "canPick" | "canMark" | "canAssemble" | "canPack" | "canReportProblem" | "canManageConsignments">, task: { stage: "PICK" | "MARK" | "ASSEMBLE" | "PACK"; status: string; assignedUserId: string | null }) {
+  const hasStagePermission=userCanMutateStage(user,task.stage);
+  const assignmentAllowsMutation=user.role==="OWNER"||!task.assignedUserId||task.assignedUserId===user.id;
+  const canProgress=hasStagePermission&&assignmentAllowsMutation&&["READY","IN_PROGRESS"].includes(task.status);
+  return {hasStagePermission,assignmentAllowsMutation,canProgress,canClaim:canProgress&&task.status==="READY"&&!task.assignedUserId,canReportProblem:canProgress&&(user.role==="OWNER"||user.canReportProblem),canManage:userCanManageConsignmentTasks(user),readOnly:!canProgress};
+}

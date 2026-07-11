@@ -1,13 +1,16 @@
 import type { Prisma, PrismaClient, User, WorkStage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
-import { assertWorkerAccountAccess, userCanMutateStage } from "./worker-access";
+import { startOfApplicationDay } from "./dates";
+import { assertWorkerAccountAccess, userCanMutateStage, userCanViewAllConsignmentWork } from "./worker-access";
 
 export const WORK_QUEUE_PAGE_SIZE = 50;
 type Client = PrismaClient | Prisma.TransactionClient;
 
 export const WORK_TASK_INCLUDE = {
   assignedUser: { select: { id: true, name: true } },
+  problemReportedBy: { select: { id: true, name: true } },
+  actionLogs: { where: { action: "TASK_PROBLEM_REPORTED" as const }, orderBy: { createdAt: "desc" as const }, take: 1, select: { note: true } },
   consignmentLine: { include: {
     consignmentBatch: { select: { id: true, displayName: true, externalConsignmentNumber: true, status: true } },
     markingAsset: { include: { files: { where: { activeVersion: true }, select: { id: true, attachmentType: true, originalFileName: true } } } },
@@ -20,8 +23,8 @@ export async function getWorkerTaskQueue(input: { actorUserId: string; accountId
   if (!userCanMutateStage(user, input.stage)) throw new Error("Worker lacks permission for this stage.");
   const page=Math.max(1,input.page??1); const status=input.status??"active";
   const statuses=status==="problem"?["PROBLEM" as const]:status==="completed"?["COMPLETED" as const]:["READY" as const,"IN_PROGRESS" as const];
-  const assignment: Prisma.WorkTaskWhereInput = user.role==="OWNER"||user.canViewAllWork ? {} : { OR:[{assignedUserId:null},{assignedUserId:user.id}] };
-  const base: Prisma.WorkTaskWhereInput={accountId:input.accountId,sourceType:"CONSIGNMENT",stage:input.stage,status:{in:statuses},consignmentLine:{completedAt:status==="completed"?undefined:null,consignmentBatch:{status:status==="completed"?{in:["ACTIVE","COMPLETED","PROBLEM"]}:{in:["ACTIVE","PROBLEM"]}}},...assignment};
+  const assignment: Prisma.WorkTaskWhereInput = userCanViewAllConsignmentWork(user) ? {} : { OR:[{assignedUserId:null},{assignedUserId:user.id}] };
+  const base: Prisma.WorkTaskWhereInput={accountId:input.accountId,sourceType:"CONSIGNMENT",stage:input.stage,status:{in:statuses},completedAt:status==="completed"?{gte:startOfApplicationDay()}:undefined,consignmentLine:{completedAt:status==="completed"?undefined:null,consignmentBatch:{status:status==="completed"?{in:["ACTIVE","COMPLETED","PROBLEM"]}:{in:["ACTIVE","PROBLEM"]}}},...assignment};
   const exactIds=await exactListingIds(input.accountId,input.search,client);
   const search=input.search?.normalize("NFKC").trim();
   const where:Prisma.WorkTaskWhereInput={...base,AND:search?[{OR:[
@@ -48,11 +51,15 @@ export async function getWorkHubCounts(user: User, accountId: string, client: Cl
   await assertWorkerAccountAccess(user.id,accountId,client);
   const stages=(["PICK","MARK","PACK"] as const).filter((stage)=>userCanMutateStage(user,stage));
   const result:Record<string,{ready:number;inProgress:number;mine:number;problems:number;completedToday:number}>={};
-  const today=new Date();today.setHours(0,0,0,0);
+  const today=startOfApplicationDay();const accountWide=userCanViewAllConsignmentWork(user);
   for(const stage of stages){
-    const base={accountId,sourceType:"CONSIGNMENT" as const,stage};
+    const base:Prisma.WorkTaskWhereInput={accountId,sourceType:"CONSIGNMENT",stage,consignmentLine:{completedAt:null,consignmentBatch:{status:{in:["ACTIVE","PROBLEM"]}}}};
+    const readyVisibility:Prisma.WorkTaskWhereInput=accountWide?{}:{OR:[{assignedUserId:null},{assignedUserId:user.id}]};
+    const inProgressVisibility:Prisma.WorkTaskWhereInput=accountWide?{}:{assignedUserId:user.id};
+    const problemVisibility:Prisma.WorkTaskWhereInput=accountWide?{}:{OR:[{assignedUserId:user.id},{problemReportedByUserId:user.id}]};
+    const completedVisibility:Prisma.WorkTaskWhereInput=accountWide?{}:{completedByUserId:user.id};
     const [ready,inProgress,mine,problems,completedToday]=await Promise.all([
-      client.workTask.count({where:{...base,status:"READY"}}),client.workTask.count({where:{...base,status:"IN_PROGRESS"}}),client.workTask.count({where:{...base,assignedUserId:user.id,status:{in:["READY","IN_PROGRESS"]}}}),client.workTask.count({where:{...base,status:"PROBLEM"}}),client.workTask.count({where:{...base,status:"COMPLETED",completedAt:{gte:today}}})
+      client.workTask.count({where:{...base,status:"READY",...readyVisibility}}),client.workTask.count({where:{...base,status:"IN_PROGRESS",...inProgressVisibility}}),client.workTask.count({where:{...base,assignedUserId:user.id,status:{in:["READY","IN_PROGRESS"]}}}),client.workTask.count({where:{...base,status:"PROBLEM",...problemVisibility}}),client.workTask.count({where:{...base,status:"COMPLETED",completedAt:{gte:today},...completedVisibility}})
     ]);result[stage]={ready,inProgress,mine,problems,completedToday};
   }return result;
 }

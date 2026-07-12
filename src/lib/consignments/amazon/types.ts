@@ -1,6 +1,7 @@
 import type { ConsignmentImportFileType } from "@prisma/client";
 
 export type AmazonSourceProfile = "SHIPMENT" | "ALL_LISTINGS" | "CATEGORY_CATALOG" | "PRODUCT_CATALOG" | "SUPPORTING" | "UNKNOWN";
+export type AmazonSheetUsage = "OPERATIONAL" | "REFERENCE" | "UNKNOWN";
 
 export type AmazonConsignmentSourceRow = {
   rowNumber: number;
@@ -34,8 +35,16 @@ export type AmazonConsignmentSourceRow = {
 };
 
 export type AmazonParserIssue = { rowNumber?: number; sheet?: string; issueType: string; severity: "INFO" | "WARNING" | "ERROR"; message: string };
-export type AmazonParsedTable = { sheet: string; headers: string[]; profile: AmazonSourceProfile; fileType: ConsignmentImportFileType; confidence: number; headerRow: number; labelRow?: number; dataRow: number; rows: AmazonConsignmentSourceRow[]; issues: AmazonParserIssue[] };
+export type AmazonParsedTable = { sheet: string; sheetUsage: AmazonSheetUsage; sheetPriority: number; headers: string[]; profile: AmazonSourceProfile; fileType: ConsignmentImportFileType; confidence: number; headerRow: number; labelRow?: number; dataRow: number; rows: AmazonConsignmentSourceRow[]; issues: AmazonParserIssue[] };
 export type AmazonParsedFile = { fileName: string; tables: AmazonParsedTable[]; fileType: ConsignmentImportFileType; shipmentCandidateCount: number; totalRows: number };
+
+export type AmazonListingEnrichmentV1 = {
+  version: 1;
+  listingId: string;
+  title?: string; brand?: string; category?: string; subCategory?: string; material?: string; color?: string; size?: string; modelNumber?: string;
+  description?: string; bulletPoints?: string[]; mainImageUrl?: string; imageUrls?: string[]; listingStatus?: string;
+  sourceFileIds: string[]; sourceTables: string[];
+};
 
 export type ConsignmentCatalogSnapshotV1 = {
   version: 1;

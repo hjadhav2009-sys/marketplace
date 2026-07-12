@@ -8,11 +8,11 @@ type Transaction = Prisma.TransactionClient;
 type Client = PrismaClient;
 export type ActivationProblem = { lineId?: string; rowNumber?: number; code: string; message: string };
 
-function routeSupported(route: ProcessRoute | null): route is "PICK_PACK" | "PICK_MARK_PACK" {
-  return route === "PICK_PACK" || route === "PICK_MARK_PACK";
+function routeSupported(route: ProcessRoute | null): route is ProcessRoute {
+  return route === "PICK_PACK" || route === "PICK_MARK_PACK" || route === "PICK_ASSEMBLE_PACK" || route === "PICK_MARK_ASSEMBLE_PACK";
 }
 
-export function createConsignmentTaskPlan(input: { lineId: string; accountId: string; route: "PICK_PACK" | "PICK_MARK_PACK"; requiredQuantity: number }) {
+export function createConsignmentTaskPlan(input: { lineId: string; accountId: string; route: ProcessRoute; requiredQuantity: number }) {
   if (!Number.isSafeInteger(input.requiredQuantity) || input.requiredQuantity <= 0) throw new Error("Required work quantity must be a positive whole number.");
   return buildTaskPlan(input.route, input.requiredQuantity).map((task) => ({ id: `wkt_${randomUUID().replace(/-/g, "")}`, accountId: input.accountId, sourceType: "CONSIGNMENT" as const, orderId: null, consignmentLineId: input.lineId, ...task }));
 }
@@ -21,29 +21,39 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
   const batch = await client.consignmentBatch.findFirst({
     where: { id: batchId, accountId },
     include: { lines: { orderBy: { rowNumber: "asc" }, include: {
-      marketplaceListing: { select: { id: true, accountId: true, marketplace: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true, identifiers: { where: { active: true }, select: { identifierType: true, rawValue: true } } } },
+      marketplaceListing: { select: { id: true, accountId: true, marketplace: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true, identifiers: { where: { active: true }, select: { identifierType: true, rawValue: true } }, processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, markingAssetId: true } } } },
       processRule: { select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, markingAssetId: true } },
       markingAsset: { select: { id: true, active: true, masterDesignId: true, instructions: true, listingLinks: { where: { active: true }, select: { accountId: true, marketplaceListingId: true } } } },
       issues: { where: { issueType: "MARKING_IMAGE_MISSING" }, select: { resolved: true } }
     } } }
   });
-  if (!batch) return { batch: null, problems: [{ code: "NOT_FOUND", message: "Consignment is not available in the selected account." }] as ActivationProblem[] };
+  if (!batch) return { batch: null, problems: [{ code: "NOT_FOUND", message: "Consignment is not available in the selected account." }] as ActivationProblem[], warnings: [] as ActivationProblem[] };
   const problems: ActivationProblem[] = [];
+  const warnings: ActivationProblem[] = [];
   for (const line of batch.lines) {
     const identify = { lineId: line.id, rowNumber: line.rowNumber };
     if (line.accountId !== accountId || line.marketplaceListing?.accountId !== accountId) problems.push({ ...identify, code: "ACCOUNT_MISMATCH", message: "Line and listing must belong to the selected account." });
     if (line.marketplaceListing && line.marketplaceListing.marketplace !== batch.marketplace) problems.push({ ...identify, code: "MARKETPLACE_MISMATCH", message: "Line listing must belong to the consignment marketplace." });
     if (!Number.isSafeInteger(line.requiredQuantity) || line.requiredQuantity <= 0) problems.push({ ...identify, code: "INVALID_QUANTITY", message: "Required quantity must be a positive whole number." });
     if (!line.marketplaceListing || !["EXACT_SKU", "EXACT_FSN", "EXACT_FNSKU", "EXACT_ASIN", "EXACT_EXTERNAL_ID", "EXACT_BARCODE", "OWNER_SELECTED"].includes(line.matchStatus)) problems.push({ ...identify, code: "MISSING_LISTING", message: "Select one account listing before activation." });
-    if (!routeSupported(line.processRoute)) problems.push({ ...identify, code: "MISSING_ROUTE", message: "Select Ready-made or Marking route before activation." });
-    if (!line.processRule?.active || line.processRule.accountId !== line.accountId || line.processRule.marketplaceListingId !== line.marketplaceListingId || line.processRule.route !== line.processRoute) problems.push({ ...identify, code: "STALE_RULE", message: "Save an active account-scoped process rule matching this listing and route." });
+    if (line.processRoute && !routeSupported(line.processRoute)) problems.push({ ...identify, code: "UNSUPPORTED_ROUTE", message: "The selected processing route is not supported." });
+    if (!line.processRoute && !line.marketplaceListing?.processRules.length) warnings.push({ ...identify, code: "NO_SAVED_DEFAULT", message: "No saved default processing; Direct to Pack will be used." });
+    if (line.processRule && (!line.processRule.active || line.processRule.accountId !== line.accountId || line.processRule.marketplaceListingId !== line.marketplaceListingId)) warnings.push({ ...identify, code: "STALE_DEFAULT", message: "The old saved default is no longer applicable; the line route or Direct to Pack will be used." });
     const markingLinked = line.markingAsset?.listingLinks.some((link) => link.accountId === line.accountId && link.marketplaceListingId === line.marketplaceListingId);
-    if (line.processRoute === "PICK_MARK_PACK" && (!line.markingAsset?.active || !markingLinked || line.processRule?.markingAssetId !== line.markingAssetId)) problems.push({ ...identify, code: "MARKING_ASSET_MISSING", message: "Marking route requires an active linked marking asset." });
-    if (line.processRoute === "PICK_MARK_PACK" && line.markingAsset && !line.markingAsset.instructions?.trim() && !line.markingAsset.masterDesignId?.trim()) problems.push({ ...identify, code: "MARKING_INSTRUCTIONS_MISSING", message: "Marking route requires instructions or a Master Design ID." });
-    if (line.processRoute === "PICK_MARK_PACK" && !line.marketplaceListing?.mainImageUrl && !line.productImageSnapshot && !line.issues.some((issue) => issue.resolved)) problems.push({ ...identify, code: "MARKING_IMAGE_MISSING", message: "Review and acknowledge the missing product image before activation." });
+    const markingRoute = line.processRoute === "PICK_MARK_PACK" || line.processRoute === "PICK_MARK_ASSEMBLE_PACK";
+    if (markingRoute && (!line.markingAsset?.active || !markingLinked)) warnings.push({ ...identify, code: "MARKING_ASSET_MISSING", message: "No saved marking asset; the marking worker will need manager guidance." });
+    if (markingRoute && line.markingAsset && !line.markingAsset.instructions?.trim() && !line.markingAsset.masterDesignId?.trim()) warnings.push({ ...identify, code: "MARKING_INSTRUCTIONS_MISSING", message: "No saved marking instructions or Master Design ID." });
+    if (!line.marketplaceListing?.mainImageUrl && !line.productImageSnapshot) warnings.push({ ...identify, code: "MISSING_IMAGE", message: "Product image is missing; a placeholder will be shown." });
+    if (!line.marketplaceListing?.productTitle && !line.productNameSource) warnings.push({ ...identify, code: "MISSING_TITLE", message: "Product title is missing." });
   }
   if (!batch.lines.length) problems.push({ code: "NO_LINES", message: "Consignment has no valid lines." });
-  return { batch, problems };
+  return { batch, problems, warnings };
+}
+
+function activationRoute(line: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"][number]): ProcessRoute {
+  const ruleMatches = line.processRule?.active && line.processRule.accountId === line.accountId && line.processRule.marketplaceListingId === line.marketplaceListingId;
+  const savedRule = ruleMatches ? line.processRule : line.marketplaceListing?.processRules[0];
+  return savedRule?.route ?? (routeSupported(line.processRoute) ? line.processRoute : "PICK_PACK");
 }
 
 async function writeSnapshotChunk(tx: Transaction, lines: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"]) {
@@ -52,6 +62,7 @@ async function writeSnapshotChunk(tx: Transaction, lines: NonNullable<Awaited<Re
   const identifier=(line:typeof lines[number],type:string)=>line.marketplaceListing?.identifiers.find((item)=>item.identifierType===type)?.rawValue??null;
   await tx.$executeRaw(Prisma.sql`UPDATE "ConsignmentLine" SET
     "activated" = true,
+    "processRoute" = CASE "id" ${cases((line) => activationRoute(line))} ELSE "processRoute" END,
     "productTitleSnapshot" = CASE "id" ${cases((line) => line.marketplaceListing?.productTitle ?? line.productNameSource)} ELSE "productTitleSnapshot" END,
     "productImageSnapshot" = CASE "id" ${cases((line) => line.marketplaceListing?.mainImageUrl ?? null)} ELSE "productImageSnapshot" END,
     "sellerSkuSnapshot" = CASE "id" ${cases((line) => line.marketplaceListing?.sellerSkuId ?? line.sellerSkuSource)} ELSE "sellerSkuSnapshot" END,
@@ -77,13 +88,13 @@ export async function activateConsignmentBatch(input: { batchId: string; account
       const validation = await validateConsignmentActivation(input.batchId, input.accountId, tx);
       if (!validation.batch || validation.problems.length) throw new Error(validation.problems[0]?.message ?? "Consignment validation failed.");
       const tasks: Prisma.WorkTaskCreateManyInput[] = [];
-      for (const line of validation.batch.lines) tasks.push(...createConsignmentTaskPlan({ lineId: line.id, accountId: input.accountId, route: line.processRoute as "PICK_PACK" | "PICK_MARK_PACK", requiredQuantity: line.requiredQuantity }));
+      for (const line of validation.batch.lines) tasks.push(...createConsignmentTaskPlan({ lineId: line.id, accountId: input.accountId, route: activationRoute(line), requiredQuantity: line.requiredQuantity }));
       for (let index = 0; index < validation.batch.lines.length; index += 200) await writeSnapshotChunk(tx, validation.batch.lines.slice(index, index + 200));
       for (let index = 0; index < tasks.length; index += 500) await tx.workTask.createMany({ data: tasks.slice(index, index + 500) });
       await tx.consignmentBatch.update({ where: { id: input.batchId }, data: { status: "ACTIVE", activatedAt: new Date(), activatedByUserId: input.actorUserId } });
       await tx.auditLog.createMany({ data: [
         { userId: input.actorUserId, accountId: input.accountId, action: "CONSIGNMENT_TASKS_CREATED", entityType: "ConsignmentBatch", entityId: input.batchId, metadata: JSON.stringify({ taskCount: tasks.length, lineCount: validation.batch.lines.length }) },
-        { userId: input.actorUserId, accountId: input.accountId, action: "CONSIGNMENT_ACTIVATED", entityType: "ConsignmentBatch", entityId: input.batchId, metadata: JSON.stringify({ taskCount: tasks.length, requiredQuantity: validation.batch.totalRequiredQuantity }) }
+        { userId: input.actorUserId, accountId: input.accountId, action: "CONSIGNMENT_ACTIVATED", entityType: "ConsignmentBatch", entityId: input.batchId, metadata: JSON.stringify({ taskCount: tasks.length, requiredQuantity: validation.batch.totalRequiredQuantity, warningCount: validation.warnings.length }) }
       ] });
       return { activated: true, alreadyActive: false, taskCount: tasks.length };
     }, { timeout: 30000 });

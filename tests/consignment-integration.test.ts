@@ -44,6 +44,18 @@ try {
  await db.consignmentBatch.create({data:{id:"batch-mark",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-MARK",displayName:"Fake Mark",status:"READY_TO_ACTIVATE",sourceFileName:"fake.csv",sourceFileSha256:"sha-mark"}});
  await db.consignmentLine.create({data:{id:"line-mark",consignmentBatchId:"batch-mark",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",fsnSource:"FSN-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU",processRoute:"PICK_MARK_PACK",processRuleId:markRule.id,markingAssetId:"asset-no-file"}});
  const markValidation=await validateConsignmentActivation("batch-mark","acct-a",db);assert.ok(!markValidation.problems.some((problem)=>problem.code==="MISSING_MARKING_FILE"),"A worker marking file is not required in Phase 6");
- assert.ok(markValidation.problems.some((problem)=>problem.code==="MARKING_IMAGE_MISSING"),"Missing product image still requires explicit owner review");
+ assert.ok(markValidation.warnings.some((warning)=>warning.code==="MISSING_IMAGE"),"Missing product image is a visible nonblocking warning");
+ await db.consignmentBatch.create({data:{id:"batch-saved-default",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-SAVED",displayName:"Fake Saved Default",status:"READY_TO_ACTIVATE",sourceFileName:"fake-saved.csv",sourceFileSha256:"sha-saved",totalRequiredQuantity:1}});
+ await db.consignmentLine.create({data:{id:"line-saved-default",consignmentBatchId:"batch-saved-default",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
+ const savedValidation=await validateConsignmentActivation("batch-saved-default","acct-a",db);assert.equal(savedValidation.problems.length,0);assert.ok(!savedValidation.warnings.some((warning)=>warning.code==="NO_SAVED_DEFAULT"),"Active saved listing rule is authoritative");
+ await activateConsignmentBatch({batchId:"batch-saved-default",accountId:"acct-a",actorUserId:"owner-fake"},db);
+ const savedTasks=await db.workTask.findMany({where:{consignmentLineId:"line-saved-default"},orderBy:{sequenceNumber:"asc"}});assert.deepEqual(savedTasks.map((task)=>task.stage),["PICK","MARK","PACK"]);
+ await db.consignmentBatch.create({data:{id:"batch-default",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-DEFAULT",displayName:"Fake Default",status:"READY_TO_ACTIVATE",sourceFileName:"fake-default.csv",sourceFileSha256:"sha-default",totalRequiredQuantity:2}});
+ await db.consignmentLine.create({data:{id:"line-default",consignmentBatchId:"batch-default",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:2,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
+ await db.productProcessRule.update({where:{id:markRule.id},data:{active:false}});
+ const defaultValidation=await validateConsignmentActivation("batch-default","acct-a",db);assert.equal(defaultValidation.problems.length,0,"Missing process rule is not blocking");assert.ok(defaultValidation.warnings.some((warning)=>warning.code==="NO_SAVED_DEFAULT"));
+ await activateConsignmentBatch({batchId:"batch-default",accountId:"acct-a",actorUserId:"owner-fake"},db);
+ const defaultLine=await db.consignmentLine.findUniqueOrThrow({where:{id:"line-default"}});assert.equal(defaultLine.processRuleId,null);assert.equal(defaultLine.processRoute,"PICK_PACK");
+ const defaultTasks=await db.workTask.findMany({where:{consignmentLineId:"line-default"},orderBy:{sequenceNumber:"asc"}});assert.deepEqual(defaultTasks.map((task)=>task.stage),["PICK","PACK"]);
 } finally { await db.$disconnect(); rmSync(file,{force:true}); }
 console.log("Consignment temporary-database integration tests passed.");

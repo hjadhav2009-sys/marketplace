@@ -4,7 +4,7 @@ import type { ProcessRoute } from "@prisma/client";
 import { SubmitButton } from "@/components/SubmitButton";
 import { disableProcessRuleAction, setProcessRuleAction } from "./actions";
 
-const OPTIONS: Array<[ProcessRoute,string]> = [["PICK_PACK","Ready-made: Pick > Pack"],["PICK_MARK_PACK","Marking: Pick > Mark > Pack"],["PICK_ASSEMBLE_PACK","Assembly: Pick > Assemble > Pack"],["PICK_MARK_ASSEMBLE_PACK","Marking + Assembly"]];
+const OPTIONS: Array<[ProcessRoute,string]> = [["PICK_PACK","Default processing: Direct to Pack"],["PICK_MARK_PACK","Default processing: Marking"],["PICK_ASSEMBLE_PACK","Default processing: Assembly"],["PICK_MARK_ASSEMBLE_PACK","Default processing: Marking + Assembly"]];
 
 export function ProcessRuleEditor({ listingId, rule, assets }: { listingId: string; rule?: { id:string; route:ProcessRoute; markingAssetId:string|null; assemblyTitle:string|null; assemblyInstructions:string|null; assemblyImageUrl:string|null }; assets:Array<{id:string;label:string;hasFile:boolean}> }) {
  const [route,setRoute]=useState<ProcessRoute>(rule?.route??"PICK_PACK"); const marking=route==="PICK_MARK_PACK"||route==="PICK_MARK_ASSEMBLE_PACK"; const assembly=route==="PICK_ASSEMBLE_PACK"||route==="PICK_MARK_ASSEMBLE_PACK";

@@ -23,7 +23,7 @@ const marketplaceSections: Array<{
   description: string;
 }> = [
   { value: "FLIPKART", label: "Flipkart", description: "Active marketplace for current pick-and-pack imports." },
-  { value: "AMAZON", label: "Amazon", description: "Coming soon for marketplace imports." },
+  { value: "AMAZON", label: "Amazon", description: "Catalog and consignment imports are available." },
   { value: "MEESHO", label: "Meesho legacy", description: "Legacy PDF account grouping for old Meesho workflows." },
   { value: "OTHER", label: "Other", description: "Reserve for future channels and special operational accounts." }
 ];

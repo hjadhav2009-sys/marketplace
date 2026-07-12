@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireWorkPermission } from "@/lib/work-permissions";
 import { ProcessRuleEditor } from "./ProcessRuleEditor";
 
-const LABELS: Record<ProcessRoute,string>={PICK_PACK:"Ready-made",PICK_MARK_PACK:"Marking required",PICK_ASSEMBLE_PACK:"Assembly required",PICK_MARK_ASSEMBLE_PACK:"Marking + assembly"};
+const LABELS: Record<ProcessRoute,string>={PICK_PACK:"Direct to Pack",PICK_MARK_PACK:"Marking",PICK_ASSEMBLE_PACK:"Assembly",PICK_MARK_ASSEMBLE_PACK:"Marking + Assembly"};
 
 export default async function ProcessRulesPage({ searchParams }: { searchParams?: Promise<Record<string,string|undefined>> }) {
  const user=await requireWorkPermission("canManageProcessRules"); const account=await requireAccount(user); const params=await searchParams; const page=Math.max(1,Number(params?.page)||1); const take=50; const q=params?.q?.trim(); const filter=params?.filter;

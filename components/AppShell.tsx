@@ -24,9 +24,9 @@ const ownerLinks = [
   { href: "/packing", label: "Pack" },
   { href: "/problems", label: "Problems" },
   { href: "/reports", label: "Reports" },
-  { href: "/owner/sku-mappings", label: "Listings" },
+  { href: "/owner/product-inventory", label: "Product Inventory" },
   { href: "/owner/marking-library", label: "Marking Library" },
-  { href: "/owner/process-rules", label: "Process Rules" },
+  { href: "/owner/process-rules", label: "Default Processing" },
   { href: "/owner/consignments", label: "Consignments" },
   { href: "/owner/accounts", label: "Accounts" },
   { href: "/owner/users", label: "Users" },
@@ -69,7 +69,7 @@ function linksForUser(user: NavigationUser) {
   if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Work Problems" });
   if (hasWorkPermission(user, "canViewConsignments") || hasWorkPermission(user, "canImportConsignments") || hasWorkPermission(user, "canManageConsignments")) links.push({ href: "/owner/consignments", label: "Consignments" });
   if (hasWorkPermission(user, "canManageMarkingLibrary")) links.push({ href: "/owner/marking-library", label: "Marking Library" });
-  if (hasWorkPermission(user, "canManageProcessRules")) links.push({ href: "/owner/process-rules", label: "Process Rules" });
+  if (hasWorkPermission(user, "canManageProcessRules")) links.push({ href: "/owner/process-rules", label: "Default Processing" });
   links.push({ href: "/change-password", label: "Password" });
   return links;
 }

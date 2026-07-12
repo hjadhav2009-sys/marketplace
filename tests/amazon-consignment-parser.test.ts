@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import yazl from "yazl";
 import { inspectAmazonConsignmentZip, validateAmazonArchiveEntryName } from "../src/lib/consignments/amazon/archive";
 import { buildConsignmentCatalogSnapshot, parseConsignmentCatalogSnapshot } from "../src/lib/consignments/amazon/catalog-snapshot";
-import { AMAZON_WORKBOOK_MAX_BYTES, classifyAmazonHeaders, parseAmazonBuffer, parseAmazonDelimitedRecords } from "../src/lib/consignments/amazon/parser";
+import { AMAZON_WORKBOOK_MAX_BYTES, classifyAmazonHeaders, parseAmazonBuffer, parseAmazonDelimitedRecords, resolveAmazonHeaderLayout } from "../src/lib/consignments/amazon/parser";
 
 const shipmentHeaders="Shipment ID,Shipment Name,Seller SKU,FNSKU,ASIN,Quantity,Destination";
 const shipment=`${shipmentHeaders}\nSHIP-FAKE,Fake Shipment,SKU-FAKE,FNSKU-FAKE,B000FAKE01,3,FC-FAKE\n`;
@@ -15,10 +15,14 @@ assert.equal(classifyAmazonHeaders(["Seller SKU","ASIN","Item Name","Category","
 assert.equal(classifyAmazonHeaders(["SKU"]).fileType,"UNKNOWN_SUPPORTING","One generic SKU header is never a shipment signature");
 assert.equal((await parseAmazonBuffer(Buffer.from("SKU\nSKU-FAKE\n"),"shipment.csv")).fileType,"UNKNOWN_SUPPORTING","Filename cannot override contradictory headers");
 assert.deepEqual(parseAmazonDelimitedRecords('A,B\n"quoted, value",2\n'),[["A","B"],["quoted, value","2"]]);
+const metadataLayout=resolveAmazonHeaderLayout([["TemplateType=amazon","attributeRow=3","labelRow=2","dataRow=4"],["Seller SKU","Item Name","Product Type","Brand"],["item_sku","item_name","feed_product_type","brand_name"],["SKU-FAKE","Fake Product","jewelry","Fake Brand"]]);assert.deepEqual({headerRow:metadataLayout.headerRow,labelRow:metadataLayout.labelRow,dataRow:metadataLayout.dataRow},{headerRow:3,labelRow:2,dataRow:4});assert.equal(metadataLayout.classification.fileType,"AMAZON_CATEGORY_CATALOG");
+const scannedLayout=resolveAmazonHeaderLayout([["Amazon template settings"],["Human labels"],["item_sku","item_name","feed_product_type","brand_name"]]);assert.equal(scannedLayout.headerRow,3,"Fallback scanning finds machine headers below row one");
 
 async function workbook(extension:"xlsx"|"xlsm") { const book=new ExcelJS.Workbook();const sheet=book.addWorksheet("Shipment");sheet.addRow(shipmentHeaders.split(","));sheet.addRow(["SHIP-FAKE","Fake Shipment","SKU-FAKE","FNSKU-FAKE","B000FAKE01",{formula:"1+2",result:3},"FC-FAKE"]);return parseAmazonBuffer(Buffer.from(await book.xlsx.writeBuffer()),`fake.${extension}`); }
 assert.equal((await workbook("xlsx")).tables[0].rows[0].requiredQuantity,3);
 assert.equal((await workbook("xlsm")).tables[0].rows[0].requiredQuantity,3,"XLSM reads cached cell data without executing formulas or macros");
+async function catalogTemplate(style:"2022"|"2026") { const book=new ExcelJS.Workbook();const instructions=book.addWorksheet("Instructions");instructions.addRow(["item_sku","item_name","feed_product_type","brand_name"]);instructions.addRow(["DO-NOT-PARSE","Instruction text","help","Amazon"]);const sheet=book.addWorksheet(style==="2026"?"Template":"Product Upload");if(style==="2026")sheet.addRow(["Template metadata","attributeRow=3","labelRow=2","dataRow=4"]);else sheet.addRow(["General template notes"]);sheet.addRow(["Seller SKU","Item Name","Product Type","Brand","Main Image"]);sheet.addRow(["item_sku","item_name","feed_product_type","brand_name","main_image_url"]);sheet.addRow([`SKU-${style}`,`Fake ${style} product`,"fashion-jewelry","Fake Brand",`https://example.invalid/${style}.png`]);return parseAmazonBuffer(Buffer.from(await book.xlsx.writeBuffer()),`generalized-${style}.${style==="2026"?"xlsm":"xlsx"}`); }
+for(const style of ["2022","2026"] as const){const parsed=await catalogTemplate(style);const template=parsed.tables.find((table)=>table.sheet!=="Instructions")!;assert.equal(template.profile,"CATEGORY_CATALOG");assert.equal(template.headerRow,3);assert.equal(template.dataRow,4);assert.equal(template.rows[0].sellerSku,`SKU-${style}`);assert.equal(template.rows[0].productTitle,`Fake ${style} product`);assert.ok(template.confidence>parsed.tables.find((table)=>table.sheet==="Instructions")!.confidence,"Template/Product sheet outranks Instructions");}
 await assert.rejects(()=>parseAmazonBuffer(Buffer.from("not a workbook"),"bad.xlsx"),/corrupt, encrypted, or unsupported/i);
 await assert.rejects(()=>parseAmazonBuffer(Buffer.alloc(AMAZON_WORKBOOK_MAX_BYTES+1),"large.xlsx"),/size limit/i);
 

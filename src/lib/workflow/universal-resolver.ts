@@ -254,8 +254,16 @@ export async function resolveUniversalWork(
     OR: [
       ...(listingIds.length ? [{ marketplaceListingId: { in: listingIds } }] : []),
       { sellerSkuSnapshot: { in: [code, upper] } },
+      { fnskuSnapshot: { in: [code, upper] } },
+      { asinSnapshot: { in: [code, upper] } },
+      { externalIdSnapshot: { in: [code, upper] } },
+      { barcodeSnapshot: { in: [code, upper] } },
       { fsnSnapshot: { in: [code, upper] } },
       { listingIdSnapshot: { in: [code, upper] } },
+      { fnskuSource: { in: [code, upper] } },
+      { asinSource: { in: [code, upper] } },
+      { externalIdSource: { in: [code, upper] } },
+      { barcodeSource: { in: [code, upper] } },
       { consignmentBatch: { externalConsignmentNumber: code } }
     ]
   };
@@ -272,7 +280,7 @@ export async function resolveUniversalWork(
     consignmentLine: {
       select: {
         id: true, rowNumber: true, marketplaceListingId: true, sellerSkuSnapshot: true, sellerSkuSource: true, fsnSnapshot: true, fsnSource: true,
-        listingIdSnapshot: true, asinSnapshot: true, asinSource: true, fnskuSnapshot: true, fnskuSource: true, externalIdSnapshot: true, productTitleSnapshot: true, productNameSource: true, productImageSnapshot: true,
+        listingIdSnapshot: true, asinSnapshot: true, asinSource: true, fnskuSnapshot: true, fnskuSource: true, externalIdSnapshot: true, externalIdSource: true, barcodeSnapshot: true, barcodeSource: true, productTitleSnapshot: true, productNameSource: true, productImageSnapshot: true,
         markingAsset: {
           select: {
             name: true, masterDesignId: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true,
@@ -398,7 +406,11 @@ export async function resolveUniversalWork(
     const matchingRows = identifierRows.filter((row) => row.marketplaceListingId === line.marketplaceListingId);
     let matchType = highestPriorityIdentifierType(matchingRows);
     if (task.id === code) matchType = "WORK_TASK_ID";
+    else if (!matchType && (line.fnskuSnapshot??line.fnskuSource) && [code, upper].includes((line.fnskuSnapshot??line.fnskuSource)!)) matchType = "FNSKU";
     else if (!matchType && line.sellerSkuSnapshot && [code, upper].includes(line.sellerSkuSnapshot)) matchType = "SELLER_SKU";
+    else if (!matchType && (line.asinSnapshot??line.asinSource) && [code, upper].includes((line.asinSnapshot??line.asinSource)!)) matchType = "ASIN";
+    else if (!matchType && (line.externalIdSnapshot??line.externalIdSource) && [code, upper].includes((line.externalIdSnapshot??line.externalIdSource)!)) matchType = "EXTERNAL_ID";
+    else if (!matchType && (line.barcodeSnapshot??line.barcodeSource) && [code, upper].includes((line.barcodeSnapshot??line.barcodeSource)!)) matchType = "BARCODE";
     else if (!matchType && line.fsnSnapshot && [code, upper].includes(line.fsnSnapshot)) matchType = "FSN";
     else if (!matchType && line.listingIdSnapshot && [code, upper].includes(line.listingIdSnapshot)) matchType = "LISTING_ID";
     else if (!matchType && line.consignmentBatch.externalConsignmentNumber === code) matchType = "CONSIGNMENT_NUMBER";
@@ -454,7 +466,7 @@ export async function resolveUniversalWork(
     client.workTask.count({
       where: {
         accountId: { in: accountIds }, sourceType: "CONSIGNMENT", status: "COMPLETED", stage: intent === "ANY" ? { in: ["PICK", "MARK", "PACK"] } : intent,
-        OR: [{ id: code }, { consignmentLine: { OR: [...(listingIds.length ? [{ marketplaceListingId: { in: listingIds } }] : []), { sellerSkuSnapshot: { in: [code, upper] } }, { fsnSnapshot: { in: [code, upper] } }, { listingIdSnapshot: { in: [code, upper] } }, { consignmentBatch: { externalConsignmentNumber: code } }] } }]
+        OR: [{ id: code }, { consignmentLine: { OR: [...(listingIds.length ? [{ marketplaceListingId: { in: listingIds } }] : []), { sellerSkuSnapshot: { in: [code, upper] } }, { fnskuSnapshot: { in: [code, upper] } }, { asinSnapshot: { in: [code, upper] } }, { externalIdSnapshot: { in: [code, upper] } }, { barcodeSnapshot: { in: [code, upper] } }, { fsnSnapshot: { in: [code, upper] } }, { listingIdSnapshot: { in: [code, upper] } }, { consignmentBatch: { externalConsignmentNumber: code } }] } }]
       }
     })
   ]);

@@ -758,6 +758,7 @@ model ConsignmentLine {
   @@index([accountId, asinSnapshot])
   @@index([accountId, fnskuSnapshot])
   @@index([accountId, externalIdSnapshot])
+  @@index([accountId, barcodeSnapshot])
   @@index([accountId, sellerSkuSnapshot])
   @@index([consignmentBatchId, asinSnapshot])
   @@index([consignmentBatchId, fnskuSnapshot])
@@ -773,6 +774,8 @@ model ConsignmentImportFile {
   fileSizeBytes       Int
   sha256              String
   entryName           String?
+  candidateTablesJson String?
+  selectedTableName   String?
   parsed              Boolean                   @default(false)
   isCurrentSource     Boolean                   @default(false)
   supersededAt        DateTime?

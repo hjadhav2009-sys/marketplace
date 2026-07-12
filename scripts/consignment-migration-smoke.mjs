@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const root=process.cwd(); const tempRoot=resolve(root,".codex-tmp"); const migrationsRoot=resolve(root,"prisma","migrations"); const latest="20260712000100_amazon_consignment_enrichment"; mkdirSync(tempRoot,{recursive:true});
+const root=process.cwd(); const tempRoot=resolve(root,".codex-tmp"); const migrationsRoot=resolve(root,"prisma","migrations"); const latest="20260712000200_amazon_source_candidates"; mkdirSync(tempRoot,{recursive:true});
 const allEntries=readdirSync(migrationsRoot,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>entry.name).sort();const entries=allEntries.slice(0,allEntries.indexOf(latest)+1);
 function apply(db,name){db.exec(readFileSync(join(migrationsRoot,name,"migration.sql"),"utf8"));}
 function open(name){const file=resolve(tempRoot,name);rmSync(file,{force:true});const db=new DatabaseSync(file);db.exec("PRAGMA foreign_keys=ON;");return{db,file};}
@@ -16,7 +16,7 @@ function seedBase(db){
  INSERT INTO "Order" ("id","accountId","uploadBatchId","awb","sku","quantity","orderNumber","createdAt","updatedAt") VALUES ('order_fake','acct_fake','upload_fake','FAKE-AWB','SKU-FAKE',1,'FAKE-ORDER',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
  `);
 }
-const fresh=open("consignment-fresh-smoke.db"); for(const name of entries)apply(fresh.db,name); for(const table of ["ConsignmentBatch","ConsignmentLine","ConsignmentImportFile","ConsignmentImportIssue"])assert.ok(fresh.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table),`Fresh migration creates ${table}`);const freshColumns=new Set(fresh.db.prepare("PRAGMA table_info('ConsignmentLine')").all().map((row)=>row.name));for(const column of ["asinSource","fnskuSource","externalIdSource","barcodeSource","asinSnapshot","fnskuSnapshot","externalIdSnapshot","barcodeSnapshot","catalogSnapshotJson"])assert.ok(freshColumns.has(column),`Fresh migration creates ${column}`);fresh.db.close();
+const fresh=open("consignment-fresh-smoke.db"); for(const name of entries)apply(fresh.db,name); for(const table of ["ConsignmentBatch","ConsignmentLine","ConsignmentImportFile","ConsignmentImportIssue"])assert.ok(fresh.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table),`Fresh migration creates ${table}`);const freshColumns=new Set(fresh.db.prepare("PRAGMA table_info('ConsignmentLine')").all().map((row)=>row.name));for(const column of ["asinSource","fnskuSource","externalIdSource","barcodeSource","asinSnapshot","fnskuSnapshot","externalIdSnapshot","barcodeSnapshot","catalogSnapshotJson"])assert.ok(freshColumns.has(column),`Fresh migration creates ${column}`);const fileColumns=new Set(fresh.db.prepare("PRAGMA table_info('ConsignmentImportFile')").all().map((row)=>row.name));for(const column of ["candidateTablesJson","selectedTableName"])assert.ok(fileColumns.has(column),`Fresh migration creates ${column}`);assert.ok(fresh.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='ConsignmentLine_accountId_barcodeSnapshot_idx'").get(),"Snapshot barcode index exists");fresh.db.close();
 
 const existing=open("consignment-existing-smoke.db"); for(const name of entries.filter((name)=>name!==latest))apply(existing.db,name); seedBase(existing.db); apply(existing.db,latest);
 existing.db.exec(`

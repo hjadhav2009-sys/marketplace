@@ -20,7 +20,7 @@
     "marking:migration-smoke": "node scripts/marking-migration-smoke.mjs",
     "consignment:migration-smoke": "node scripts/consignment-migration-smoke.mjs",
     "consignment:test": "tsx tests/consignment-parser.test.ts && tsx tests/consignment-foundation.test.ts && tsx tests/consignment-integration.test.ts",
-    "amazon-consignment:test": "tsx tests/amazon-consignment-parser.test.ts && tsx tests/amazon-consignment-matching.test.ts && tsx tests/amazon-consignment-integration.test.ts && tsx tests/amazon-consignment-source.test.ts",
+    "amazon-consignment:test": "tsx tests/amazon-consignment-parser.test.ts && tsx tests/amazon-consignment-matching.test.ts && tsx tests/amazon-consignment-integration.test.ts && tsx tests/amazon-snapshot-scan.test.ts && tsx tests/amazon-consignment-source.test.ts",
     "workflow:migration-smoke": "node scripts/workflow-migration-smoke.mjs",
     "workflow:test": "tsx tests/workflow-worker.test.ts && tsx tests/workflow-stream.test.ts && tsx tests/workflow-hardening.test.ts",
     "workflow:benchmark": "tsx scripts/workflow-activation-benchmark.ts",

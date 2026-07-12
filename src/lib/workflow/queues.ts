@@ -13,6 +13,7 @@ export const WORK_TASK_INCLUDE = {
   actionLogs: { where: { action: "TASK_PROBLEM_REPORTED" as const }, orderBy: { createdAt: "desc" as const }, take: 1, select: { note: true } },
   consignmentLine: { include: {
     consignmentBatch: { select: { id: true, displayName: true, externalConsignmentNumber: true, marketplace: true, status: true } },
+    marketplaceListing: { select: { mainImageUrl: true } },
     markingAsset: true,
     workTasks: { select: { id: true, stage: true, status: true, sequenceNumber: true }, orderBy: { sequenceNumber: "asc" as const } }
   } }
@@ -30,7 +31,7 @@ export async function getWorkerTaskQueue(input: { actorUserId: string; accountId
   const where:Prisma.WorkTaskWhereInput={...base,AND:search?[{OR:[
     ...(exactIds.length?[{consignmentLine:{marketplaceListingId:{in:exactIds}}}]:[]),
     {consignmentLine:{consignmentBatch:{externalConsignmentNumber:{equals:search}}}},
-    ...(!exactIds.length?[{consignmentLine:{OR:[{sellerSkuSnapshot:{contains:search}},{fsnSnapshot:{contains:search}},{listingIdSnapshot:{contains:search}},{productTitleSnapshot:{contains:search}}]}}]:[])
+    {consignmentLine:{OR:[{sellerSkuSnapshot:{contains:search}},{fnskuSnapshot:{contains:search}},{asinSnapshot:{contains:search}},{externalIdSnapshot:{contains:search}},{barcodeSnapshot:{contains:search}},{fsnSnapshot:{contains:search}},{listingIdSnapshot:{contains:search}},{productTitleSnapshot:{contains:search}}]}}
   ]}]:undefined};
   const [tasks,total]=await Promise.all([client.workTask.findMany({where,include:WORK_TASK_INCLUDE,orderBy:[{status:"asc"},{updatedAt:"asc"},{id:"asc"}],skip:(page-1)*WORK_QUEUE_PAGE_SIZE,take:WORK_QUEUE_PAGE_SIZE}),client.workTask.count({where})]);
   return {tasks,total,page,pageSize:WORK_QUEUE_PAGE_SIZE,user};

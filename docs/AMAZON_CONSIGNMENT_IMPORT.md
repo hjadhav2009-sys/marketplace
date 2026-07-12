@@ -4,4 +4,6 @@ Select an active Amazon seller account, open **Owner > Consignments > New**, ent
 
 The importer classifies content from headers, stores files in ignored managed storage, synchronizes the selected account's listing master, and creates a draft preview. It never creates worker tasks during upload. If no shipment report or more than one shipment candidate is found, activation remains blocked for owner review.
 
+When multiple shipment files or worksheets are detected, the owner chooses one exact stored file and table. Reparsing reuses every stored All Listings/catalog report, clears the previous current-source marker, and rebuilds draft lines without duplicating file records. Only the selected table creates work quantities.
+
 Accepted formats: CSV, TSV, TXT, XLSX, XLSM, and ZIP. Legacy XLS, encrypted workbooks, executable entries, nested archives, unsafe paths, and files beyond configured limits are rejected. Never commit real reports, extracted catalogs, or managed import storage.

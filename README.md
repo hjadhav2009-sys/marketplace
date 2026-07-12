@@ -241,3 +241,16 @@ Assembly is intentionally simple workflow tracking. It does not add BOM, parts s
 Amazon seller accounts can import bounded CSV, TSV/TXT, XLSX, XLSM, or ZIP shipment/listing/catalog reports through the existing owner consignment pages. The app classifies content from headers, enriches the account-scoped listing master, matches FNSKU then Seller SKU, ASIN, External ID, and barcodes, and requires explicit owner activation before creating shared Pick/Mark/Pack tasks. See [Amazon Import](docs/AMAZON_CONSIGNMENT_IMPORT.md), [Matching](docs/AMAZON_LISTING_MATCHING.md), [Catalog Enrichment](docs/AMAZON_CATALOG_ENRICHMENT.md), and [Activation](docs/AMAZON_CONSIGNMENT_ACTIVATION.md).
 
 Worker marking cards now focus on product/design identity, instructions, settings, and quantity progress. Worker file download/open automation is postponed; the private owner marking library remains preserved. Never commit real Amazon reports, extracted catalog archives, private images, databases, or managed storage.
+
+## Phase 7 Performance And QA
+
+Phase 7 adds safe local scale presets, complete universal-resolver timing, SQLite query-plan checks, controlled duplicate concurrency tests, a permission matrix, and Amazon stored-reparse aggregate limits. Generated databases live only in ignored `.codex-tmp/`.
+
+```powershell
+npm.cmd run performance:test
+npm.cmd run concurrency:test
+npm.cmd run permission:test
+npm.cmd run security:test
+```
+
+See [Performance plan](docs/PHASE_7_PERFORMANCE_AND_QA_PLAN.md), [benchmarks](docs/PERFORMANCE_BENCHMARKS.md), [query plans](docs/QUERY_PLAN_REVIEW.md), [security QA](docs/SECURITY_QA.md), and [production readiness](docs/PRODUCTION_READINESS.md). Browser and warehouse checklists remain required before real rollout. Phase 8 is native Expo without WebView; a signed APK remains the final deployment step.

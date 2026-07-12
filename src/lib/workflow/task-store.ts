@@ -93,7 +93,7 @@ export async function activateConsignmentBatch(input: { batchId: string; account
   }
 }
 
-async function taskForMutation(tx: Transaction, input: { taskId: string; accountId: string; actorUserId: string }) {
+async function taskForMutation(tx: Transaction | Client, input: { taskId: string; accountId: string; actorUserId: string }) {
   const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
   const task = await tx.workTask.findFirst({ where: { id: input.taskId, accountId: input.accountId, sourceType: "CONSIGNMENT" }, include: { consignmentLine: { select: { id: true, accountId: true, consignmentBatchId: true } } } });
   if (!task?.consignmentLine || task.consignmentLine.accountId !== input.accountId) throw new Error("Task is not available in the selected account.");
@@ -107,7 +107,7 @@ const REPLAY_ACTIONS: Record<WorkRequestKind, WorkActionType[]> = {
 
 function requestFingerprint(payload:Record<string,unknown>){return createHash("sha256").update(JSON.stringify(payload)).digest("hex");}
 
-async function duplicateResult(tx: Transaction, input: { taskId: string; actorUserId: string; requestKind: WorkRequestKind; clientRequestId?: string; fingerprint?:string }) {
+async function duplicateResult(tx: Transaction | Client, input: { taskId: string; actorUserId: string; requestKind: WorkRequestKind; clientRequestId?: string; fingerprint?:string }) {
   if (!input.clientRequestId) return null;
   const log = await tx.workActionLog.findFirst({ where: { taskId: input.taskId, clientRequestId: input.clientRequestId }, orderBy: { createdAt: "asc" } });
   if (!log) return null;
@@ -128,17 +128,32 @@ async function recoverIdempotentReplay<T>(input: {
   mutate: () => Promise<T>;
   replay: () => Promise<T | null>;
 }) {
-  try {
-    return await input.mutate();
-  } catch (error) {
-    if (!input.clientRequestId) throw error;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const replay = await input.replay();
-      if (replay) return replay;
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 10));
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      return await input.mutate();
+    } catch (error) {
+      lastError = error;
+      if (!input.clientRequestId) throw error;
+      try {
+        const replay = await input.replay();
+        if (replay) return replay;
+      } catch (replayError) {
+        if (!isTransientWorkflowConflict(replayError)) throw replayError;
+        lastError = replayError;
+      }
+      if (!isTransientWorkflowConflict(error)) throw error;
+      if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
     }
-    throw error;
   }
+  if (isTransientWorkflowConflict(lastError)) throw new Error("Work is busy; retry the action.");
+  throw lastError;
+}
+
+function isTransientWorkflowConflict(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && ["P1008", "P2002", "P2028", "P2034"].includes(error.code)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /database is locked|socket timeout|transaction.*(?:closed|conflict|timeout)|write conflict/i.test(message);
 }
 
 export async function claimWorkTask(input: { taskId: string; accountId: string; actorUserId: string; clientRequestId?: string }, client: Client = prisma) {
@@ -208,21 +223,12 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     }
     return { completedQuantity: targetQuantity, completed: nextStatus === "COMPLETED", idempotent: false };
   });
-  try { return await mutate(); }
-  catch (error) {
-    if (!input.clientRequestId) throw error;
-    for (let attempt=0;attempt<3;attempt++) {
-      const replay = await client.$transaction(async (tx) => {
-        const { user, task } = await taskForMutation(tx, input);
+  return recoverIdempotentReplay({clientRequestId:input.clientRequestId,mutate,replay:async() => {
+        const { user, task } = await taskForMutation(client, input);
         if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
         const targetQuantity=requestKind==="COMPLETE"?task.requiredQuantity:input.targetQuantity;if(targetQuantity===undefined)throw new Error("Target quantity is required.");
-        return duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId,fingerprint:requestFingerprint({expectedQuantity:input.expectedQuantity,targetQuantity,requestKind}) });
-      });
-      if (replay) return replay;
-      if (attempt<2) await new Promise((resolve)=>setTimeout(resolve,10));
-    }
-    throw error;
-  }
+        return duplicateResult(client, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId,fingerprint:requestFingerprint({expectedQuantity:input.expectedQuantity,targetQuantity,requestKind}) });
+      }});
 }
 
 export function incrementWorkTaskProgress(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; increment: number; clientRequestId?: string }, client: Client = prisma) {

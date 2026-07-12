@@ -7,6 +7,7 @@ import { requireAccount } from "@/lib/auth";
 import { requireConsignmentAccess } from "@/lib/consignment-auth";
 import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { amazonShipmentCandidates } from "@/src/lib/consignments/amazon/candidate-policy";
 import { cancelConsignmentAction, reparseConsignmentAction, replaceConsignmentSourceAction, selectConsignmentMainFileAction } from "../actions";
 import { TaskAssignmentPanel } from "./TaskAssignmentPanel";
 
@@ -14,7 +15,7 @@ export default async function ConsignmentDetailPage({ params, searchParams }: { 
   const user = await requireConsignmentAccess("view"); const account = await requireAccount(user); const { batchId } = await params; const query = await searchParams;
   const batch = await prisma.consignmentBatch.findFirst({ where: { id: batchId, accountId: account.id }, include: { files: { orderBy: { createdAt: "asc" } }, _count: { select: { lines: true, issues: true } } } }); if (!batch) notFound();
   const taskCount = await prisma.workTask.count({ where: { accountId: account.id, consignmentLine: { consignmentBatchId: batch.id } } });
-  const shipmentCandidates=batch.files.flatMap((file)=>{if(batch.marketplace!=="AMAZON")return file.fileType==="CONSIGNMENT_DETAILS"?[{file,tableName:"Text report",label:file.originalFileName}]:[];try{const parsed=JSON.parse(file.candidateTablesJson??"[]") as Array<{tableName?:unknown;profile?:unknown;label?:unknown}>;return parsed.filter((item)=>item.profile==="SHIPMENT"&&typeof item.tableName==="string").map((item)=>({file,tableName:String(item.tableName),label:typeof item.label==="string"?item.label:`${file.originalFileName} - ${item.tableName}`}));}catch{return[];}});
+  const shipmentCandidates=batch.files.flatMap((file)=>batch.marketplace!=="AMAZON"?file.fileType==="CONSIGNMENT_DETAILS"?[{file,tableName:"Text report",label:file.originalFileName}]:[]:amazonShipmentCandidates(file.candidateTablesJson).map((item)=>({file,tableName:item.tableName,label:item.label})));
   return <AppShell><PageHeader eyebrow="Consignment detail" title={batch.displayName} description={`${batch.externalConsignmentNumber} / ${account.accountDisplayName ?? account.name}`}><Link href={`/owner/consignments/${batch.id}/review`} className="rounded-md bg-berry px-4 py-2 text-sm font-bold text-white">Open review</Link></PageHeader>
     {query.activated ? <div className="mb-4 rounded-md bg-teal-50 p-3 font-bold text-teal-800">Consignment is active. {taskCount} tasks exist.</div> : null}{query.error ? <div className="mb-4 rounded-md bg-rose-50 p-3 font-bold text-rose-700">{query.error}</div> : null}
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">{[["Status",batch.status],["Lines",batch._count.lines],["Required",batch.totalRequiredQuantity],["Matched",batch.matchedLines],["Issues",batch._count.issues],["Tasks",taskCount]].map(([label,value]) => <div key={label} className="rounded-md border bg-white p-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 font-black">{String(value).replaceAll("_"," ")}</p></div>)}</section>

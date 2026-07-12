@@ -39,9 +39,12 @@ Implemented exact process-rule resolution, immutable Assembly task snapshots, au
 
 Implemented bounded Amazon CSV/TSV/XLSX/XLSM/ZIP classification, account-scoped listing/catalog enrichment, exact FNSKU/SKU/ASIN/external/barcode matching, owner preview and activation, immutable catalog snapshots, shared Pick/Mark/Pack tasks, Amazon scanner identifiers, and rich marking details. Worker marking-file delivery is postponed while the owner library remains preserved.
 
+## Phase 7: Performance And Complete Backend QA
+
+Added bounded Amazon stored-reparse policy, real-resolver scale presets and benchmarks, query-plan checks, controlled concurrency and replay hardening, a documented permission matrix, security source checks, and browser/warehouse release gates. Full-size generation is local and ignored; measured results are documented honestly per machine.
+
 ## Next Phases
 
-- Phase 7: performance and complete website/backend QA.
 - Phase 8: fully native React Native/Expo app, without WebView.
 - Final: Android release APK after Expo testing.
 - Future optional: reviewed EngravingBrain protocol and authenticated Worker Agent.

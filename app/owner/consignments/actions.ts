@@ -12,6 +12,8 @@ import { getRequestMeta } from "@/lib/request-context";
 import { requireWorkPermission } from "@/lib/work-permissions";
 import { importFlipkartConsignmentDraft } from "@/src/lib/consignments/import-service";
 import { importAmazonConsignmentDraft } from "@/src/lib/consignments/amazon/import-service";
+import { requireAmazonShipmentCandidate } from "@/src/lib/consignments/amazon/candidate-policy";
+import { validateStoredAmazonReparseManifest } from "@/src/lib/consignments/amazon/limits";
 import { resolveExistingConsignmentPath } from "@/src/lib/consignments/storage";
 import { setActiveProcessRule } from "@/src/lib/marking/process-rules";
 import { activateConsignmentBatch, validateConsignmentActivation } from "@/src/lib/workflow/task-store";
@@ -73,7 +75,7 @@ async function reparseFromManagedFile(input: { batchId: string; fileName: string
 
 async function reparseAmazonStoredBatch(input:{batchId:string;accountId:string;user:Awaited<ReturnType<typeof requireWorkPermission>>;selectedCandidate?:{fileId:string;tableName:string}}){
   const batch=await prisma.consignmentBatch.findFirst({where:{id:input.batchId,accountId:input.accountId,marketplace:"AMAZON",status:{in:["DRAFT","PARSING","REVIEW_REQUIRED","READY_TO_ACTIVATE","FAILED"]}}});if(!batch)throw new Error("Amazon draft is unavailable for reparse.");
-  const stored=await prisma.consignmentImportFile.findMany({where:{consignmentBatchId:batch.id,managedRelativePath:{not:null},supersededAt:null},orderBy:[{createdAt:"asc"},{id:"asc"}]});const files:File[]=[];const storedFileIds:string[]=[];
+  const stored=await prisma.consignmentImportFile.findMany({where:{consignmentBatchId:batch.id,managedRelativePath:{not:null},supersededAt:null},orderBy:[{createdAt:"asc"},{id:"asc"}]});validateStoredAmazonReparseManifest(stored);const files:File[]=[];const storedFileIds:string[]=[];
   for(const item of stored){if(!item.managedRelativePath)continue;const data=await readFile(await resolveExistingConsignmentPath(item.managedRelativePath));files.push(new File([data],item.originalFileName));storedFileIds.push(item.id);}
   if(!files.length)throw new Error("Stored Amazon source files are unavailable.");
   return importAmazonConsignmentDraft({accountId:input.accountId,user:input.user,externalConsignmentNumber:batch.externalConsignmentNumber,displayName:batch.displayName,destinationText:batch.destinationText??undefined,existingBatchId:batch.id,files,storedFileIds,selectedCandidate:input.selectedCandidate,request:await getRequestMeta()});
@@ -83,7 +85,7 @@ export async function selectConsignmentMainFileAction(formData: FormData) {
   const user = await requireWorkPermission("canManageConsignments"); const account = await requireAccount(user); const batchId = value(formData, "batchId", 80); const fileId = value(formData, "fileId", 80);const tableName=value(formData,"tableName",100);
   const file = await prisma.consignmentImportFile.findFirst({ where: { id: fileId, consignmentBatchId: batchId, consignmentBatch: { accountId: account.id }, fileType: { in: ["CONSIGNMENT_DETAILS", "AMAZON_SHIPMENT"] }, managedRelativePath: { not: null } } });
   if (!file?.managedRelativePath) redirect(`/owner/consignments/${batchId}?error=file`);
-  try { if(account.marketplace==="AMAZON"){if(!tableName)throw new Error("Choose an Amazon shipment worksheet.");await reparseAmazonStoredBatch({batchId,accountId:account.id,user,selectedCandidate:{fileId,tableName}});}else await reparseFromManagedFile({ batchId, fileName: file.originalFileName, managedRelativePath: file.managedRelativePath, user, accountId: account.id }); redirect(`/owner/consignments/${batchId}/review`); }
+  try { if(account.marketplace==="AMAZON"){if(!tableName)throw new Error("Choose an Amazon shipment worksheet.");requireAmazonShipmentCandidate(file.candidateTablesJson,tableName);await reparseAmazonStoredBatch({batchId,accountId:account.id,user,selectedCandidate:{fileId,tableName}});}else await reparseFromManagedFile({ batchId, fileName: file.originalFileName, managedRelativePath: file.managedRelativePath, user, accountId: account.id }); redirect(`/owner/consignments/${batchId}/review`); }
   catch (error) { redirect(`/owner/consignments/${batchId}?error=${encodeURIComponent(error instanceof Error ? error.message : "Reparse failed.")}`); }
 }
 

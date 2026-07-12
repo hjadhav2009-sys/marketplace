@@ -1,0 +1,9 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const read=(path:string)=>readFileSync(path,"utf8");const archive=read("src/lib/consignments/amazon/archive.ts");const parser=read("src/lib/consignments/amazon/parser.ts");const candidate=read("src/lib/consignments/amazon/candidate-policy.ts");const limits=read("src/lib/consignments/amazon/limits.ts");const actions=read("app/owner/consignments/actions.ts");const taskStore=read("src/lib/workflow/task-store.ts");const readiness=read("scripts/check-production-readiness.mjs");const schemas=[read("prisma/schema.prisma"),read("prisma/schema.postgres.prisma")];
+assert.match(archive,/unsafe entry path/);assert.match(archive,/encrypted/i);assert.match(archive,/symlink/i);assert.match(archive,/nested archive/i);assert.match(archive,/MAX_UNCOMPRESSED_BYTES/);
+assert.match(parser,/cell\.formula!==undefined[^]*cellText\(cell\.result\)/,"Workbook formulas use cached values only");assert.match(parser,/MAX_TOTAL_CELLS/);assert.match(candidate,/sheetUsage === "REFERENCE"/);assert.match(candidate,/Selected Amazon worksheet is not an operational shipment source/);assert.match(limits,/MAX_AGGREGATE_BYTES/);assert.match(limits,/MAX_ARCHIVE_FILES/);assert.match(actions,/consignmentBatchId:batch\.id/);assert.match(actions,/requireAmazonShipmentCandidate/);assert.match(taskStore,/Work is busy; retry the action/);assert.doesNotMatch(taskStore,/throw new Prisma/);
+assert.match(readiness,/process\.platform === "win32" \? "cmd\.exe"/,"Windows preflight executes npm command shims through cmd.exe");
+for(const schema of schemas){assert.match(schema,/@@index\(\[accountId, identifierType, normalizedValue\]\)/);assert.match(schema,/@@index\(\[identifierType, normalizedValue, accountId\]\)/);assert.match(schema,/@@index\(\[accountId, sourceType, stage, status\]\)/);}
+console.log("Phase 7 security hardening source checks passed.");

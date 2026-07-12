@@ -12,7 +12,7 @@ export const AMAZON_WORKBOOK_MAX_COLUMNS=250;
 export const AMAZON_WORKBOOK_MAX_CELL_LENGTH=20_000;
 export const AMAZON_WORKBOOK_MAX_TOTAL_CELLS=2_000_000;
 const HEADER_SCAN_ROWS=30;
-const REFERENCE_SHEETS=/^(instructions?|data definitions?|valid values?|images?|examples?|dropdowns?|read\s*me|help|guide)$/i;
+const REFERENCE_SHEETS=/^(?:instructions?|data definitions?|valid values?|images?|examples?|dropdowns?(?: lists?)?|attributeptdmap|conditions?(?: lists?)?|feed processing summary|browse data|processing summary|changes to the template|read\s*me|help|guide)$/i;
 const PREFERRED_SHEETS=/template|upload|product|inventory|listings?|data|feed/i;
 
 export function classifyAmazonSheetUsage(sheetName:string):{sheetUsage:AmazonSheetUsage;sheetPriority:number}{const normalized=sheetName.normalize("NFKC").trim();if(REFERENCE_SHEETS.test(normalized))return{sheetUsage:"REFERENCE",sheetPriority:-100};if(PREFERRED_SHEETS.test(normalized))return{sheetUsage:"OPERATIONAL",sheetPriority:100};return{sheetUsage:"UNKNOWN",sheetPriority:0};}
@@ -82,4 +82,4 @@ async function workbookTables(buffer:Buffer){if(buffer.length>AMAZON_WORKBOOK_MA
 
 export async function parseAmazonBuffer(buffer:Buffer,fileName:string):Promise<AmazonParsedFile>{const extension=path.extname(fileName).toLowerCase();let tables:AmazonParsedTable[];if(extension===".xlsx"||extension===".xlsm")tables=await workbookTables(buffer);else if([".csv",".tsv",".txt"].includes(extension)){if(buffer.length>AMAZON_WORKBOOK_MAX_BYTES)throw new Error("Amazon text report exceeds the configured size limit.");tables=[tableFromRows("Text report",parseAmazonDelimitedRecords(buffer.toString("utf8"),extension===".tsv"?"\t":undefined))];}else throw new Error("Unsupported Amazon file type. Use CSV, TSV, TXT, XLSX, XLSM, or ZIP.");const usable=tables.filter((table)=>table.sheetUsage!=="REFERENCE");const ranked=[...usable].sort((left,right)=>right.confidence-left.confidence||right.sheetPriority-left.sheetPriority||left.sheet.localeCompare(right.sheet));return{fileName,fileType:ranked[0]?.fileType??"UNKNOWN_SUPPORTING",tables,shipmentCandidateCount:usable.filter((table)=>table.fileType==="AMAZON_SHIPMENT").length,totalRows:usable.reduce((sum,table)=>sum+table.rows.length,0)};}
 
-export function amazonSourceRows(parsed:AmazonParsedFile,profile?:AmazonSourceProfile){return parsed.tables.filter((table)=>!profile||table.profile===profile).flatMap((table)=>table.rows);}
+export function amazonSourceRows(parsed:AmazonParsedFile,profile?:AmazonSourceProfile,options?:{includeReference?:boolean}){return parsed.tables.filter((table)=>(options?.includeReference===true||table.sheetUsage!=="REFERENCE")&&(!profile||table.profile===profile)).flatMap((table)=>table.rows);}

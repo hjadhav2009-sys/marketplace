@@ -8,7 +8,9 @@ const autoApplyMigrations = process.env.AUTO_APPLY_MIGRATIONS === "true";
 const isStartup = process.argv.includes("--startup");
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const executable = process.platform === "win32" ? "cmd.exe" : command;
+  const executableArgs = process.platform === "win32" ? ["/d", "/s", "/c", command, ...args] : args;
+  const result = spawnSync(executable, executableArgs, {
     cwd: process.cwd(),
     env: process.env,
     encoding: "utf8",

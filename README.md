@@ -254,3 +254,16 @@ npm.cmd run security:test
 ```
 
 See [Performance plan](docs/PHASE_7_PERFORMANCE_AND_QA_PLAN.md), [benchmarks](docs/PERFORMANCE_BENCHMARKS.md), [query plans](docs/QUERY_PLAN_REVIEW.md), [security QA](docs/SECURITY_QA.md), and [production readiness](docs/PRODUCTION_READINESS.md). Browser and warehouse checklists remain required before real rollout. Phase 8 is native Expo without WebView; a signed APK remains the final deployment step.
+
+## Safe Real SQLite Migration
+
+Before reviewing current warehouse data on the latest schema, stop every app writer and run the guarded Phase 7.1 workflow:
+
+```powershell
+npm.cmd run real-db:inspect
+npm.cmd run real-db:backup
+npm.cmd run real-db:test-migrations
+npm.cmd run real-db:verify
+```
+
+Only after reviewing those results may the owner run `npm.cmd run real-db:migrate -- --confirm-real-migration` and type the exact database filename. Backups and QA copies are private and Git-ignored. After migration, `/owner/manual-review` provides owner-only links, safe counts, and empty-state guidance without mutating business data. See [backup and migration](docs/REAL_DATABASE_BACKUP_AND_MIGRATION.md) and [desktop review](docs/REAL_DATA_DESKTOP_REVIEW.md).

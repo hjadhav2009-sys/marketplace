@@ -12,6 +12,10 @@ function routeSupported(route: ProcessRoute | null): route is ProcessRoute {
   return route === "PICK_PACK" || route === "PICK_MARK_PACK" || route === "PICK_ASSEMBLE_PACK" || route === "PICK_MARK_ASSEMBLE_PACK";
 }
 
+export function isConsignmentRouteCurrentlyEnabled(route: ProcessRoute | null): route is "PICK_PACK" | "PICK_MARK_PACK" {
+  return route === "PICK_PACK" || route === "PICK_MARK_PACK";
+}
+
 export function createConsignmentTaskPlan(input: { lineId: string; accountId: string; route: ProcessRoute; requiredQuantity: number }) {
   if (!Number.isSafeInteger(input.requiredQuantity) || input.requiredQuantity <= 0) throw new Error("Required work quantity must be a positive whole number.");
   return buildTaskPlan(input.route, input.requiredQuantity).map((task) => ({ id: `wkt_${randomUUID().replace(/-/g, "")}`, accountId: input.accountId, sourceType: "CONSIGNMENT" as const, orderId: null, consignmentLineId: input.lineId, ...task }));
@@ -32,15 +36,19 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
   const warnings: ActivationProblem[] = [];
   for (const line of batch.lines) {
     const identify = { lineId: line.id, rowNumber: line.rowNumber };
+    const attachedRuleMatches = line.processRule?.active && line.processRule.accountId === line.accountId && line.processRule.marketplaceListingId === line.marketplaceListingId;
+    const resolvedRoute = (attachedRuleMatches ? line.processRule?.route : line.marketplaceListing?.processRules[0]?.route) ?? line.processRoute ?? "PICK_PACK";
     if (line.accountId !== accountId || line.marketplaceListing?.accountId !== accountId) problems.push({ ...identify, code: "ACCOUNT_MISMATCH", message: "Line and listing must belong to the selected account." });
     if (line.marketplaceListing && line.marketplaceListing.marketplace !== batch.marketplace) problems.push({ ...identify, code: "MARKETPLACE_MISMATCH", message: "Line listing must belong to the consignment marketplace." });
     if (!Number.isSafeInteger(line.requiredQuantity) || line.requiredQuantity <= 0) problems.push({ ...identify, code: "INVALID_QUANTITY", message: "Required quantity must be a positive whole number." });
     if (!line.marketplaceListing || !["EXACT_SKU", "EXACT_FSN", "EXACT_FNSKU", "EXACT_ASIN", "EXACT_EXTERNAL_ID", "EXACT_BARCODE", "OWNER_SELECTED"].includes(line.matchStatus)) problems.push({ ...identify, code: "MISSING_LISTING", message: "Select one account listing before activation." });
     if (line.processRoute && !routeSupported(line.processRoute)) problems.push({ ...identify, code: "UNSUPPORTED_ROUTE", message: "The selected processing route is not supported." });
+    if (!isConsignmentRouteCurrentlyEnabled(resolvedRoute) && resolvedRoute === "PICK_ASSEMBLE_PACK") problems.push({ ...identify, code: "CONSIGNMENT_ASSEMBLY_NOT_ENABLED", message: "Consignment Assembly routing is not enabled yet." });
+    if (!isConsignmentRouteCurrentlyEnabled(resolvedRoute) && resolvedRoute === "PICK_MARK_ASSEMBLE_PACK") problems.push({ ...identify, code: "CONSIGNMENT_MARK_ASSEMBLY_NOT_ENABLED", message: "Consignment Marking + Assembly routing is not enabled yet." });
     if (!line.processRoute && !line.marketplaceListing?.processRules.length) warnings.push({ ...identify, code: "NO_SAVED_DEFAULT", message: "No saved default processing; Direct to Pack will be used." });
     if (line.processRule && (!line.processRule.active || line.processRule.accountId !== line.accountId || line.processRule.marketplaceListingId !== line.marketplaceListingId)) warnings.push({ ...identify, code: "STALE_DEFAULT", message: "The old saved default is no longer applicable; the line route or Direct to Pack will be used." });
     const markingLinked = line.markingAsset?.listingLinks.some((link) => link.accountId === line.accountId && link.marketplaceListingId === line.marketplaceListingId);
-    const markingRoute = line.processRoute === "PICK_MARK_PACK" || line.processRoute === "PICK_MARK_ASSEMBLE_PACK";
+    const markingRoute = resolvedRoute === "PICK_MARK_PACK" || resolvedRoute === "PICK_MARK_ASSEMBLE_PACK";
     if (markingRoute && (!line.markingAsset?.active || !markingLinked)) warnings.push({ ...identify, code: "MARKING_ASSET_MISSING", message: "No saved marking asset; the marking worker will need manager guidance." });
     if (markingRoute && line.markingAsset && !line.markingAsset.instructions?.trim() && !line.markingAsset.masterDesignId?.trim()) warnings.push({ ...identify, code: "MARKING_INSTRUCTIONS_MISSING", message: "No saved marking instructions or Master Design ID." });
     if (!line.marketplaceListing?.mainImageUrl && !line.productImageSnapshot) warnings.push({ ...identify, code: "MISSING_IMAGE", message: "Product image is missing; a placeholder will be shown." });

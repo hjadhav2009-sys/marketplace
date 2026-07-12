@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { matchConsignmentLines } from "../src/lib/consignments/import-service";
-import { activateConsignmentBatch, validateConsignmentActivation } from "../src/lib/workflow/task-store";
+import { activateConsignmentBatch, isConsignmentRouteCurrentlyEnabled, validateConsignmentActivation } from "../src/lib/workflow/task-store";
 
 const tempRoot=resolve(process.cwd(),".codex-tmp");mkdirSync(tempRoot,{recursive:true});const file=resolve(tempRoot,"consignment-integration.db");rmSync(file,{force:true});
 const sqlite=new DatabaseSync(file);sqlite.exec("PRAGMA foreign_keys=ON;");const migrations=resolve(process.cwd(),"prisma","migrations");for(const name of readdirSync(migrations,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>entry.name).sort())sqlite.exec(readFileSync(join(migrations,name,"migration.sql"),"utf8"));sqlite.close();
@@ -57,5 +57,18 @@ try {
  await activateConsignmentBatch({batchId:"batch-default",accountId:"acct-a",actorUserId:"owner-fake"},db);
  const defaultLine=await db.consignmentLine.findUniqueOrThrow({where:{id:"line-default"}});assert.equal(defaultLine.processRuleId,null);assert.equal(defaultLine.processRoute,"PICK_PACK");
  const defaultTasks=await db.workTask.findMany({where:{consignmentLineId:"line-default"},orderBy:{sequenceNumber:"asc"}});assert.deepEqual(defaultTasks.map((task)=>task.stage),["PICK","PACK"]);
+ assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_PACK"),true);assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_MARK_PACK"),true);assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_ASSEMBLE_PACK"),false);assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_MARK_ASSEMBLE_PACK"),false);
+ await db.productProcessRule.update({where:{id:markRule.id},data:{active:true,route:"PICK_ASSEMBLE_PACK",markingRequired:false,assemblyRequired:true}});
+ await db.consignmentBatch.create({data:{id:"batch-assembly-blocked",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-ASSEMBLY",displayName:"Fake Assembly",status:"READY_TO_ACTIVATE",sourceFileName:"fake-assembly.csv",sourceFileSha256:"sha-assembly",totalRequiredQuantity:1}});
+ await db.consignmentLine.create({data:{id:"line-assembly-blocked",consignmentBatchId:"batch-assembly-blocked",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
+ const assemblyValidation=await validateConsignmentActivation("batch-assembly-blocked","acct-a",db);assert.ok(assemblyValidation.problems.some((problem)=>problem.code==="CONSIGNMENT_ASSEMBLY_NOT_ENABLED"));
+ await assert.rejects(()=>activateConsignmentBatch({batchId:"batch-assembly-blocked",accountId:"acct-a",actorUserId:"owner-fake"},db),/Consignment Assembly routing is not enabled yet/);
+ assert.equal(await db.workTask.count({where:{consignmentLineId:"line-assembly-blocked"}}),0,"Blocked Assembly route creates no task");
+ await db.productProcessRule.update({where:{id:markRule.id},data:{route:"PICK_MARK_ASSEMBLE_PACK",markingRequired:true,assemblyRequired:true}});
+ await db.consignmentBatch.create({data:{id:"batch-mark-assembly-blocked",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-MARK-ASSEMBLY",displayName:"Fake Mark Assembly",status:"READY_TO_ACTIVATE",sourceFileName:"fake-mark-assembly.csv",sourceFileSha256:"sha-mark-assembly",totalRequiredQuantity:1}});
+ await db.consignmentLine.create({data:{id:"line-mark-assembly-blocked",consignmentBatchId:"batch-mark-assembly-blocked",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
+ const markAssemblyValidation=await validateConsignmentActivation("batch-mark-assembly-blocked","acct-a",db);assert.ok(markAssemblyValidation.problems.some((problem)=>problem.code==="CONSIGNMENT_MARK_ASSEMBLY_NOT_ENABLED"));
+ await assert.rejects(()=>activateConsignmentBatch({batchId:"batch-mark-assembly-blocked",accountId:"acct-a",actorUserId:"owner-fake"},db),/Consignment Marking \+ Assembly routing is not enabled yet/);
+ assert.equal(await db.workTask.count({where:{stage:"ASSEMBLE",sourceType:"CONSIGNMENT"}}),0,"No consignment Assembly task is created");
 } finally { await db.$disconnect(); rmSync(file,{force:true}); }
 console.log("Consignment temporary-database integration tests passed.");

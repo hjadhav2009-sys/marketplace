@@ -1,6 +1,6 @@
 # Amazon Consignment Import
 
-Select an active Amazon seller account, open **Owner > Consignments > New**, enter the shipment reference, and upload the shipment report plus optional All Listings/catalog files. ZIP archives may contain the same supported report types.
+Select an active Amazon seller account, open **Owner > Consignments > New**, enter the shipment reference, and normally upload only the new shipment quantity report. Periodic All Listings/catalog files belong in Product Inventory Refresh; optional supporting files remain accepted for compatibility.
 
 The importer classifies content from headers, stores files in ignored managed storage, synchronizes the selected account's listing master, and creates a draft preview. It never creates worker tasks during upload. If no shipment report or more than one shipment candidate is found, activation remains blocked for owner review.
 

@@ -378,6 +378,15 @@ model ImportJob {
   startedAt          DateTime?
   finishedAt         DateTime?
   lastError          String?
+  stage              String    @default("QUEUED")
+  currentFile        String?
+  totalFiles         Int       @default(0)
+  processedFiles     Int       @default(0)
+  manifestJson       String?
+  progressJson       String?
+  reportJson         String?
+  cancelRequestedAt  DateTime?
+  mergeStartedAt     DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

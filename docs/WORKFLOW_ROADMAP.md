@@ -2,6 +2,8 @@
 
 Marketplace Pick & Pack is a worker workflow system, not an ERP or inventory product.
 
+Phase 7.2B adds periodic asynchronous Flipkart/Amazon Product Inventory Refresh, separate from per-shipment consignment uploads. Phase 7.2C will add worker-selected next routes and final mobile-web simplification; native Expo/APK remains postponed.
+
 ## Current Live Flow
 
 - Ready-made customer order: Pick, then Pack.

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export type ImportJobStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
-export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER";
+export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER" | "FLIPKART_PRODUCT_INVENTORY" | "AMAZON_ALL_LISTINGS" | "AMAZON_CATEGORY_CATALOG" | "AMAZON_PRODUCT_INVENTORY";
 
 export type ImportJobRecord = {
   id: string;
@@ -26,6 +26,15 @@ export type ImportJobRecord = {
   startedAt: Date | null;
   finishedAt: Date | null;
   lastError: string | null;
+  stage: string;
+  currentFile: string | null;
+  totalFiles: number;
+  processedFiles: number;
+  manifestJson: string | null;
+  progressJson: string | null;
+  reportJson: string | null;
+  cancelRequestedAt: Date | null;
+  mergeStartedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -48,6 +57,10 @@ type ImportJobDbRow = Omit<
   | "finishedAt"
   | "createdAt"
   | "updatedAt"
+  | "totalFiles"
+  | "processedFiles"
+  | "cancelRequestedAt"
+  | "mergeStartedAt"
 > & {
   importType: string;
   status: string;
@@ -65,6 +78,10 @@ type ImportJobDbRow = Omit<
   finishedAt: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  totalFiles: number | bigint;
+  processedFiles: number | bigint;
+  cancelRequestedAt: Date | string | null;
+  mergeStartedAt: Date | string | null;
 };
 
 export type ImportJobCreateInput = {
@@ -113,10 +130,14 @@ function normalizeJob(row: ImportJobDbRow): ImportJobRecord {
     errorRows: numberValue(row.errorRows),
     missingListingRows: numberValue(row.missingListingRows),
     missingImageRows: numberValue(row.missingImageRows),
+    totalFiles: numberValue(row.totalFiles),
+    processedFiles: numberValue(row.processedFiles),
     startedAt: dateValue(row.startedAt),
     finishedAt: dateValue(row.finishedAt),
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt)
+    ,cancelRequestedAt: dateValue(row.cancelRequestedAt)
+    ,mergeStartedAt: dateValue(row.mergeStartedAt)
   };
 }
 
@@ -184,6 +205,15 @@ export async function findImportJobById(id: string) {
       "startedAt",
       "finishedAt",
       "lastError",
+      "stage",
+      "currentFile",
+      "totalFiles",
+      "processedFiles",
+      "manifestJson",
+      "progressJson",
+      "reportJson",
+      "cancelRequestedAt",
+      "mergeStartedAt",
       "createdAt",
       "updatedAt"
     FROM "ImportJob"
@@ -219,6 +249,15 @@ export async function listRecentImportJobs(accountId: string, limit = 20) {
       "startedAt",
       "finishedAt",
       "lastError",
+      "stage",
+      "currentFile",
+      "totalFiles",
+      "processedFiles",
+      "manifestJson",
+      "progressJson",
+      "reportJson",
+      "cancelRequestedAt",
+      "mergeStartedAt",
       "createdAt",
       "updatedAt"
     FROM "ImportJob"

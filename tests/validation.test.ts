@@ -1253,7 +1253,7 @@ assert.match(marketplaceImportWizardComponent, /Daily workers upload this order 
 assert.match(marketplaceImportWizardComponent, /accounts\.filter\(\(account\) => account\.active && account\.marketplace === marketplace\)/, "Upload wizard filters accounts by selected marketplace");
 assert.match(marketplaceImportWizardComponent, /marketplace === "FLIPKART"[\s\S]*Flipkart Listing Master[\s\S]*Flipkart Daily Orders/, "Flipkart import types appear only under Flipkart");
 assert.match(marketplaceImportWizardComponent, /marketplace === "MEESHO"[\s\S]*Advanced \/ Legacy imports[\s\S]*Legacy PDF parser for old Meesho label\/manifest workflow/, "Meesho legacy PDF import appears only under Meesho legacy");
-assert.match(marketplaceImportWizardComponent, /Amazon coming soon/, "Amazon import option is disabled for now");
+assert.match(marketplaceImportWizardComponent, /Amazon Product Inventory Refresh/, "Amazon Product Inventory Refresh is enabled in the marketplace wizard");
 assert.match(ownerImportsPage, /IMPORT_JOB_PAGE_SIZES\.map/, "Import Progress page exposes configured page size choices");
 assert.match(ownerImportsPage, /Showing \{compactNumber\(window\.from\)\}-\{compactNumber\(window\.to\)\} of \{compactNumber\(totalRows\)\}/, "Import Progress page shows pagination range");
 assert.match(ownerImportsPage, /Previous[\s\S]*Next/, "Import Progress page includes previous and next pagination controls");

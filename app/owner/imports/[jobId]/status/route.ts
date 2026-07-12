@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { startImportJob } from "@/src/lib/import-jobs/runner";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
+import { startProductInventoryJob } from "@/src/lib/product-inventory/jobs";
 
 type ImportJobStatusRouteProps = {
   params: Promise<{
@@ -28,7 +29,7 @@ export async function GET(_request: Request, { params }: ImportJobStatusRoutePro
   }
 
   if (job.status === "QUEUED" || job.status === "RUNNING") {
-    startImportJob(job.id);
+    if(job.importType.endsWith("PRODUCT_INVENTORY"))startProductInventoryJob(job.id);else startImportJob(job.id);
   }
 
   return NextResponse.json({ job });

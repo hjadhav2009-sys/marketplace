@@ -18,6 +18,8 @@ type ImportJobJson = Omit<ImportJobRecord, "startedAt" | "finishedAt" | "created
 };
 
 function labelForImportType(importType: string) {
+  if(importType==="FLIPKART_PRODUCT_INVENTORY")return "Flipkart Product Inventory Refresh";
+  if(importType==="AMAZON_PRODUCT_INVENTORY")return "Amazon Product Inventory Refresh";
   return importType === "FLIPKART_LISTING_MASTER" ? "Flipkart Listing Master" : "Flipkart Order Excel";
 }
 
@@ -64,6 +66,9 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
   const stats = useMemo(
     () => [
       ["Processed", `${job.processedRows} / ${job.totalRows}`],
+      ["Stage", job.stage],
+      ["Files", `${job.processedFiles} / ${job.totalFiles}`],
+      ["Current file", job.currentFile ?? "-"],
       ["Created", job.createdRows],
       ["Updated", job.updatedRows],
       ["Unchanged", job.unchangedRows],

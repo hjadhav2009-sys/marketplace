@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { getRequestMeta } from "@/lib/request-context";
 import { createRetryImportJob, retainedImportJobFileExists, startImportJob } from "@/src/lib/import-jobs/runner";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
+import { requestProductInventoryJobCancel } from "@/src/lib/product-inventory/jobs";
 
 export async function retryImportJobAction(formData: FormData) {
   const user = await requireUser(["OWNER"]);
@@ -28,3 +29,5 @@ export async function retryImportJobAction(formData: FormData) {
   startImportJob(retryJob.id, request);
   redirect(`/owner/imports/${retryJob.id}?retry=started`);
 }
+
+export async function cancelProductInventoryJobAction(formData:FormData){await requireUser(["OWNER"]);const jobId=String(formData.get("jobId")??"");const job=await findImportJobById(jobId);if(!job||!job.importType.endsWith("PRODUCT_INVENTORY"))redirect("/owner/imports");await requestProductInventoryJobCancel(jobId,job.accountId);redirect(`/owner/imports/${jobId}`);}

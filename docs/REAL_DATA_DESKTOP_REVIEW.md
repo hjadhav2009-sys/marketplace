@@ -7,7 +7,7 @@ cd E:\marketplace1\marketplace
 npm.cmd run real-review:start
 ```
 
-Open `http://localhost:3001/owner/manual-review`, sign in as Owner, and select each seller account in turn. Review Dashboard, Accounts, Users, Imports, Listings, Marking Library, Process Rules, Customer Picker, Assembly, Customer Packing, Consignments, Consignment Pick/Mark/Pack, Universal Scanner, Problems, Reports, and System.
+Open `http://localhost:3001/owner/manual-review`, sign in as Owner, and select each seller account in turn. Review Dashboard, Accounts, Users, Imports, Product Inventory, Product Inventory Refresh, Marking Library, Default Processing, Customer Picker, Assembly, Customer Packing, Consignments, Consignment Pick/Mark/Pack, Universal Scanner, Problems, Reports, and System. Never upload or screenshot private sample rows during review.
 
 At 360, 390, 430, 768, 1024, and 1440 px check route errors, authorization, identifiers, image fallbacks, status text, action visibility, overflow, navigation overlap, and empty-state guidance. Empty pages remain empty until current data is imported or configured; never seed the real database to fill them.
 

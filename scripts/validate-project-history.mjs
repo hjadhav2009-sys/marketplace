@@ -7,8 +7,8 @@ if(candidates.length!==1)throw new Error(`Expected exactly one consolidated hist
 const file=resolve(historyDirectory,candidates[0]);
 const declaredMatch=file.match(/_(\d+)_LINES\.txt$/), declaredLineCount=declaredMatch?Number(declaredMatch[1]):NaN;
 const buffer=readFileSync(file); const roundTrip=Buffer.from(buffer.toString("utf8"),"utf8");
-const utf8Valid=buffer.equals(roundTrip); const text=buffer.toString("utf8"); const terminated=text.endsWith("\n");
-const lines=(terminated?text.slice(0,-1):text).split("\n"); const numberingErrors=[]; const payloads=new Set(); const duplicatePayloads=[];
+const utf8Valid=buffer.equals(roundTrip); const text=buffer.toString("utf8"); const terminated=/\r?\n$/.test(text);
+const lines=(terminated?text.replace(/\r?\n$/,""):text).split(/\r?\n/); const numberingErrors=[]; const payloads=new Set(); const duplicatePayloads=[];
 for(let index=0;index<lines.length;index++){const expected=String(index+1).padStart(6,"0");const match=lines[index].match(/^(\d{6}) \| (.+)$/);if(!match||match[1]!==expected)numberingErrors.push(index+1);else if(payloads.has(match[2]))duplicatePayloads.push(index+1);else payloads.add(match[2]);}
 const forbidden=[/\blorem ipsum\b/i,/\bmeaningless padding\b/i,/\b(?:filler|dummy padding)\b/i,/\b[A-Z]:\\[A-Za-z0-9]/i,/\/(?:home|Users)\/[^/]+\//,/\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/,/\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\./,/\b(?:SESSION_SECRET|DATABASE_URL)\s*=/];
 const privacyErrors=[];lines.forEach((line,index)=>{if(forbidden.some((pattern)=>pattern.test(line)))privacyErrors.push(index+1);});

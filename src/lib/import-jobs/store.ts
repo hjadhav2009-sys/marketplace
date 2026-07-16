@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-export type ImportJobStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
+export type ImportJobStatus = "QUEUED" | "RUNNING" | "NEEDS_MAPPING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
 export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER" | "FLIPKART_PRODUCT_INVENTORY" | "AMAZON_ALL_LISTINGS" | "AMAZON_CATEGORY_CATALOG" | "AMAZON_PRODUCT_INVENTORY";
 
 export type ImportJobRecord = {
@@ -282,6 +282,10 @@ export async function markImportJobRunning(id: string) {
     WHERE "id" = ${id}
   `;
 }
+
+export async function markImportJobNeedsMapping(id:string,input:{headers:string[];fingerprint:string;requiredFields:string[];optionalFields:string[]}){await prisma.importJob.update({where:{id},data:{status:"NEEDS_MAPPING",stage:"NEEDS_MAPPING",progressJson:JSON.stringify(input),lastError:"Owner header mapping is required.",finishedAt:null}});}
+
+export async function resumeMappedImportJob(id:string){await prisma.importJob.update({where:{id},data:{status:"QUEUED",stage:"QUEUED",progressJson:null,lastError:null,finishedAt:null}});}
 
 export async function setImportJobBatch(id: string, batchId: string) {
   const now = new Date();

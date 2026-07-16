@@ -1,10 +1,11 @@
-import type { Account, Prisma, User } from "@prisma/client";
+import type { Account, Prisma, ProcessRoute, User } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { setImportJobBatch, updateImportJobProgress } from "@/src/lib/import-jobs/store";
 import { syncIdentifiersForImportedListings } from "@/src/lib/marking/identifiers";
+import { createWorkRouteSnapshot } from "@/src/lib/workflow/dynamic-route";
 import {
   chunkFlipkartListingRows,
   dedupeFlipkartListingRows,
@@ -158,9 +159,16 @@ export async function importFlipkartOrderRows(input: {
         sku: { in: orderSkus }
       },
       select: {
+        id: true,
         sellerSkuId: true,
         sku: true,
-        mainImageUrl: true
+        mainImageUrl: true,
+        productTitle: true,
+        fsn: true,
+        listingId: true,
+        liveBrand: true,
+        liveCategory: true,
+        processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { route: true } }
       }
     })
   ]);
@@ -227,10 +235,12 @@ export async function importFlipkartOrderRows(input: {
       imageUrl
     };
 
+    let persistedOrderId: string;
     if (!existing) {
-      await prisma.order.create({ data: orderData });
+      persistedOrderId=(await prisma.order.create({ data: orderData,select:{id:true} })).id;
       createdRows += 1;
     } else if (sameOrder(existing, order, imageUrl)) {
+      persistedOrderId=existing.id;
       duplicateRows += 1;
       await prisma.importRowIssue.create({
         data: {
@@ -245,8 +255,13 @@ export async function importFlipkartOrderRows(input: {
         where: { id: existing.id },
         data: orderData
       });
+      persistedOrderId=existing.id;
       updatedRows += 1;
     }
+
+    const route=(listing?.processRules[0]?.route??"PICK_PACK") as ProcessRoute;
+    const existingPick=await prisma.workTask.findFirst({where:{orderId:persistedOrderId,stage:"PICK"},select:{id:true}});
+    if(!existingPick)await prisma.workTask.create({data:{accountId:input.account.id,sourceType:"ORDER",orderId:persistedOrderId,stage:"PICK",sequenceNumber:1,requiredQuantity:order.quantity??1,status:"READY",metadataJson:JSON.stringify({version:1,recommendedProcessRoute:route}),workCardSnapshotJson:JSON.stringify({version:1,productTitle:listing?.productTitle??order.productTitle??null,primaryImage:listing?.mainImageUrl??null,sellerSku:sku,operationalBarcode:order.trackingId??internalKey,marketplaceIdentifiers:{fsn:order.fsn??listing?.fsn??null,listingId:listing?.listingId??null,orderItemId:order.orderItemId??null,trackingId:order.trackingId??null},category:listing?.liveCategory??null,brand:listing?.liveBrand??null,variantIdentity:null,routeRecommendation:route}),routeSnapshotJson:JSON.stringify(createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}))}});
 
     processedRows += 1;
     if (input.jobId && processedRows % 500 === 0) {

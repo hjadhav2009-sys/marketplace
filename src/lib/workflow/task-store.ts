@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient, type ProcessRoute, type WorkActionType, type
 import { prisma } from "@/lib/prisma";
 import { buildTaskPlan } from "./tasks";
 import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutateStage, userCanResolveConsignmentProblems } from "./worker-access";
+import { createWorkRouteSnapshot } from "./dynamic-route";
 
 type Transaction = Prisma.TransactionClient;
 type Client = PrismaClient;
@@ -93,7 +94,7 @@ export async function activateConsignmentBatch(input: { batchId: string; account
       if (await tx.workTask.count({ where: { consignmentLine: { consignmentBatchId: input.batchId } } })) throw new Error("Consignment already has a task plan.");
       const validation = await validateConsignmentActivation(input.batchId, input.accountId, tx);
       if (!validation.batch || validation.problems.length) throw new Error(validation.problems[0]?.message ?? "Consignment validation failed.");
-      const tasks: Prisma.WorkTaskCreateManyInput[] = validation.batch.lines.map((line) => ({
+      const tasks: Prisma.WorkTaskCreateManyInput[] = validation.batch.lines.map((line) => {const route=activationRoute(line),identifier=(type:string)=>line.marketplaceListing?.identifiers.find(item=>item.identifierType===type)?.rawValue??null;return({
         id: `wkt_${randomUUID().replace(/-/g, "")}`,
         accountId: input.accountId,
         sourceType: "CONSIGNMENT",
@@ -104,8 +105,10 @@ export async function activateConsignmentBatch(input: { batchId: string; account
         requiredQuantity: line.requiredQuantity,
         completedQuantity: 0,
         status: "READY",
-        metadataJson: JSON.stringify({ version: 1, recommendedProcessRoute: activationRoute(line) })
-      }));
+        metadataJson: JSON.stringify({ version: 1, recommendedProcessRoute: route }),
+        workCardSnapshotJson:JSON.stringify({version:1,productTitle:line.marketplaceListing?.productTitle??line.productNameSource??null,primaryImage:line.marketplaceListing?.mainImageUrl??line.productImageSnapshot??null,sellerSku:line.marketplaceListing?.sellerSkuId??line.sellerSkuSource??null,operationalBarcode:validation.batch.marketplace==="AMAZON"?identifier("FNSKU")??line.fnskuSource??identifier("ASIN")??line.asinSource:identifier("EAN")??identifier("UPC")??identifier("GTIN")??line.barcodeSource??line.fsnSource??line.marketplaceListing?.listingId,marketplaceIdentifiers:{fsn:line.marketplaceListing?.fsn??line.fsnSource??null,listingId:line.marketplaceListing?.listingId??null,asin:identifier("ASIN")??line.asinSource??null,fnsku:identifier("FNSKU")??line.fnskuSource??null,externalId:identifier("EXTERNAL_ID")??line.externalIdSource??null},variantIdentity:{color:line.colorSource??null,size:line.sizeSource??null},routeRecommendation:route}),
+        routeSnapshotJson:JSON.stringify(createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}))
+      });});
       for (let index = 0; index < validation.batch.lines.length; index += 200) await writeSnapshotChunk(tx, validation.batch.lines.slice(index, index + 200));
       for (let index = 0; index < tasks.length; index += 500) await tx.workTask.createMany({ data: tasks.slice(index, index + 500) });
       await tx.consignmentBatch.update({ where: { id: input.batchId }, data: { status: "ACTIVE", activatedAt: new Date(), activatedByUserId: input.actorUserId } });

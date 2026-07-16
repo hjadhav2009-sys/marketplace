@@ -6,12 +6,14 @@ import { parseSpreadsheetRowsFromPath } from "@/lib/import/files";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { importFlipkartListingRows, importFlipkartOrderRows } from "@/src/lib/marketplaces/flipkart";
+import { findHeaderProfile,headerFingerprint,normalizeMarketplaceHeader } from "@/src/lib/imports/header-profiles";
 import {
   completeImportJob,
   createImportJob,
   failImportJob,
   findImportJobById,
   markImportJobRunning,
+  markImportJobNeedsMapping,
   type ImportJobRecord,
   type ImportJobType
 } from "./store";
@@ -139,8 +141,10 @@ export async function processImportJob(jobId: string, request?: RequestMeta) {
   }
 
   await markImportJobRunning(job.id);
-  const rows = await parseSpreadsheetRowsFromPath(job.filePath);
+  let rows = await parseSpreadsheetRowsFromPath(job.filePath);
   const { account, user } = await loadJobActors(job);
+
+  if(job.importType==="FLIPKART_ORDER"){const headers=Object.keys(rows[0]??{}),normalized=new Set(headers.map(normalizeMarketplaceHeader)),requiredHeaders=["ORDER ITEM ID","Order Id","SKU","Quantity","Tracking ID"],known=requiredHeaders.every(header=>normalized.has(normalizeMarketplaceHeader(header))),profile=await findHeaderProfile({accountId:account.id,marketplace:"FLIPKART",importPurpose:"DAILY_ORDER",headers});if(!known&&profile.state==="NEEDS_MAPPING"){await markImportJobNeedsMapping(job.id,{headers,fingerprint:headerFingerprint(headers),requiredFields:["orderItemId","orderId","sellerSku","quantity","trackingId"],optionalFields:["shipmentId","fsn","productTitle","city","state"]});return;}if(profile.state==="MATCHED"){const targets:Record<string,string>={orderItemId:"ORDER ITEM ID",orderId:"Order Id",sellerSku:"SKU",quantity:"Quantity",trackingId:"Tracking ID",shipmentId:"Shipment ID",fsn:"FSN",productTitle:"Product Title",city:"City",state:"State"};rows=rows.map(row=>{const mapped={...row};for(const [canonical,sourceHeader] of Object.entries(profile.mapping)){const target=targets[canonical];if(target)mapped[target]=row[sourceHeader]??"";}return mapped;});}}
 
   if (job.importType === "FLIPKART_LISTING_MASTER") {
     const batch = await importFlipkartListingRows({

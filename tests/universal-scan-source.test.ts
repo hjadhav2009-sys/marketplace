@@ -30,7 +30,8 @@ assert.match(resolver, /assignedTasks[\s\S]*generalTasks[\s\S]*new Map/, "Assign
 assert.match(resolver, /FNSKU[\s\S]*SELLER_SKU[\s\S]*FSN[\s\S]*ASIN[\s\S]*LISTING_ID/, "Identifier ranking is explicit");
 assert.doesNotMatch(resolver, /managedRelativePath|passwordHash|DATABASE_URL|SESSION_SECRET/);
 assert.match(panel, /Scanning never changes work/);
-assert.match(panel, /All authorized accounts/);
+assert.match(panel, /Selected-account lookup only/);
+assert.match(scanActions, /submittedAccountId!==selectedAccount\.id/, "Scanner actions reject a client-switched account");
 assert.match(panel, /No action was performed/);
 assert.match(packing, /UniversalScannerPanel/);
 assert.match(packing, /canPack\s*\?[\s\S]*getPackingDashboard/, "Packing counts are queried only for pack-authorized users");

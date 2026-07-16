@@ -9,7 +9,7 @@ export type ImportJobProgressLike = {
   finishedAt?: Date | string | null;
 };
 
-export const TERMINAL_IMPORT_JOB_STATUSES = ["COMPLETED", "COMPLETED_WITH_WARNINGS", "FAILED", "CANCELLED"] as const;
+export const TERMINAL_IMPORT_JOB_STATUSES = ["NEEDS_MAPPING", "COMPLETED", "COMPLETED_WITH_WARNINGS", "FAILED", "CANCELLED"] as const;
 
 export function isTerminalImportJobStatus(status: string | null | undefined) {
   return TERMINAL_IMPORT_JOB_STATUSES.includes(status as (typeof TERMINAL_IMPORT_JOB_STATUSES)[number]);

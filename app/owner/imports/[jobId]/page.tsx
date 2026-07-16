@@ -65,6 +65,7 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
           View issue rows without exposing private raw order/customer data. Retry is available only while the retained upload file still exists.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
+          {job.status === "NEEDS_MAPPING" ? <a href={`/owner/imports/${job.id}/mapping`} className="rounded-md bg-berry px-3 py-2 text-sm font-bold text-white">Map File Headers</a> : null}
           {issueCount > 0 && job.batchId ? <a href={`/owner/imports/${job.id}/issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">View issues ({issueCount})</a> : <span className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-800">No issues</span>}
           {issueCount > 0 && job.batchId ? <a href={`/owner/imports/export?jobId=${encodeURIComponent(job.id)}&format=csv&type=issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">Download issues</a> : null}
           {canRetry ? (

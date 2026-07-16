@@ -47,17 +47,15 @@ export function ProductImage({
   priority = false
 }: ProductImageProps) {
   const [state, setState] = useState<ProductImageState>(initialState(src, imageHealth, cacheStatus));
-  const [slowLoading, setSlowLoading] = useState(false);
   const [manualCheck, setManualCheck] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
   const validSrc = isDisplayableImageSrc(src) ? src : null;
   const isExternalSrc = isLoadableImageUrl(validSrc);
   const hasSource = Boolean(validSrc);
-  const stateText = productImageStateText(state, hasSource, slowLoading, cacheStatus);
+  const stateText = productImageStateText(state, hasSource, false, cacheStatus);
 
   useEffect(() => {
     setState(initialState(src, imageHealth, cacheStatus));
-    setSlowLoading(false);
     setManualCheck(false);
     if (src && !validSrc && mappingId) {
       void markProductImageBrokenAction(mappingId);
@@ -66,7 +64,6 @@ export function ProductImage({
 
   useEffect(() => {
     if (!validSrc || (state !== "loading" && state !== "retrying") || !isExternalSrc) {
-      setSlowLoading(false);
       return;
     }
 
@@ -89,7 +86,6 @@ export function ProductImage({
 
   function retryImage(event: MouseEvent<HTMLButtonElement>) {
     stopParentNavigation(event);
-    setSlowLoading(false);
     setManualCheck(true);
     setState(validSrc ? "loading" : getInitialDisplayImageState(src));
     setRetryVersion((version) => version + 1);
@@ -128,13 +124,12 @@ export function ProductImage({
           fetchPriority={priority ? "high" : "auto"}
           onLoad={() => {
             setState("loaded");
-            setSlowLoading(false);
             if (isExternalSrc && mappingId && (imageHealth === "BROKEN" || manualCheck)) {
               void markProductImageMappedAction(mappingId);
             }
             setManualCheck(false);
           }}
-          onError={() => { setSlowLoading(false); setManualCheck(false); if (isExternalSrc && retryVersion === 0) { setState("retrying"); setRetryVersion(1); } else { setState("unavailable"); } }}
+          onError={() => { setManualCheck(false); if (isExternalSrc && retryVersion === 0) { setState("retrying"); setRetryVersion(1); } else { setState("unavailable"); } }}
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center bg-slate-50 px-3 text-center">
@@ -145,13 +140,13 @@ export function ProductImage({
             {state === "broken" || state === "unavailable" ? "Image unavailable" : state === "missing" ? "No image" : stateText}
           </span>
           <span className="mt-1 max-w-36 text-xs text-slate-500">{state === "missing" ? "Use Listing Master or cache today's images" : stateText}</span>
-          {showDebug && state === "broken" && validSrc && isExternalSrc ? (
+          {(state === "broken" || state === "unavailable") && validSrc && isExternalSrc ? (
             <button
               type="button"
               onClick={retryImage}
               className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
             >
-              Check this image
+              Retry image
             </button>
           ) : null}
           {showDebug && originalImageUrl ? (
@@ -161,11 +156,6 @@ export function ProductImage({
           ) : null}
         </div>
       )}
-      {state === "loading" && slowLoading && isExternalSrc ? (
-        <div className="absolute inset-x-2 bottom-2 rounded bg-white/90 px-2 py-1 text-center text-xs font-semibold text-slate-700">
-          Still loading
-        </div>
-      ) : null}
       {showBadge ? (
         <span className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[11px] font-semibold ring-1 ${badge.className}`}>
           {badge.label}

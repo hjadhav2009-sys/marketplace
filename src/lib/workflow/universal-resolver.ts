@@ -10,11 +10,12 @@ import type { OrderAssemblyPolicy } from "./order-assembly-policy";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type UniversalScanIntent = "ANY" | "PICK" | "MARK" | "ASSEMBLE" | "PACK";
+export type UniversalSourceFilter = "ALL" | "CUSTOMER_ORDERS" | "CONSIGNMENTS";
 
 export type UniversalWorkCandidate = {
   candidateKey: string;
   sourceType: "CUSTOMER_ORDER" | "CUSTOMER_ORDER_SHIPMENT" | "CONSIGNMENT_TASK";
-  actionType: "ORDER_PICK" | "ORDER_PACK" | "ORDER_SEND_TO_ASSEMBLY" | "ORDER_ASSEMBLY" | "ORDER_WAITING_ASSEMBLY" | "CONSIGNMENT_PICK" | "CONSIGNMENT_MARK" | "CONSIGNMENT_PACK" | "PROBLEM" | "READ_ONLY";
+  actionType: "ORDER_PICK" | "ORDER_PACK" | "ORDER_SEND_TO_ASSEMBLY" | "ORDER_ASSEMBLY" | "ORDER_WAITING_ASSEMBLY" | "CONSIGNMENT_PICK" | "CONSIGNMENT_MARK" | "CONSIGNMENT_ASSEMBLE" | "CONSIGNMENT_PACK" | "PROBLEM" | "READ_ONLY";
   sourceId: string;
   taskId?: string;
   orderId?: string;
@@ -145,6 +146,7 @@ function taskAction(stage: WorkStage, status: string) {
   if (status === "PROBLEM") return "PROBLEM" as const;
   if (stage === "PICK") return "CONSIGNMENT_PICK" as const;
   if (stage === "MARK") return "CONSIGNMENT_MARK" as const;
+  if (stage === "ASSEMBLE") return "CONSIGNMENT_ASSEMBLE" as const;
   if (stage === "PACK") return "CONSIGNMENT_PACK" as const;
   return "READ_ONLY" as const;
 }
@@ -169,7 +171,7 @@ function shipmentKey(order: { accountId: string; marketplace: string; trackingId
 }
 
 export async function resolveUniversalWork(
-  input: { actorUserId: string; code: string; accountId?: string; intent?: UniversalScanIntent; includeCompleted?: boolean; limit?: number },
+  input: { actorUserId: string; code: string; accountId?: string; intent?: UniversalScanIntent; sourceFilter?: UniversalSourceFilter; includeCompleted?: boolean; limit?: number },
   client: Client = prisma
 ) {
   const started = performance.now();
@@ -270,7 +272,7 @@ export async function resolveUniversalWork(
   const taskWhere: Prisma.WorkTaskWhereInput = {
     accountId: { in: accountIds },
     sourceType: "CONSIGNMENT",
-    stage: intent === "ANY" ? { in: ["PICK", "MARK", "PACK"] } : intent,
+    stage: intent === "ANY" ? { in: ["PICK", "MARK", "ASSEMBLE", "PACK"] } : intent,
     status: { in: ["READY", "IN_PROGRESS", "PROBLEM"] },
     OR: [{ id: code }, { consignmentLine: taskLineMatch }]
   };
@@ -465,7 +467,7 @@ export async function resolveUniversalWork(
     client.order.count({ where: { ...orderWhere, packStatus: "PACKED" } }),
     client.workTask.count({
       where: {
-        accountId: { in: accountIds }, sourceType: "CONSIGNMENT", status: "COMPLETED", stage: intent === "ANY" ? { in: ["PICK", "MARK", "PACK"] } : intent,
+        accountId: { in: accountIds }, sourceType: "CONSIGNMENT", status: "COMPLETED", stage: intent === "ANY" ? { in: ["PICK", "MARK", "ASSEMBLE", "PACK"] } : intent,
         OR: [{ id: code }, { consignmentLine: { OR: [...(listingIds.length ? [{ marketplaceListingId: { in: listingIds } }] : []), { sellerSkuSnapshot: { in: [code, upper] } }, { fnskuSnapshot: { in: [code, upper] } }, { asinSnapshot: { in: [code, upper] } }, { externalIdSnapshot: { in: [code, upper] } }, { barcodeSnapshot: { in: [code, upper] } }, { fsnSnapshot: { in: [code, upper] } }, { listingIdSnapshot: { in: [code, upper] } }, { consignmentBatch: { externalConsignmentNumber: code } }] } }]
       }
     })
@@ -478,11 +480,12 @@ export async function resolveUniversalWork(
     candidate.candidateKey
   ].join("|");
   candidates.sort((left, right) => rank(left).localeCompare(rank(right)));
+  const filteredCandidates = input.sourceFilter === "CUSTOMER_ORDERS" ? candidates.filter((candidate) => candidate.sourceType !== "CONSIGNMENT_TASK") : input.sourceFilter === "CONSIGNMENTS" ? candidates.filter((candidate) => candidate.sourceType === "CONSIGNMENT_TASK") : candidates;
   return {
     normalizedInput: code,
     searchedAccountCount: accounts.length,
     exactMatch: true,
-    candidates: candidates.slice(0, limit),
+    candidates: filteredCandidates.slice(0, limit),
     completedMatchCount: completedOrders + completedTasks,
     durationMs: Math.round(performance.now() - started)
   };

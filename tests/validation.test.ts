@@ -1298,7 +1298,8 @@ assert.match(pickerProductCardComponent, /Details[\s\S]*ProductDetailsDrawer/, "
 assert.doesNotMatch(pickerProductCardComponent, /href=.*picker\/\$\{/, "Picker card image/details controls do not navigate to the SKU page");
 assert.match(productDetailsDrawerComponent, /fetch\(detailsUrl/, "Product details drawer fetches heavy detail data only after opening");
 assert.match(pickerDetailsRoute, /getSkuDetail/, "Picker details drawer route reuses the full SKU detail query");
-assert.match(pickerActions, /markSkuGroupPickedInlineAction[\s\S]*return \{ ok: true, updatedRows: result\.updatedCount \}/, "Direct picker card action returns picked result without redirecting");
+assert.match(pickerProductCardComponent, /window\.location\.assign[\s\S]*\/picker\//, "Picker card opens the explicit post-pick route chooser");
+assert.match(pickerActions, /completeOrderPickWithRoute/, "Picker route action uses the authoritative route service");
 assert.match(pickerActions, /markSkuGroupProblemInlineAction[\s\S]*return \{ ok: true, affectedOrders: orders\.length/, "Direct picker problem action returns problem result without redirecting");
 assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
 assert.match(pickerDetailPage, /mapping\?\.cachedImageUrl/, "Picker detail uses cached image URL first");
@@ -1479,11 +1480,11 @@ assert.match(windowsLauncher + windowsEnvUtils, /dotenv/, "Windows launcher load
 assert.match(windowsLauncher, /SKIP_PRISMA_MIGRATE/, "Windows launcher defaults migration skip for local production");
 assert.match(windowsCheckEnv, /printEnvironmentSummary/, "check-env prints a masked environment summary");
 assert.match(productImageComponent, /decoding="async"/, "Product images decode asynchronously");
-assert.match(productImageComponent, /state !== "loading" \|\| !isExternalSrc/, "ProductImage does not show slow external warning for local cached images");
+assert.match(productImageComponent, /state !== "loading" && state !== "retrying"[\s\S]*!isExternalSrc/, "ProductImage bounds retries only for external loading states");
 assert.match(productImageComponent, /aspect-square w-full/, "Large product image areas stay square");
 assert.match(productImageComponent, /object-contain/, "Product images fit without cropping");
 assert.match(productImageComponent, /Use Listing Master or cache today's images/, "Product cards show a clean missing-image fallback");
-assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
+assert.match(productImageComponent, /Retry image/, "Image fallback includes a manual client retry button");
 assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
 assert.match(productImageGalleryComponent, /role="dialog"/, "Product image gallery opens as an accessible dialog");
 assert.match(productImageGalleryComponent, /data-mobile-product-gallery/, "Product gallery has mobile-specific modal structure");

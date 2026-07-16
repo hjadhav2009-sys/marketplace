@@ -17,6 +17,9 @@ export type ParsedOrderImportRow = {
   paymentType?: PaymentType;
   city?: string | null;
   state?: string | null;
+  shipmentId?: string | null;
+  orderItemId?: string | null;
+  trackingId?: string | null;
 };
 
 export type OrderImportPlan = {
@@ -258,6 +261,10 @@ export async function importParsedOrderRows(input: {
       data: {
         accountId: input.account.id,
         batchId: batch.id,
+        marketplace: input.account.marketplace,
+        shipmentId: trimValue(row.shipmentId) || null,
+        orderItemId: trimValue(row.orderItemId) || null,
+        trackingId: trimValue(row.trackingId) || trimValue(row.awb),
         awb: trimValue(row.awb),
         courier: trimValue(row.courier) || null,
         sku,
@@ -283,6 +290,10 @@ export async function importParsedOrderRows(input: {
       },
       data: {
         batchId: batch.id,
+        marketplace: input.account.marketplace,
+        shipmentId: trimValue(row.shipmentId) || null,
+        orderItemId: trimValue(row.orderItemId) || null,
+        trackingId: trimValue(row.trackingId) || trimValue(row.awb),
         courier: trimValue(row.courier) || null,
         sku,
         qty: row.qty ?? 1,

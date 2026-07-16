@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { getAvailableAccounts, requireAccount, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { importSkuMappingFileAction } from "@/app/owner/sku-mappings/import/actions";
-import { createFlipkartOrderImportAction, createUploadBatchAction } from "../actions";
+import { createAmazonOrderImportAction, createFlipkartOrderImportAction, createUploadBatchAction } from "../actions";
 
 type UploadPageProps = {
   searchParams?: Promise<{
@@ -99,6 +99,7 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
         selectedAccountId={selectedAccount.id}
         listingAction={importSkuMappingFileAction}
         flipkartOrdersAction={createFlipkartOrderImportAction}
+        amazonOrdersAction={createAmazonOrderImportAction}
         legacyPdfAction={createUploadBatchAction}
       />
     </AppShell>

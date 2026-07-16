@@ -26,6 +26,7 @@ import { normalizeSkuForMatching } from "@/lib/sku";
 import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
 import { FLIPKART_IMPORT_MAX_BYTES, PDF_UPLOAD_MAX_BYTES, isUploadTooLarge } from "@/lib/upload-limits";
 import { accountSelectionSchema, flipkartOrderImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
+import { parseAmazonOrderReport } from "@/lib/parsers/amazon-orders";
 
 type PreviewRowDraft = {
   sourceFileName: string;
@@ -972,6 +973,15 @@ export async function createFlipkartOrderImportAction(formData: FormData) {
   revalidatePath("/owner");
   revalidatePath("/owner/uploads/new");
   redirect(`/owner/imports/${jobId}`);
+}
+
+export async function createAmazonOrderImportAction(formData: FormData) {
+  const user=await requireUser(["OWNER"]);const selectedAccount=await requireAccount(user);const account=await ownerUploadAccount(formData,selectedAccount.id);const file=formData.get("amazonOrderFile");
+  if(!account||account.marketplace!=="AMAZON")redirect("/owner/uploads/new?error=account");
+  if(!(file instanceof File)||file.size===0)redirect("/owner/uploads/new?error=missing-amazon-orders");
+  if(file.size>25*1024*1024)redirect("/owner/uploads/new?error=amazon-order-file-too-large");
+  if(!/\.(csv|tsv|txt)$/i.test(file.name))redirect("/owner/uploads/new?error=invalid-amazon-orders");
+  let batchId="";try{const rows=parseAmazonOrderReport(Buffer.from(await file.arrayBuffer()).toString("utf8"),file.name);const batch=await importParsedOrderRows({rows,fileName:file.name,account,user,request:await getRequestMeta()});batchId=batch.id;}catch{redirect("/owner/uploads/new?error=amazon-order-import-failed");}revalidatePath("/picker");revalidatePath("/packing");redirect(`/owner/uploads/${batchId}/review`);
 }
 
 export async function confirmParsedBatchAction(formData: FormData) {

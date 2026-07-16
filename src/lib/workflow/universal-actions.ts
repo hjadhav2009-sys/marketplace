@@ -4,12 +4,13 @@ import { hasWorkPermission } from "@/lib/work-permissions";
 import { claimWorkTask, completeWorkTask, incrementWorkTaskProgress } from "./task-store";
 import { getAuthorizedWorkAccounts } from "./universal-resolver";
 import { packCustomerOrderShipmentSafely } from "./order-pack-scope";
-import { markCustomerOrdersPickedSafely } from "./order-picking";
 import { claimOrderAssemblyTask, completeOrderAssemblyTask, reportOrderAssemblyProblem, sendOrderToAssembly } from "./order-assembly";
+import { completeConsignmentPickWithRoute, completeOrderPickWithRoute } from "./route-selection";
+import { markCustomerOrdersPickedSafely } from "./order-picking";
 
 type Client = PrismaClient;
-export type UniversalCandidateAction = "ORDER_PICK" | "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_CLAIM" | "TASK_INCREMENT" | "TASK_COMPLETE";
-const UNIVERSAL_ACTIONS = new Set<UniversalCandidateAction>(["ORDER_PICK", "ORDER_PACK", "ASSEMBLY_SEND", "ASSEMBLY_CLAIM", "ASSEMBLY_COMPLETE", "ASSEMBLY_PROBLEM", "TASK_CLAIM", "TASK_INCREMENT", "TASK_COMPLETE"]);
+export type UniversalCandidateAction = "ORDER_PICK" | "ORDER_PICK_ROUTE" | "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_PICK_ROUTE" | "TASK_CLAIM" | "TASK_INCREMENT" | "TASK_COMPLETE";
+const UNIVERSAL_ACTIONS = new Set<UniversalCandidateAction>(["ORDER_PICK", "ORDER_PICK_ROUTE", "ORDER_PACK", "ASSEMBLY_SEND", "ASSEMBLY_CLAIM", "ASSEMBLY_COMPLETE", "ASSEMBLY_PROBLEM", "TASK_PICK_ROUTE", "TASK_CLAIM", "TASK_INCREMENT", "TASK_COMPLETE"]);
 
 export async function applyUniversalCandidateAction(input: {
   actorUserId: string;
@@ -22,6 +23,7 @@ export async function applyUniversalCandidateAction(input: {
   manualTitle?: string;
   manualInstructions?: string;
   manualImageUrl?: string;
+  route?: string;
 }, client: Client = prisma) {
   if (!UNIVERSAL_ACTIONS.has(input.action) || !input.clientRequestId.trim()) throw new Error("Universal action request is invalid.");
   const scope = await getAuthorizedWorkAccounts(input.actorUserId, client);
@@ -31,6 +33,8 @@ export async function applyUniversalCandidateAction(input: {
   if (input.action === "ASSEMBLY_CLAIM") return claimOrderAssemblyTask({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_COMPLETE") return completeOrderAssemblyTask({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_PROBLEM") return reportOrderAssemblyProblem({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", reason: "OTHER", note: "Reported from universal scanner.", clientRequestId: input.clientRequestId }, client);
+  if (input.action === "TASK_PICK_ROUTE") return completeConsignmentPickWithRoute({ taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedQuantity: input.expectedQuantity ?? -1, route: input.route ?? "", clientRequestId: input.clientRequestId }, client);
+  if (input.action === "ORDER_PICK_ROUTE") return completeOrderPickWithRoute({ orderIds: [input.sourceId], accountId: input.accountId, actorUserId: input.actorUserId, route: input.route ?? "", clientRequestId: input.clientRequestId }, client);
 
   if (input.action.startsWith("TASK_")) {
     if (input.action === "TASK_CLAIM") return claimWorkTask({ taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, clientRequestId: input.clientRequestId }, client);
@@ -44,6 +48,7 @@ export async function applyUniversalCandidateAction(input: {
   });
   if (!order) throw new Error("Order is no longer available in this account.");
 
+  // Backward-compatible non-UI action for already deployed clients. New web UI always uses ORDER_PICK_ROUTE.
   if (input.action === "ORDER_PICK") {
     if (!hasWorkPermission(scope.user, "canPick")) throw new Error("Order picking permission is required.");
     if (order.pickStatus === "PICKED") return { updatedCount: 0, idempotent: true };

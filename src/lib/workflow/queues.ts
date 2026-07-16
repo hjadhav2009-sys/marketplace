@@ -8,6 +8,7 @@ export const WORK_QUEUE_PAGE_SIZE = 50;
 type Client = PrismaClient | Prisma.TransactionClient;
 
 export const WORK_TASK_INCLUDE = {
+  account: { select: { name: true, accountDisplayName: true } },
   assignedUser: { select: { id: true, name: true } },
   problemReportedBy: { select: { id: true, name: true } },
   actionLogs: { where: { action: "TASK_PROBLEM_REPORTED" as const }, orderBy: { createdAt: "desc" as const }, take: 1, select: { note: true } },

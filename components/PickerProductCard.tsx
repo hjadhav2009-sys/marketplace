@@ -33,7 +33,7 @@ function statusLabel(status: string) {
   return status.charAt(0) + status.slice(1).toLowerCase();
 }
 
-export function PickerProductCard({ group, encodedColor, encodedSize, detailsUrl, compactMode }: PickerProductCardProps) {
+export function PickerProductCard({ group, encodedColor, encodedSize, detailsUrl, activeFilter, compactMode }: PickerProductCardProps) {
   const [local, setLocal] = useState<LocalState>({
     pickedCount: group.pickedCount,
     pendingCount: group.pendingCount,

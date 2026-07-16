@@ -189,6 +189,7 @@ export async function completeOrderAssemblyTask(input: { taskId: string; account
     const changed = await tx.workTask.updateMany({ where: { id: task.id, status: task.status, assignedUserId: task.assignedUserId }, data: { status: "COMPLETED", assignedUserId: task.assignedUserId ?? user.id, completedQuantity: task.requiredQuantity, startedAt: task.startedAt ?? new Date(), startedByUserId: task.startedByUserId ?? user.id, completedAt: new Date(), completedByUserId: user.id } });
     if (changed.count !== 1) throw new Error(task.assignedUserId ? "Assembly changed; refresh before completing." : "This assembly task was taken by another worker.");
     await actionLog(tx, { ...input, action: "TASK_COMPLETED", requestKind: "COMPLETE", metadata: { requestFingerprint } });
+    await tx.workTask.updateMany({ where: { orderId: task.orderId, sequenceNumber: task.sequenceNumber + 1, status: "LOCKED" }, data: { status: "READY" } });
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_COMPLETED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ orderId: task.orderId, quantity: task.requiredQuantity }) } });
     return { taskId: task.id, status: "COMPLETED" as const, idempotent: false };
   }), replay: () => client.$transaction(async (tx) => {

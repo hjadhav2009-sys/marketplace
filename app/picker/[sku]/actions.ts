@@ -8,7 +8,7 @@ import { decodePickerDimension, pickerDetailPath } from "@/lib/operations/pickin
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { hasWorkPermission } from "@/lib/work-permissions";
-import { markCustomerOrdersPickedSafely } from "@/src/lib/workflow/order-picking";
+import { completeOrderPickWithRoute } from "@/src/lib/workflow/route-selection";
 
 function groupWhere(accountId: string, formData: FormData) {
   const sku = String(formData.get("sku") ?? "").trim();
@@ -40,7 +40,8 @@ export async function markSkuGroupPickedAction(formData: FormData) {
   const account = await requireAccount(user);
   if (!hasWorkPermission(user, "canPick")) redirect("/dashboard");
   const group = groupWhere(account.id, formData);
-  const result = await markCustomerOrdersPickedSafely({ actorUserId: user.id, accountId: account.id, where: group.where, source: "picker-group" });
+  const orders = await prisma.order.findMany({ where: group.where, select: { id: true } });
+  const result = await completeOrderPickWithRoute({ actorUserId: user.id, accountId: account.id, orderIds: orders.map((order) => order.id), route: String(formData.get("route") ?? ""), clientRequestId: String(formData.get("clientRequestId") ?? "") || undefined });
 
   revalidatePath("/picker");
   redirect(`${pickerDetailPath(group.sku, group.color, group.size)}&picked=${result.updatedCount > 0 ? "1" : "already"}`);
@@ -51,10 +52,7 @@ export async function markSkuGroupPickedInlineAction(formData: FormData) {
   const account = await requireAccount(user);
   if (!hasWorkPermission(user, "canPick")) return { ok: false, updatedRows: 0 };
   const group = groupWhere(account.id, formData);
-  const result = await markCustomerOrdersPickedSafely({ actorUserId: user.id, accountId: account.id, where: group.where, source: "picker-card" });
-
-  revalidatePath("/picker");
-  return { ok: true, updatedRows: result.updatedCount };
+  return { ok: false, updatedRows: 0, error: `Open ${pickerDetailPath(group.sku, group.color, group.size)} to choose the next route.` };
 }
 
 export async function markSkuGroupProblemAction(formData: FormData) {

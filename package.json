@@ -40,6 +40,7 @@
     "real-review:start": "node scripts/real-db/review-start.mjs",
     "real-db:test-safety": "node tests/real-db-safety.test.mjs",
     "product-inventory-import:test": "tsx tests/product-inventory-import.test.ts",
+    "production-flow:test": "tsx tests/production-flow.test.ts",
     "fresh-db:inspect": "node scripts/fresh-db/inspect.mjs",
     "fresh-db:backup": "node scripts/fresh-db/backup.mjs",
     "fresh-db:test-reset": "node scripts/fresh-db/test-reset.mjs",

@@ -153,7 +153,13 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
               <input type="hidden" name="sku" value={sku} />
               <input type="hidden" name="color" value={hiddenColor} />
               <input type="hidden" name="size" value={hiddenSize} />
-              <SubmitButton pendingText="Marking...">Mark all picked</SubmitButton>
+              <input type="hidden" name="clientRequestId" value={`pick-route:${sku}:${groupColor ?? ""}:${groupSize ?? ""}:${detail.orders.length}`} />
+              <label className="block text-sm font-bold text-slate-700">After picking
+                <select name="route" required defaultValue="" className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3">
+                  <option value="" disabled>Choose next route</option><option value="DIRECT_PACK">Direct to Pack</option><option value="MARK">Marking</option><option value="ASSEMBLE">Assembly</option><option value="MARK_ASSEMBLE">Marking + Assembly</option>
+                </select>
+              </label>
+              <div className="mt-3"><SubmitButton pendingText="Completing pick...">Complete pick and route</SubmitButton></div>
             </form>
 
             <form action={markSkuGroupProblemAction} className="mt-5 border-t border-slate-200 pt-4">
@@ -267,13 +273,17 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-7xl grid-cols-[1fr_1fr] gap-2">
+        <div className="mx-auto grid max-w-7xl grid-cols-[1.4fr_1fr] gap-2">
           <form action={markSkuGroupPickedAction}>
             <input type="hidden" name="sku" value={sku} />
             <input type="hidden" name="color" value={hiddenColor} />
             <input type="hidden" name="size" value={hiddenSize} />
+            <input type="hidden" name="clientRequestId" value={`pick-route-mobile:${sku}:${groupColor ?? ""}:${groupSize ?? ""}:${detail.orders.length}`} />
+            <select name="route" required defaultValue="" aria-label="After picking" className="mb-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-bold">
+              <option value="" disabled>Choose next route</option><option value="DIRECT_PACK">Direct to Pack</option><option value="MARK">Marking</option><option value="ASSEMBLE">Assembly</option><option value="MARK_ASSEMBLE">Marking + Assembly</option>
+            </select>
             <button type="submit" className="min-h-14 w-full rounded-md bg-berry px-4 py-3 text-base font-black text-white shadow-sm">
-              Mark all picked
+              Complete pick
             </button>
           </form>
           <Link href="/picker?filter=pending" className="inline-flex min-h-14 items-center justify-center rounded-md bg-slate-950 px-4 py-3 text-base font-black text-white shadow-sm">

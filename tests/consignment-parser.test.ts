@@ -12,6 +12,7 @@ const aliases=parseFlipkartConsignmentCsv(" product name , fsn ,SELLER SKU,Qty S
 assert.throws(()=>parseFlipkartConsignmentCsv("Product Name,FSN,SKU Id\nFake,F,S\n"),/headers/i,"Missing Quantity Sent blocks parser");
 const decimal=parseFlipkartConsignmentCsv(`${headers}\nFake,FSN-1,SKU-1,,,,,,,1.5\n`);assert.equal(decimal.lines.length,0);assert.equal(decimal.issues[0].issueType,"INVALID_QUANTITY");
 const duplicate=parseFlipkartConsignmentCsv(`${headers}\nFake,FSN-1,SKU-1,Brand,M,,Red,,Model,2\nFake,FSN-1,SKU-1,Brand,M,,Red,,Model,3\n`);assert.equal(duplicate.lines.length,1);assert.equal(duplicate.lines[0].requiredQuantity,5);assert.equal(duplicate.issues[0].issueType,"DUPLICATE_AGGREGATED");
+const zero=parseFlipkartConsignmentCsv(`${headers}\nFake,FSN-0,SKU-0,Brand,M,,Red,,Model,0\n`);assert.equal(zero.lines.length,0);assert.equal(zero.issues.length,0,"Zero quantity creates no work and is not blocking");
 const conflict=parseFlipkartConsignmentCsv(`${headers}\nFake A,FSN-1,SKU-1,Brand,M,,Red,,Model,2\nFake B,FSN-1,SKU-1,Brand,M,,Red,,Model,3\n`);assert.equal(conflict.lines.length,2);assert.ok(conflict.issues.every((issue)=>issue.issueType==="DUPLICATE_IDENTITY_CONFLICT"));
 assert.equal(classifyConsignmentTextFile("Quality_Check_fake.csv","QC Parameter,Required\n"),"QUALITY_CHECK_REFERENCE");
 assert.equal(classifyConsignmentTextFile("Labels.csv","Category,Label Requirement\nFake,Yes\n"),"LABEL_REQUIREMENTS");

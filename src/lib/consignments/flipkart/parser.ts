@@ -112,13 +112,17 @@ export function parseFlipkartConsignmentCsv(content: string): ParsedConsignmentC
   const indexes = Object.fromEntries(Object.entries(HEADER_ALIASES).map(([key, aliases]) => [key, headerIndex(headers, aliases)])) as Record<keyof typeof HEADER_ALIASES, number>;
   const issues: ConsignmentParserIssue[] = [];
   const parsed: ParsedConsignmentLine[] = [];
+  let sourceRows = 0;
   for (let index = 1; index < records.length; index += 1) {
     const row = records[index];
     if (row.every((cell) => !cell.trim())) continue;
+    sourceRows += 1;
     const rowNumber = index + 1;
+    const rawQuantity = clean(row[indexes.quantity], 80)?.replace(/,/g, "");
     const quantity = positiveWholeQuantity(row[indexes.quantity]);
     const sellerSkuSource = clean(row[indexes.sku], 160);
     const fsnSource = clean(row[indexes.fsn], 160);
+    if (rawQuantity === "0") continue;
     if (!quantity) {
       issues.push({ rowNumber, issueType: "INVALID_QUANTITY", severity: "ERROR", message: "Quantity Sent must be a positive whole number.", safeData: { sku: sellerSkuSource, fsn: fsnSource } });
       continue;
@@ -163,7 +167,7 @@ export function parseFlipkartConsignmentCsv(content: string): ParsedConsignmentC
       for (const line of duplicates) issues.push({ rowNumber: line.rowNumber, issueType: "DUPLICATE_IDENTITY_CONFLICT", severity: "ERROR", message: "Repeated SKU and FSN rows have conflicting identity fields.", safeData: { sku: line.sellerSkuSource, fsn: line.fsnSource } });
     }
   }
-  return { headers, sourceRows: parsed.length + issues.filter((issue) => issue.issueType === "INVALID_QUANTITY" || issue.issueType === "MISSING_IDENTIFIER").length, lines, issues };
+  return { headers, sourceRows, lines, issues };
 }
 
 export function classifyConsignmentTextFile(fileName: string, content: string): ConsignmentImportFileType {

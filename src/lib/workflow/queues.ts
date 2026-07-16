@@ -50,7 +50,7 @@ async function exactListingIds(accountId:string, code:string|undefined, client:C
 
 export async function getWorkHubCounts(user: User, accountId: string, client: Client = prisma) {
   await assertWorkerAccountAccess(user.id,accountId,client);
-  const stages=(["PICK","MARK","PACK"] as const).filter((stage)=>userCanMutateStage(user,stage));
+  const stages=(["PICK","MARK","ASSEMBLE","PACK"] as const).filter((stage)=>userCanMutateStage(user,stage));
   const result:Record<string,{ready:number;inProgress:number;mine:number;problems:number;completedToday:number}>={};
   const today=startOfApplicationDay();const accountWide=userCanViewAllConsignmentWork(user);
   for(const stage of stages){

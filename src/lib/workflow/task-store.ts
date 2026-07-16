@@ -12,8 +12,8 @@ function routeSupported(route: ProcessRoute | null): route is ProcessRoute {
   return route === "PICK_PACK" || route === "PICK_MARK_PACK" || route === "PICK_ASSEMBLE_PACK" || route === "PICK_MARK_ASSEMBLE_PACK";
 }
 
-export function isConsignmentRouteCurrentlyEnabled(route: ProcessRoute | null): route is "PICK_PACK" | "PICK_MARK_PACK" {
-  return route === "PICK_PACK" || route === "PICK_MARK_PACK";
+export function isConsignmentRouteCurrentlyEnabled(route: ProcessRoute | null): route is ProcessRoute {
+  return routeSupported(route);
 }
 
 export function createConsignmentTaskPlan(input: { lineId: string; accountId: string; route: ProcessRoute; requiredQuantity: number }) {
@@ -43,8 +43,6 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
     if (!Number.isSafeInteger(line.requiredQuantity) || line.requiredQuantity <= 0) problems.push({ ...identify, code: "INVALID_QUANTITY", message: "Required quantity must be a positive whole number." });
     if (!line.marketplaceListing || !["EXACT_SKU", "EXACT_FSN", "EXACT_FNSKU", "EXACT_ASIN", "EXACT_EXTERNAL_ID", "EXACT_BARCODE", "OWNER_SELECTED"].includes(line.matchStatus)) problems.push({ ...identify, code: "MISSING_LISTING", message: "Select one account listing before activation." });
     if (line.processRoute && !routeSupported(line.processRoute)) problems.push({ ...identify, code: "UNSUPPORTED_ROUTE", message: "The selected processing route is not supported." });
-    if (!isConsignmentRouteCurrentlyEnabled(resolvedRoute) && resolvedRoute === "PICK_ASSEMBLE_PACK") problems.push({ ...identify, code: "CONSIGNMENT_ASSEMBLY_NOT_ENABLED", message: "Consignment Assembly routing is not enabled yet." });
-    if (!isConsignmentRouteCurrentlyEnabled(resolvedRoute) && resolvedRoute === "PICK_MARK_ASSEMBLE_PACK") problems.push({ ...identify, code: "CONSIGNMENT_MARK_ASSEMBLY_NOT_ENABLED", message: "Consignment Marking + Assembly routing is not enabled yet." });
     if (!line.processRoute && !line.marketplaceListing?.processRules.length) warnings.push({ ...identify, code: "NO_SAVED_DEFAULT", message: "No saved default processing; Direct to Pack will be used." });
     if (line.processRule && (!line.processRule.active || line.processRule.accountId !== line.accountId || line.processRule.marketplaceListingId !== line.marketplaceListingId)) warnings.push({ ...identify, code: "STALE_DEFAULT", message: "The old saved default is no longer applicable; the line route or Direct to Pack will be used." });
     const markingLinked = line.markingAsset?.listingLinks.some((link) => link.accountId === line.accountId && link.marketplaceListingId === line.marketplaceListingId);
@@ -95,8 +93,19 @@ export async function activateConsignmentBatch(input: { batchId: string; account
       if (await tx.workTask.count({ where: { consignmentLine: { consignmentBatchId: input.batchId } } })) throw new Error("Consignment already has a task plan.");
       const validation = await validateConsignmentActivation(input.batchId, input.accountId, tx);
       if (!validation.batch || validation.problems.length) throw new Error(validation.problems[0]?.message ?? "Consignment validation failed.");
-      const tasks: Prisma.WorkTaskCreateManyInput[] = [];
-      for (const line of validation.batch.lines) tasks.push(...createConsignmentTaskPlan({ lineId: line.id, accountId: input.accountId, route: activationRoute(line), requiredQuantity: line.requiredQuantity }));
+      const tasks: Prisma.WorkTaskCreateManyInput[] = validation.batch.lines.map((line) => ({
+        id: `wkt_${randomUUID().replace(/-/g, "")}`,
+        accountId: input.accountId,
+        sourceType: "CONSIGNMENT",
+        orderId: null,
+        consignmentLineId: line.id,
+        stage: "PICK",
+        sequenceNumber: 1,
+        requiredQuantity: line.requiredQuantity,
+        completedQuantity: 0,
+        status: "READY",
+        metadataJson: JSON.stringify({ version: 1, recommendedProcessRoute: activationRoute(line) })
+      }));
       for (let index = 0; index < validation.batch.lines.length; index += 200) await writeSnapshotChunk(tx, validation.batch.lines.slice(index, index + 200));
       for (let index = 0; index < tasks.length; index += 500) await tx.workTask.createMany({ data: tasks.slice(index, index + 500) });
       await tx.consignmentBatch.update({ where: { id: input.batchId }, data: { status: "ACTIVE", activatedAt: new Date(), activatedByUserId: input.actorUserId } });
@@ -220,6 +229,10 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     const { user, task } = await taskForMutation(tx, input);
     const line = task.consignmentLine;
     if (!line) throw new Error("Task source line is unavailable.");
+    if (task.stage === "PICK" && requestKind === "COMPLETE") {
+      const legacyDownstreamCount = await tx.workTask.count({ where: { consignmentLineId: task.consignmentLineId!, sequenceNumber: { gt: task.sequenceNumber } } });
+      if (!legacyDownstreamCount) throw new Error("Choose the next route before completing picking.");
+    }
     const targetQuantity=requestKind==="COMPLETE"?task.requiredQuantity:input.targetQuantity;
     if(targetQuantity===undefined)throw new Error("Target quantity is required.");
     const fingerprint=requestFingerprint({expectedQuantity:input.expectedQuantity,targetQuantity,requestKind});
@@ -346,7 +359,7 @@ export function unassignWorkTask(input: { taskId: string; accountId: string; act
   return reassignWorkTask({ ...input, assignedUserId: null }, client);
 }
 
-export async function reassignConsignmentStage(input: { batchId: string; accountId: string; actorUserId: string; stage: "PICK" | "MARK" | "PACK"; assignedUserId: string | null; clientRequestId?: string }, client: Client = prisma) {
+export async function reassignConsignmentStage(input: { batchId: string; accountId: string; actorUserId: string; stage: "PICK" | "MARK" | "ASSEMBLE" | "PACK"; assignedUserId: string | null; clientRequestId?: string }, client: Client = prisma) {
   const fingerprint=requestFingerprint({batchId:input.batchId,stage:input.stage,assignedUserId:input.assignedUserId});
   return recoverIdempotentReplay({ clientRequestId: input.clientRequestId, mutate: () => client.$transaction(async (tx) => {
     const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);

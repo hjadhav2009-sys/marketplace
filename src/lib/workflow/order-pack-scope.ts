@@ -6,6 +6,35 @@ import { assertOrderAssemblyPackingEligible } from "./order-assembly";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
+function explicitRoute(metadataJson: string | null) {
+  if (!metadataJson) return null;
+  try {
+    const value = JSON.parse(metadataJson) as { version?: number; routeChoice?: string };
+    return value.version === 1 && ["DIRECT_PACK", "MARK", "ASSEMBLE", "MARK_ASSEMBLE"].includes(value.routeChoice ?? "") ? value.routeChoice! : null;
+  } catch { return null; }
+}
+
+async function assertExplicitRoutePackingEligible(accountId: string, orderIds: string[], client: Client) {
+  const tasks = await client.workTask.findMany({ where: { accountId, sourceType: "ORDER", orderId: { in: orderIds } }, select: { id: true, orderId: true, stage: true, status: true, metadataJson: true } });
+  const byOrder = new Map<string, typeof tasks>();
+  for (const task of tasks) if (task.orderId) byOrder.set(task.orderId, [...(byOrder.get(task.orderId) ?? []), task]);
+  const explicitOrderIds = new Set<string>();
+  for (const orderId of orderIds) {
+    const orderTasks = byOrder.get(orderId) ?? [];
+    const route = explicitRoute(orderTasks.find((task) => task.stage === "PICK")?.metadataJson ?? null);
+    if (!route) continue;
+    explicitOrderIds.add(orderId);
+    const required = route === "MARK_ASSEMBLE" ? ["MARK", "ASSEMBLE"] : route === "MARK" ? ["MARK"] : route === "ASSEMBLE" ? ["ASSEMBLE"] : [];
+    for (const stage of required) {
+      const task = orderTasks.find((candidate) => candidate.stage === stage);
+      if (!task || !["COMPLETED", "SKIPPED"].includes(task.status)) throw new Error(`${stage === "MARK" ? "Marking" : "Assembly"} is required before packing.`);
+    }
+    const pack = orderTasks.find((task) => task.stage === "PACK");
+    if (!pack || !["READY", "IN_PROGRESS"].includes(pack.status)) throw new Error("Packing route is not ready yet.");
+  }
+  return explicitOrderIds;
+}
+
 const orderPackScopeSelect = {
   id: true,
   accountId: true,
@@ -113,7 +142,9 @@ export async function packCustomerOrderShipmentSafely(
       throw new Error("Order changed; scan again before acting.");
     }
     assertOrderPackScopeEligible(scope);
-    await assertOrderAssemblyPackingEligible({ accountId: input.accountId, orders: scope.shipmentOrders }, tx);
+    const explicitOrderIds = await assertExplicitRoutePackingEligible(input.accountId, scope.shipmentOrders.map((order) => order.id), tx);
+    const legacyOrders = scope.shipmentOrders.filter((order) => !explicitOrderIds.has(order.id));
+    if (legacyOrders.length) await assertOrderAssemblyPackingEligible({ accountId: input.accountId, orders: legacyOrders }, tx);
 
     const verifiedOrderIds = scope.shipmentOrders.map((order) => order.id);
     const update = await tx.order.updateMany({
@@ -127,6 +158,8 @@ export async function packCustomerOrderShipmentSafely(
       data: { status: "PACKED", packStatus: "PACKED", packedAt: new Date() }
     });
     if (update.count !== verifiedOrderIds.length) throw new Error("Shipment changed; scan again before packing.");
+    const packTasks = await tx.workTask.findMany({ where: { accountId: input.accountId, sourceType: "ORDER", orderId: { in: verifiedOrderIds }, stage: "PACK", status: { in: ["READY", "IN_PROGRESS"] } }, select: { id: true, requiredQuantity: true } });
+    for (const task of packTasks) await tx.workTask.update({ where: { id: task.id }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, completedAt: new Date(), completedByUserId: access.user.id } });
 
     await tx.scanLog.createMany({
       data: scope.shipmentOrders.map((order) => ({

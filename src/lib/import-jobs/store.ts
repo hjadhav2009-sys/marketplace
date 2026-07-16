@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-export type ImportJobStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+export type ImportJobStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
 export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER" | "FLIPKART_PRODUCT_INVENTORY" | "AMAZON_ALL_LISTINGS" | "AMAZON_CATEGORY_CATALOG" | "AMAZON_PRODUCT_INVENTORY";
 
 export type ImportJobRecord = {
@@ -332,7 +332,10 @@ export async function completeImportJob(id: string, batchId?: string | null) {
   await prisma.$executeRaw`
     UPDATE "ImportJob"
     SET
-      "status" = ${"COMPLETED"},
+      "status" = CASE WHEN "errorRows" = 0 AND ("warningRows" > 0 OR "duplicateRows" > 0 OR "missingImageRows" > 0 OR "missingListingRows" > 0)
+        THEN ${"COMPLETED_WITH_WARNINGS"} ELSE ${"COMPLETED"} END,
+      "stage" = ${"COMPLETED"},
+      "processedRows" = CASE WHEN "totalRows" > "processedRows" THEN "totalRows" ELSE "processedRows" END,
       "batchId" = COALESCE(${batchId ?? null}, "batchId"),
       "finishedAt" = ${now},
       "updatedAt" = ${now}

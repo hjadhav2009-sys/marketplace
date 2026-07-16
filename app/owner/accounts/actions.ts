@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAccount, requireUser } from "@/lib/auth";
+import { requireUser, setSelectedAccount } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
@@ -14,7 +14,6 @@ function redirectWithError(error: string): never {
 
 export async function saveOwnerAccountAction(formData: FormData) {
   const user = await requireUser(["OWNER"]);
-  const selectedAccount = await requireAccount(user);
   const request = await getRequestMeta();
   const parsed = ownerAccountSchema.safeParse({
     accountId: formData.get("accountId") || undefined,
@@ -33,6 +32,7 @@ export async function saveOwnerAccountAction(formData: FormData) {
   const accountInput = parsed.data;
   const accountName = accountInput.accountDisplayName;
   const accountCode = accountInput.accountCode;
+  const isNewAccount = !accountInput.accountId;
 
   try {
     const account = accountInput.accountId
@@ -64,7 +64,7 @@ export async function saveOwnerAccountAction(formData: FormData) {
 
     await recordAuditLog({
       userId: user.id,
-      accountId: selectedAccount.id,
+      accountId: account.id,
       action: accountInput.accountId ? "OWNER_ACCOUNT_UPDATED" : "OWNER_ACCOUNT_CREATED",
       entityType: "Account",
       entityId: account.id,
@@ -78,6 +78,11 @@ export async function saveOwnerAccountAction(formData: FormData) {
       },
       request
     });
+
+    if (isNewAccount && account.active) {
+      await prisma.user.update({ where: { id: user.id }, data: { accountId: account.id } });
+      await setSelectedAccount(account.id);
+    }
   } catch {
     redirectWithError("duplicate");
   }
@@ -89,7 +94,6 @@ export async function saveOwnerAccountAction(formData: FormData) {
 
 export async function toggleOwnerAccountActiveAction(formData: FormData) {
   const user = await requireUser(["OWNER"]);
-  const selectedAccount = await requireAccount(user);
   const request = await getRequestMeta();
   const accountId = String(formData.get("accountId") ?? "");
   const active = formData.get("active") === "true";
@@ -105,7 +109,7 @@ export async function toggleOwnerAccountActiveAction(formData: FormData) {
 
   await recordAuditLog({
     userId: user.id,
-    accountId: selectedAccount.id,
+    accountId: account.id,
     action: active ? "OWNER_ACCOUNT_REACTIVATED" : "OWNER_ACCOUNT_DEACTIVATED",
     entityType: "Account",
     entityId: account.id,

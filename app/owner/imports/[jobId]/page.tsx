@@ -4,6 +4,7 @@ import { ImportJobProgress } from "@/components/ImportJobProgress";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { retainedImportJobFileExists, startImportJob } from "@/src/lib/import-jobs/runner";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
 import { cancelProductInventoryJobAction, retryImportJobAction } from "./actions";
@@ -27,6 +28,8 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
   if (!job) {
     notFound();
   }
+
+  const account = await prisma.account.findFirst({ where: { id: job.accountId, active: true }, select: { name: true, accountDisplayName: true, marketplace: true } });
 
   if (job.status === "QUEUED" || job.status === "RUNNING") {
     if(job.importType.endsWith("PRODUCT_INVENTORY"))startProductInventoryJob(job.id);else startImportJob(job.id);
@@ -54,7 +57,7 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
         </div>
       ) : null}
 
-      <ImportJobProgress initialJob={job} />
+      <ImportJobProgress initialJob={job} accountLabel={account?.accountDisplayName ?? account?.name ?? "Unavailable account"} />
 
       <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="font-semibold text-slate-950">Issue and retry actions</h2>
@@ -62,12 +65,8 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
           View issue rows without exposing private raw order/customer data. Retry is available only while the retained upload file still exists.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <a href={`/owner/imports/${job.id}/issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-            View issues ({issueCount})
-          </a>
-          <a href={`/owner/imports/export?jobId=${encodeURIComponent(job.id)}&format=csv&type=issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-            Download issues
-          </a>
+          {issueCount > 0 && job.batchId ? <a href={`/owner/imports/${job.id}/issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">View issues ({issueCount})</a> : <span className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-800">No issues</span>}
+          {issueCount > 0 && job.batchId ? <a href={`/owner/imports/export?jobId=${encodeURIComponent(job.id)}&format=csv&type=issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">Download issues</a> : null}
           {canRetry ? (
             <form action={retryImportJobAction}>
               <input type="hidden" name="jobId" value={job.id} />

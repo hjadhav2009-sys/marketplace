@@ -118,7 +118,7 @@ export async function importFlipkartOrderRows(input: {
       totalRows: input.rows.length,
       processedRows: 0,
       errorRows: parsed.issues.length,
-      warningRows: parsed.issues.length
+      warningRows: 0
     });
   }
   const duplicateIssues: FlipkartParseIssue[] = [];
@@ -374,7 +374,7 @@ export async function importFlipkartListingRows(input: {
     await updateImportJobProgress(input.jobId, {
       processedRows,
       duplicateRows: deduped.duplicateIssues.length,
-      warningRows: issues.length,
+      warningRows: deduped.duplicateIssues.length,
       errorRows: parsed.issues.length
     });
   }
@@ -457,8 +457,8 @@ export async function importFlipkartListingRows(input: {
         updatedRows,
         unchangedRows: skippedRows,
         duplicateRows: deduped.duplicateIssues.length,
-        warningRows: issues.length + missingImageRows,
-        errorRows: issues.length + missingImageRows,
+        warningRows: deduped.duplicateIssues.length + missingImageRows,
+        errorRows: parsed.issues.length,
         missingImageRows
       });
     }
@@ -477,7 +477,7 @@ export async function importFlipkartListingRows(input: {
       duplicateRows: deduped.duplicateIssues.length,
       skippedRows,
       missingImageRows,
-      errorRows: allIssues.length,
+      errorRows: parsed.issues.length,
       notes: JSON.stringify({
         marketplace: "FLIPKART",
         parser: "flipkart-listings-xlsx",
@@ -494,8 +494,8 @@ export async function importFlipkartListingRows(input: {
       updatedRows,
       unchangedRows: skippedRows,
       duplicateRows: deduped.duplicateIssues.length,
-      warningRows: allIssues.length,
-      errorRows: allIssues.length,
+      warningRows: deduped.duplicateIssues.length + missingImageRows,
+      errorRows: parsed.issues.length,
       missingImageRows
     });
   }

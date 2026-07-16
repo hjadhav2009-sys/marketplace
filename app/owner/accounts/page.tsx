@@ -3,7 +3,7 @@ import type { Marketplace } from "@prisma/client";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
-import { requireAccount, requireUser } from "@/lib/auth";
+import { getSelectedAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { saveOwnerAccountAction, toggleOwnerAccountActiveAction } from "./actions";
@@ -54,7 +54,7 @@ function latestDate(account: { uploadBatches: Array<{ createdAt: Date }>; import
 
 export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsPageProps) {
   const user = await requireUser(["OWNER"]);
-  const selectedAccount = await requireAccount(user);
+  const selectedAccount = await getSelectedAccount(user);
   const params = await searchParams;
   const accounts = await prisma.account.findMany({
     orderBy: [{ active: "desc" }, { marketplace: "asc" }, { name: "asc" }],
@@ -80,16 +80,16 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
       }
     }
   });
-  const companyName = selectedAccount.companyName;
+  const companyName = selectedAccount?.companyName ?? accounts[0]?.companyName ?? "";
   const activeAccounts = accounts.filter((account) => account.active).length;
 
   return (
-    <AppShell>
+    <AppShell allowNoAccount>
       <PageHeader
         eyebrow="Owner"
         title="Marketplace accounts"
         description="Manage company, marketplace, and seller account structure. Workers stay scoped to their assigned account."
-        action={{ href: "/accounts", label: "Switch account" }}
+        action={activeAccounts > 0 ? { href: "/accounts", label: "Choose account" } : undefined}
       />
 
       {params?.saved || params?.deactivated || params?.reactivated ? (
@@ -104,15 +104,26 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
         </div>
       ) : null}
 
+      {!selectedAccount && activeAccounts === 0 ? (
+        <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950">
+          <p className="font-bold">No seller accounts have been created yet.</p>
+          <p className="mt-1 text-sm">Create your first seller account below to begin importing new production data.</p>
+        </div>
+      ) : null}
+
       <section className="mb-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Company / Organization</p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{companyName}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Selected: <span className="font-semibold text-slate-950">{accountLabel(selectedAccount)}</span>{" "}
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{selectedAccount.marketplace}</span>
-            </p>
+            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{companyName || "Set up your first seller account"}</h2>
+            {selectedAccount ? (
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Selected: <span className="font-semibold text-slate-950">{accountLabel(selectedAccount)}</span>{" "}
+                <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{selectedAccount.marketplace}</span>
+              </p>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-slate-600">No seller account is currently selected.</p>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-sm">
             <SummaryCount label="Accounts" value={accounts.length} />
@@ -182,7 +193,7 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
                                 <span className={`rounded-full px-2 py-1 text-xs font-bold ${account.active ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-600"}`}>
                                   {account.active ? "Active" : "Inactive"}
                                 </span>
-                                {account.id === selectedAccount.id ? (
+                                {account.id === selectedAccount?.id ? (
                                   <span className="rounded-full bg-pink-50 px-2 py-1 text-xs font-bold text-berry">Selected</span>
                                 ) : null}
                               </div>

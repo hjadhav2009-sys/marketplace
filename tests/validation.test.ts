@@ -493,6 +493,7 @@ assert.equal(canRoleAccessPath("PACKER", "/owner/users"), false, "Packer cannot 
 assert.equal(canRoleAccessPath("PACKER", "/problems"), true, "Packer can access problems");
 assert.equal(canAccessAccount({ role: "PICKER", accountId: "a1" }, "a1"), true, "Assigned user can access account");
 assert.equal(canAccessAccount({ role: "PICKER", accountId: "a1" }, "a2"), false, "Assigned user cannot access other account");
+assert.equal(canAccessAccount({ role: "PICKER", accountId: null }, "a1"), false, "Worker with no assignment cannot access an account");
 assert.equal(canRoleAccessPath("PICKER", "/change-password"), true, "Workers can change password");
 
 assert.equal(canConfirmPacked({ packStatus: "READY" }), true, "Ready order can be packed");
@@ -1416,6 +1417,8 @@ assert.match(appShell, /MobileBottomNav/, "App shell renders mobile bottom navig
 assert.match(appShell, /data-owner-mobile-menu/, "Owner mobile navigation is tucked behind a compact menu");
 assert.match(appShell, /account\.companyName[\s\S]*account\.marketplace/, "App shell shows selected company and marketplace context");
 assert.match(accountsPage, /AccountSwitcherForm/, "Account switch page uses the grouped marketplace switcher");
+assert.match(accountsPage, /user\.role === "OWNER"[\s\S]*No seller accounts have been created yet\.[\s\S]*Create First Seller Account/, "Owner with zero accounts sees the first-account setup action");
+assert.match(accountsPage, /No active seller account is assigned to this user\. Ask the owner to assign an account\./, "Worker with zero assignments keeps the owner-assignment guidance");
 assert.match(accountSwitcherComponent, /Search accounts/, "Switch account UX is searchable");
 assert.match(accountSwitcherComponent, /marketplaceLabels/, "Switch account UX groups accounts by marketplace");
 assert.match(accountActions, /active: true/, "Switch account action only selects active accounts");
@@ -1424,6 +1427,8 @@ assert.match(ownerAccountsPage, /Company \/ Organization/, "Owner accounts page 
 assert.match(ownerAccountsPage, /Marketplace accounts/, "Owner accounts page uses marketplace account language");
 assert.match(ownerAccountsPage, /Flipkart[\s\S]*Amazon[\s\S]*Meesho legacy[\s\S]*Other/, "Owner accounts page shows marketplace sections");
 assert.match(ownerAccountsPage, /Create seller account/, "Owner accounts page supports marketplace-aware account creation");
+assert.match(ownerAccountsPage, /<AppShell allowNoAccount>/, "Owner can open account management without a selected account");
+assert.doesNotMatch(ownerAccountsPage, /requireAccount/, "Owner account management does not require an existing account");
 assert.match(ownerAccountsPage, /name="marketplace"/, "Owner account form requires marketplace");
 assert.match(ownerAccountsPage, /accountDisplayName/, "Owner account form captures account display name");
 assert.match(ownerAccountsPage, /accountCode/, "Owner account form captures account code");
@@ -1431,6 +1436,7 @@ assert.match(ownerAccountsPage, /marketplaceListings/, "Owner accounts page show
 assert.match(ownerAccountsPage, /importJobs/, "Owner accounts page shows import counts");
 assert.match(ownerAccountsPage, /Deactivate|Reactivate/, "Owner accounts page supports activate/deactivate controls");
 assert.match(ownerAccountsActions, /OWNER_ACCOUNT_CREATED/, "Owner account creation is audited");
+assert.match(ownerAccountsActions, /isNewAccount && account\.active[\s\S]*accountId: account\.id[\s\S]*setSelectedAccount\(account\.id\)/, "A newly created active account is selected for the owner without a new login");
 assert.match(ownerAccountsActions, /marketplace: accountInput\.marketplace/, "Owner account action stores marketplace");
 assert.match(ownerAccountsActions, /accountDisplayName: accountName/, "Owner account action stores display name");
 assert.match(ownerAccountsActions, /OWNER_ACCOUNT_DEACTIVATED/, "Owner account deactivation is audited");
@@ -1467,6 +1473,7 @@ assert.match(mobileLoginRoute, /passwordHashNeedsUpgrade[\s\S]*hashPassword\(par
 assert.doesNotMatch(mobileLoginRoute, /inactive_user|Too many failed attempts|This user is inactive/, "Mobile login does not reveal inactive or locked account state");
 assert.match(mobileApiHelper, /getSafeClientIp[\s\S]*shouldTrustProxyHeaders/, "Mobile API rate limit metadata uses the safe client IP helper");
 assert.match(accountSelectionActions, /assignedUsers/, "Worker account switch checks assigned accounts");
+assert.match(accountSelectionActions, /user\.role === "OWNER"[\s\S]*users:[\s\S]*assignedUsers:/, "Account selection allows owners while requiring a worker assignment server-side");
 assert.match(authHelpers, /assignedUsers/, "Auth available-account helper includes assigned accounts");
 assert.match(windowsLauncher + windowsEnvUtils, /dotenv/, "Windows launcher loads .env with dotenv");
 assert.match(windowsLauncher, /SKIP_PRISMA_MIGRATE/, "Windows launcher defaults migration skip for local production");

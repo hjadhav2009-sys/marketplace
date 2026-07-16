@@ -13,17 +13,19 @@ import { markProductImageBrokenAction, markProductImageMappedAction } from "./pr
 type ProductImageProps = {
   src?: string | null;
   alt: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "inventory" | "md" | "lg";
   showBadge?: boolean;
   mappingId?: string | null;
   showDebug?: boolean;
   imageHealth?: string | null;
   cacheStatus?: string | null;
   originalImageUrl?: string | null;
+  priority?: boolean;
 };
 
 const sizeClass = {
   sm: "h-16 w-16",
+  inventory: "h-[5.5rem] w-[5.5rem]",
   md: "h-28 w-28",
   lg: "aspect-square w-full"
 };
@@ -41,7 +43,8 @@ export function ProductImage({
   showDebug = false,
   imageHealth,
   cacheStatus,
-  originalImageUrl
+  originalImageUrl,
+  priority = false
 }: ProductImageProps) {
   const [state, setState] = useState<ProductImageState>(initialState(src, imageHealth, cacheStatus));
   const [slowLoading, setSlowLoading] = useState(false);
@@ -62,14 +65,19 @@ export function ProductImage({
   }, [cacheStatus, imageHealth, mappingId, src, validSrc]);
 
   useEffect(() => {
-    if (!validSrc || state !== "loading" || !isExternalSrc) {
+    if (!validSrc || (state !== "loading" && state !== "retrying") || !isExternalSrc) {
       setSlowLoading(false);
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      setSlowLoading(true);
-    }, 5000);
+      if (retryVersion === 0) {
+        setState("retrying");
+        setRetryVersion(1);
+      } else {
+        setState("unavailable");
+      }
+    }, retryVersion === 0 ? 2000 : 2500);
 
     return () => window.clearTimeout(timeout);
   }, [isExternalSrc, retryVersion, state, validSrc]);
@@ -98,7 +106,7 @@ export function ProductImage({
   const badge =
     state === "loaded"
       ? { label: "Image mapped", className: "bg-teal-50 text-teal-700 ring-teal-200" }
-      : state === "broken"
+      : state === "broken" || state === "unavailable"
         ? { label: showDebug ? stateText : "Image issue", className: "bg-rose-50 text-rose-700 ring-rose-200" }
         : { label: stateText, className: "bg-amber-50 text-amber-800 ring-amber-200" };
 
@@ -107,8 +115,8 @@ export function ProductImage({
       className={`relative flex shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white ${sizeClass[size]}`}
       title={src ? `${stateText}: ${src}` : stateText}
     >
-      {state === "loading" ? <div className="absolute inset-0 animate-pulse bg-slate-100" /> : null}
-      {validSrc && state !== "broken" ? (
+      {(state === "loading" || state === "retrying") ? <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400"><span className="flex h-9 w-9 items-center justify-center rounded-md border bg-white text-[10px] font-black">IMG</span><span className="mt-1 text-[10px] font-bold uppercase">{state === "retrying" ? "Retrying" : "Loading"}</span></div> : null}
+      {validSrc && state !== "broken" && state !== "unavailable" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={`${validSrc}-${retryVersion}`}
@@ -116,7 +124,8 @@ export function ProductImage({
           alt={alt}
           className={`h-full w-full object-contain p-2 transition-opacity ${state === "loaded" ? "opacity-100" : "opacity-0"}`}
           decoding="async"
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
           onLoad={() => {
             setState("loaded");
             setSlowLoading(false);
@@ -125,14 +134,7 @@ export function ProductImage({
             }
             setManualCheck(false);
           }}
-          onError={() => {
-            setState("broken");
-            setSlowLoading(false);
-            setManualCheck(false);
-            if (isExternalSrc && mappingId) {
-              void markProductImageBrokenAction(mappingId);
-            }
-          }}
+          onError={() => { setSlowLoading(false); setManualCheck(false); if (isExternalSrc && retryVersion === 0) { setState("retrying"); setRetryVersion(1); } else { setState("unavailable"); } }}
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center bg-slate-50 px-3 text-center">
@@ -140,7 +142,7 @@ export function ProductImage({
             IMG
           </span>
           <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {state === "broken" ? "Image failed" : state === "missing" ? "No image" : stateText}
+            {state === "broken" || state === "unavailable" ? "Image unavailable" : state === "missing" ? "No image" : stateText}
           </span>
           <span className="mt-1 max-w-36 text-xs text-slate-500">{state === "missing" ? "Use Listing Master or cache today's images" : stateText}</span>
           {showDebug && state === "broken" && validSrc && isExternalSrc ? (

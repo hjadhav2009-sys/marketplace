@@ -12,6 +12,7 @@ const cleanJson=(row:MarketplaceCatalogRowV1)=>{const values={productType:row.pr
 
 export async function mergeMarketplaceCatalogRows(input:{accountId:string;marketplace:Marketplace;rows:MarketplaceCatalogRowV1[];chunkSize?:number},client:Client=prisma):Promise<CatalogMergeResult>{
  const result:CatalogMergeResult={processed:0,inserted:0,enriched:0,unchanged:0,conflicts:[],warnings:[]};
+ const seenSellerSkus=new Set<string>();
  for(const sourceChunk of chunks(input.rows,input.chunkSize??250)){
   const rows=sourceChunk.map(normalizeCatalogRow).filter(row=>row.accountId===input.accountId&&row.marketplace===input.marketplace);result.processed+=rows.length;
   const sellerSkus=[...new Set(rows.map(row=>row.sellerSku).filter((v):v is string=>Boolean(v)))];const identifiers=rows.flatMap(identityEntries);
@@ -20,7 +21,7 @@ export async function mergeMarketplaceCatalogRows(input:{accountId:string;market
    identifiers.length?client.marketplaceListingIdentifier.findMany({where:{accountId:input.accountId,marketplace:input.marketplace,active:true,OR:[...new Map(identifiers.map(item=>[key(item.type,item.normalized),{identifierType:item.type,normalizedValue:item.normalized}])).values()]},select:{marketplaceListingId:true,identifierType:true,normalizedValue:true}}):[]
   ]);
   const bySku=new Map(bySkuRows.map(item=>[normalizeListingIdentifier("SELLER_SKU",item.sellerSkuId)!,item]));const byIdentifier=new Map<string,Set<string>>();for(const item of idRows){const k=key(item.identifierType,item.normalizedValue);const set=byIdentifier.get(k)??new Set<string>();set.add(item.marketplaceListingId);byIdentifier.set(k,set);}
-  for(const row of rows){const entries=identityEntries(row);let listing=row.sellerSku?bySku.get(normalizeListingIdentifier("SELLER_SKU",row.sellerSku)!):undefined;const exactIds=[...new Set(entries.flatMap(item=>[...(byIdentifier.get(key(item.type,item.normalized))??[])]))];
+  for(const row of rows){const entries=identityEntries(row);const normalizedSellerSku=row.sellerSku?normalizeListingIdentifier("SELLER_SKU",row.sellerSku):null;if(normalizedSellerSku&&seenSellerSkus.has(normalizedSellerSku))result.warnings.push(conflict(row,"Duplicate Seller SKU source row was safely merged into the canonical account-scoped listing.","Nonblank existing information and identifiers were preserved."));if(normalizedSellerSku)seenSellerSkus.add(normalizedSellerSku);let listing=normalizedSellerSku?bySku.get(normalizedSellerSku):undefined;const exactIds=[...new Set(entries.flatMap(item=>[...(byIdentifier.get(key(item.type,item.normalized))??[])]))];
    if(listing&&exactIds.some(id=>id!==listing!.id)){result.conflicts.push(conflict(row,"Identifiers resolve to a different same-account product.","Existing products were preserved; owner review is required."));continue;}
    if(!listing&&exactIds.length===1)listing=await client.marketplaceListing.findFirst({where:{id:exactIds[0],accountId:input.accountId,marketplace:input.marketplace},include:{identifiers:{where:{active:true}}}})??undefined;
    if(!listing&&exactIds.length>1){result.conflicts.push(conflict(row,"Identifiers resolve to multiple same-account products.","No merge was applied."));continue;}

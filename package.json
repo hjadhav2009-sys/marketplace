@@ -46,6 +46,7 @@
     "selected-account-scanner:test": "tsx tests/selected-account-scanner.test.ts",
     "grouped-work:test": "tsx tests/grouped-work.test.ts",
     "smart-stage-entry:test": "tsx tests/grouped-work.test.ts",
+    "grouped-details:test": "tsx tests/grouped-details-progress.test.ts",
     "fresh-db:inspect": "node scripts/fresh-db/inspect.mjs",
     "fresh-db:backup": "node scripts/fresh-db/backup.mjs",
     "fresh-db:test-reset": "node scripts/fresh-db/test-reset.mjs",

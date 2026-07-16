@@ -1299,7 +1299,7 @@ assert.doesNotMatch(pickerProductCardComponent, /href=.*picker\/\$\{/, "Picker c
 assert.match(productDetailsDrawerComponent, /fetch\(detailsUrl/, "Product details drawer fetches heavy detail data only after opening");
 assert.match(pickerDetailsRoute, /getSkuDetail/, "Picker details drawer route reuses the full SKU detail query");
 assert.match(pickerProductCardComponent, /window\.location\.assign[\s\S]*\/picker\//, "Picker card opens the explicit post-pick route chooser");
-assert.match(pickerActions, /completeOrderPickWithRoute/, "Picker route action uses the authoritative route service");
+assert.match(pickerActions, /completePickWithNextRoute/, "Picker route action uses the authoritative route service");
 assert.match(pickerActions, /markSkuGroupProblemInlineAction[\s\S]*return \{ ok: true, affectedOrders: orders\.length/, "Direct picker problem action returns problem result without redirecting");
 assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
 assert.match(pickerDetailPage, /mapping\?\.cachedImageUrl/, "Picker detail uses cached image URL first");

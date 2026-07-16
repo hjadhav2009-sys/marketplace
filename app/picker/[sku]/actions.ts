@@ -8,7 +8,7 @@ import { decodePickerDimension, pickerDetailPath } from "@/lib/operations/pickin
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { hasWorkPermission } from "@/lib/work-permissions";
-import { completeOrderPickWithRoute } from "@/src/lib/workflow/route-selection";
+import { completePickWithNextRoute } from "@/src/lib/workflow/route-selection";
 
 function groupWhere(accountId: string, formData: FormData) {
   const sku = String(formData.get("sku") ?? "").trim();
@@ -41,7 +41,7 @@ export async function markSkuGroupPickedAction(formData: FormData) {
   if (!hasWorkPermission(user, "canPick")) redirect("/dashboard");
   const group = groupWhere(account.id, formData);
   const orders = await prisma.order.findMany({ where: group.where, select: { id: true } });
-  const result = await completeOrderPickWithRoute({ actorUserId: user.id, accountId: account.id, orderIds: orders.map((order) => order.id), route: String(formData.get("route") ?? ""), clientRequestId: String(formData.get("clientRequestId") ?? "") || undefined });
+  const result = await completePickWithNextRoute({ sourceType:"ORDER", actorUserId: user.id, accountId: account.id, orderIds: orders.map((order) => order.id), route: String(formData.get("route") ?? ""), clientRequestId: String(formData.get("clientRequestId") ?? "") || undefined });
 
   revalidatePath("/picker");
   redirect(`${pickerDetailPath(group.sku, group.color, group.size)}&picked=${result.updatedCount > 0 ? "1" : "already"}`);

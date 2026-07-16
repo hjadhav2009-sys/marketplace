@@ -198,3 +198,13 @@ export async function completeOrderPickWithRoute(input: {
 }
 
 export function processRouteForPostPickRoute(route: PostPickRoute) { return ROUTE_TO_PROCESS[route]; }
+
+export function completePickWithNextRoute(input:{ sourceType:"ORDER"; orderIds:string[]; accountId:string; actorUserId:string; route:string; clientRequestId?:string },client?:Client):ReturnType<typeof completeOrderPickWithRoute>;
+export function completePickWithNextRoute(input:{ sourceType:"CONSIGNMENT"; taskId:string; accountId:string; actorUserId:string; expectedQuantity:number; route:string; clientRequestId?:string },client?:Client):ReturnType<typeof completeConsignmentPickWithRoute>;
+export function completePickWithNextRoute(input:
+  | { sourceType:"ORDER"; orderIds:string[]; accountId:string; actorUserId:string; route:string; clientRequestId?:string }
+  | { sourceType:"CONSIGNMENT"; taskId:string; accountId:string; actorUserId:string; expectedQuantity:number; route:string; clientRequestId?:string },
+  client:Client=prisma
+) {
+  return input.sourceType==="ORDER" ? completeOrderPickWithRoute(input,client) : completeConsignmentPickWithRoute(input,client);
+}

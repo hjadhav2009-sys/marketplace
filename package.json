@@ -44,6 +44,8 @@
     "adaptive-import:test": "tsx tests/adaptive-import.test.ts",
     "direct-stage-actions:test": "tsx tests/direct-stage-actions.test.ts",
     "selected-account-scanner:test": "tsx tests/selected-account-scanner.test.ts",
+    "grouped-work:test": "tsx tests/grouped-work.test.ts",
+    "smart-stage-entry:test": "tsx tests/grouped-work.test.ts",
     "fresh-db:inspect": "node scripts/fresh-db/inspect.mjs",
     "fresh-db:backup": "node scripts/fresh-db/backup.mjs",
     "fresh-db:test-reset": "node scripts/fresh-db/test-reset.mjs",

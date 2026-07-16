@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { getAvailableAccounts, requireAccount, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { importSkuMappingFileAction } from "@/app/owner/sku-mappings/import/actions";
-import { createAmazonOrderImportAction, createFlipkartOrderImportAction, createUploadBatchAction } from "../actions";
+import { createFlipkartOrderImportAction, createUploadBatchAction } from "../actions";
 
 type UploadPageProps = {
   searchParams?: Promise<{
@@ -34,6 +34,7 @@ function errorText(error: string | undefined) {
   if (error === "flipkart-order-import-failed") {
     return "The Flipkart order file could not be imported. Check the headers and try again.";
   }
+  if (error === "amazon-daily-orders-disabled") return "Amazon Daily Orders are currently disabled. Product Catalog and Consignments remain available.";
 
   if (error === "too-large") {
     return "The PDF upload is larger than 100 MB. Split the marketplace download into smaller files and upload again.";
@@ -99,7 +100,6 @@ export default async function UploadBatchPage({ searchParams }: UploadPageProps)
         selectedAccountId={selectedAccount.id}
         listingAction={importSkuMappingFileAction}
         flipkartOrdersAction={createFlipkartOrderImportAction}
-        amazonOrdersAction={createAmazonOrderImportAction}
         legacyPdfAction={createUploadBatchAction}
       />
     </AppShell>

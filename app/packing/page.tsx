@@ -52,9 +52,9 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
       />
       <UniversalScannerPanel
         actorUserId={user.id}
+        selectedAccountId={account.id}
         query={params?.q}
         intent={params?.intent === "PICK" || params?.intent === "MARK" || params?.intent === "ASSEMBLE" || params?.intent === "PACK" ? params.intent : "ANY"}
-        accountId={params?.accountId}
         success={params?.scanSuccess}
         error={params?.scanError}
         actionPath="/packing"

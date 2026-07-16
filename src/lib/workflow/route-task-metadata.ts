@@ -41,6 +41,9 @@ export function buildOrderMarkingMetadata(input: RouteSnapshotV1 & { marketplace
   const markingAssetName = optionalText(input.asset.name, 160);
   const sellerSkuSnapshot = optionalText(input.sellerSkuSnapshot, 160);
   if (!markingAssetName || !sellerSkuSnapshot || !input.asset.id || !input.marketplaceListingId || !input.processRuleId || !input.requestedByUserId) throw new Error("Marking instructions are incomplete for this product.");
+  const hasInstructions = Boolean(optionalText(input.asset.instructions));
+  const hasOperationalDesign = Boolean(optionalText(input.asset.masterDesignId, 160) && optionalText(input.asset.markingPosition, 500) && input.asset.markingWidthMm && input.asset.markingHeightMm && input.asset.powerSetting != null && input.asset.speedSetting != null);
+  if (!hasInstructions && !hasOperationalDesign) throw new Error("Marking instructions need owner review.");
   return {
     version: 1, routeChoice: input.routeChoice, processRoute: input.processRoute, requestFingerprint: input.requestFingerprint,
     source: "PROCESS_RULE", marketplaceListingId: input.marketplaceListingId, processRuleId: input.processRuleId,

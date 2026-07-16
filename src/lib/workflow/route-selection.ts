@@ -39,7 +39,7 @@ function baseRouteMetadata(route: PostPickRoute, requestFingerprint: string): Ro
   return { version: 1, routeChoice: route, processRoute: ROUTE_TO_PROCESS[route], requestFingerprint };
 }
 
-async function resolveRouteStageMetadata(tx: Transaction, input: { accountId: string; actorUserId: string; sourceType: "ORDER" | "CONSIGNMENT"; sourceId: string; route: PostPickRoute; requestFingerprint: string }) {
+export async function resolveRouteStageMetadata(tx: Transaction, input: { accountId: string; actorUserId: string; sourceType: "ORDER" | "CONSIGNMENT"; sourceId: string; route: PostPickRoute; requestFingerprint: string }) {
   const base = baseRouteMetadata(input.route, input.requestFingerprint);
   if (input.route === "DIRECT_PACK") return new Map<WorkStage, string>();
   const needsMark = input.route === "MARK" || input.route === "MARK_ASSEMBLE";

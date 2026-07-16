@@ -22,6 +22,14 @@ enum BatchStatus {
   REVIEWED
   IMPORTED
   FAILED
+  NEEDS_MAPPING
+}
+
+enum MarketplaceImportPurpose {
+  PRODUCT_CATALOG
+  DAILY_ORDER
+  CONSIGNMENT_QUANTITY
+  CONSIGNMENT_ENRICHMENT
 }
 
 enum ImportType {
@@ -347,6 +355,8 @@ model Account {
   workActionLogs      WorkActionLog[]
   consignmentBatches  ConsignmentBatch[]
   consignmentLines    ConsignmentLine[]
+  fileProfiles        MarketplaceFileProfile[]
+  workChangeEvents    WorkChangeEvent[]
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
 
@@ -623,6 +633,9 @@ model WorkTask {
   problemResolvedBy       User?            @relation("WorkTaskProblemResolvedBy", fields: [problemResolvedByUserId], references: [id], onDelete: SetNull)
   statusBeforeProblem     WorkTaskStatus?
   metadataJson            String?
+  workCardSnapshotJson    String?
+  routeSnapshotJson       String?
+  version                 Int              @default(1)
   actionLogs              WorkActionLog[]
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
@@ -639,6 +652,21 @@ model WorkTask {
   @@index([accountId, assignedUserId, stage, status])
   @@index([accountId, stage, status, completedAt])
   @@index([consignmentLineId, stage, status])
+}
+
+model WorkChangeEvent {
+  id          Int       @id @default(autoincrement())
+  accountId   String
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  eventType   String
+  sourceType  String
+  stage       WorkStage?
+  groupKey    String?
+  entityId    String?
+  createdAt   DateTime  @default(now())
+
+  @@index([accountId, id])
+  @@index([accountId, stage, id])
 }
 
 model WorkActionLog {
@@ -870,6 +898,8 @@ model UploadBatch {
   skippedRows      Int                @default(0)
   errorRows        Int                @default(0)
   notes            String?
+  fileProfileId    String?
+  fileProfile      MarketplaceFileProfile? @relation(fields: [fileProfileId], references: [id], onDelete: SetNull)
   orders           Order[]
   issues           ImportRowIssue[]
   previewRows      UploadPreviewRow[]
@@ -878,6 +908,32 @@ model UploadBatch {
 
   @@index([accountId, createdAt])
   @@index([accountId, importType, createdAt])
+}
+
+model MarketplaceFileProfile {
+  id                    String                    @id @default(cuid())
+  accountId             String?
+  account               Account?                  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  marketplace           Marketplace
+  importPurpose         MarketplaceImportPurpose
+  profileName           String
+  headerFingerprint     String
+  workbookSignatureJson String?
+  fieldMappingJson      String
+  requiredFieldsJson    String
+  optionalFieldsJson    String?
+  dataSheetRuleJson     String?
+  dataStartRuleJson     String?
+  version               Int                       @default(1)
+  active                Boolean                   @default(true)
+  createdByUserId       String?
+  uploadBatches         UploadBatch[]
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@unique([marketplace, importPurpose, headerFingerprint, version])
+  @@index([accountId, marketplace, importPurpose, active])
+  @@index([marketplace, importPurpose, active])
 }
 
 model Order {

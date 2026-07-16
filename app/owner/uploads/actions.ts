@@ -27,6 +27,7 @@ import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/impor
 import { FLIPKART_IMPORT_MAX_BYTES, PDF_UPLOAD_MAX_BYTES, isUploadTooLarge } from "@/lib/upload-limits";
 import { accountSelectionSchema, flipkartOrderImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 import { parseAmazonOrderReport } from "@/lib/parsers/amazon-orders";
+import { assertMarketplaceCapability } from "@/src/lib/marketplace-capabilities";
 
 type PreviewRowDraft = {
   sourceFileName: string;
@@ -978,6 +979,7 @@ export async function createFlipkartOrderImportAction(formData: FormData) {
 export async function createAmazonOrderImportAction(formData: FormData) {
   const user=await requireUser(["OWNER"]);const selectedAccount=await requireAccount(user);const account=await ownerUploadAccount(formData,selectedAccount.id);const file=formData.get("amazonOrderFile");
   if(!account||account.marketplace!=="AMAZON")redirect("/owner/uploads/new?error=account");
+  try{assertMarketplaceCapability(account.marketplace,"dailyOrders");}catch{redirect("/owner/uploads/new?error=amazon-daily-orders-disabled");}
   if(!(file instanceof File)||file.size===0)redirect("/owner/uploads/new?error=missing-amazon-orders");
   if(file.size>25*1024*1024)redirect("/owner/uploads/new?error=amazon-order-file-too-large");
   if(!/\.(csv|tsv|txt)$/i.test(file.name))redirect("/owner/uploads/new?error=invalid-amazon-orders");

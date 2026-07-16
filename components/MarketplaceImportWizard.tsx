@@ -36,14 +36,12 @@ export function MarketplaceImportWizard({
   selectedAccountId,
   listingAction,
   flipkartOrdersAction,
-  amazonOrdersAction,
   legacyPdfAction
 }: {
   accounts: ImportAccount[];
   selectedAccountId: string;
   listingAction: WizardAction;
   flipkartOrdersAction: WizardAction;
-  amazonOrdersAction: WizardAction;
   legacyPdfAction: WizardAction;
 }) {
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
@@ -199,7 +197,7 @@ export function MarketplaceImportWizard({
           <><div className="rounded-md border border-teal-200 bg-white p-5 text-sm leading-6 text-slate-600">
             <h2 className="text-lg font-black text-slate-950">Amazon Product Inventory Refresh</h2>
             <p className="mt-2">Upload All Listings, category catalog XLSM/XLSX, product catalog TXT/TSV, supporting CSV files, multiple files, or ZIP. New consignments normally need only the shipment quantity file.</p><Link href="/owner/product-inventory/refresh" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 font-bold text-white">Open Product Inventory Refresh</Link>
-          </div><form action={amazonOrdersAction} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm"><input type="hidden" name="accountId" value={accountId}/><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Amazon</p><h2 className="text-lg font-black">Amazon Daily Orders</h2><p className="mt-2 text-sm text-slate-600">Upload the reviewed fulfilled-order CSV, TSV, or TXT report. Tracking ID, Amazon Order ID, Seller SKU, and quantity are required.</p><input name="amazonOrderFile" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" required className="mt-4 block w-full rounded-md border p-3"/><div className="mt-4"><SubmitButton pendingText="Importing orders...">Import Amazon Daily Orders</SubmitButton></div></form></>
+          </div><div className="rounded-md border border-amber-200 bg-amber-50 p-5"><p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Capability disabled</p><h2 className="text-lg font-black">Amazon Daily Orders</h2><p className="mt-2 text-sm text-amber-900">Daily Order imports are disabled for Amazon. Product Catalog refresh and Amazon Consignments remain available.</p></div></>
         ) : null}
       </div>
     </section>

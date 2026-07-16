@@ -30,7 +30,7 @@ export type OrderImportPlan = {
   missingImageRows: ParsedOrderImportRow[];
 };
 
-type ExistingOrder = Pick<Order, "awb" | "courier" | "sku" | "qty" | "color" | "size" | "orderNo" | "productDescription" | "paymentType">;
+type ExistingOrder = Pick<Order, "awb" | "courier" | "sku" | "qty" | "color" | "size" | "orderNo" | "productDescription" | "paymentType"> & Partial<Pick<Order, "shipmentId" | "orderItemId" | "trackingId">>;
 type MetadataMapping = Pick<SkuImageMapping, "id" | "sku" | "productName" | "color" | "size">;
 
 function trimValue(value?: string | null) {
@@ -50,7 +50,10 @@ function hasSafeOrderChanges(existing: ExistingOrder, row: ParsedOrderImportRow)
     trimValue(existing.size) !== trimValue(row.size) ||
     existing.orderNo !== trimValue(row.orderNo) ||
     trimValue(existing.productDescription) !== trimValue(row.productDescription) ||
-    existing.paymentType !== (row.paymentType ?? "UNKNOWN")
+    existing.paymentType !== (row.paymentType ?? "UNKNOWN") ||
+    (row.shipmentId != null && trimValue(existing.shipmentId) !== trimValue(row.shipmentId)) ||
+    (row.orderItemId != null && trimValue(existing.orderItemId) !== trimValue(row.orderItemId)) ||
+    (row.trackingId != null && trimValue(existing.trackingId) !== trimValue(row.trackingId))
   );
 }
 

@@ -7,6 +7,7 @@ import { getWorkTaskCapabilities, userCanViewAllConsignmentWork } from "./worker
 import { canOfferManualAssemblyDiversion, getOrderAssemblyPackingGate } from "./order-assembly";
 import { parseOrderAssemblyMetadata } from "./order-assembly-metadata";
 import type { OrderAssemblyPolicy } from "./order-assembly-policy";
+import { parseOrderMarkingMetadata } from "./route-task-metadata";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type UniversalScanIntent = "ANY" | "PICK" | "MARK" | "ASSEMBLE" | "PACK";
@@ -15,7 +16,7 @@ export type UniversalSourceFilter = "ALL" | "CUSTOMER_ORDERS" | "CONSIGNMENTS";
 export type UniversalWorkCandidate = {
   candidateKey: string;
   sourceType: "CUSTOMER_ORDER" | "CUSTOMER_ORDER_SHIPMENT" | "CONSIGNMENT_TASK";
-  actionType: "ORDER_PICK" | "ORDER_PACK" | "ORDER_SEND_TO_ASSEMBLY" | "ORDER_ASSEMBLY" | "ORDER_WAITING_ASSEMBLY" | "CONSIGNMENT_PICK" | "CONSIGNMENT_MARK" | "CONSIGNMENT_ASSEMBLE" | "CONSIGNMENT_PACK" | "PROBLEM" | "READ_ONLY";
+  actionType: "ORDER_PICK" | "ORDER_MARK" | "ORDER_PACK" | "ORDER_SEND_TO_ASSEMBLY" | "ORDER_ASSEMBLY" | "ORDER_WAITING_ASSEMBLY" | "CONSIGNMENT_PICK" | "CONSIGNMENT_MARK" | "CONSIGNMENT_ASSEMBLE" | "CONSIGNMENT_PACK" | "PROBLEM" | "READ_ONLY";
   sourceId: string;
   taskId?: string;
   orderId?: string;
@@ -167,7 +168,7 @@ function summarize(values: Array<string | null | undefined>, max = 3) {
 }
 
 function shipmentKey(order: { accountId: string; marketplace: string; trackingId: string | null }) {
-  return order.marketplace === "FLIPKART" && order.trackingId ? `${order.accountId}\u0000${order.trackingId}` : null;
+  return ["FLIPKART", "AMAZON"].includes(order.marketplace) && order.trackingId ? `${order.accountId}\u0000${order.marketplace}\u0000${order.trackingId}` : null;
 }
 
 export async function resolveUniversalWork(
@@ -222,7 +223,7 @@ export async function resolveUniversalWork(
     ? await client.order.findMany({
         where: {
           packStatus: { not: "PACKED" },
-          OR: trackedShipments.map((order) => ({ accountId: order.accountId, marketplace: "FLIPKART", trackingId: order.trackingId }))
+          OR: trackedShipments.map((order) => ({ accountId: order.accountId, marketplace: order.marketplace, trackingId: order.trackingId }))
         },
         select: {
           id: true, accountId: true, marketplace: true, shipmentId: true, orderItemId: true, fsn: true, trackingId: true, awb: true, sku: true, qty: true, orderNo: true,
@@ -248,6 +249,8 @@ export async function resolveUniversalWork(
     gate.tasks.forEach((task) => { if (task.orderId) assemblyTaskByOrder.set(task.orderId, task); });
     gate.policies.forEach((policy, orderId) => assemblyPolicyByOrder.set(orderId, policy));
   }
+  const orderMarkTasks = gateOrders.length ? await client.workTask.findMany({ where: { accountId: { in: accountIds }, sourceType: "ORDER", orderId: { in: gateOrders.map((order) => order.id) }, stage: "MARK", status: { in: ["READY", "IN_PROGRESS", "PROBLEM"] } }, select: { id: true, orderId: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, metadataJson: true, assignedUser: { select: { name: true } } } }) : [];
+  const orderMarkTaskByOrder = new Map(orderMarkTasks.flatMap((task) => task.orderId ? [[task.orderId, task] as const] : []));
 
   const listingIds = [...new Set(identifierRows.map((row) => row.marketplaceListingId))];
   const taskLineMatch: Prisma.ConsignmentLineWhereInput = {
@@ -305,6 +308,7 @@ export async function resolveUniversalWork(
     const account = accountMap.get(order.accountId);
     if (!account) continue;
     const wantsPick = intent === "ANY" || intent === "PICK";
+    const wantsMark = intent === "ANY" || intent === "MARK";
     const wantsPack = intent === "ANY" || intent === "PACK";
     const wantsAssembly = intent === "ANY" || intent === "ASSEMBLE";
     const isProblem = order.status === "PROBLEM" || order.pickStatus === "PROBLEM" || order.packStatus === "PROBLEM";
@@ -337,6 +341,14 @@ export async function resolveUniversalWork(
     }
     if (!isProblem && wantsPick && order.pickStatus === "READY" && order.packStatus !== "PACKED" && hasWorkPermission(scope.user, "canPick")) {
       candidates.push({ ...common, candidateKey: `order:${order.id}:pick`, actionType: "ORDER_PICK", status: order.pickStatus, canAct: true });
+    }
+    const markTask = orderMarkTaskByOrder.get(order.id);
+    if (!isProblem && wantsMark && markTask) {
+      const metadata = parseOrderMarkingMetadata(markTask.metadataJson);
+      const assignedElsewhere = Boolean(markTask.assignedUserId && markTask.assignedUserId !== scope.user.id && scope.user.role !== "OWNER");
+      const canMark = hasWorkPermission(scope.user, "canMark");
+      const canAct = canMark && !assignedElsewhere && markTask.status !== "PROBLEM" && Boolean(metadata);
+      candidates.push({ ...common, candidateKey: `order-mark:${markTask.id}`, sourceId: markTask.id, taskId: markTask.id, actionType: markTask.status === "PROBLEM" ? "PROBLEM" : "ORDER_MARK", sourceLabel: markTask.status === "PROBLEM" ? "Order marking problem" : "Order Marking", stage: "MARK", status: markTask.status, requiredQuantity: markTask.requiredQuantity, completedQuantity: markTask.completedQuantity, remainingQuantity: markTask.requiredQuantity - markTask.completedQuantity, assignedUserId: markTask.assignedUserId, assignedUserName: markTask.assignedUser?.name, markingMasterDesignId: metadata?.masterDesignId, markingAssetName: metadata?.markingAssetName, markingPosition: metadata?.markingPosition, markingWidthMm: metadata?.markingWidthMm, markingHeightMm: metadata?.markingHeightMm, markingPower: metadata?.powerSetting, markingSpeed: metadata?.speedSetting, markingFrequency: metadata?.frequencySetting, markingPasses: metadata?.passes, markingInstructions: metadata?.instructions, canAct, readOnlyReason: markTask.status === "PROBLEM" ? "Problem requires review." : !metadata ? "Marking instructions are malformed." : assignedElsewhere ? "Marking is assigned to another worker." : canMark ? null : "Read-only work view." });
     }
     const assemblyState = assemblyStateByOrder.get(order.id);
     const assemblyTask = assemblyTaskByOrder.get(order.id);
@@ -373,7 +385,7 @@ export async function resolveUniversalWork(
         sourceType: "CUSTOMER_ORDER_SHIPMENT",
         candidateKey: `order-shipment:${order.accountId}:${order.trackingId}`,
         actionType: "ORDER_PACK",
-        sourceLabel: "Flipkart shipment",
+        sourceLabel: `${order.marketplace === "AMAZON" ? "Amazon" : "Flipkart"} shipment`,
         displayReference: order.trackingId ?? order.awb,
         productSummary: summarize(shipment.map((item) => item.productDescription ?? item.sku)) ?? undefined,
         orderNumber: summarize(shipment.map((item) => item.orderNo)),

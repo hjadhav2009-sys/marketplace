@@ -22,11 +22,12 @@ export async function UniversalScannerPanel({ actorUserId, query, intent = "ANY"
   </section>;
 }
 
-type CandidateAction = { value: "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_CLAIM" | "TASK_COMPLETE"; label: string };
+type CandidateAction = { value: "ORDER_MARK_COMPLETE" | "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_CLAIM" | "TASK_COMPLETE"; label: string };
 function UniversalCandidateCard({ candidate, code, intent, sourceFilter, accountFilter, returnPath }: { candidate: UniversalWorkCandidate; code: string; intent: UniversalScanIntent; sourceFilter: UniversalSourceFilter; accountFilter?: string; returnPath: string }) {
   const actions: CandidateAction[] = [];
   if (candidate.canAct) {
     if (candidate.actionType === "ORDER_PACK") actions.push({ value: "ORDER_PACK", label: "Pack order" });
+    else if (candidate.actionType === "ORDER_MARK") actions.push({ value: "ORDER_MARK_COMPLETE", label: "Complete marking" });
     else if (candidate.actionType === "ORDER_SEND_TO_ASSEMBLY") { /* Explicit form rendered below. */ }
     else if (candidate.actionType === "ORDER_ASSEMBLY") { if (candidate.status === "READY" && !candidate.assignedUserId) actions.push({ value: "ASSEMBLY_CLAIM", label: "Start" }); actions.push({ value: "ASSEMBLY_COMPLETE", label: "Assembly Completed" }, { value: "ASSEMBLY_PROBLEM", label: "Report Problem" }); }
     else { if (candidate.status === "READY" && !candidate.assignedUserId) actions.push({ value: "TASK_CLAIM", label: "Start" }); if(candidate.stage!=="PICK") actions.push({ value: "TASK_COMPLETE", label: candidate.stage==="ASSEMBLE"?"Assembly Completed":"Complete stage" }); }

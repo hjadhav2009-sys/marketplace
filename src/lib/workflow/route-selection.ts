@@ -3,9 +3,13 @@ import { Prisma, type PrismaClient, type ProcessRoute, type WorkStage } from "@p
 import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { assertWorkerAccountAccess } from "./worker-access";
+import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
+import { buildOrderAssemblyMetadata } from "./order-assembly-metadata";
+import { buildConsignmentAssemblyMetadata, buildOrderMarkingMetadata, parseConsignmentAssemblyMetadata, parseOrderMarkingMetadata, type RouteSnapshotV1 } from "./route-task-metadata";
 
 type Client = PrismaClient;
 type Transaction = Prisma.TransactionClient;
+type RouteListing = Prisma.MarketplaceListingGetPayload<{ include: { processRules: { include: { markingAsset: true } } } }>;
 
 export const POST_PICK_ROUTES = ["DIRECT_PACK", "MARK", "ASSEMBLE", "MARK_ASSEMBLE"] as const;
 export type PostPickRoute = (typeof POST_PICK_ROUTES)[number];
@@ -30,6 +34,55 @@ type RouteMetadata = {
   processRoute: ProcessRoute;
   requestFingerprint: string;
 };
+
+function baseRouteMetadata(route: PostPickRoute, requestFingerprint: string): RouteSnapshotV1 {
+  return { version: 1, routeChoice: route, processRoute: ROUTE_TO_PROCESS[route], requestFingerprint };
+}
+
+async function resolveRouteStageMetadata(tx: Transaction, input: { accountId: string; actorUserId: string; sourceType: "ORDER" | "CONSIGNMENT"; sourceId: string; route: PostPickRoute; requestFingerprint: string }) {
+  const base = baseRouteMetadata(input.route, input.requestFingerprint);
+  if (input.route === "DIRECT_PACK") return new Map<WorkStage, string>();
+  const needsMark = input.route === "MARK" || input.route === "MARK_ASSEMBLE";
+  const needsAssembly = input.route === "ASSEMBLE" || input.route === "MARK_ASSEMBLE";
+  let sku = "";
+  let productTitle: string | null = null;
+  let productImage: string | null = null;
+  let listing: RouteListing | null = null;
+  if (input.sourceType === "ORDER") {
+    const order = await tx.order.findFirst({ where: { id: input.sourceId, accountId: input.accountId }, select: { sku: true, productDescription: true, imageUrl: true } });
+    if (!order) throw new Error("Order is unavailable while resolving route instructions.");
+    sku = order.sku; productTitle = order.productDescription; productImage = order.imageUrl;
+    const identifiers = ["SELLER_SKU", "INTERNAL_SKU"] as const;
+    const lookups = identifiers.flatMap((identifierType) => { const normalizedValue = normalizeListingIdentifier(identifierType, sku); return normalizedValue ? [{ identifierType, normalizedValue }] : []; });
+    const matches = lookups.length ? await tx.marketplaceListingIdentifier.findMany({ where: { accountId: input.accountId, active: true, OR: lookups }, select: { marketplaceListingId: true } }) : [];
+    const listingIds = [...new Set(matches.map((match) => match.marketplaceListingId))];
+    if (listingIds.length !== 1) throw new Error(listingIds.length ? "Product instructions are ambiguous; ask an owner to correct the listing match." : "No reviewed process rule exists for this product and route.");
+    listing = await tx.marketplaceListing.findFirst({ where: { id: listingIds[0], accountId: input.accountId }, include: { processRules: { where: { active: true, route: ROUTE_TO_PROCESS[input.route] }, include: { markingAsset: true }, take: 2 } } });
+  } else {
+    const line = await tx.consignmentLine.findFirst({ where: { id: input.sourceId, accountId: input.accountId }, select: { sellerSkuSnapshot: true, sellerSkuSource: true, productTitleSnapshot: true, productImageSnapshot: true, marketplaceListing: { include: { processRules: { where: { active: true, route: ROUTE_TO_PROCESS[input.route] }, include: { markingAsset: true }, take: 2 } } } } });
+    if (!line?.marketplaceListing) throw new Error("No reviewed process rule exists for this consignment item and route.");
+    sku = line.sellerSkuSnapshot ?? line.sellerSkuSource ?? ""; productTitle = line.productTitleSnapshot; productImage = line.productImageSnapshot;
+    listing = line.marketplaceListing;
+  }
+  if (!listing) throw new Error("No reviewed product listing exists for this route.");
+  const rules = listing.processRules;
+  if (rules.length !== 1) throw new Error(rules.length ? "More than one active process rule matches this route." : "No active process rule contains instructions for this route.");
+  const rule = rules[0];
+  const metadata = new Map<WorkStage, string>();
+  if (needsMark) {
+    if (!rule.markingRequired || !rule.markingAsset?.active) throw new Error("Usable marking instructions are required before sending this work to Marking.");
+    metadata.set("MARK", JSON.stringify(buildOrderMarkingMetadata({ ...base, marketplaceListingId: listing!.id, processRuleId: rule.id, asset: rule.markingAsset, sellerSkuSnapshot: sku, productTitleSnapshot: listing!.productTitle ?? productTitle, productImageSnapshot: listing!.mainImageUrl ?? productImage, requestedByUserId: input.actorUserId })));
+  }
+  if (needsAssembly) {
+    if (!rule.assemblyRequired || !rule.assemblyTitle?.trim() || !rule.assemblyInstructions?.trim()) throw new Error("Usable assembly title and instructions are required before sending this work to Assembly.");
+    if (input.sourceType === "ORDER") {
+      metadata.set("ASSEMBLE", JSON.stringify({ ...buildOrderAssemblyMetadata({ source: "PROCESS_RULE", marketplaceListingId: listing!.id, processRuleId: rule.id, assemblyTitle: rule.assemblyTitle, assemblyInstructions: rule.assemblyInstructions, assemblyImageUrl: rule.assemblyImageUrl ?? undefined, sellerSkuSnapshot: sku, productTitleSnapshot: listing!.productTitle ?? productTitle ?? undefined, productImageSnapshot: listing!.mainImageUrl ?? productImage ?? undefined, requestedByUserId: input.actorUserId, requiredByRule: true }), ...base }));
+    } else {
+      metadata.set("ASSEMBLE", JSON.stringify(buildConsignmentAssemblyMetadata({ ...base, processRuleId: rule.id, assemblyTitle: rule.assemblyTitle, assemblyInstructions: rule.assemblyInstructions, assemblyImageUrl: rule.assemblyImageUrl ?? undefined, sellerSkuSnapshot: sku, productTitleSnapshot: listing!.productTitle ?? productTitle ?? undefined, productImageSnapshot: listing!.mainImageUrl ?? productImage ?? undefined, requestedByUserId: input.actorUserId })));
+    }
+  }
+  return metadata;
+}
 
 function routeMetadata(value: string | null): RouteMetadata | null {
   if (!value) return null;
@@ -72,6 +125,7 @@ async function replaceDownstreamTasks(tx: Transaction, input: {
   quantity: number;
   route: PostPickRoute;
   requestFingerprint: string;
+  stageMetadata: Map<WorkStage, string>;
 }) {
   const sourceWhere = input.sourceType === "ORDER" ? { orderId: input.sourceId } : { consignmentLineId: input.sourceId };
   const existing = await tx.workTask.findMany({ where: { accountId: input.accountId, ...sourceWhere, stage: { not: "PICK" } } });
@@ -80,7 +134,7 @@ async function replaceDownstreamTasks(tx: Transaction, input: {
   }
   if (existing.length) await tx.workTask.deleteMany({ where: { id: { in: existing.map((task) => task.id) } } });
 
-  const metadataJson = JSON.stringify({ version: 1, routeChoice: input.route, processRoute: ROUTE_TO_PROCESS[input.route], requestFingerprint: input.requestFingerprint } satisfies RouteMetadata);
+  const metadataJson = JSON.stringify(baseRouteMetadata(input.route, input.requestFingerprint));
   const stages = ROUTE_STAGES[input.route];
   for (let index = 0; index < stages.length; index += 1) {
     await tx.workTask.create({ data: {
@@ -92,7 +146,7 @@ async function replaceDownstreamTasks(tx: Transaction, input: {
       sequenceNumber: index + 2,
       requiredQuantity: input.quantity,
       status: index === 0 ? "READY" : "LOCKED",
-      metadataJson
+      metadataJson: input.stageMetadata.get(stages[index]) ?? metadataJson
     } });
   }
 }
@@ -121,7 +175,8 @@ async function completePickTask(tx: Transaction, input: {
   if (pick && (pick.status === "PROBLEM" || pick.status === "CANCELLED" || pick.status === "SKIPPED")) throw new Error("Picking cannot be completed from its current state.");
   if (pick && pick.assignedUserId && pick.assignedUserId !== input.actorUserId) throw new Error("This picking work was taken by another worker.");
 
-  await replaceDownstreamTasks(tx, input);
+  const stageMetadata = await resolveRouteStageMetadata(tx, input);
+  await replaceDownstreamTasks(tx, { ...input, stageMetadata });
   const metadataJson = JSON.stringify({ version: 1, routeChoice: input.route, processRoute: ROUTE_TO_PROCESS[input.route], requestFingerprint: input.requestFingerprint } satisfies RouteMetadata);
   if (!pick) {
     pick = await tx.workTask.create({ data: {
@@ -163,7 +218,10 @@ export async function completeConsignmentPickWithRoute(input: {
     const requestFingerprint = fingerprint({ sourceType: "CONSIGNMENT", sourceIds: [task.consignmentLine.id], route });
     const result = await completePickTask(tx, { accountId: input.accountId, actorUserId: user.id, sourceType: "CONSIGNMENT", sourceId: task.consignmentLine.id, quantity: task.requiredQuantity, route, requestFingerprint, clientRequestId: input.clientRequestId, existingTaskId: task.id });
     if (!result.idempotent) {
-      await tx.consignmentLine.update({ where: { id: task.consignmentLine.id }, data: { processRoute: ROUTE_TO_PROCESS[route] } });
+      const downstream = await tx.workTask.findMany({ where: { consignmentLineId: task.consignmentLine.id, stage: { in: ["MARK", "ASSEMBLE"] } }, select: { stage: true, metadataJson: true } });
+      const marking = parseOrderMarkingMetadata(downstream.find((item) => item.stage === "MARK")?.metadataJson);
+      const assembly = parseConsignmentAssemblyMetadata(downstream.find((item) => item.stage === "ASSEMBLE")?.metadataJson);
+      await tx.consignmentLine.update({ where: { id: task.consignmentLine.id }, data: { processRoute: ROUTE_TO_PROCESS[route], processRuleId: marking?.processRuleId ?? assembly?.processRuleId ?? null, markingAssetId: marking?.markingAssetId ?? null } });
       await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "CONSIGNMENT_POST_PICK_ROUTE_SELECTED", entityType: "ConsignmentLine", entityId: task.consignmentLine.id, metadata: JSON.stringify({ route }) } });
     }
     return { ...result, route, processRoute: ROUTE_TO_PROCESS[route] };

@@ -61,10 +61,10 @@ export async function resolveOrderPackScope(
 
   const shipmentOrders = await client.order.findMany({
     where:
-      primaryOrder.marketplace === "FLIPKART" && primaryOrder.trackingId
+      ["FLIPKART", "AMAZON"].includes(primaryOrder.marketplace) && primaryOrder.trackingId
         ? {
             accountId: input.accountId,
-            marketplace: "FLIPKART",
+            marketplace: primaryOrder.marketplace,
             trackingId: primaryOrder.trackingId,
             packStatus: { not: "PACKED" }
           }

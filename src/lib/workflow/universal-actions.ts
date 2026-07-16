@@ -7,10 +7,11 @@ import { packCustomerOrderShipmentSafely } from "./order-pack-scope";
 import { claimOrderAssemblyTask, completeOrderAssemblyTask, reportOrderAssemblyProblem, sendOrderToAssembly } from "./order-assembly";
 import { completePickWithNextRoute } from "./route-selection";
 import { markCustomerOrdersPickedSafely } from "./order-picking";
+import { completeOrderMarkingTask } from "./order-route-tasks";
 
 type Client = PrismaClient;
-export type UniversalCandidateAction = "ORDER_PICK" | "ORDER_PICK_ROUTE" | "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_PICK_ROUTE" | "TASK_CLAIM" | "TASK_INCREMENT" | "TASK_COMPLETE";
-const UNIVERSAL_ACTIONS = new Set<UniversalCandidateAction>(["ORDER_PICK", "ORDER_PICK_ROUTE", "ORDER_PACK", "ASSEMBLY_SEND", "ASSEMBLY_CLAIM", "ASSEMBLY_COMPLETE", "ASSEMBLY_PROBLEM", "TASK_PICK_ROUTE", "TASK_CLAIM", "TASK_INCREMENT", "TASK_COMPLETE"]);
+export type UniversalCandidateAction = "ORDER_PICK" | "ORDER_PICK_ROUTE" | "ORDER_MARK_COMPLETE" | "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_PICK_ROUTE" | "TASK_CLAIM" | "TASK_INCREMENT" | "TASK_COMPLETE";
+const UNIVERSAL_ACTIONS = new Set<UniversalCandidateAction>(["ORDER_PICK", "ORDER_PICK_ROUTE", "ORDER_MARK_COMPLETE", "ORDER_PACK", "ASSEMBLY_SEND", "ASSEMBLY_CLAIM", "ASSEMBLY_COMPLETE", "ASSEMBLY_PROBLEM", "TASK_PICK_ROUTE", "TASK_CLAIM", "TASK_INCREMENT", "TASK_COMPLETE"]);
 
 export async function applyUniversalCandidateAction(input: {
   actorUserId: string;
@@ -35,6 +36,7 @@ export async function applyUniversalCandidateAction(input: {
   if (input.action === "ASSEMBLY_PROBLEM") return reportOrderAssemblyProblem({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", reason: "OTHER", note: "Reported from universal scanner.", clientRequestId: input.clientRequestId }, client);
   if (input.action === "TASK_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"CONSIGNMENT", taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedQuantity: input.expectedQuantity ?? -1, route: input.route ?? "", clientRequestId: input.clientRequestId }, client);
   if (input.action === "ORDER_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"ORDER", orderIds: [input.sourceId], accountId: input.accountId, actorUserId: input.actorUserId, route: input.route ?? "", clientRequestId: input.clientRequestId }, client);
+  if (input.action === "ORDER_MARK_COMPLETE") return completeOrderMarkingTask({ taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedStatus: input.expectedStatus ?? "", clientRequestId: input.clientRequestId }, client);
 
   if (input.action.startsWith("TASK_")) {
     if (input.action === "TASK_CLAIM") return claimWorkTask({ taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, clientRequestId: input.clientRequestId }, client);

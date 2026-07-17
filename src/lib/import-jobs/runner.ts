@@ -13,7 +13,8 @@ import {
   createImportJob,
   findImportJobById,
   type ImportJobRecord,
-  type ImportJobType
+  type ImportJobType,
+  renewImportJobLease
 } from "./store";
 
 export const IMPORT_JOB_STORAGE_DIR = path.join(process.cwd(), "storage", "import-jobs");
@@ -129,6 +130,8 @@ async function loadJobActors(job: ImportJobRecord) {
 
 async function applyAdaptiveHeaderProfile(job:ImportJobRecord,rows:RawImportRow[],account:Account){const definition=definitionForImportJob(job);return definition?applyAdaptiveRows({jobId:job.id,accountId:account.id,marketplace:definition.marketplace,purpose:definition.purpose,rows}):rows;}
 
+async function withHeartbeat<T>(id:string,runnerId:string,stage:string,operation:()=>Promise<T>){await heartbeat(id,runnerId,stage);let lost:unknown=null,busy=false;const timer=setInterval(()=>{if(busy||lost)return;busy=true;void heartbeat(id,runnerId,stage).catch(error=>{lost=error;}).finally(()=>{busy=false;});},30000);try{const result=await operation();if(lost)throw lost;await heartbeat(id,runnerId,stage);return result;}finally{clearInterval(timer);}}
+
 export async function processImportJob(jobId: string, request?: RequestMeta) {
   const now=new Date(),runnerId=`import-runner:${randomUUID()}`,claimed=await prisma.importJob.updateMany({where:{id:jobId,attemptNumber:{lt:10},OR:[{status:"QUEUED"},{status:"RUNNING",OR:[{leaseExpiresAt:null},{leaseExpiresAt:{lt:now}}]}]},data:{status:"RUNNING",stage:"PARSING",startedAt:now,runnerId,heartbeatAt:now,leaseExpiresAt:new Date(now.getTime()+120000),attemptNumber:{increment:1},lastError:null}});if(claimed.count!==1)return;
   const job = await findImportJobById(jobId);
@@ -142,33 +145,33 @@ export async function processImportJob(jobId: string, request?: RequestMeta) {
   }
 
   try {
-  if(await finishIfCancelled(job.id,runnerId))return;let rows = await parseSpreadsheetRowsFromPath(job.filePath);if(await finishIfCancelled(job.id,runnerId))return;await heartbeat(job.id,runnerId,"MAPPING");
+  if(await finishIfCancelled(job.id,runnerId))return;let rows = await withHeartbeat(job.id,runnerId,"PARSING",()=>parseSpreadsheetRowsFromPath(job.filePath!));if(await finishIfCancelled(job.id,runnerId))return;await heartbeat(job.id,runnerId,"MAPPING");
   const { account, user } = await loadJobActors(job);
 
-  const mappedRows=await applyAdaptiveHeaderProfile(job,rows,account);if(!mappedRows){await prisma.importJob.updateMany({where:{id:job.id,runnerId},data:{runnerId:null,leaseExpiresAt:null}});return;}rows=mappedRows;await heartbeat(job.id,runnerId,"IMPORTING");
+  const mappedRows=await withHeartbeat(job.id,runnerId,"MAPPING",()=>applyAdaptiveHeaderProfile(job,rows,account));if(!mappedRows){await prisma.importJob.updateMany({where:{id:job.id,runnerId},data:{runnerId:null,leaseExpiresAt:null}});return;}rows=mappedRows;await heartbeat(job.id,runnerId,"IMPORTING");
 
   if (job.importType === "FLIPKART_LISTING_MASTER") {
-    const batch = await importFlipkartListingRows({
+    const batch = await withHeartbeat(job.id,runnerId,"IMPORTING",()=>importFlipkartListingRows({
       rows,
       fileName: job.fileName,
       account,
       user,
       request,
-      jobId: job.id
-    });
+      jobId: job.id,runnerId,assertLease:()=>heartbeat(job.id,runnerId,"IMPORTING")
+    }));
     await completeOwned(job.id,runnerId,batch.id);
     return;
   }
 
   if (job.importType === "FLIPKART_ORDER") {
-    const batch = await importFlipkartOrderRows({
+    const batch = await withHeartbeat(job.id,runnerId,"IMPORTING",()=>importFlipkartOrderRows({
       rows,
       fileName: job.fileName,
       account,
       user,
       request,
-      jobId: job.id
-    });
+      jobId: job.id,runnerId,assertLease:()=>heartbeat(job.id,runnerId,"IMPORTING")
+    }));
     await completeOwned(job.id,runnerId,batch.id);
     return;
   }
@@ -177,6 +180,6 @@ export async function processImportJob(jobId: string, request?: RequestMeta) {
   }catch(error){const message=(error instanceof Error?error.message:"Import failed.").replace(/[A-Z]:\\[^\s]+/gi,"[private path]").slice(0,500);await prisma.importJob.updateMany({where:{id:job.id,runnerId},data:{status:"FAILED",stage:"FAILED",lastError:message,finishedAt:new Date(),runnerId:null,leaseExpiresAt:null}});throw error;}
 }
 
-async function heartbeat(id:string,runnerId:string,stage:string){const now=new Date(),result=await prisma.importJob.updateMany({where:{id,runnerId},data:{stage,heartbeatAt:now,leaseExpiresAt:new Date(now.getTime()+120000)}});if(result.count!==1)throw new Error("Import runner lease was lost.");}
-async function completeOwned(id:string,runnerId:string,batchId:string){const result=await prisma.importJob.updateMany({where:{id,runnerId},data:{status:"COMPLETED",stage:"COMPLETED",batchId,finishedAt:new Date(),runnerId:null,leaseExpiresAt:null}});if(result.count!==1)throw new Error("Import runner lease was lost before completion.");}
-async function finishIfCancelled(id:string,runnerId:string){const current=await prisma.importJob.findFirst({where:{id,runnerId},select:{cancelRequestedAt:true}});if(!current)throw new Error("Import runner lease was lost.");if(!current.cancelRequestedAt)return false;await prisma.importJob.updateMany({where:{id,runnerId},data:{status:"CANCELLED",stage:"CANCELLED",finishedAt:new Date(),runnerId:null,leaseExpiresAt:null}});return true;}
+async function heartbeat(id:string,runnerId:string,stage:string){await renewImportJobLease(id,runnerId,stage);}
+async function completeOwned(id:string,runnerId:string,batchId:string){const now=new Date(),result=await prisma.importJob.updateMany({where:{id,runnerId,leaseExpiresAt:{gt:now}},data:{status:"COMPLETED",stage:"COMPLETED",batchId,finishedAt:now,runnerId:null,leaseExpiresAt:null}});if(result.count!==1)throw new Error("Import runner lease was lost before completion.");}
+async function finishIfCancelled(id:string,runnerId:string){const now=new Date(),current=await prisma.importJob.findFirst({where:{id,runnerId,leaseExpiresAt:{gt:now}},select:{cancelRequestedAt:true}});if(!current)throw new Error("Import runner lease was lost.");if(!current.cancelRequestedAt)return false;const finished=await prisma.importJob.updateMany({where:{id,runnerId,leaseExpiresAt:{gt:now}},data:{status:"CANCELLED",stage:"CANCELLED",finishedAt:now,runnerId:null,leaseExpiresAt:null}});if(finished.count!==1)throw new Error("Import runner lease was lost.");return true;}

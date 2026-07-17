@@ -95,7 +95,10 @@ export async function importFlipkartOrderRows(input: {
   user: User;
   request?: RequestMeta;
   jobId?: string;
+  runnerId?: string;
+  assertLease?: () => Promise<void>;
 }) {
+  await input.assertLease?.();
   const parsed = parseFlipkartOrderRows(input.rows, input.fileName);
   const batch = await prisma.uploadBatch.create({
     data: {
@@ -115,13 +118,13 @@ export async function importFlipkartOrderRows(input: {
     }
   });
   if (input.jobId) {
-    await setImportJobBatch(input.jobId, batch.id);
+    await setImportJobBatch(input.jobId, batch.id, input.runnerId);
     await updateImportJobProgress(input.jobId, {
       totalRows: input.rows.length,
       processedRows: 0,
       errorRows: parsed.issues.length,
       warningRows: 0
-    });
+    }, input.runnerId);
   }
   const duplicateIssues: FlipkartParseIssue[] = [];
   const deduped = dedupeFlipkartOrderRows(parsed.orders);
@@ -192,10 +195,11 @@ export async function importFlipkartOrderRows(input: {
       duplicateRows: duplicateIssues.length,
       warningRows: parsed.issues.length + duplicateIssues.length,
       errorRows: parsed.issues.length
-    });
+    }, input.runnerId);
   }
 
   for (const order of importableOrders) {
+    await input.assertLease?.();
     const internalKey = flipkartInternalOrderKey(order);
 
     if (!internalKey) {
@@ -239,7 +243,7 @@ export async function importFlipkartOrderRows(input: {
       imageUrl
     };
 
-    let persistedOrderId: string;
+    let persistedOrderId: string,pendingOrderUpdate=false;
     if (!existing) {
       persistedOrderId=(await prisma.order.create({ data: orderData,select:{id:true} })).id;
       createdRows += 1;
@@ -257,18 +261,15 @@ export async function importFlipkartOrderRows(input: {
     } else {
       const operationalChanged=existing.batchId!==orderData.batchId||existing.sku!==orderData.sku||existing.qty!==orderData.qty||existing.trackingId!==orderData.trackingId||existing.shipmentId!==orderData.shipmentId||existing.orderItemId!==orderData.orderItemId;
       const workStarted=existing.workTasks.some(task=>task.status==="IN_PROGRESS"||task.status==="COMPLETED"||task.status==="PROBLEM"||task.completedQuantity>0||task.assignedUserId||task.startedAt);
-      if(operationalChanged&&workStarted){persistedOrderId=existing.id;mappingIssues.push({rowNumber:order.rowNumber,issueType:"ACTIVE_WORK_IDENTITY_CONFLICT",message:"Order identity, SKU, Tracking ID or quantity changed after workflow started. Existing Order and immutable tasks were preserved for owner review.",rawData:order.rawData??{}});processedRows+=1;continue;}
-      await prisma.order.update({
-        where: { id: existing.id },
-        data: orderData
-      });
+      if(operationalChanged&&workStarted){persistedOrderId=existing.id;if(!existing.productDescription&&orderData.productDescription)await prisma.order.update({where:{id:existing.id},data:{productDescription:orderData.productDescription}});mappingIssues.push({rowNumber:order.rowNumber,issueType:"ACTIVE_WORK_IDENTITY_CONFLICT",message:"Order identity, SKU, Tracking ID or quantity changed after workflow started. Existing operational identity and immutable tasks were preserved; safe missing descriptive data was enriched for owner review.",rawData:order.rawData??{}});processedRows+=1;continue;}
       persistedOrderId=existing.id;
+      pendingOrderUpdate=true;
       updatedRows += 1;
     }
 
     const savedRule=listing?.processRules[0]??null,route=(savedRule?.route??"PICK_PACK") as ProcessRoute,provenance=createImmutableRouteProvenance({route,rule:savedRule});
     pickTaskCandidates.push({accountId:input.account.id,sourceType:"ORDER",orderId:persistedOrderId,stage:"PICK",sequenceNumber:1,requiredQuantity:order.quantity??1,status:"READY",metadataJson:JSON.stringify({version:1,recommendedProcessRoute:route}),workCardSnapshotJson:JSON.stringify({version:2,productTitle:listing?.productTitle??order.productTitle??null,primaryImage:listing?.mainImageUrl??null,sellerSku:sku,operationalBarcode:order.trackingId??internalKey,marketplaceIdentifiers:{fsn:order.fsn??listing?.fsn??null,listingId:listing?.listingId??null,orderItemId:order.orderItemId??null,trackingId:order.trackingId??null},category:listing?.liveCategory??null,brand:listing?.liveBrand??null,variantIdentity:null,...provenance}),routeSnapshotJson:JSON.stringify({...createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}),...provenance})});
-    const candidate=pickTaskCandidates[pickTaskCandidates.length-1];if(existing&&candidate){await prisma.workTask.updateMany({where:{orderId:existing.id,status:{in:["LOCKED","READY"]},completedQuantity:0,assignedUserId:null,startedAt:null},data:{requiredQuantity:candidate.requiredQuantity,workCardSnapshotJson:candidate.workCardSnapshotJson,routeSnapshotJson:candidate.routeSnapshotJson}});}
+    const candidate=pickTaskCandidates[pickTaskCandidates.length-1];if(existing&&candidate&&pendingOrderUpdate){await prisma.$transaction(async tx=>{await tx.order.update({where:{id:existing.id},data:orderData});const tasks=await tx.workTask.updateMany({where:{orderId:existing.id,status:{in:["LOCKED","READY"]},completedQuantity:0,assignedUserId:null,startedAt:null},data:{requiredQuantity:candidate.requiredQuantity,workCardSnapshotJson:candidate.workCardSnapshotJson,routeSnapshotJson:candidate.routeSnapshotJson}});if(tasks.count===0)throw new Error("Order workflow task is missing or changed; the reimport was rolled back for owner review.");});}
 
     processedRows += 1;
     if (input.jobId && processedRows % 500 === 0) {
@@ -282,7 +283,7 @@ export async function importFlipkartOrderRows(input: {
         errorRows: parsed.issues.length,
         missingListingRows: mappingIssues.filter((issue) => issue.issueType === "MISSING_FLIPKART_LISTING_MAPPING").length,
         missingImageRows
-      });
+      }, input.runnerId);
     }
   }
 
@@ -325,7 +326,7 @@ export async function importFlipkartOrderRows(input: {
       errorRows,
       missingListingRows: mappingIssues.filter((issue) => issue.issueType === "MISSING_FLIPKART_LISTING_MAPPING").length,
       missingImageRows
-    });
+    }, input.runnerId);
   }
 
   await recordAuditLog({
@@ -355,7 +356,10 @@ export async function importFlipkartListingRows(input: {
   user: User;
   request?: RequestMeta;
   jobId?: string;
+  runnerId?: string;
+  assertLease?: () => Promise<void>;
 }) {
+  await input.assertLease?.();
   const parsed = parseFlipkartListingRows(input.rows, input.fileName);
   const batch = await prisma.uploadBatch.create({
     data: {
@@ -372,13 +376,13 @@ export async function importFlipkartListingRows(input: {
     }
   });
   if (input.jobId) {
-    await setImportJobBatch(input.jobId, batch.id);
+    await setImportJobBatch(input.jobId, batch.id, input.runnerId);
     await updateImportJobProgress(input.jobId, {
       totalRows: input.rows.length,
       processedRows: 0,
       errorRows: parsed.issues.length,
       warningRows: parsed.issues.length
-    });
+    }, input.runnerId);
   }
   let createdRows = 0;
   let updatedRows = 0;
@@ -402,10 +406,11 @@ export async function importFlipkartListingRows(input: {
       duplicateRows: deduped.duplicateIssues.length,
       warningRows: deduped.duplicateIssues.length,
       errorRows: parsed.issues.length
-    });
+    }, input.runnerId);
   }
 
   for (const chunk of chunkFlipkartListingRows(listingDrafts)) {
+    await input.assertLease?.();
     const listingSkus = Array.from(new Set(chunk.map((draft) => draft.data.sku).filter(Boolean)));
     const existingListings = await prisma.marketplaceListing.findMany({
       where: {
@@ -486,7 +491,7 @@ export async function importFlipkartListingRows(input: {
         warningRows: deduped.duplicateIssues.length + missingImageRows,
         errorRows: parsed.issues.length,
         missingImageRows
-      });
+      }, input.runnerId);
     }
   }
 
@@ -523,7 +528,7 @@ export async function importFlipkartListingRows(input: {
       warningRows: deduped.duplicateIssues.length + missingImageRows,
       errorRows: parsed.issues.length,
       missingImageRows
-    });
+    }, input.runnerId);
   }
 
   await recordAuditLog({

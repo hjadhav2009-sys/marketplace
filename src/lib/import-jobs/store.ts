@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 
 export type ImportJobStatus = "QUEUED" | "RUNNING" | "NEEDS_MAPPING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
 export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER" | "FLIPKART_PRODUCT_INVENTORY" | "AMAZON_ALL_LISTINGS" | "AMAZON_CATEGORY_CATALOG" | "AMAZON_PRODUCT_INVENTORY" | "FLIPKART_CONSIGNMENT_QUANTITY" | "FLIPKART_CONSIGNMENT_ENRICHMENT" | "AMAZON_CONSIGNMENT_QUANTITY" | "AMAZON_CONSIGNMENT_ENRICHMENT";
@@ -323,19 +324,11 @@ export async function markImportJobNeedsMapping(id:string,input:{headers:string[
 
 export async function resumeMappedImportJob(id:string){await prisma.importJob.update({where:{id},data:{status:"QUEUED",stage:"QUEUED",progressJson:null,lastError:null,finishedAt:null}});}
 
-export async function setImportJobBatch(id: string, batchId: string) {
-  const now = new Date();
-
-  await prisma.$executeRaw`
-    UPDATE "ImportJob"
-    SET
-      "batchId" = ${batchId},
-      "updatedAt" = ${now}
-    WHERE "id" = ${id}
-  `;
+export async function setImportJobBatch(id: string, batchId: string, runnerId?:string) {
+  const now = new Date(),updated=await prisma.importJob.updateMany({where:{id,...(runnerId?{runnerId,leaseExpiresAt:{gt:now}}:{})},data:{batchId,updatedAt:now}});if(updated.count!==1)throw new Error("Import runner lease was lost.");
 }
 
-export async function updateImportJobProgress(id: string, progress: ImportJobProgressUpdate) {
+export async function updateImportJobProgress(id: string, progress: ImportJobProgressUpdate, runnerId?:string) {
   const now = new Date();
   const totalRows = progress.totalRows ?? null;
   const processedRows = progress.processedRows ?? null;
@@ -348,25 +341,10 @@ export async function updateImportJobProgress(id: string, progress: ImportJobPro
   const missingListingRows = progress.missingListingRows ?? null;
   const missingImageRows = progress.missingImageRows ?? null;
 
-  await prisma.$executeRaw`
-    UPDATE "ImportJob"
-    SET
-      "totalRows" = COALESCE(${totalRows}, "totalRows"),
-      "processedRows" = COALESCE(${processedRows}, "processedRows"),
-      "createdRows" = COALESCE(${createdRows}, "createdRows"),
-      "updatedRows" = COALESCE(${updatedRows}, "updatedRows"),
-      "unchangedRows" = COALESCE(${unchangedRows}, "unchangedRows"),
-      "duplicateRows" = COALESCE(${duplicateRows}, "duplicateRows"),
-      "warningRows" = COALESCE(${warningRows}, "warningRows"),
-      "errorRows" = COALESCE(${errorRows}, "errorRows"),
-      "missingListingRows" = COALESCE(${missingListingRows}, "missingListingRows"),
-      "missingImageRows" = COALESCE(${missingImageRows}, "missingImageRows"),
-      "updatedAt" = ${now}
-    WHERE "id" = ${id}
-      AND "runnerId" IS NOT NULL
-      AND "leaseExpiresAt" > ${now}
-  `;
+  const updated=await prisma.importJob.updateMany({where:{id,...(runnerId?{runnerId,leaseExpiresAt:{gt:now}}:{})},data:{...(totalRows!==null?{totalRows}:{}),...(processedRows!==null?{processedRows}:{}),...(createdRows!==null?{createdRows}:{}),...(updatedRows!==null?{updatedRows}:{}),...(unchangedRows!==null?{unchangedRows}:{}),...(duplicateRows!==null?{duplicateRows}:{}),...(warningRows!==null?{warningRows}:{}),...(errorRows!==null?{errorRows}:{}),...(missingListingRows!==null?{missingListingRows}:{}),...(missingImageRows!==null?{missingImageRows}:{}),updatedAt:now}});if(updated.count!==1)throw new Error("Import runner lease was lost.");
 }
+
+export async function renewImportJobLease(id:string,runnerId:string,stage:string,leaseMs=120_000,client:PrismaClient=prisma){const now=new Date(),updated=await client.importJob.updateMany({where:{id,runnerId,leaseExpiresAt:{gt:now}},data:{stage,heartbeatAt:now,leaseExpiresAt:new Date(now.getTime()+Math.max(50,leaseMs))}});if(updated.count!==1)throw new Error("Import runner lease was lost.");return updated;}
 
 export async function completeImportJob(id: string, batchId?: string | null) {
   const now = new Date();

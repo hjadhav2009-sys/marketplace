@@ -16,4 +16,4 @@ export const IMPORT_PURPOSE_DEFINITIONS:ImportPurposeDefinition[]=[
 ];
 
 export function importPurposeDefinition(marketplace:Marketplace,purpose:MarketplaceImportPurpose){return IMPORT_PURPOSE_DEFINITIONS.find(item=>item.marketplace===marketplace&&item.purpose===purpose)??null;}
-export function definitionForImportJob(job:Pick<ImportJobRecord,"marketplace"|"importType">){const marketplace=job.marketplace as Marketplace,purpose:MarketplaceImportPurpose=job.importType==="FLIPKART_ORDER"?"DAILY_ORDER":"PRODUCT_CATALOG";return importPurposeDefinition(marketplace,purpose);}
+export function definitionForImportJob(job:Pick<ImportJobRecord,"marketplace"|"importType">){const marketplace=job.marketplace as Marketplace,purpose:MarketplaceImportPurpose=job.importType==="FLIPKART_ORDER"?"DAILY_ORDER":job.importType.endsWith("CONSIGNMENT_QUANTITY")?"CONSIGNMENT_QUANTITY":job.importType.endsWith("CONSIGNMENT_ENRICHMENT")?"CONSIGNMENT_ENRICHMENT":"PRODUCT_CATALOG";return importPurposeDefinition(marketplace,purpose);}

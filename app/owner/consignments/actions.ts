@@ -58,6 +58,7 @@ export async function uploadConsignmentAction(formData: FormData) {
       request: await getRequestMeta()
     };
     const result = account.marketplace === "AMAZON" ? await importAmazonConsignmentDraft({ ...common, files }) : await importFlipkartConsignmentDraft({ ...common, file });
+    if("mappingJobId" in result&&result.mappingJobId)redirect(`/owner/imports/${result.mappingJobId}/mapping`);
     redirect(`/owner/consignments/${result.batchId}/review`);
   } catch (error) {
     redirect(`/owner/consignments/new?error=${encodeURIComponent(error instanceof Error ? error.message : "Import failed.")}`);

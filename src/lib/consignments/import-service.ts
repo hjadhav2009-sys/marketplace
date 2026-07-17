@@ -6,11 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
 import { ensureMinimalCatalogPlaceholder } from "@/src/lib/product-inventory/placeholder";
 import { inspectFlipkartConsignmentZip } from "./flipkart/archive";
-import { classifyConsignmentTextFile, parseFlipkartConsignmentCsv, type ParsedConsignmentLine } from "./flipkart/parser";
+import { classifyConsignmentTextFile, isConsignmentDetailsHeaders, parseCsvRecords, parseFlipkartConsignmentCsv, type ParsedConsignmentLine } from "./flipkart/parser";
 import { decideConsignmentListingMatch, type MatchCandidate } from "./matching";
 import { removeConsignmentBatchFiles, sanitizeConsignmentFileName, storeConsignmentBuffer, validateConsignmentUpload } from "./storage";
+import { resolveAdaptiveRows } from "@/src/lib/imports/adaptive-rows";
+import { completeConsignmentHeaderMapping, pauseConsignmentForHeaderMapping } from "./adaptive-mapping";
 
 const CHUNK_SIZE = 400;
+function rowsToCsv(rows:Record<string,unknown>[]){const headers=[...new Set(rows.flatMap(row=>Object.keys(row)))],cell=(value:unknown)=>`"${String(value??"").replaceAll('"','""')}"`;return[headers.map(cell).join(","),...rows.map(row=>headers.map(header=>cell(row[header])).join(","))].join("\n");}
 
 function chunks<T>(values: T[], size = CHUNK_SIZE) {
   const output: T[][] = [];
@@ -153,11 +156,14 @@ export async function importFlipkartConsignmentDraft(input: {
       mainData = archive.mainCandidates[0].data;
     } else {
       const fileType = classifyConsignmentTextFile(mainName, mainData.toString("utf8"));
-      if (fileType !== "CONSIGNMENT_DETAILS") throw new Error("Uploaded file is not a Consignment Details CSV.");
-      files.push({ ...rawStored, fileType, parsed: true, rowCount: 0 });
+      if (fileType !== "CONSIGNMENT_DETAILS"&&extension!==".csv") throw new Error("Uploaded file is not a Consignment Details CSV.");
+      files.push({ ...rawStored, fileType:"CONSIGNMENT_DETAILS", parsed: fileType==="CONSIGNMENT_DETAILS", rowCount: 0 });
     }
 
-    const parsed = parseFlipkartConsignmentCsv(mainData.toString("utf8"));
+    const records=parseCsvRecords(mainData.toString("utf8")),headers=records[0]??[],rawRows=records.slice(1).filter(row=>row.some(cell=>cell.trim())).map(row=>Object.fromEntries(headers.map((header,index)=>[header,row[index]??""]))),adaptive=await resolveAdaptiveRows({accountId:account.id,marketplace:"FLIPKART",purpose:"CONSIGNMENT_QUANTITY",rows:rawRows,layoutKnown:isConsignmentDetailsHeaders(headers)});
+    if(adaptive.state==="NEEDS_MAPPING"){const job=await pauseConsignmentForHeaderMapping({batchId,accountId:account.id,actorUserId:input.user.id,marketplace:"FLIPKART",purpose:"CONSIGNMENT_QUANTITY",fileName:mainName,mappingRequest:adaptive.mappingRequest});return{batchId,requiresMainSelection:false,needsMapping:true,mappingJobId:job.id};}
+    const parsed = parseFlipkartConsignmentCsv(adaptive.profileId?rowsToCsv(adaptive.rows):mainData.toString("utf8"));
+    await completeConsignmentHeaderMapping({batchId,profileId:adaptive.profileId});
     let matches = await matchConsignmentLines(account.id, parsed.lines);
     for(const item of matches){if(item.decision.status==="NOT_FOUND"&&item.line.requiredQuantity>0&&item.line.sellerSkuSource){await ensureMinimalCatalogPlaceholder({accountId:account.id,marketplace:"FLIPKART",sellerSku:item.line.sellerSkuSource,title:item.line.productNameSource,fsn:item.line.fsnSource,sourceRow:item.line.rowNumber});}}
     if(matches.some(item=>item.decision.status==="NOT_FOUND"&&item.line.requiredQuantity>0&&item.line.sellerSkuSource))matches=await matchConsignmentLines(account.id,parsed.lines);

@@ -70,6 +70,23 @@ try {
     { ...order("same-sku-b", "TRACK-SAME-B", "READY", "READY"), sku: "SKU-same-sku-a" },
     order("problem-visible", "TRACK-VISIBLE", "PROBLEM", "PROBLEM")
   ] });
+  const workflowOrders = await db.order.findMany({ where: { pickStatus: { not: "PROBLEM" }, packStatus: { not: "PROBLEM" } } });
+  await db.workTask.createMany({ data: workflowOrders.flatMap((item) => [
+    {
+      id: `${item.id}-pick`, accountId: item.accountId, sourceType: "ORDER", orderId: item.id,
+      stage: "PICK", sequenceNumber: 1, requiredQuantity: item.qty,
+      completedQuantity: item.pickStatus === "PICKED" ? item.qty : 0,
+      status: item.pickStatus === "PICKED" ? "COMPLETED" : "READY",
+      completedAt: item.pickStatus === "PICKED" ? new Date() : null
+    },
+    {
+      id: `${item.id}-pack`, accountId: item.accountId, sourceType: "ORDER", orderId: item.id,
+      stage: "PACK", sequenceNumber: 2, requiredQuantity: item.qty,
+      completedQuantity: item.packStatus === "PACKED" ? item.qty : 0,
+      status: item.packStatus === "PACKED" ? "COMPLETED" : "READY",
+      completedAt: item.packStatus === "PACKED" ? new Date() : null
+    }
+  ]) });
   await db.problemOrder.create({ data: { id: "reported-problem", accountId: "account", orderId: "problem-visible", reason: "FAKE", status: "OPEN", reportedById: "reporter" } });
 
   const grouped = await resolveUniversalWork({ actorUserId: "worker", code: "TRACK-GROUP", intent: "PACK" }, db);
@@ -113,6 +130,10 @@ try {
   const universalPackedCount = groupedResult.updatedCount;
   assert.equal(universalPackedCount, 3);
   await db.order.createMany({ data: [order("legacy-a", "TRACK-LEGACY", "PICKED", "READY", 1), order("legacy-b", "TRACK-LEGACY", "PICKED", "READY", 2), order("legacy-c", "TRACK-LEGACY", "PICKED", "READY", 3)] });
+  await db.workTask.createMany({ data: ["legacy-a", "legacy-b", "legacy-c"].flatMap((id, index) => [
+    { id: `${id}-pick`, accountId: "account", sourceType: "ORDER", orderId: id, stage: "PICK", sequenceNumber: 1, requiredQuantity: index + 1, completedQuantity: index + 1, status: "COMPLETED", completedAt: new Date() },
+    { id: `${id}-pack`, accountId: "account", sourceType: "ORDER", orderId: id, stage: "PACK", sequenceNumber: 2, requiredQuantity: index + 1, status: "READY" }
+  ]) });
   const legacyResult = await packCustomerOrderShipmentSafely({ actorUserId: "worker", accountId: "account", orderId: "legacy-a", source: "packing-search-card" }, db);
   assert.equal(legacyResult.packedCount, universalPackedCount, "Universal and legacy paths produce identical shipment results");
 

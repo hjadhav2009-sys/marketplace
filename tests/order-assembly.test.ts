@@ -59,6 +59,10 @@ try {
 
   await db.marketplaceListingIdentifier.delete({ where: { id: "identifier-ambiguous" } });
   await db.order.createMany({ data: [order("auto", "ASSEMBLY-SKU"), order("ready", "READY-SKU"), order("manual", "NO-RULE-SKU", "PICKED"), order("problem", "NO-RULE-PROBLEM", "PICKED"), order("concurrent-claim", "NO-RULE-CLAIM", "PICKED"), order("concurrent-complete", "NO-RULE-COMPLETE", "PICKED"), order("concurrent-problem", "NO-RULE-PROBLEM-REPLAY", "PICKED"), order("ship-a", "ASSEMBLY-SKU", "PICKED", "TRACK-SHIP"), order("ship-b", "READY-SKU", "PICKED", "TRACK-SHIP")] });
+  await db.workTask.createMany({ data: ["ship-a", "ship-b"].flatMap(id => [
+    { id: `${id}-pick`, accountId: "account", sourceType: "ORDER", orderId: id, stage: "PICK", sequenceNumber: 10, requiredQuantity: 1, completedQuantity: 1, status: "COMPLETED", completedAt: new Date() },
+    { id: `${id}-pack`, accountId: "account", sourceType: "ORDER", orderId: id, stage: "PACK", sequenceNumber: 11, requiredQuantity: 1, status: "READY" }
+  ]) });
 
   const picked = await markCustomerOrdersPickedSafely({ actorUserId: "picker", accountId: "account", where: { id: { in: ["auto", "ready"] } }, source: "picker-card", expectedStatus: "READY" }, db);
   assert.equal(picked.updatedCount, 2);

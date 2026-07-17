@@ -6,6 +6,7 @@ import { normalizeSkuForMatching } from "@/lib/sku";
 import { setImportJobBatch, updateImportJobProgress } from "@/src/lib/import-jobs/store";
 import { syncIdentifiersForImportedListings } from "@/src/lib/marking/identifiers";
 import { createWorkRouteSnapshot } from "@/src/lib/workflow/dynamic-route";
+import { createImmutableRouteProvenance } from "@/src/lib/workflow/route-provenance";
 import {
   chunkFlipkartListingRows,
   dedupeFlipkartListingRows,
@@ -168,7 +169,7 @@ export async function importFlipkartOrderRows(input: {
         listingId: true,
         liveBrand: true,
         liveCategory: true,
-        processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { route: true } }
+        processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, route: true, updatedAt: true, markingRequired: true, assemblyRequired: true, assemblyTitle: true, assemblyInstructions: true, assemblyImageUrl: true, markingAssetId: true, markingAsset: { select: { id: true, name: true, masterDesignId: true, material: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true, speedSetting: true, frequencySetting: true, passes: true, instructions: true } } } }
       }
     })
   ]);
@@ -260,8 +261,8 @@ export async function importFlipkartOrderRows(input: {
       updatedRows += 1;
     }
 
-    const route=(listing?.processRules[0]?.route??"PICK_PACK") as ProcessRoute;
-    pickTaskCandidates.push({accountId:input.account.id,sourceType:"ORDER",orderId:persistedOrderId,stage:"PICK",sequenceNumber:1,requiredQuantity:order.quantity??1,status:"READY",metadataJson:JSON.stringify({version:1,recommendedProcessRoute:route}),workCardSnapshotJson:JSON.stringify({version:1,productTitle:listing?.productTitle??order.productTitle??null,primaryImage:listing?.mainImageUrl??null,sellerSku:sku,operationalBarcode:order.trackingId??internalKey,marketplaceIdentifiers:{fsn:order.fsn??listing?.fsn??null,listingId:listing?.listingId??null,orderItemId:order.orderItemId??null,trackingId:order.trackingId??null},category:listing?.liveCategory??null,brand:listing?.liveBrand??null,variantIdentity:null,routeRecommendation:route,hasExplicitSavedRoute:Boolean(listing?.processRules[0]),routeRecommendationSource:listing?.processRules[0]?"PRODUCT_RULE":"SYSTEM_FALLBACK"}),routeSnapshotJson:JSON.stringify(createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}))});
+    const savedRule=listing?.processRules[0]??null,route=(savedRule?.route??"PICK_PACK") as ProcessRoute,provenance=createImmutableRouteProvenance({route,rule:savedRule});
+    pickTaskCandidates.push({accountId:input.account.id,sourceType:"ORDER",orderId:persistedOrderId,stage:"PICK",sequenceNumber:1,requiredQuantity:order.quantity??1,status:"READY",metadataJson:JSON.stringify({version:1,recommendedProcessRoute:route}),workCardSnapshotJson:JSON.stringify({version:2,productTitle:listing?.productTitle??order.productTitle??null,primaryImage:listing?.mainImageUrl??null,sellerSku:sku,operationalBarcode:order.trackingId??internalKey,marketplaceIdentifiers:{fsn:order.fsn??listing?.fsn??null,listingId:listing?.listingId??null,orderItemId:order.orderItemId??null,trackingId:order.trackingId??null},category:listing?.liveCategory??null,brand:listing?.liveBrand??null,variantIdentity:null,...provenance}),routeSnapshotJson:JSON.stringify({...createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}),...provenance})});
 
     processedRows += 1;
     if (input.jobId && processedRows % 500 === 0) {

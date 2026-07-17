@@ -19,7 +19,7 @@ function parseObject(value: string | null) {
   catch { return {}; }
 }
 
-const VOLATILE_KEYS = new Set(["requestFingerprint", "requestedAt", "requestedByUserId", "actorUserId", "taskId", "routeDecisionTimestamp", "decidedAt", "createdAt", "updatedAt", "audit"]);
+const VOLATILE_KEYS = new Set(["requestFingerprint", "requestedAt", "requestedByUserId", "actorUserId", "taskId", "routeDecisionTimestamp", "decidedAt", "createdAt", "updatedAt", "audit", "routedByUserId", "routedAt", "requestId", "clientRequestId", "importTimestamp"]);
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (!value || typeof value !== "object") return value;
@@ -31,11 +31,22 @@ export function canonicalInstructionFingerprint(metadataJson: string | null, sta
   return sha(canonical(parseObject(metadataJson)));
 }
 
-export function canonicalRouteFingerprint(routeSnapshotJson: string | null, metadataJson: string | null, stage?: WorkStage) {
+export function canonicalRouteFingerprint(routeSnapshotJson: string | null, metadataJson: string | null, workCardSnapshotJson?: string | null, stage?: WorkStage) {
   if (stage === "PACK") return sha("PACK");
   const route = parseObject(routeSnapshotJson);
   const metadata = parseObject(metadataJson);
-  return sha(canonical({ processRoute: metadata.processRoute ?? metadata.recommendedProcessRoute ?? null, recommendedStages: route.recommendedStages ?? null }));
+  const work = parseObject(workCardSnapshotJson ?? null);
+  const source = work.routeRecommendationSource === "PRODUCT_RULE" ? "EXPLICIT_PRODUCT_RULE" : work.routeRecommendationSource ?? route.routeRecommendationSource ?? "LEGACY_SNAPSHOT";
+  return sha(canonical({
+    routeRecommendation: work.routeRecommendation ?? route.routeRecommendation ?? metadata.processRoute ?? metadata.recommendedProcessRoute ?? null,
+    routeRecommendationSource: source,
+    hasExplicitSavedRoute: work.hasExplicitSavedRoute ?? route.hasExplicitSavedRoute ?? false,
+    savedProcessRoute: work.savedProcessRoute ?? route.savedProcessRoute ?? (work.hasExplicitSavedRoute === true ? work.routeRecommendation : null),
+    savedProcessRuleId: work.savedProcessRuleId ?? route.savedProcessRuleId ?? null,
+    savedProcessRuleFingerprint: work.savedProcessRuleFingerprint ?? route.savedProcessRuleFingerprint ?? null,
+    selectedProcessRoute: metadata.processRoute ?? route.selectedProcessRoute ?? null,
+    recommendedStages: route.recommendedStages ?? null
+  }));
 }
 
 export function safeWorkSnapshot(value: string | null) { return parseObject(value); }
@@ -52,7 +63,7 @@ function taskGroups(input: { accountId: string; sourceType: ProjectionSource; st
     const batch = input.stage === "PACK" && order ? "shipment" : order?.batchId ?? line?.consignmentBatchId ?? "unbatched";
     const variant = sha([identity, snapshot.variantIdentity ?? null, order?.color ?? line?.colorSource ?? null, order?.size ?? line?.sizeSource ?? null]);
     const instruction = canonicalInstructionFingerprint(task.metadataJson, input.stage);
-    const route = canonicalRouteFingerprint(task.routeSnapshotJson, task.metadataJson, input.stage);
+    const route = canonicalRouteFingerprint(task.routeSnapshotJson, task.metadataJson, task.workCardSnapshotJson, input.stage);
     const assignment = task.assignedUserId ?? "UNASSIGNED";
     const parts = [input.accountId, marketplace, input.sourceType, input.stage, batch, identity, variant, instruction, route, assignment];
     const raw = parts.join("\u0000"), group = grouped.get(raw) ?? { parts, sku, tasks: [] };

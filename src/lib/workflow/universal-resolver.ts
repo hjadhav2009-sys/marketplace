@@ -8,6 +8,8 @@ import { canOfferManualAssemblyDiversion, getOrderAssemblyPackingGate } from "./
 import { parseOrderAssemblyMetadata } from "./order-assembly-metadata";
 import type { OrderAssemblyPolicy } from "./order-assembly-policy";
 import { parseOrderMarkingMetadata } from "./route-task-metadata";
+import { resolveConsignmentLineWorkflowPrerequisites, resolveOrderShipmentWorkflowPrerequisites, type WorkflowPrerequisiteSummary } from "./workflow-prerequisites";
+import { parseImmutableRouteProvenance } from "./route-provenance";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type UniversalScanIntent = "ANY" | "PICK" | "MARK" | "ASSEMBLE" | "PACK";
@@ -75,6 +77,8 @@ export type UniversalWorkCandidate = {
   packedByName?: string | null;
   packedAt?: Date | null;
   problemReason?: string | null;
+  workflowPrerequisites?: WorkflowPrerequisiteSummary;
+  missingInstructionStages?: WorkStage[];
 };
 
 export const LISTING_IDENTIFIER_PRIORITY = [
@@ -253,6 +257,7 @@ export async function resolveUniversalWork(
   }
   const orderMarkTasks = gateOrders.length ? await client.workTask.findMany({ where: { accountId: { in: accountIds }, sourceType: "ORDER", orderId: { in: gateOrders.map((order) => order.id) }, stage: "MARK", status: { in: ["READY", "IN_PROGRESS", "PROBLEM"] } }, select: { id: true, orderId: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, metadataJson: true, assignedUser: { select: { name: true } } } }) : [];
   const orderMarkTaskByOrder = new Map(orderMarkTasks.flatMap((task) => task.orderId ? [[task.orderId, task] as const] : []));
+  const orderPickTasks=gateOrders.length?await client.workTask.findMany({where:{accountId:{in:accountIds},sourceType:"ORDER",orderId:{in:gateOrders.map(order=>order.id)},stage:"PICK"},select:{orderId:true,workCardSnapshotJson:true,routeSnapshotJson:true}}):[],orderPickTaskByOrder=new Map(orderPickTasks.flatMap(task=>task.orderId?[[task.orderId,task] as const]:[]));
 
   const listingIds = [...new Set(identifierRows.map((row) => row.marketplaceListingId))];
   const taskLineMatch: Prisma.ConsignmentLineWhereInput = {
@@ -281,7 +286,7 @@ export async function resolveUniversalWork(
     OR: [{ id: code }, { consignmentLine: taskLineMatch }]
   };
   const taskSelect = {
-    id: true, accountId: true, stage: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, completedAt: true, problemReason: true,
+    id: true, accountId: true, stage: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, completedAt: true, problemReason: true,workCardSnapshotJson:true,routeSnapshotJson:true,
     assignedUser: { select: { name: true } }, completedByUser: { select: { name: true } }, problemReportedByUserId: true,
     consignmentLine: {
       select: {
@@ -335,10 +340,11 @@ export async function resolveUniversalWork(
       requiredQuantity: order.qty,
       completedQuantity: 0,
       remainingQuantity: order.qty,
-      packedAt: order.packedAt
+      packedAt: order.packedAt,
+      missingInstructionStages:(()=>{const pick=orderPickTaskByOrder.get(order.id),provenance=parseImmutableRouteProvenance(pick?.workCardSnapshotJson)??parseImmutableRouteProvenance(pick?.routeSnapshotJson),missing:WorkStage[]=[];if(!provenance?.markingInstructionSnapshot)missing.push("MARK");if(!provenance?.assemblyInstructionSnapshot)missing.push("ASSEMBLE");return missing;})()
     };
     if (order.packStatus === "PACKED") {
-      if (intent === "ANY" || intent === "PACK") candidates.push({ ...common, candidateKey: `order:${order.id}:packed`, actionType: "READ_ONLY", sourceLabel: "Customer order", status: "PACKED", completedQuantity: order.qty, remainingQuantity: 0, shipmentItemCount: 1, shipmentTotalQuantity: order.qty, canAct: false, readOnlyReason: "Packing is complete. This result is read-only." });
+      if (intent === "ANY" || intent === "PACK") {const key=shipmentKey(order),shipment=key?shipmentMap.get(key)??[order]:[order];if(!key||!groupedPackKeys.has(key)){if(key)groupedPackKeys.add(key);const totalQuantity=shipment.reduce((sum,item)=>sum+item.qty,0);candidates.push({ ...common,sourceType:key?"CUSTOMER_ORDER_SHIPMENT":"CUSTOMER_ORDER", candidateKey:key?`order-shipment:${order.accountId}:${order.trackingId}:packed`:`order:${order.id}:packed`, actionType: "READ_ONLY", sourceLabel:key?`${order.marketplace === "AMAZON" ? "Amazon" : "Flipkart"} shipment`:"Customer order",productSummary:summarize(shipment.map(item=>item.productDescription??item.sku))??undefined,orderNumber:summarize(shipment.map(item=>item.orderNo)),awb:summarize(shipment.map(item=>item.awb)),shipmentId:summarize(shipment.map(item=>item.shipmentId)), status: "PACKED",requiredQuantity:totalQuantity, completedQuantity: totalQuantity, remainingQuantity: 0, shipmentItemCount: shipment.length, shipmentTotalQuantity: totalQuantity,productCount:new Set(shipment.map(item=>item.sku)).size, canAct: false, readOnlyReason: "Packing is complete. This result is read-only." });}}
       continue;
     }
     const reportedByIds = order.problemOrders.map((problem) => problem.reportedById).filter((id): id is string => Boolean(id));
@@ -383,8 +389,8 @@ export async function resolveUniversalWork(
       const unpickedCount = shipment.filter((item) => item.pickStatus !== "PICKED").length;
       const pickedItemCount = shipment.length - unpickedCount;
       const totalQuantity = shipment.reduce((total, item) => total + item.qty, 0);
-      const assemblyBlocker = shipment.map((item) => assemblyStateByOrder.get(item.id)).find((state) => state && !state.allowed);
-      const packReady = problemCount === 0 && unpickedCount === 0 && !assemblyBlocker && shipment.every((item) => item.packStatus === "READY");
+      const workflow = await resolveOrderShipmentWorkflowPrerequisites({ accountId: order.accountId, orderIds: shipment.map(item => item.id) }, client);
+      const packReady = workflow.package.packReady && shipment.every((item) => ["READY", "PACKED"].includes(item.packStatus));
       const packable = packReady && hasWorkPermission(scope.user, "canPack");
       const products = [...new Set(shipment.map((item) => item.sku))];
       candidates.push({
@@ -398,7 +404,7 @@ export async function resolveUniversalWork(
         orderNumber: summarize(shipment.map((item) => item.orderNo)),
         awb: summarize(shipment.map((item) => item.awb)),
         shipmentId: summarize(shipment.map((item) => item.shipmentId)),
-        status: packReady ? "PACK_READY" : problemCount ? "PROBLEM" : assemblyBlocker ? "ASSEMBLY_PENDING" : "PICK_PENDING",
+        status: packReady ? "PACK_READY" : problemCount ? "PROBLEM" : workflow.package.stages.MARK.state !== "SATISFIED" && workflow.package.stages.MARK.state !== "NOT_REQUIRED" ? "MARK_PENDING" : workflow.package.stages.ASSEMBLE.state !== "SATISFIED" && workflow.package.stages.ASSEMBLE.state !== "NOT_REQUIRED" ? "ASSEMBLY_PENDING" : "PICK_PENDING",
         requiredQuantity: totalQuantity,
         completedQuantity: shipment.filter((item) => item.pickStatus === "PICKED").reduce((total, item) => total + item.qty, 0),
         remainingQuantity: shipment.filter((item) => item.pickStatus !== "PICKED").reduce((total, item) => total + item.qty, 0),
@@ -407,15 +413,17 @@ export async function resolveUniversalWork(
         pickedItemCount,
         unpickedItemCount: unpickedCount,
         productCount: products.length,
+        workflowPrerequisites: workflow.package,
         canAct: packable,
-        readOnlyReason: problemCount ? "Shipment contains problem work." : unpickedCount ? `Pick pending for ${unpickedCount} item(s). Pack is locked.` : assemblyBlocker ? `${assemblyBlocker.message} Pack is locked.` : packable ? null : packReady ? "Pack permission is required." : "Shipment changed; scan again before packing."
+        readOnlyReason: problemCount ? "Shipment contains problem work." : workflow.package.blocker ? `${workflow.package.blocker} Pack is locked.` : packable ? null : packReady ? "Pack permission is required." : "Shipment changed; scan again before packing."
       });
     } else if (!isProblem) {
-      const packReady = order.packStatus === "READY" && order.pickStatus === "PICKED" && assemblyState?.allowed !== false,packable=packReady&&hasWorkPermission(scope.user,"canPack");
-      candidates.push({ ...common, candidateKey: `order:${order.id}:pack`, actionType: "ORDER_PACK", stage:"PACK", status: packReady ? "PACK_READY" : order.pickStatus !== "PICKED" ? "PICK_PENDING" : "ASSEMBLY_PENDING", canAct: packable, readOnlyReason: packable ? null : !packReady ? order.pickStatus !== "PICKED" ? "Pick pending. Pack is locked." : `${assemblyState?.message ?? "Assembly is required before packing."} Pack is locked.` : "Pack permission is required." });
+      const workflow=await resolveOrderShipmentWorkflowPrerequisites({accountId:order.accountId,orderIds:[order.id]},client),packReady=workflow.package.packReady&&order.packStatus==="READY",packable=packReady&&hasWorkPermission(scope.user,"canPack");
+      candidates.push({ ...common, candidateKey: `order:${order.id}:pack`, actionType: "ORDER_PACK", stage:"PACK", status: packReady ? "PACK_READY" : workflow.package.stages.MARK.state!=="SATISFIED"&&workflow.package.stages.MARK.state!=="NOT_REQUIRED"?"MARK_PENDING":workflow.package.stages.ASSEMBLE.state!=="SATISFIED"&&workflow.package.stages.ASSEMBLE.state!=="NOT_REQUIRED"?"ASSEMBLY_PENDING":"PICK_PENDING", workflowPrerequisites:workflow.package,canAct: packable, readOnlyReason: packable ? null : !packReady ? `${workflow.package.blocker??"Workflow prerequisites are incomplete."} Pack is locked.` : "Pack permission is required." });
     }
   }
 
+  const consignmentWorkflowByLine=new Map<string,WorkflowPrerequisiteSummary>();
   for (const task of tasks) {
     const line = task.consignmentLine;
     const account = accountMap.get(task.accountId);
@@ -423,7 +431,8 @@ export async function resolveUniversalWork(
     const visibleProblem = task.status !== "PROBLEM" || userCanViewAllConsignmentWork(scope.user) || task.assignedUserId === scope.user.id || task.problemReportedByUserId === scope.user.id;
     if (!visibleProblem) continue;
     const capabilities = getWorkTaskCapabilities(scope.user, task);
-    const canAct = task.status === "PROBLEM"||task.stage==="PICK" ? false : capabilities.canProgress;
+    let workflow=consignmentWorkflowByLine.get(line.id);if(!workflow){workflow=await resolveConsignmentLineWorkflowPrerequisites({accountId:task.accountId,consignmentLineId:line.id},client);consignmentWorkflowByLine.set(line.id,workflow);}
+    const canAct = task.status === "PROBLEM"||task.stage==="PICK" ? false : capabilities.canProgress&&(task.stage!=="PACK"||workflow.packReady);
     const matchingRows = identifierRows.filter((row) => row.marketplaceListingId === line.marketplaceListingId);
     let matchType = highestPriorityIdentifierType(matchingRows);
     if (task.id === code) matchType = "WORK_TASK_ID";
@@ -436,6 +445,7 @@ export async function resolveUniversalWork(
     else if (!matchType && line.listingIdSnapshot && [code, upper].includes(line.listingIdSnapshot)) matchType = "LISTING_ID";
     else if (!matchType && line.consignmentBatch.externalConsignmentNumber === code) matchType = "CONSIGNMENT_NUMBER";
     const asset = line.markingAsset;
+    const provenance=parseImmutableRouteProvenance(task.workCardSnapshotJson)??parseImmutableRouteProvenance(task.routeSnapshotJson),missingInstructionStages:WorkStage[]=[];if(!provenance?.markingInstructionSnapshot)missingInstructionStages.push("MARK");if(!provenance?.assemblyInstructionSnapshot)missingInstructionStages.push("ASSEMBLE");
     candidates.push({
       candidateKey: `task:${task.id}`,
       sourceType: "CONSIGNMENT_TASK",
@@ -470,6 +480,8 @@ export async function resolveUniversalWork(
       packedByName: task.stage==="PACK"&&task.status==="COMPLETED"?task.completedByUser?.name:null,
       packedAt: task.stage==="PACK"&&task.status==="COMPLETED"?task.completedAt:null,
       problemReason: task.problemReason,
+      workflowPrerequisites:workflow,
+      missingInstructionStages,
       markingMasterDesignId: asset?.masterDesignId,
       markingAssetName: asset?.name,
       markingPosition: asset?.markingPosition,
@@ -481,7 +493,7 @@ export async function resolveUniversalWork(
       markingPasses: asset?.passes,
       markingInstructions: asset?.instructions,
       canAct,
-      readOnlyReason: canAct ? null : task.stage==="PICK"&&capabilities.canProgress?"Pack locked. Open Details to continue in Pick work.":task.status === "COMPLETED" ? "Packing is complete. This result is read-only." : task.status === "PROBLEM" ? "Problem requires authorized review." : "Task is assigned to another worker or you lack stage permission."
+      readOnlyReason: canAct ? null : task.stage==="PACK"&&workflow.blocker?`${workflow.blocker} Pack is locked.`:task.stage==="PICK"&&capabilities.canProgress?"Pack locked. Open Details to continue in Pick work.":task.status === "COMPLETED" ? "Packing is complete. This result is read-only." : task.status === "PROBLEM" ? "Problem requires authorized review." : "Task is assigned to another worker or you lack stage permission."
     });
   }
 

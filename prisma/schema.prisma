@@ -266,6 +266,8 @@ model User {
   workTasksStarted             WorkTask[]                @relation("WorkTaskStartedBy")
   workTasksCompleted           WorkTask[]                @relation("WorkTaskCompletedBy")
   workRouteDecisions           WorkRouteDecision[]       @relation("WorkRouteDecisionActor")
+  workflowActionReceipts       WorkflowActionReceipt[]   @relation("WorkflowActionReceiptActor")
+  workRouteDecisionRejections  WorkRouteDecisionRejection[] @relation("WorkRouteDecisionRejectionActor")
   workTaskProblemsReported     WorkTask[]                @relation("WorkTaskProblemReportedBy")
   workTaskProblemsResolved     WorkTask[]                @relation("WorkTaskProblemResolvedBy")
   workActionLogs               WorkActionLog[]           @relation("WorkActionActor")
@@ -359,6 +361,8 @@ model Account {
   workChangeEvents    WorkChangeEvent[]
   workGroupProjections WorkGroupProjection[]
   workRouteDecisions  WorkRouteDecision[]
+  workflowActionReceipts WorkflowActionReceipt[]
+  workRouteDecisionRejections WorkRouteDecisionRejection[]
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
 
@@ -988,6 +992,48 @@ model UploadBatch {
 
   @@index([accountId, createdAt])
   @@index([accountId, importType, createdAt])
+}
+
+model WorkflowActionReceipt {
+  id                 String         @id @default(cuid())
+  accountId          String
+  account            Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  actorUserId        String
+  actorUser          User           @relation("WorkflowActionReceiptActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  requestKind        String
+  clientRequestId    String
+  requestFingerprint String
+  sourceType         WorkSourceType
+  stage              WorkStage?
+  originalGroupKey   String?
+  status             String         @default("IN_PROGRESS")
+  resultJson         String?
+  completedAt        DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@unique([accountId, actorUserId, requestKind, clientRequestId])
+  @@index([accountId, createdAt])
+  @@index([accountId, originalGroupKey])
+}
+
+model WorkRouteDecisionRejection {
+  id                 String         @id @default(cuid())
+  accountId          String
+  account            Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  actorUserId        String
+  actorUser          User           @relation("WorkRouteDecisionRejectionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  taskId             String?
+  sourceType         WorkSourceType
+  sourceId           String?
+  stage              WorkStage
+  requestFingerprint String?
+  rejectionType      String
+  safeMessage        String
+  createdAt          DateTime       @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([accountId, rejectionType, createdAt])
 }
 
 model MarketplaceFileProfile {

@@ -2,39 +2,12 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { assertWorkerAccountAccess } from "./worker-access";
-import { assertOrderAssemblyPackingEligible } from "./order-assembly";
 import { refreshAffectedWorkGroups } from "./work-group-projection";
+import { resolveOrderShipmentWorkflowPrerequisites } from "./workflow-prerequisites";
+import { routeFingerprint } from "./dynamic-route";
+import { beginWorkflowActionReceipt, completeWorkflowActionReceipt } from "./workflow-action-receipt";
 
 type Client = PrismaClient | Prisma.TransactionClient;
-
-function explicitRoute(metadataJson: string | null) {
-  if (!metadataJson) return null;
-  try {
-    const value = JSON.parse(metadataJson) as { version?: number; routeChoice?: string };
-    return value.version === 1 && ["DIRECT_PACK", "MARK", "ASSEMBLE", "MARK_ASSEMBLE"].includes(value.routeChoice ?? "") ? value.routeChoice! : null;
-  } catch { return null; }
-}
-
-async function assertExplicitRoutePackingEligible(accountId: string, orderIds: string[], client: Client) {
-  const tasks = await client.workTask.findMany({ where: { accountId, sourceType: "ORDER", orderId: { in: orderIds } }, select: { id: true, orderId: true, stage: true, status: true, metadataJson: true } });
-  const byOrder = new Map<string, typeof tasks>();
-  for (const task of tasks) if (task.orderId) byOrder.set(task.orderId, [...(byOrder.get(task.orderId) ?? []), task]);
-  const explicitOrderIds = new Set<string>();
-  for (const orderId of orderIds) {
-    const orderTasks = byOrder.get(orderId) ?? [];
-    const route = explicitRoute(orderTasks.find((task) => task.stage === "PICK")?.metadataJson ?? null);
-    if (!route) continue;
-    explicitOrderIds.add(orderId);
-    const required = route === "MARK_ASSEMBLE" ? ["MARK", "ASSEMBLE"] : route === "MARK" ? ["MARK"] : route === "ASSEMBLE" ? ["ASSEMBLE"] : [];
-    for (const stage of required) {
-      const task = orderTasks.find((candidate) => candidate.stage === stage);
-      if (!task || !["COMPLETED", "SKIPPED"].includes(task.status)) throw new Error(`${stage === "MARK" ? "Marking" : "Assembly"} is required before packing.`);
-    }
-    const pack = orderTasks.find((task) => task.stage === "PACK");
-    if (!pack || !["READY", "IN_PROGRESS"].includes(pack.status)) throw new Error("Packing route is not ready yet.");
-  }
-  return explicitOrderIds;
-}
 
 const orderPackScopeSelect = {
   id: true,
@@ -66,13 +39,11 @@ export async function resolveOrderPackScope(
         ? {
             accountId: input.accountId,
             marketplace: primaryOrder.marketplace,
-            trackingId: primaryOrder.trackingId,
-            packStatus: { not: "PACKED" }
+            trackingId: primaryOrder.trackingId
           }
         : {
             id: primaryOrder.id,
-            accountId: input.accountId,
-            packStatus: { not: "PACKED" }
+            accountId: input.accountId
           },
     select: orderPackScopeSelect,
     orderBy: { id: "asc" }
@@ -82,7 +53,7 @@ export async function resolveOrderPackScope(
   const problemCount = shipmentOrders.filter(
     (order) => order.status === "PROBLEM" || order.pickStatus === "PROBLEM" || order.packStatus === "PROBLEM"
   ).length;
-  const allReadyToPack = shipmentOrders.every((order) => order.packStatus === "READY");
+  const workflow = await resolveOrderShipmentWorkflowPrerequisites({ accountId: input.accountId, orderIds: shipmentOrders.map(order => order.id) }, client);
 
   return {
     primaryOrder,
@@ -92,7 +63,8 @@ export async function resolveOrderPackScope(
     allPicked: unpickedCount === 0,
     unpickedCount,
     problemCount,
-    packable: shipmentOrders.length > 0 && unpickedCount === 0 && problemCount === 0 && allReadyToPack
+    workflow: workflow.package,
+    packable: shipmentOrders.length > 0 && workflow.package.packReady && shipmentOrders.every(order => ["READY", "PACKED"].includes(order.packStatus))
   };
 }
 
@@ -101,6 +73,7 @@ export function assertOrderPackScopeEligible(scope: Awaited<ReturnType<typeof re
   if (scope.unpickedCount > 0) {
     throw new Error(`Shipment cannot be packed: ${scope.unpickedCount} item(s) are still waiting for picking.`);
   }
+  if (scope.workflow.blocker) throw new Error(scope.workflow.blocker);
   if (!scope.packable) throw new Error("Shipment changed; scan again before packing.");
 }
 
@@ -146,20 +119,19 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
 ) {
     const access = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
     if (!hasWorkPermission(access.user, "canPack")) throw new Error("Order packing permission is required.");
+    const receipt = input.clientRequestId ? await beginWorkflowActionReceipt<{ packedCount:number; skippedCount:number; scopedCount:number; totalQuantity:number; packTaskIds?:string[]; idempotent:boolean }>(tx, { accountId: input.accountId, actorUserId: access.user.id, requestKind: "ORDER_PACK", clientRequestId: input.clientRequestId, requestFingerprint: routeFingerprint({ orderId: input.orderId, expectedStatus: input.expectedStatus ?? null, source: input.source }), sourceType: "ORDER", stage: "PACK" }) : null;
+    if (receipt?.replay) return { ...receipt.replay, idempotent: true };
 
     const scope = await resolveOrderPackScope({ accountId: input.accountId, orderId: input.orderId }, tx);
-    if (scope.shipmentOrders.length === 0) {
-      return { packedCount: 0, skippedCount: 0, scopedCount: 0, totalQuantity: 0, idempotent: true };
+    if (scope.shipmentOrders.length === 0 || scope.shipmentOrders.every(order => order.packStatus === "PACKED")) {
+      const result = { packedCount: 0, skippedCount: 0, scopedCount: 0, totalQuantity: 0, packTaskIds: [] as string[], idempotent: true };
+      return receipt ? completeWorkflowActionReceipt(tx, receipt.receiptId, result) : result;
     }
     if (input.expectedStatus && scope.primaryOrder.packStatus !== input.expectedStatus) {
       throw new Error("Order changed; scan again before acting.");
     }
     assertOrderPackScopeEligible(scope);
-    const explicitOrderIds = await assertExplicitRoutePackingEligible(input.accountId, scope.shipmentOrders.map((order) => order.id), tx);
-    const legacyOrders = scope.shipmentOrders.filter((order) => !explicitOrderIds.has(order.id));
-    if (legacyOrders.length) await assertOrderAssemblyPackingEligible({ accountId: input.accountId, orders: legacyOrders }, tx);
-
-    const verifiedOrderIds = scope.shipmentOrders.map((order) => order.id);
+    const verifiedOrderIds = scope.shipmentOrders.filter(order => order.packStatus !== "PACKED").map((order) => order.id);
     const update = await tx.order.updateMany({
       where: {
         id: { in: verifiedOrderIds },
@@ -176,7 +148,7 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
     for (const task of packTasks) await tx.workTask.update({ where: { id: task.id }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, assignedUserId: access.user.id, startedAt: completedAt, startedByUserId: access.user.id, completedAt, completedByUserId: access.user.id, version: { increment: 1 } } });
 
     await tx.scanLog.createMany({
-      data: scope.shipmentOrders.map((order) => ({
+      data: scope.shipmentOrders.filter(order => verifiedOrderIds.includes(order.id)).map((order) => ({
         accountId: input.accountId,
         orderId: order.id,
         awb: order.trackingId ?? order.awb,
@@ -203,7 +175,7 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
     });
     await refreshAffectedWorkGroups({ accountId: input.accountId, sourceType: "ORDER", stages: ["PACK"], taskIds:packTasks.map(task=>task.id),orderIds:verifiedOrderIds }, tx);
 
-    return {
+    const result = {
       packedCount: update.count,
       skippedCount: 0,
       scopedCount: verifiedOrderIds.length,
@@ -211,4 +183,5 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
       packTaskIds: packTasks.map(task => task.id),
       idempotent: false
     };
+    return receipt ? completeWorkflowActionReceipt(tx, receipt.receiptId, result) : result;
 }

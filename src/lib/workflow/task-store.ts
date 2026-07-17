@@ -5,6 +5,9 @@ import { buildTaskPlan } from "./tasks";
 import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutateStage, userCanResolveConsignmentProblems } from "./worker-access";
 import { createWorkRouteSnapshot } from "./dynamic-route";
 import { refreshAffectedWorkGroups } from "./work-group-projection";
+import { createImmutableRouteProvenance } from "./route-provenance";
+import { deriveOrderWorkflowPrerequisites } from "./workflow-prerequisites";
+import { beginWorkflowActionReceipt, completeWorkflowActionReceipt } from "./workflow-action-receipt";
 
 type Transaction = Prisma.TransactionClient;
 type Client = PrismaClient;
@@ -27,8 +30,8 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
   const batch = await client.consignmentBatch.findFirst({
     where: { id: batchId, accountId },
     include: { lines: { orderBy: { rowNumber: "asc" }, include: {
-      marketplaceListing: { select: { id: true, accountId: true, marketplace: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true, identifiers: { where: { active: true }, select: { identifierType: true, rawValue: true } }, processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, markingAssetId: true } } } },
-      processRule: { select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, markingAssetId: true } },
+      marketplaceListing: { select: { id: true, accountId: true, marketplace: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true, identifiers: { where: { active: true }, select: { identifierType: true, rawValue: true } }, processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, updatedAt: true, markingRequired: true, markingAssetId: true, markingAsset: { select: { id: true, name: true, masterDesignId: true, material: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true, speedSetting: true, frequencySetting: true, passes: true, instructions: true } }, assemblyRequired: true, assemblyTitle: true, assemblyInstructions: true, assemblyImageUrl: true } } } },
+      processRule: { select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, updatedAt: true, markingRequired: true, markingAssetId: true, markingAsset: { select: { id: true, name: true, masterDesignId: true, material: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true, speedSetting: true, frequencySetting: true, passes: true, instructions: true } }, assemblyRequired: true, assemblyTitle: true, assemblyInstructions: true, assemblyImageUrl: true } },
       markingAsset: { select: { id: true, active: true, masterDesignId: true, instructions: true, listingLinks: { where: { active: true }, select: { accountId: true, marketplaceListingId: true } } } },
       issues: { where: { issueType: "MARKING_IMAGE_MISSING" }, select: { resolved: true } }
     } } }
@@ -64,9 +67,9 @@ function activationRoute(line: NonNullable<Awaited<ReturnType<typeof validateCon
   return savedRule?.route ?? (routeSupported(line.processRoute) ? line.processRoute : "PICK_PACK");
 }
 
-function activationHasExplicitSavedRoute(line: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"][number]) {
+function activationSavedRule(line: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"][number]) {
   const ruleMatches = line.processRule?.active && line.processRule.accountId === line.accountId && line.processRule.marketplaceListingId === line.marketplaceListingId;
-  return Boolean(ruleMatches ? line.processRule : line.marketplaceListing?.processRules[0]);
+  return ruleMatches ? line.processRule : line.marketplaceListing?.processRules[0] ?? null;
 }
 
 async function writeSnapshotChunk(tx: Transaction, lines: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"]) {
@@ -100,7 +103,7 @@ export async function activateConsignmentBatch(input: { batchId: string; account
       if (await tx.workTask.count({ where: { consignmentLine: { consignmentBatchId: input.batchId } } })) throw new Error("Consignment already has a task plan.");
       const validation = await validateConsignmentActivation(input.batchId, input.accountId, tx);
       if (!validation.batch || validation.problems.length) throw new Error(validation.problems[0]?.message ?? "Consignment validation failed.");
-      const tasks: Prisma.WorkTaskCreateManyInput[] = validation.batch.lines.map((line) => {const route=activationRoute(line),identifier=(type:string)=>line.marketplaceListing?.identifiers.find(item=>item.identifierType===type)?.rawValue??null;return({
+      const tasks: Prisma.WorkTaskCreateManyInput[] = validation.batch.lines.map((line) => {const route=activationRoute(line),savedRule=activationSavedRule(line),provenance=createImmutableRouteProvenance({route,rule:savedRule}),identifier=(type:string)=>line.marketplaceListing?.identifiers.find(item=>item.identifierType===type)?.rawValue??null;return({
         id: `wkt_${randomUUID().replace(/-/g, "")}`,
         accountId: input.accountId,
         sourceType: "CONSIGNMENT",
@@ -112,8 +115,8 @@ export async function activateConsignmentBatch(input: { batchId: string; account
         completedQuantity: 0,
         status: "READY",
         metadataJson: JSON.stringify({ version: 1, recommendedProcessRoute: route }),
-        workCardSnapshotJson:JSON.stringify({version:1,productTitle:line.marketplaceListing?.productTitle??line.productNameSource??null,primaryImage:line.marketplaceListing?.mainImageUrl??line.productImageSnapshot??null,sellerSku:line.marketplaceListing?.sellerSkuId??line.sellerSkuSource??null,operationalBarcode:validation.batch.marketplace==="AMAZON"?identifier("FNSKU")??line.fnskuSource??identifier("ASIN")??line.asinSource:identifier("EAN")??identifier("UPC")??identifier("GTIN")??line.barcodeSource??line.fsnSource??line.marketplaceListing?.listingId,marketplaceIdentifiers:{fsn:line.marketplaceListing?.fsn??line.fsnSource??null,listingId:line.marketplaceListing?.listingId??null,asin:identifier("ASIN")??line.asinSource??null,fnsku:identifier("FNSKU")??line.fnskuSource??null,externalId:identifier("EXTERNAL_ID")??line.externalIdSource??null},variantIdentity:{color:line.colorSource??null,size:line.sizeSource??null},routeRecommendation:route,hasExplicitSavedRoute:activationHasExplicitSavedRoute(line),routeRecommendationSource:activationHasExplicitSavedRoute(line)?"PRODUCT_RULE":"SYSTEM_FALLBACK"}),
-        routeSnapshotJson:JSON.stringify(createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}))
+        workCardSnapshotJson:JSON.stringify({version:2,productTitle:line.marketplaceListing?.productTitle??line.productNameSource??null,primaryImage:line.marketplaceListing?.mainImageUrl??line.productImageSnapshot??null,sellerSku:line.marketplaceListing?.sellerSkuId??line.sellerSkuSource??null,operationalBarcode:validation.batch.marketplace==="AMAZON"?identifier("FNSKU")??line.fnskuSource??identifier("ASIN")??line.asinSource:identifier("EAN")??identifier("UPC")??identifier("GTIN")??line.barcodeSource??line.fsnSource??line.marketplaceListing?.listingId,marketplaceIdentifiers:{fsn:line.marketplaceListing?.fsn??line.fsnSource??null,listingId:line.marketplaceListing?.listingId??null,asin:identifier("ASIN")??line.asinSource??null,fnsku:identifier("FNSKU")??line.fnskuSource??null,externalId:identifier("EXTERNAL_ID")??line.externalIdSource??null},variantIdentity:{color:line.colorSource??null,size:line.sizeSource??null},...provenance}),
+        routeSnapshotJson:JSON.stringify({...createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}),...provenance})
       });});
       for (let index = 0; index < validation.batch.lines.length; index += 200) await writeSnapshotChunk(tx, validation.batch.lines.slice(index, index + 200));
       for (let index = 0; index < tasks.length; index += 500) await tx.workTask.createMany({ data: tasks.slice(index, index + 500) });
@@ -234,6 +237,27 @@ export async function recalculateConsignmentCompletion(tx: Transaction, input: {
   } else if (batch.status === "PROBLEM") await tx.consignmentBatch.update({ where: { id: batch.id }, data: { status: "ACTIVE" } });
 }
 
+export async function completeConsignmentPackTasksInTransaction(tx: Transaction, input: { accountId: string; actorUserId: string; taskIds: string[] }) {
+  const taskIds = [...new Set(input.taskIds)];
+  const tasks = await tx.workTask.findMany({ where: { id: { in: taskIds }, accountId: input.accountId, sourceType: "CONSIGNMENT", stage: "PACK" }, include: { consignmentLine: { select: { id: true, accountId: true, consignmentBatchId: true } } } });
+  if (tasks.length !== taskIds.length || tasks.some(task => !task.consignmentLine || task.consignmentLine.accountId !== input.accountId)) throw new Error("Packing work changed; refresh before completing the package.");
+  for (const task of tasks) {
+    if (!["READY", "IN_PROGRESS"].includes(task.status)) throw new Error("Packing work is no longer ready.");
+    const siblings = await tx.workTask.findMany({ where: { accountId: input.accountId, consignmentLineId: task.consignmentLineId }, select: { id: true, stage: true, status: true, routeSnapshotJson: true } });
+    const workflow = deriveOrderWorkflowPrerequisites({ id: task.consignmentLineId!, pickStatus: "READY", packStatus: "READY", status: "READY" }, siblings);
+    if (workflow.blocker) throw new Error(workflow.blocker);
+  }
+  const completedAt = new Date();
+  for (const task of tasks) {
+    const changed = await tx.workTask.updateMany({ where: { id: task.id, version: task.version, status: task.status, completedQuantity: task.completedQuantity }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, assignedUserId: task.assignedUserId ?? input.actorUserId, startedAt: task.startedAt ?? completedAt, startedByUserId: task.startedByUserId ?? input.actorUserId, completedAt, completedByUserId: input.actorUserId, version: { increment: 1 } } });
+    if (changed.count !== 1) throw new Error("Packing work changed; no partial completion was saved.");
+    await tx.consignmentLine.updateMany({ where: { id: task.consignmentLineId!, completedAt: null }, data: { completedAt, completedByUserId: input.actorUserId } });
+  }
+  const batchIds = [...new Set(tasks.map(task => task.consignmentLine!.consignmentBatchId))];
+  for (const batchId of batchIds) await recalculateConsignmentCompletion(tx, { batchId, actorUserId: input.actorUserId });
+  return { taskIds: tasks.map(task => task.id), completedAt };
+}
+
 export async function setWorkTaskProgress(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; targetQuantity?: number; clientRequestId?: string; action?: "set" | "increment"; requestKind?: "INCREMENT" | "SET_PROGRESS" | "COMPLETE" }, client: Client = prisma) {
   if (!Number.isSafeInteger(input.expectedQuantity) || input.expectedQuantity < 0 || (input.targetQuantity !== undefined && (!Number.isSafeInteger(input.targetQuantity) || input.targetQuantity < 0))) throw new Error("Work quantity must be a non-negative whole number.");
   const requestKind = input.requestKind ?? (input.action === "increment" ? "INCREMENT" : "SET_PROGRESS");
@@ -282,6 +306,8 @@ export function incrementWorkTaskProgress(input: { taskId: string; accountId: st
 }
 
 export async function completeWorkTask(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; clientRequestId?: string }, client: Client = prisma) {
+  const task=await client.workTask.findFirst({where:{id:input.taskId,accountId:input.accountId,sourceType:"CONSIGNMENT"},select:{stage:true}});
+  if(task?.stage==="PACK")return client.$transaction(async tx=>{const{user}=await assertWorkerAccountAccess(input.actorUserId,input.accountId,tx);if(!userCanMutateStage(user,"PACK"))throw new Error("PACK permission is required.");const fingerprint=requestFingerprint({taskId:input.taskId,expectedQuantity:input.expectedQuantity});const receipt=input.clientRequestId?await beginWorkflowActionReceipt<{completedQuantity:number;completed:boolean;idempotent:boolean}>(tx,{accountId:input.accountId,actorUserId:user.id,requestKind:"CONSIGNMENT_PACK",clientRequestId:input.clientRequestId,requestFingerprint:fingerprint,sourceType:"CONSIGNMENT",stage:"PACK"}):null;if(receipt?.replay)return{...receipt.replay,idempotent:true};const current=await tx.workTask.findFirst({where:{id:input.taskId,accountId:input.accountId,sourceType:"CONSIGNMENT",stage:"PACK"}});if(!current)throw new Error("Packing task is unavailable.");if(current.completedQuantity!==input.expectedQuantity)throw new Error("Work changed; refresh before packing.");await completeConsignmentPackTasksInTransaction(tx,{accountId:input.accountId,actorUserId:user.id,taskIds:[current.id]});await logAction(tx,{accountId:input.accountId,taskId:current.id,actorUserId:user.id,action:"TASK_COMPLETED",requestKind:"COMPLETE",fingerprint,before:current.completedQuantity,after:current.requiredQuantity,clientRequestId:input.clientRequestId});await refreshTaskProjection(tx,current);const result={completedQuantity:current.requiredQuantity,completed:true,idempotent:false};return receipt?completeWorkflowActionReceipt(tx,receipt.receiptId,result):result;});
   return setWorkTaskProgress({ ...input, action: "set", requestKind: "COMPLETE" }, client);
 }
 

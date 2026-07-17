@@ -5,7 +5,7 @@ import { assertWorkerAccountAccess } from "./worker-access";
 import { refreshAffectedWorkGroups } from "./work-group-projection";
 import { resolveOrderShipmentWorkflowPrerequisites } from "./workflow-prerequisites";
 import { routeFingerprint } from "./dynamic-route";
-import { beginWorkflowActionReceipt, completeWorkflowActionReceipt } from "./workflow-action-receipt";
+import { beginWorkflowActionReceipt, completeWorkflowActionReceipt, withWorkflowActionRequestGate } from "./workflow-action-receipt";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -103,7 +103,7 @@ export async function packCustomerOrderShipmentSafely(
 ) {
   const initialAccess = await assertWorkerAccountAccess(input.actorUserId, input.accountId, client);
   if (!hasWorkPermission(initialAccess.user, "canPack")) throw new Error("Order packing permission is required.");
-  return client.$transaction(tx => packCustomerOrderShipmentSafelyInTransaction(input, tx));
+  const execute=async()=>{let last:unknown;for(let attempt=0;attempt<6;attempt++){try{return await client.$transaction(tx => packCustomerOrderShipmentSafelyInTransaction(input, tx));}catch(error){last=error;const transient=error instanceof Error&&(/database is locked|unique constraint|write conflict|P2002|P2034/i.test(error.message)||"code" in error&&["P2002","P2034"].includes(String((error as {code?:string}).code)));if(!transient||attempt===5)throw error;await new Promise(resolve=>setTimeout(resolve,20*(attempt+1)));}}throw last;};return input.clientRequestId?withWorkflowActionRequestGate([input.accountId,input.actorUserId,"ORDER_PACK",input.clientRequestId].join(":"),execute):execute();
 }
 
 export async function packCustomerOrderShipmentSafelyInTransaction(

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createTempWorkflowDb } from "./temp-workflow-db";
 import { reportOrderWorkflowProblem, resolveOrderWorkflowProblem } from "../src/lib/workflow/order-problems";
-import { incrementWorkTaskProgress, setWorkTaskProgress } from "../src/lib/workflow/task-store";
+import { completeWorkTask, incrementWorkTaskProgress, setWorkTaskProgress } from "../src/lib/workflow/task-store";
 
 const { db, cleanup } = createTempWorkflowDb("production-audit-workflow");
 
@@ -15,10 +15,11 @@ try {
 
   await db.consignmentBatch.create({ data: { id: "consignment", accountId: "account", marketplace: "FLIPKART", externalConsignmentNumber: "SYN-C", displayName: "Synthetic Consignment", status: "ACTIVE", sourceFileName: "synthetic.csv", sourceFileSha256: "synthetic" } });
   await db.consignmentLine.create({ data: { id: "pack-line", consignmentBatchId: "consignment", accountId: "account", rowNumber: 1, sellerSkuSource: "PACK-SKU", sellerSkuSnapshot: "PACK-SKU", requiredQuantity: 1, matchStatus: "OWNER_SELECTED", activated: true, processRoute: "PICK_PACK" } });
-  await db.workTask.create({ data: { id: "pack-task", accountId: "account", sourceType: "CONSIGNMENT", consignmentLineId: "pack-line", stage: "PACK", sequenceNumber: 2, requiredQuantity: 1, status: "READY" } });
+  await db.workTask.createMany({ data: [{ id: "pack-pick", accountId: "account", sourceType: "CONSIGNMENT", consignmentLineId: "pack-line", stage: "PICK", sequenceNumber: 1, requiredQuantity: 1, completedQuantity: 1, status: "COMPLETED", completedAt: new Date() },{ id: "pack-task", accountId: "account", sourceType: "CONSIGNMENT", consignmentLineId: "pack-line", stage: "PACK", sequenceNumber: 2, requiredQuantity: 1, status: "READY" }] });
   await assert.rejects(() => setWorkTaskProgress({ taskId: "pack-task", accountId: "account", actorUserId: "worker", expectedQuantity: 0, targetQuantity: 1, clientRequestId: "pack-set" }, db), /authoritative Pack Completed/i);
   await assert.rejects(() => incrementWorkTaskProgress({ taskId: "pack-task", accountId: "account", actorUserId: "worker", expectedQuantity: 0, increment: 1, clientRequestId: "pack-increment" }, db), /authoritative Pack Completed/i);
   assert.equal((await db.workTask.findUniqueOrThrow({ where: { id: "pack-task" } })).status, "READY");
+  const consignmentPacks=await Promise.all(Array.from({length:20},()=>completeWorkTask({taskId:"pack-task",accountId:"account",actorUserId:"worker",expectedQuantity:0,clientRequestId:"direct-consignment-pack"},db)));assert.equal(consignmentPacks.filter(result=>!result.idempotent).length,1,"Twenty direct Consignment Pack retries mutate once");assert.equal((await db.consignmentLine.findUniqueOrThrow({where:{id:"pack-line"}})).completedAt instanceof Date,true);assert.equal(await db.workflowActionReceipt.count({where:{requestKind:"CONSIGNMENT_PACK",clientRequestId:"direct-consignment-pack",status:"COMPLETED"}}),1);
 
   for (const [index, stage] of (["PICK", "MARK", "ASSEMBLE", "PACK"] as const).entries()) {
     const orderId = `problem-order-${stage}`;

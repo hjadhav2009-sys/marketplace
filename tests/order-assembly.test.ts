@@ -75,8 +75,9 @@ try {
   assert.equal(parseOrderAssemblyMetadata((await db.workTask.findUniqueOrThrow({ where: { id: autoTask.id } })).metadataJson)?.assemblyInstructions, "Attach the fake part securely.", "Task metadata is immutable");
 
   const manual = await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Use the fake attachment.", clientRequestId: "manual-send" }, db);
-  const manualReplay = await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Different ignored text", clientRequestId: "manual-send-2" }, db);
+  const manualReplay = await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Use the fake attachment.", clientRequestId: "manual-send-2" }, db);
   assert.equal(manual.task.id, manualReplay.task.id);
+  await assert.rejects(()=>sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Changed collision", clientRequestId: "manual-send" }, db),/different workflow action|different payload/i);
   assert.equal(await db.workTask.count({ where: { orderId: "manual", stage: "ASSEMBLE" } }), 1);
   await claimOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, clientRequestId: "claim-a" }, db);
   await assert.rejects(() => claimOrderAssemblyTask({ actorUserId: "assembler-b", accountId: "account", taskId: manual.task.id, clientRequestId: "claim-b" }, db), /another worker/i);
@@ -84,6 +85,9 @@ try {
   await completeOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, expectedStatus: "IN_PROGRESS", clientRequestId: "complete-a" }, db);
   const completeReplay = await completeOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, expectedStatus: "IN_PROGRESS", clientRequestId: "complete-a" }, db);
   assert.equal(completeReplay.idempotent, true);
+  const completedBefore=await db.workTask.findUniqueOrThrow({where:{id:manual.task.id}}),packBefore=await db.workTask.findUniqueOrThrow({where:{orderId_stage:{orderId:"manual",stage:"PACK"}}});assert.equal(packBefore.status,"READY");
+  const lateRetry=await sendOrderToAssembly({actorUserId:"packer",accountId:"account",orderId:"manual",manualInstructions:"Use the fake attachment.",clientRequestId:"manual-send-after-complete"},db);assert.equal(lateRetry.task.status,"COMPLETED");
+  const completedAfter=await db.workTask.findUniqueOrThrow({where:{id:manual.task.id}}),packAfter=await db.workTask.findUniqueOrThrow({where:{id:packBefore.id}});assert.equal(packAfter.status,"READY","A late Send retry never re-locks Packing");assert.equal(completedAfter.metadataJson,completedBefore.metadataJson);assert.equal(completedAfter.routeSnapshotJson,completedBefore.routeSnapshotJson);
 
   const claimTask=(await sendOrderToAssembly({actorUserId:"packer",accountId:"account",orderId:"concurrent-claim",manualInstructions:"Fake concurrent claim."},db)).task;
   const claims=await Promise.all([claimOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:claimTask.id,clientRequestId:"claim-same"},db),claimOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:claimTask.id,clientRequestId:"claim-same"},db)]);

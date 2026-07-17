@@ -7,6 +7,7 @@ import { resolveRouteSourceContext, resolveRouteStageMetadata, type PostPickRout
 import { assertWorkerAccountAccess, userCanMutateStage } from "./worker-access";
 import { refreshAffectedWorkGroups } from "./work-group-projection";
 import { beginWorkflowActionReceipt, completeWorkflowActionReceipt } from "./workflow-action-receipt";
+import { assertReusableDownstreamTask } from "./downstream-task-safety";
 
 type Client = PrismaClient;
 type Transaction = Prisma.TransactionClient;
@@ -45,8 +46,7 @@ async function routeFinishedMember(tx:Transaction,input:{task:MemberTask;actorUs
   const routedSnapshot=nextSnapshot(snapshot,input.stage,next,input.actorUserId);
   if(next){
     const existing=await tx.workTask.findFirst({where:{accountId:input.accountId,...sourceWhere(task),stage:next}});
-    if(existing?.status==="COMPLETED")throw new Error(`${next} was already completed.`);
-    if(existing)await tx.workTask.update({where:{id:existing.id},data:{status:"READY",metadataJson:metadata??existing.metadataJson,routeSnapshotJson:JSON.stringify(routedSnapshot),version:{increment:1}}});
+    if(existing){const nextMetadata=metadata??existing.metadataJson;assertReusableDownstreamTask(existing,{stage:next,workCardSnapshotJson:task.workCardSnapshotJson,metadataJson:nextMetadata});await tx.workTask.update({where:{id:existing.id},data:{status:"READY",metadataJson:nextMetadata,routeSnapshotJson:JSON.stringify(routedSnapshot),version:{increment:1}}});}
     else{const max=await tx.workTask.aggregate({where:sourceWhere(task),_max:{sequenceNumber:true}});await tx.workTask.create({data:{accountId:input.accountId,sourceType:task.sourceType,orderId:task.orderId,consignmentLineId:task.consignmentLineId,stage:next,sequenceNumber:(max._max.sequenceNumber??0)+1,requiredQuantity:task.requiredQuantity,status:"READY",metadataJson:metadata,workCardSnapshotJson:task.workCardSnapshotJson,routeSnapshotJson:JSON.stringify(routedSnapshot)}});}
     await tx.workRouteDecision.create({data:{accountId:input.accountId,taskId:task.id,sourceType:task.sourceType,sourceId,sellerSku:sourceContext.sellerSku,reference:sourceContext.reference,savedRoute:sourceContext.savedProcessRoute,savedNextStage:savedNext,selectedNextStage:next,decisionType:policy.decisionType,reason,workerNote:workerNote||null,missingInstructionStage,actorUserId:input.actorUserId}});
   }

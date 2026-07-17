@@ -180,6 +180,7 @@ export async function importFlipkartOrderRows(input: {
   let missingImageRows = 0;
   let processedRows = parsed.issues.length + duplicateIssues.length;
   const mappingIssues: FlipkartParseIssue[] = [];
+  const pickTaskCandidates: Prisma.WorkTaskCreateManyInput[] = [];
 
   await writeIssues(batch.id, [...parsed.issues, ...duplicateIssues]);
   if (input.jobId) {
@@ -260,8 +261,7 @@ export async function importFlipkartOrderRows(input: {
     }
 
     const route=(listing?.processRules[0]?.route??"PICK_PACK") as ProcessRoute;
-    const existingPick=await prisma.workTask.findFirst({where:{orderId:persistedOrderId,stage:"PICK"},select:{id:true}});
-    if(!existingPick)await prisma.workTask.create({data:{accountId:input.account.id,sourceType:"ORDER",orderId:persistedOrderId,stage:"PICK",sequenceNumber:1,requiredQuantity:order.quantity??1,status:"READY",metadataJson:JSON.stringify({version:1,recommendedProcessRoute:route}),workCardSnapshotJson:JSON.stringify({version:1,productTitle:listing?.productTitle??order.productTitle??null,primaryImage:listing?.mainImageUrl??null,sellerSku:sku,operationalBarcode:order.trackingId??internalKey,marketplaceIdentifiers:{fsn:order.fsn??listing?.fsn??null,listingId:listing?.listingId??null,orderItemId:order.orderItemId??null,trackingId:order.trackingId??null},category:listing?.liveCategory??null,brand:listing?.liveBrand??null,variantIdentity:null,routeRecommendation:route}),routeSnapshotJson:JSON.stringify(createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}))}});
+    pickTaskCandidates.push({accountId:input.account.id,sourceType:"ORDER",orderId:persistedOrderId,stage:"PICK",sequenceNumber:1,requiredQuantity:order.quantity??1,status:"READY",metadataJson:JSON.stringify({version:1,recommendedProcessRoute:route}),workCardSnapshotJson:JSON.stringify({version:1,productTitle:listing?.productTitle??order.productTitle??null,primaryImage:listing?.mainImageUrl??null,sellerSku:sku,operationalBarcode:order.trackingId??internalKey,marketplaceIdentifiers:{fsn:order.fsn??listing?.fsn??null,listingId:listing?.listingId??null,orderItemId:order.orderItemId??null,trackingId:order.trackingId??null},category:listing?.liveCategory??null,brand:listing?.liveBrand??null,variantIdentity:null,routeRecommendation:route,hasExplicitSavedRoute:Boolean(listing?.processRules[0]),routeRecommendationSource:listing?.processRules[0]?"PRODUCT_RULE":"SYSTEM_FALLBACK"}),routeSnapshotJson:JSON.stringify(createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}))});
 
     processedRows += 1;
     if (input.jobId && processedRows % 500 === 0) {
@@ -278,6 +278,9 @@ export async function importFlipkartOrderRows(input: {
       });
     }
   }
+
+  const candidateOrderIds=pickTaskCandidates.flatMap(task=>task.orderId?[task.orderId]:[]),existingPicks=candidateOrderIds.length?await prisma.workTask.findMany({where:{orderId:{in:candidateOrderIds},stage:"PICK"},select:{orderId:true}}):[],existingPickOrderIds=new Set(existingPicks.flatMap(task=>task.orderId?[task.orderId]:[])),missingPicks=pickTaskCandidates.filter(task=>task.orderId&&!existingPickOrderIds.has(task.orderId));
+  for(let index=0;index<missingPicks.length;index+=500)await prisma.workTask.createMany({data:missingPicks.slice(index,index+500)});
 
   await writeIssues(batch.id, mappingIssues);
 

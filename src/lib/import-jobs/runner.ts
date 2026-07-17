@@ -3,17 +3,18 @@ import { randomUUID } from "node:crypto";
 import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseSpreadsheetRowsFromPath } from "@/lib/import/files";
+import type { RawImportRow } from "@/lib/import/sku-mappings";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { importFlipkartListingRows, importFlipkartOrderRows } from "@/src/lib/marketplaces/flipkart";
-import { findHeaderProfile,headerFingerprint,normalizeMarketplaceHeader } from "@/src/lib/imports/header-profiles";
+import { applyAdaptiveRows } from "@/src/lib/imports/adaptive-rows";
+import { definitionForImportJob } from "@/src/lib/imports/import-purpose-definitions";
 import {
   completeImportJob,
   createImportJob,
   failImportJob,
   findImportJobById,
   markImportJobRunning,
-  markImportJobNeedsMapping,
   type ImportJobRecord,
   type ImportJobType
 } from "./store";
@@ -129,6 +130,8 @@ async function loadJobActors(job: ImportJobRecord) {
   return { account, user };
 }
 
+async function applyAdaptiveHeaderProfile(job:ImportJobRecord,rows:RawImportRow[],account:Account){const definition=definitionForImportJob(job);return definition?applyAdaptiveRows({jobId:job.id,accountId:account.id,marketplace:definition.marketplace,purpose:definition.purpose,rows}):rows;}
+
 export async function processImportJob(jobId: string, request?: RequestMeta) {
   const job = await findImportJobById(jobId);
 
@@ -144,7 +147,7 @@ export async function processImportJob(jobId: string, request?: RequestMeta) {
   let rows = await parseSpreadsheetRowsFromPath(job.filePath);
   const { account, user } = await loadJobActors(job);
 
-  if(job.importType==="FLIPKART_ORDER"){const headers=Object.keys(rows[0]??{}),normalized=new Set(headers.map(normalizeMarketplaceHeader)),requiredHeaders=["ORDER ITEM ID","Order Id","SKU","Quantity","Tracking ID"],known=requiredHeaders.every(header=>normalized.has(normalizeMarketplaceHeader(header))),profile=await findHeaderProfile({accountId:account.id,marketplace:"FLIPKART",importPurpose:"DAILY_ORDER",headers});if(!known&&profile.state==="NEEDS_MAPPING"){await markImportJobNeedsMapping(job.id,{headers,fingerprint:headerFingerprint(headers),requiredFields:["orderItemId","orderId","sellerSku","quantity","trackingId"],optionalFields:["shipmentId","fsn","productTitle","city","state"]});return;}if(profile.state==="MATCHED"){const targets:Record<string,string>={orderItemId:"ORDER ITEM ID",orderId:"Order Id",sellerSku:"SKU",quantity:"Quantity",trackingId:"Tracking ID",shipmentId:"Shipment ID",fsn:"FSN",productTitle:"Product Title",city:"City",state:"State"};rows=rows.map(row=>{const mapped={...row};for(const [canonical,sourceHeader] of Object.entries(profile.mapping)){const target=targets[canonical];if(target)mapped[target]=row[sourceHeader]??"";}return mapped;});}}
+  const mappedRows=await applyAdaptiveHeaderProfile(job,rows,account);if(!mappedRows)return;rows=mappedRows;
 
   if (job.importType === "FLIPKART_LISTING_MASTER") {
     const batch = await importFlipkartListingRows({

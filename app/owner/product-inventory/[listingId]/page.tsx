@@ -6,7 +6,8 @@ import { requireAccount, requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { ProcessRuleEditor } from "../../process-rules/ProcessRuleEditor";
-import { LOCKABLE_CATALOG_FIELDS, saveCatalogFieldLocksAction } from "./actions";
+import { saveCatalogFieldLocksAction } from "./actions";
+import { LOCKABLE_CATALOG_FIELDS } from "./fields";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ listingId: string }> }) {
   const user=await requireUser(["OWNER"]),account=await requireAccount(user),{listingId}=await params;

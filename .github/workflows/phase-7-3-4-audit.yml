@@ -1,0 +1,37 @@
+name: Phase 7.3.4 audit
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: file:${{ github.workspace }}/.ci-phase734.db
+      SESSION_SECRET: ci-only-synthetic-session-secret-000000000000
+      SESSION_COOKIE_SECURE: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma validate --schema prisma/schema.prisma
+      - run: npx prisma generate --schema prisma/schema.prisma
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run production-audit-hardening:test
+      - run: npm run grouped-pack-safety:test
+      - run: npm run direct-stage-actions:test
+      - run: npm run grouped-details:test
+      - run: npm run product-inventory-import:test
+      - run: npm run import-recovery:test
+      - run: npm run permission:test
+      - run: npm run security:test
+      - run: npm run adaptive-import:test

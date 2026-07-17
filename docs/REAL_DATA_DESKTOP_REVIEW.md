@@ -1,5 +1,7 @@
 # Real Data Desktop Review
 
+No real-data mutation is part of Phase 7.3.4. Rehearse migrations and repair commands on a verified copy and compare counts, constraints and file hashes before any rollout decision.
+
 After the deliberate migration succeeds, start the site:
 
 ```powershell

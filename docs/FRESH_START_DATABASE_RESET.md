@@ -1,5 +1,7 @@
 # Owner-only fresh-start database reset
 
+Phase 7.3.4 does not authorize a real database reset. All migration, repair, import recovery and retention checks must use disposable or copied databases unless separately approved.
+
 ## Purpose and safety boundary
 
 This checkpoint removes active marketplace and workflow data while retaining one explicitly selected active OWNER, the SQLite schema, and `_prisma_migrations`. It does not delete or recreate `prisma/dev.db`. Implementation and automated tests operate on disposable copies; the real reset is a separate, guarded owner action.

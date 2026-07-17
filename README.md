@@ -1,5 +1,7 @@
 # Marketplace Pick & Pack
 
+> Phase 7.3.4 is production-audit hardening. Production rollout and fully native Expo remain blocked by [the production gates](docs/audits/PRODUCTION_READINESS_GATES.md).
+
 Multi-marketplace warehouse pick-and-pack app cloned from the working Meesho foundation.
 
 This application manages worker Pick / Mark / Assemble / Pack workflows. It is not inventory-management or ERP software and does not track physical available stock, valuation, receiving, QC, or marketplace stock updates.

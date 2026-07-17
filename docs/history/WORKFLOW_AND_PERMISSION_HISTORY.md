@@ -7,3 +7,6 @@ Capabilities are explicit: pick, pack, mark, assemble, report problem, manage ma
 Task progression is ordered. Locked future stages cannot start early. Problems preserve recoverable prior state. Assignments, claims, quantities, completion, and action logs are checked together. Client request identity prevents duplicate effects. Shipment-level packing checks prevent one line from being packed while related required work is incomplete.
 
 Known limitation: the high-contention 2/5/10/20 test applies specifically to duplicate quantity increments. Some other action families have two-request or targeted competition tests, and some replay callbacks still open read transactions.
+# Phase 7.3.4 amendment
+
+Legacy SKU mutations were retired, generic Consignment Pack progress was blocked, Order problems became stage-aware, manual Assembly now creates a complete immutable route plan, and explicit permission flags became authoritative for non-owners.

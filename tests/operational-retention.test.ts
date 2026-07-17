@@ -1,0 +1,8 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const root=resolve(process.cwd(),".codex-tmp");mkdirSync(root,{recursive:true});const file=resolve(root,"operational-retention.db");rmSync(file,{force:true});const sqlite=new DatabaseSync(file);sqlite.exec("PRAGMA foreign_keys=ON;");for(const name of readdirSync(resolve("prisma/migrations"),{withFileTypes:true}).filter(item=>item.isDirectory()).map(item=>item.name).sort())sqlite.exec(readFileSync(join("prisma/migrations",name,"migration.sql"),"utf8"));sqlite.exec("INSERT INTO Account (id,name,code,marketplace,active,createdAt,updatedAt) VALUES ('account','Synthetic','SYN','FLIPKART',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");sqlite.exec("INSERT INTO WorkChangeEvent (accountId,eventType,sourceType,createdAt) VALUES ('account','SYNTHETIC','ORDER','2000-01-01 00:00:00')");sqlite.close();
+const output=execFileSync(process.execPath,[resolve("node_modules/tsx/dist/cli.mjs"),resolve("scripts/operational-retention.ts")],{cwd:process.cwd(),env:{...process.env,DATABASE_URL:`file:${file.replace(/\\/g,"/")}`},encoding:"utf8"});assert.match(output,/"dryRun": true/);const verify=new DatabaseSync(file,{readOnly:true});assert.equal((verify.prepare("SELECT COUNT(*) AS count FROM WorkChangeEvent").get() as {count:number}).count,1,"Retention dry-run never deletes eligible records");verify.close();rmSync(file,{force:true});console.log("Operational retention dry-run safety test passed.");

@@ -1,5 +1,7 @@
 # Marketplace Pick & Pack: project master guide
 
+Phase 7.3.4 freezes new features while authoritative workflow, projection, import recovery, permissions and security paths are audited. See `docs/audits/PHASE_7_3_4_PRODUCTION_AUDIT.md`.
+
 ## 1–5. Purpose, non-goals, structure, deployment, and SQLite
 
 The application coordinates marketplace catalog imports, marking references, customer-order and consignment work, scanning, assignment, problems, and pack completion for a small owner-operated warehouse. It is a Next.js application with UI/routes under `app`, reusable UI under `components`, domain services under `src/lib`, Prisma schemas/migrations under `prisma`, tests under `tests`, operational scripts under `scripts`, and decisions/runbooks under `docs`.

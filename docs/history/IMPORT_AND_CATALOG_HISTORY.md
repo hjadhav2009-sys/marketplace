@@ -7,3 +7,6 @@ MarketplaceListing is the current catalog center; MarketplaceListingIdentifier e
 Amazon reference worksheets are excluded by default. Stored reparsing has limits for file count, aggregate/individual bytes, cells, and archive-derived entries, and submitted worksheet selection is revalidated server-side. Flipkart multi-item shipment safety remains part of packing, not merely parsing.
 
 Phase 7.2B is not implemented on this checkpoint branch. No later bulk-refresh route, migration, catalog-merge service, or test is included in this history. Phase 7.2C is also not implemented.
+# Phase 7.3.4 amendment
+
+Catalog refresh now records field authority and manual locks. Safe Order reimport updates untouched task snapshots transactionally and blocks operational identity changes after work starts. Meesho Daily Orders is disabled until it can create modern immutable work.

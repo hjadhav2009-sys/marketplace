@@ -369,7 +369,8 @@ export async function getSkuDetail(
         productDescription: true,
         imageUrl: true,
         pickStatus: true,
-        packStatus: true
+        packStatus: true,
+        workTasks:{where:{stage:"PICK"},take:1,select:{workCardSnapshotJson:true,routeSnapshotJson:true}}
       },
       orderBy: { createdAt: "asc" }
     }),
@@ -687,7 +688,7 @@ export async function getOrderWithImage(accountId: string, awb: string) {
   const order = await withDevTiming("packing order result", () => prisma.order.findFirst({
     where: {
       accountId,
-      awb
+      OR: [{ id: awb }, { awb }, { trackingId: awb }]
     },
     select: {
       id: true,
@@ -829,13 +830,12 @@ export async function getOrderWithImage(accountId: string, awb: string) {
   return {
     order,
     shipmentItems:
-      order.marketplace === "FLIPKART" && order.trackingId
+      ["FLIPKART", "AMAZON"].includes(order.marketplace) && order.trackingId
         ? await prisma.order.findMany({
             where: {
               accountId,
-              marketplace: "FLIPKART",
-              trackingId: order.trackingId,
-              packStatus: "READY"
+              marketplace: order.marketplace,
+              trackingId: order.trackingId
             },
             select: {
               id: true,

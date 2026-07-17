@@ -1,0 +1,11 @@
+import type { WorkStage } from "@prisma/client";
+import { getCurrentUser,getSelectedAccount } from "@/lib/auth";
+import { hasWorkPermission } from "@/lib/work-permissions";
+import { marketplaceCapabilityEnabled } from "@/src/lib/marketplace-capabilities";
+import { getGroupedWork, getSmartStageSummary, type GroupedWorkSource } from "@/src/lib/workflow/grouped-work";
+import { getLiveWorkVersion } from "@/src/lib/workflow/live-work";
+import { assertWorkerAccountAccess,stagePermissionField } from "@/src/lib/workflow/worker-access";
+
+export const dynamic="force-dynamic";export const runtime="nodejs";
+const stages=new Set(["PICK","MARK","ASSEMBLE","PACK"]),sources=new Set(["ORDER","CONSIGNMENT"]);
+export async function GET(request:Request){const sessionUser=await getCurrentUser();if(!sessionUser)return Response.json({error:"Authentication required."},{status:401});const account=await getSelectedAccount(sessionUser);if(!account)return Response.json({error:"Select an active seller account."},{status:409});const url=new URL(request.url),rawStage=url.searchParams.get("stage"),rawSource=url.searchParams.get("source");if(rawStage&&!stages.has(rawStage)||rawSource&&!sources.has(rawSource))return Response.json({error:"Invalid work filter."},{status:400});const stage=rawStage as WorkStage|undefined,sourceType=rawSource as GroupedWorkSource|undefined,{user}=await assertWorkerAccountAccess(sessionUser.id,account.id);if(stage&&!hasWorkPermission(user,stagePermissionField(stage))&&!user.canViewAllWork)return Response.json({error:`${stage} permission is required.`},{status:403});if(sourceType&&!marketplaceCapabilityEnabled(account.marketplace,sourceType==="ORDER"?"dailyOrders":"consignments"))return Response.json({error:"This work source is disabled for the selected marketplace."},{status:403});const cursor=await getLiveWorkVersion({accountId:account.id,stage,sourceType});const summary=stage?await getSmartStageSummary({actorUserId:user.id,accountId:account.id,stage}):null;const snapshot=stage&&sourceType?(await getGroupedWork({actorUserId:user.id,accountId:account.id,stage,sourceType,pageSize:25})).cards:null;return Response.json({cursor,summary,snapshot},{headers:{"Cache-Control":"no-store"}});}

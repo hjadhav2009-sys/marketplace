@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
+import { RouteChoiceWithInstructionConfirmation } from "@/components/RouteChoiceWithInstructionConfirmation";
 import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { getSkuDetail } from "@/lib/data";
@@ -13,6 +14,7 @@ import { encodePickerDimension } from "@/lib/operations/picking";
 import { buildListingImageGallery } from "@/lib/product-image";
 import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { markSkuGroupPickedAction, markSkuGroupProblemAction } from "./actions";
+import { parseImmutableRouteProvenance } from "@/src/lib/workflow/route-provenance";
 
 type PickerSkuDetailPageProps = {
   params: Promise<{
@@ -41,6 +43,8 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
   }
 
   const firstOrder = detail.orders[0];
+  const routeProvenances=detail.orders.map(order=>parseImmutableRouteProvenance(order.workTasks[0]?.workCardSnapshotJson)??parseImmutableRouteProvenance(order.workTasks[0]?.routeSnapshotJson));
+  const markingInstructionsAvailable=routeProvenances.length>0&&routeProvenances.every(item=>Boolean(item?.markingInstructionSnapshot)),assemblyInstructionsAvailable=routeProvenances.length>0&&routeProvenances.every(item=>Boolean(item?.assemblyInstructionSnapshot));
   const imageUrl = detail.mapping?.cachedImageUrl ?? null;
   const groupColor = firstOrder?.color ?? detail.mapping?.color ?? null;
   const groupSize = firstOrder?.size ?? detail.mapping?.size ?? null;
@@ -154,11 +158,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
               <input type="hidden" name="color" value={hiddenColor} />
               <input type="hidden" name="size" value={hiddenSize} />
               <input type="hidden" name="clientRequestId" value={`pick-route:${sku}:${groupColor ?? ""}:${groupSize ?? ""}:${detail.orders.length}`} />
-              <label className="block text-sm font-bold text-slate-700">After picking
-                <select name="route" required defaultValue="" className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3">
-                  <option value="" disabled>Choose next route</option><option value="DIRECT_PACK">Direct to Pack</option><option value="MARK">Marking</option><option value="ASSEMBLE">Assembly</option><option value="MARK_ASSEMBLE">Marking + Assembly</option>
-                </select>
-              </label>
+              <RouteChoiceWithInstructionConfirmation markingAvailable={markingInstructionsAvailable} assemblyAvailable={assemblyInstructionsAvailable}/>
               <RouteDecisionFields />
               <div className="mt-3"><SubmitButton pendingText="Completing pick...">Complete pick and route</SubmitButton></div>
             </form>
@@ -280,9 +280,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
             <input type="hidden" name="color" value={hiddenColor} />
             <input type="hidden" name="size" value={hiddenSize} />
             <input type="hidden" name="clientRequestId" value={`pick-route-mobile:${sku}:${groupColor ?? ""}:${groupSize ?? ""}:${detail.orders.length}`} />
-            <select name="route" required defaultValue="" aria-label="After picking" className="mb-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-bold">
-              <option value="" disabled>Choose next route</option><option value="DIRECT_PACK">Direct to Pack</option><option value="MARK">Marking</option><option value="ASSEMBLE">Assembly</option><option value="MARK_ASSEMBLE">Marking + Assembly</option>
-            </select>
+            <RouteChoiceWithInstructionConfirmation markingAvailable={markingInstructionsAvailable} assemblyAvailable={assemblyInstructionsAvailable}/>
             <RouteDecisionFields compact />
             <button type="submit" className="min-h-14 w-full rounded-md bg-berry px-4 py-3 text-base font-black text-white shadow-sm">
               Complete pick
@@ -298,5 +296,5 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
 }
 
 function RouteDecisionFields({compact=false}:{compact?:boolean}) {
-  return <div className={`grid gap-2 ${compact?"mb-2":"mt-3"}`}><select name="routeReason" defaultValue="" aria-label="Route-change reason" className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="">Reason only when changing a saved route</option>{["Assembly required","Marking required","Wrong saved route","Special order requirement","Product needs correction","Other"].map(reason=><option key={reason}>{reason}</option>)}</select><input name="routeOtherReason" maxLength={240} placeholder="Other reason (if selected)" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm"/><textarea name="workerNote" maxLength={240} placeholder="Optional downstream note" className="min-h-20 rounded-md border border-slate-300 p-3 text-sm"/><label className="flex min-h-11 items-center gap-2 text-sm font-bold"><input type="checkbox" name="confirmMissingInstructions" value="1"/>Continue if saved instructions are unavailable</label></div>;
+  return <div className={`grid gap-2 ${compact?"mb-2":"mt-3"}`}><select name="routeReason" defaultValue="" aria-label="Route-change reason" className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="">Reason only when changing a saved route</option>{["Assembly required","Marking required","Wrong saved route","Special order requirement","Product needs correction","Other"].map(reason=><option key={reason}>{reason}</option>)}</select><input name="routeOtherReason" maxLength={240} placeholder="Other reason (if selected)" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm"/><textarea name="workerNote" maxLength={240} placeholder="Optional downstream note" className="min-h-20 rounded-md border border-slate-300 p-3 text-sm"/></div>;
 }

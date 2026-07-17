@@ -36,12 +36,13 @@ export default async function WorkRouteSummaryPage({ searchParams }: { searchPar
   const selectedTo = period === "custom" ? safeDate(params.to, today) : today;
   const to = new Date(startOfDay(selectedTo).getTime() + 86_400_000);
   const where: Prisma.WorkRouteDecisionWhereInput = { accountId: account.id, createdAt: { gte: from, lt: to } };
-  const [rows, grouped, missingMark, missingAssembly, skuGroups] = await Promise.all([
+  const [rows, grouped, missingMark, missingAssembly, skuGroups, rejectionCount] = await Promise.all([
     prisma.workRouteDecision.findMany({ where, include: { actorUser: { select: { name: true, username: true } } }, orderBy: { createdAt: "desc" }, take: 250 }),
     prisma.workRouteDecision.groupBy({ by: ["decisionType"], where, _count: { _all: true } }),
     prisma.workRouteDecision.count({ where: { ...where, missingInstructionStage: "MARK" } }),
     prisma.workRouteDecision.count({ where: { ...where, missingInstructionStage: "ASSEMBLE" } }),
-    prisma.workRouteDecision.groupBy({ by: ["sellerSku"], where: { ...where, decisionType: "OVERRIDDEN_SAVED_ROUTE", sellerSku: { not: "" } }, _count: { _all: true }, having: { sellerSku: { _count: { gt: 1 } } } })
+    prisma.workRouteDecision.groupBy({ by: ["sellerSku"], where: { ...where, decisionType: "OVERRIDDEN_SAVED_ROUTE", sellerSku: { not: "" } }, _count: { _all: true }, having: { sellerSku: { _count: { gt: 1 } } } }),
+    prisma.workRouteDecisionRejection.count({where:{accountId:account.id,createdAt:{gte:from,lt:to}}})
   ]);
   const counts = new Map(grouped.map((item) => [item.decisionType, item._count._all]));
 
@@ -58,7 +59,7 @@ export default async function WorkRouteSummaryPage({ searchParams }: { searchPar
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-4"><p className="text-sm text-amber-900">Missing Marking instructions</p><p className="mt-1 text-3xl font-black">{missingMark}</p></div>
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-4"><p className="text-sm text-amber-900">Missing Assembly instructions</p><p className="mt-1 text-3xl font-black">{missingAssembly}</p></div>
       <div className="rounded-lg border bg-white p-4"><p className="text-sm text-slate-600">Repeated SKU route changes</p><p className="mt-1 text-3xl font-black">{skuGroups.length}</p></div>
-      <div className="rounded-lg border bg-white p-4"><p className="text-sm text-slate-600">Route conflicts or rejected stale decisions</p><p className="mt-1 text-3xl font-black">0</p><p className="text-xs text-slate-500">Rejected transactions make no route-decision record.</p></div>
+      <div className="rounded-lg border bg-white p-4"><p className="text-sm text-slate-600">Route conflicts or rejected stale decisions</p><p className="mt-1 text-3xl font-black">{rejectionCount}</p><p className="text-xs text-slate-500">Persisted safe rejection records for this period.</p></div>
     </section>
     <section className="mt-5 overflow-x-auto rounded-lg border bg-white">
       <table className="min-w-[980px] w-full text-left text-sm"><thead className="bg-slate-100"><tr>{["Time", "Source", "Seller SKU", "Reference", "Saved route", "Selected", "Decision", "Reason / note", "Worker"].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>

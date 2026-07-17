@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   getInitialDisplayImageState,
   isDisplayableImageSrc,
@@ -49,6 +49,8 @@ export function ProductImage({
   const [state, setState] = useState<ProductImageState>(initialState(src, imageHealth, cacheStatus));
   const [manualCheck, setManualCheck] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [eligibleToLoad,setEligibleToLoad]=useState(priority);
+  const containerRef=useRef<HTMLDivElement>(null);
   const validSrc = isDisplayableImageSrc(src) ? src : null;
   const isExternalSrc = isLoadableImageUrl(validSrc);
   const hasSource = Boolean(validSrc);
@@ -62,8 +64,10 @@ export function ProductImage({
     }
   }, [cacheStatus, imageHealth, mappingId, src, validSrc]);
 
+  useEffect(()=>{if(priority||eligibleToLoad)return;const element=containerRef.current;if(!element)return;if(typeof IntersectionObserver==="undefined"){setEligibleToLoad(true);return;}const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setEligibleToLoad(true);observer.disconnect();}},{rootMargin:"200px"});observer.observe(element);return()=>observer.disconnect();},[eligibleToLoad,priority]);
+
   useEffect(() => {
-    if (!validSrc || (state !== "loading" && state !== "retrying") || !isExternalSrc) {
+    if (!eligibleToLoad || !validSrc || (state !== "loading" && state !== "retrying") || !isExternalSrc) {
       return;
     }
 
@@ -77,7 +81,7 @@ export function ProductImage({
     }, retryVersion === 0 ? 2000 : 2500);
 
     return () => window.clearTimeout(timeout);
-  }, [isExternalSrc, retryVersion, state, validSrc]);
+  }, [eligibleToLoad, isExternalSrc, retryVersion, state, validSrc]);
 
   function stopParentNavigation(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -107,12 +111,12 @@ export function ProductImage({
         : { label: stateText, className: "bg-amber-50 text-amber-800 ring-amber-200" };
 
   return (
-    <div
+    <div ref={containerRef}
       className={`relative flex shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white ${sizeClass[size]}`}
       title={src ? `${stateText}: ${src}` : stateText}
     >
       {(state === "loading" || state === "retrying") ? <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400"><span className="flex h-9 w-9 items-center justify-center rounded-md border bg-white text-[10px] font-black">IMG</span><span className="mt-1 text-[10px] font-bold uppercase">{state === "retrying" ? "Retrying" : "Loading"}</span></div> : null}
-      {validSrc && state !== "broken" && state !== "unavailable" ? (
+      {eligibleToLoad && validSrc && state !== "broken" && state !== "unavailable" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={`${validSrc}-${retryVersion}`}

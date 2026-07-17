@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
@@ -159,7 +160,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             <div className="flex flex-wrap items-center gap-2">
               {canPack ? (
                 <form action={confirmPackedAction}>
-                  <input type="hidden" name="orderId" value={order.id} />
+                   <input type="hidden" name="orderId" value={order.id} />
+                   <input type="hidden" name="clientRequestId" value={`packing-problem:${order.id}:${randomUUID()}`} />
                   <SubmitButton pendingText="Packing...">Pack</SubmitButton>
                 </form>
               ) : null}

@@ -180,7 +180,7 @@ export default async function ProblemOrdersPage({ searchParams }: ProblemsPagePr
       <PageHeader
         eyebrow="Problems"
         title="Problem order workflow"
-        description="Resolve warehouse exceptions with notes, audit logs, and explicit return-to-ready control."
+        description="Resolve warehouse exceptions with notes, audit logs, and stage-aware workflow restoration."
       />
 
       {params?.resolved ? (
@@ -326,11 +326,9 @@ export default async function ProblemOrdersPage({ searchParams }: ProblemsPagePr
                     <>
                       <form action={resolveProblemOrderAction} className="grid min-w-[18rem] gap-2 rounded-md border border-teal-200 bg-teal-50 p-3">
                         <input type="hidden" name="problemId" value={problem.id} />
-                        <textarea name="resolutionNote" placeholder="Resolution note" className="min-h-20 rounded-md border border-slate-300 px-3 py-2 text-sm" />
-                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                          <input type="checkbox" name="returnToReady" value="1" className="h-4 w-4 rounded border-slate-300" />
-                          Mark order back to ready
-                        </label>
+                        <input type="hidden" name="clientRequestId" value={`resolve:${problem.id}:${problem.createdAt.toISOString()}`} />
+                        <textarea name="resolutionNote" required maxLength={1000} placeholder="Resolution note" className="min-h-20 rounded-md border border-slate-300 px-3 py-2 text-sm" />
+                        <p className="text-sm font-semibold text-slate-800">Restores only the interrupted stage to its exact previous state.</p>
                         <SubmitButton pendingText="Resolving..." variant="primary">
                           Resolve problem
                         </SubmitButton>

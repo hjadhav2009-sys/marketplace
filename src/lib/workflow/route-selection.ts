@@ -7,6 +7,7 @@ import { buildOrderAssemblyMetadata } from "./order-assembly-metadata";
 import { buildConsignmentAssemblyMetadata, buildOrderMarkingMetadata, parseConsignmentAssemblyMetadata, parseOrderMarkingMetadata, type RouteSnapshotV1 } from "./route-task-metadata";
 import { getRouteDecisionPolicy, sanitizeRouteNote, validateRouteDecisionReason } from "./route-decision-policy";
 import { parseImmutableRouteProvenance, type ImmutableRouteProvenance } from "./route-provenance";
+import { createWorkRouteSnapshot, parseWorkRouteSnapshot } from "./dynamic-route";
 
 type Client = PrismaClient;
 type Transaction = Prisma.TransactionClient;
@@ -69,6 +70,15 @@ function routeMetadata(value: string | null): RouteMetadata | null {
   }
 }
 
+function objectSnapshot(value:string|null|undefined){try{return JSON.parse(value??"") as Record<string,unknown>;}catch{return{};}}
+function buildDirectRouteSnapshots(input:{pick:{workCardSnapshotJson:string|null;routeSnapshotJson:string|null}|null;context:RouteSourceContext;route:PostPickRoute;actorUserId:string;decisionType:string;routeReason:string|null;workerNote:string;now:Date}){
+  const original=input.context.provenance??(()=>{const timestamp=input.now.toISOString(),recommended=input.context.savedProcessRoute??"PICK_PACK";return{routeSnapshotVersion:3 as const,routeRecommendation:recommended,routeRecommendationSource:input.context.hasExplicitSavedRoute?"LEGACY_SNAPSHOT" as const:"SYSTEM_FALLBACK" as const,hasExplicitSavedRoute:input.context.hasExplicitSavedRoute,savedProcessRoute:input.context.hasExplicitSavedRoute?input.context.savedProcessRoute:null,savedProcessRuleId:null,savedProcessRuleUpdatedAt:null,savedProcessRuleFingerprint:null,markingInstructionSnapshot:null,assemblyInstructionSnapshot:null,catalogSnapshotAt:timestamp,workCreatedAt:timestamp};})();
+  const originalRoute=objectSnapshot(input.pick?.routeSnapshotJson),prior=parseWorkRouteSnapshot(input.pick?.routeSnapshotJson)??createWorkRouteSnapshot({processRoute:original.routeRecommendation,currentStage:"PICK"}),actualStages=["PICK",...ROUTE_STAGES[input.route]] as WorkStage[],selectedNextStage=ROUTE_STAGES[input.route][0];
+  const routeSnapshot={...originalRoute,...original,version:2 as const,routeVersion:prior.routeVersion+1,recommendedStages:createWorkRouteSnapshot({processRoute:original.routeRecommendation,currentStage:"PICK"}).recommendedStages,actualStages,completedStages:["PICK" as const],currentStage:selectedNextStage,selectedNextStage,decisions:[...prior.decisions.filter(item=>item.fromStage!=="PICK"),{fromStage:"PICK" as const,toStage:selectedNextStage,actorUserId:input.actorUserId,decidedAt:input.now.toISOString(),reason:input.decisionType==="FOLLOWED_SAVED_ROUTE"?"DEFAULT" as const:"WORKER_SELECTION" as const}],selectedActualRoute:input.route,actualProcessRoute:ROUTE_TO_PROCESS[input.route],routeDecisionType:input.decisionType,routeDecisionReason:input.routeReason,routeWorkerNote:input.workerNote||null};
+  const workCardSnapshot=input.pick?.workCardSnapshotJson??JSON.stringify({version:2,productTitle:input.context.productTitle,primaryImage:input.context.productImage,sellerSku:input.context.sellerSku,...original});
+  return{workCardSnapshotJson:workCardSnapshot,routeSnapshotJson:JSON.stringify(routeSnapshot)};
+}
+
 function fingerprint(input: { sourceType: "ORDER" | "CONSIGNMENT"; sourceIds: string[]; route: PostPickRoute }) {
   return createHash("sha256").update(JSON.stringify({ ...input, sourceIds: [...input.sourceIds].sort() })).digest("hex");
 }
@@ -101,6 +111,8 @@ async function replaceDownstreamTasks(tx: Transaction, input: {
   route: PostPickRoute;
   requestFingerprint: string;
   stageMetadata: Map<WorkStage, string>;
+  workCardSnapshotJson: string;
+  routeSnapshotJson: string;
 }) {
   const sourceWhere = input.sourceType === "ORDER" ? { orderId: input.sourceId } : { consignmentLineId: input.sourceId };
   const existing = await tx.workTask.findMany({ where: { accountId: input.accountId, ...sourceWhere, stage: { not: "PICK" } } });
@@ -121,7 +133,9 @@ async function replaceDownstreamTasks(tx: Transaction, input: {
       sequenceNumber: index + 2,
       requiredQuantity: input.quantity,
       status: index === 0 ? "READY" : "LOCKED",
-      metadataJson: input.stageMetadata.get(stages[index]) ?? metadataJson
+      metadataJson: input.stageMetadata.get(stages[index]) ?? metadataJson,
+      workCardSnapshotJson:input.workCardSnapshotJson,
+      routeSnapshotJson:input.routeSnapshotJson
     } });
   }
 }
@@ -161,7 +175,8 @@ async function completePickTask(tx: Transaction, input: {
   const policy=getRouteDecisionPolicy({hasExplicitSavedRoute:resolution.context.hasExplicitSavedRoute,savedRoute:resolution.context.savedProcessRoute,selectedRoute:selectedProcessRoute,savedNextStage,selectedNextStage});
   const routeReason=validateRouteDecisionReason({required:policy.reasonRequired,reason:input.routeReason,otherReason:input.routeOtherReason});
   if(resolution.missingStages.length&&!input.confirmMissingInstructions)throw new Error(`Saved ${resolution.missingStages.join(" and ")} instructions are unavailable. Confirm Continue to create manual-route work.`);
-  await replaceDownstreamTasks(tx, { ...input, stageMetadata:resolution.metadata });
+  const now=new Date(),snapshots=buildDirectRouteSnapshots({pick,context:resolution.context,route:input.route,actorUserId:input.actorUserId,decisionType:policy.decisionType,routeReason,workerNote,now});
+  await replaceDownstreamTasks(tx, { ...input, stageMetadata:resolution.metadata,...snapshots });
   const metadataJson = JSON.stringify({ version: 1, routeChoice: input.route, processRoute: ROUTE_TO_PROCESS[input.route], requestFingerprint: input.requestFingerprint } satisfies RouteMetadata);
   if (!pick) {
     pick = await tx.workTask.create({ data: {
@@ -170,14 +185,14 @@ async function completePickTask(tx: Transaction, input: {
       consignmentLineId: input.sourceType === "CONSIGNMENT" ? input.sourceId : null,
       stage: "PICK", sequenceNumber: 1, requiredQuantity: input.quantity,
       completedQuantity: input.quantity, status: "COMPLETED", assignedUserId: input.actorUserId,
-      startedAt: new Date(), startedByUserId: input.actorUserId, completedAt: new Date(), completedByUserId: input.actorUserId,
-      metadataJson
+      startedAt: now, startedByUserId: input.actorUserId, completedAt: now, completedByUserId: input.actorUserId,
+      metadataJson,workCardSnapshotJson:snapshots.workCardSnapshotJson,routeSnapshotJson:snapshots.routeSnapshotJson
     } });
   } else {
     const changed = await tx.workTask.updateMany({ where: { id: pick.id, status: pick.status, completedQuantity: pick.completedQuantity }, data: {
       completedQuantity: pick.requiredQuantity, status: "COMPLETED", assignedUserId: pick.assignedUserId ?? input.actorUserId,
-      startedAt: pick.startedAt ?? new Date(), startedByUserId: pick.startedByUserId ?? input.actorUserId,
-      completedAt: new Date(), completedByUserId: input.actorUserId, metadataJson
+      startedAt: pick.startedAt ?? now, startedByUserId: pick.startedByUserId ?? input.actorUserId,
+      completedAt: now, completedByUserId: input.actorUserId, metadataJson,workCardSnapshotJson:snapshots.workCardSnapshotJson,routeSnapshotJson:snapshots.routeSnapshotJson
     } });
     if (changed.count !== 1) throw new Error("Picking changed; refresh before choosing the route.");
   }

@@ -361,6 +361,7 @@ model Account {
   fileProfiles        MarketplaceFileProfile[]
   workChangeEvents    WorkChangeEvent[]
   workGroupProjections WorkGroupProjection[]
+  workProjectionStates WorkProjectionState[]
   workRouteDecisions  WorkRouteDecision[]
   workflowActionReceipts WorkflowActionReceipt[]
   workRouteDecisionRejections WorkRouteDecisionRejection[]
@@ -405,6 +406,14 @@ model ImportJob {
   reportJson         String?
   cancelRequestedAt  DateTime?
   mergeStartedAt     DateTime?
+  runnerId           String?
+  leaseExpiresAt     DateTime?
+  heartbeatAt        DateTime?
+  attemptNumber      Int       @default(0)
+  checkpointJson     String?
+  currentEntryId     String?
+  currentChunk       Int       @default(0)
+  mergeCompletedEntryIdsJson String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -412,6 +421,7 @@ model ImportJob {
   @@index([accountId, importType, createdAt])
   @@index([accountId, marketplace, importType])
   @@index([batchId])
+  @@index([status, leaseExpiresAt])
 }
 
 model MarketplaceListing {
@@ -463,6 +473,9 @@ model MarketplaceListing {
   image1366Url9             String?
   image1366Url10            String?
   mainImageUrl              String?
+  fieldProvenanceJson       String?
+  manualLocksJson           String?
+  imageCacheStaleAt         DateTime?
   lastImportedAt            DateTime?
   createdAt                 DateTime                       @default(now())
   updatedAt                 DateTime                       @updatedAt
@@ -662,6 +675,20 @@ model WorkTask {
   @@index([consignmentLineId, stage, status])
 }
 
+model SecurityThrottle {
+  keyHash      String   @id
+  scope        String
+  attempts     Int      @default(0)
+  windowStart  DateTime @default(now())
+  blockedUntil DateTime?
+  lastAttemptAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([scope, lastAttemptAt])
+  @@index([blockedUntil])
+}
+
 model WorkChangeEvent {
   id          Int       @id @default(autoincrement())
   accountId   String
@@ -726,6 +753,24 @@ model WorkGroupMember {
 
   @@id([groupKey, taskId])
   @@index([groupKey])
+}
+
+model WorkProjectionState {
+  id                     String         @id @default(cuid())
+  accountId              String
+  account                Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceType             WorkSourceType
+  stage                  WorkStage
+  state                  String         @default("READY")
+  lastAppliedTaskVersion Int            @default(0)
+  rebuildLeaseOwner      String?
+  rebuildLeaseExpiresAt  DateTime?
+  errorSummary           String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  @@unique([accountId, sourceType, stage])
+  @@index([state, updatedAt])
 }
 
 model WorkRouteDecision {
@@ -1145,6 +1190,13 @@ model ProblemOrder {
   order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   reason         String
   details        String?
+  interruptedStage WorkStage?
+  workTaskId     String?
+  taskStatusBefore WorkTaskStatus?
+  orderStatusBefore OrderStatus?
+  pickStatusBefore PickStatus?
+  packStatusBefore PackStatus?
+  clientRequestId String?
   status         ProblemStatus @default(OPEN)
   reportedById   String?
   reportedBy     User?         @relation("ReportedProblems", fields: [reportedById], references: [id], onDelete: SetNull)
@@ -1156,6 +1208,8 @@ model ProblemOrder {
   @@index([accountId, status])
   @@index([accountId, status, createdAt])
   @@index([orderId])
+  @@index([accountId, interruptedStage, status])
+  @@unique([accountId, reportedById, clientRequestId])
 }
 
 model ImportRowIssue {

@@ -3,6 +3,7 @@ import { createTempWorkflowDb } from "./temp-workflow-db";
 import { getGroupedWork } from "../src/lib/workflow/grouped-work";
 import { completeGroupedStage } from "../src/lib/workflow/grouped-transition";
 import { createWorkRouteSnapshot } from "../src/lib/workflow/dynamic-route";
+import { rebuildWorkGroupProjection } from "../src/lib/workflow/work-group-projection";
 const {db,cleanup}=createTempWorkflowDb("grouped-consignment-completion");
 try {
   await db.account.create({ data: { id: "a", name: "A", code: "A", marketplace: "FLIPKART" } });
@@ -13,6 +14,7 @@ try {
     await db.workTask.create({ data: { id: `p${index}`, accountId: "a", sourceType: "CONSIGNMENT", consignmentLineId: `l${index}`, stage: "PICK", sequenceNumber: 1, requiredQuantity: 1, completedQuantity: 1, status: "COMPLETED", completedAt: new Date() } });
     await db.workTask.create({ data: { id: `t${index}`, accountId: "a", sourceType: "CONSIGNMENT", consignmentLineId: `l${index}`, stage: "PACK", sequenceNumber: 2, requiredQuantity: 1, status: "READY", workCardSnapshotJson: JSON.stringify({ sellerSku: "SKU" }), routeSnapshotJson: JSON.stringify(createWorkRouteSnapshot({ processRoute: "PICK_PACK", currentStage: "PACK" })) } });
   }
+  await rebuildWorkGroupProjection({ accountId: "a", sourceType: "CONSIGNMENT", stage: "PACK" }, db);
   const result = await getGroupedWork({ actorUserId: "w", accountId: "a", stage: "PACK", sourceType: "CONSIGNMENT" }, db);
   const card = result.cards[0];
   await completeGroupedStage({ actorUserId: "w", selectedAccountId: "a", sourceType: "CONSIGNMENT", stage: "PACK", groupKey: card.groupKey, expectedGroupVersion: card.groupVersion, clientRequestId: "complete" }, db);

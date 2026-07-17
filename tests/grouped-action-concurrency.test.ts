@@ -3,6 +3,7 @@ import { createTempWorkflowDb } from "./temp-workflow-db";
 import { createWorkRouteSnapshot } from "../src/lib/workflow/dynamic-route";
 import { getGroupedWork } from "../src/lib/workflow/grouped-work";
 import { completeGroupedStage } from "../src/lib/workflow/grouped-transition";
+import { rebuildWorkGroupProjection } from "../src/lib/workflow/work-group-projection";
 
 const { db, cleanup } = createTempWorkflowDb("grouped-action-concurrency");
 try {
@@ -14,6 +15,7 @@ try {
   await db.uploadBatch.create({ data: { id: "batch", accountId: "a", fileName: "synthetic.csv" } });
   await db.order.create({ data: { id: "order", accountId: "a", batchId: "batch", marketplace: "FLIPKART", awb: "A", sku: "SKU", qty: 1, orderNo: "O" } });
   await db.workTask.create({ data: { id: "pick", accountId: "a", sourceType: "ORDER", orderId: "order", stage: "PICK", sequenceNumber: 1, requiredQuantity: 1, status: "READY", workCardSnapshotJson: JSON.stringify({ sellerSku: "SKU" }), routeSnapshotJson: JSON.stringify(createWorkRouteSnapshot({ processRoute: "PICK_PACK", currentStage: "PICK" })) } });
+  await rebuildWorkGroupProjection({ accountId: "a", sourceType: "ORDER", stage: "PICK" }, db);
   const card = (await getGroupedWork({ actorUserId: "worker", accountId: "a", stage: "PICK", sourceType: "ORDER" }, db)).cards[0];
   const request = { actorUserId: "worker", selectedAccountId: "a", sourceType: "ORDER" as const, stage: "PICK" as const, groupKey: card.groupKey, expectedGroupVersion: card.groupVersion, useRecommendedNextStage: true, clientRequestId: "twenty-identical" };
   const results = await Promise.all(Array.from({ length: 20 }, () => completeGroupedStage(request, db)));

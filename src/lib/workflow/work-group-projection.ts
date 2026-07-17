@@ -108,12 +108,15 @@ function buildProjectionData(input:{accountId:string;sourceType:ProjectionSource
 
 async function replaceProjection(input: { accountId: string; sourceType: ProjectionSource; stage: WorkStage }, client: Client) {
   const account = await client.account.findUniqueOrThrow({ where: { id: input.accountId }, select: { marketplace: true } });
-  const tasks = await client.workTask.findMany({ where: { accountId: input.accountId, sourceType: input.sourceType, stage: input.stage, status: { in: ["READY", "IN_PROGRESS", "PROBLEM", "COMPLETED"] } }, include: INCLUDE, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+  const recentCompletedAt=new Date(Date.now()-30*24*60*60*1000);const [activeTasks,recentCompletedTasks]=await Promise.all([
+    client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage:input.stage,status:{in:["READY","IN_PROGRESS","PROBLEM"]}},include:INCLUDE,orderBy:[{createdAt:"asc"},{id:"asc"}]}),
+    client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage:input.stage,status:"COMPLETED",completedAt:{gte:recentCompletedAt}},include:INCLUDE,orderBy:[{completedAt:"desc"},{id:"asc"}],take:10_000})
+  ]);const tasks=[...activeTasks,...recentCompletedTasks].sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()||a.id.localeCompare(b.id));
   const {rows,members}=buildProjectionData({...input,marketplace:String(account.marketplace)},tasks);
   await client.workGroupProjection.deleteMany({ where: input });
   for (let index = 0; index < rows.length; index += 500) await client.workGroupProjection.createMany({ data: rows.slice(index, index + 500) });
   for (let index = 0; index < members.length; index += 1000) await client.workGroupMember.createMany({ data: members.slice(index, index + 1000) });
-  return { groupCount: rows.length, memberCount: members.length };
+  await client.workProjectionState.upsert({where:{accountId_sourceType_stage:input},create:{...input,state:"READY",lastAppliedTaskVersion:Math.max(0,...tasks.map(task=>task.version))},update:{state:"READY",lastAppliedTaskVersion:Math.max(0,...tasks.map(task=>task.version)),rebuildLeaseOwner:null,rebuildLeaseExpiresAt:null,errorSummary:null}});return { groupCount: rows.length, memberCount: members.length };
 }
 
 export async function rebuildWorkGroupProjection(input: { accountId: string; sourceType: ProjectionSource; stage: WorkStage }, client: Client = prisma) {
@@ -132,17 +135,17 @@ export async function refreshAffectedWorkGroups(input:{accountId:string;sourceTy
     for(const task of affected){if(task.order){if(stage==="PACK")cohortOr.push(task.order.trackingId?{order:{trackingId:task.order.trackingId}}:{order:{awb:task.order.awb}});else cohortOr.push({order:{batchId:task.order.batchId,sku:task.order.sku}});}else if(task.consignmentLine){cohortOr.push(stage==="PACK"?{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId}}:{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId,OR:[{sellerSkuSnapshot:task.consignmentLine.sellerSkuSnapshot},{sellerSkuSource:task.consignmentLine.sellerSkuSource}]}});}}
     const candidates=await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage,status:{in:["READY","IN_PROGRESS","PROBLEM","COMPLETED"]},OR:[...(oldMemberIds.length?[{id:{in:oldMemberIds}}]:[]),...cohortOr]},include:INCLUDE,orderBy:[{createdAt:"asc"},{id:"asc"}]});
     const relevantIds=new Set([...affectedIds,...oldMemberIds]),{rows,members}=buildProjectionData({accountId:input.accountId,sourceType:input.sourceType,stage,marketplace:String(account.marketplace)},candidates,relevantIds),replaceKeys=[...new Set([...oldGroupKeys,...rows.map(row=>row.groupKey)])];
-    if(replaceKeys.length)await client.workGroupProjection.deleteMany({where:{groupKey:{in:replaceKeys},accountId:input.accountId,sourceType:input.sourceType,stage}});for(let index=0;index<rows.length;index+=500)await client.workGroupProjection.createMany({data:rows.slice(index,index+500)});for(let index=0;index<members.length;index+=1000)await client.workGroupMember.createMany({data:members.slice(index,index+1000)});results[stage]={groupCount:rows.length,memberCount:members.length};
+    if(replaceKeys.length)await client.workGroupProjection.deleteMany({where:{groupKey:{in:replaceKeys},accountId:input.accountId,sourceType:input.sourceType,stage}});for(let index=0;index<rows.length;index+=500)await client.workGroupProjection.createMany({data:rows.slice(index,index+500)});for(let index=0;index<members.length;index+=1000)await client.workGroupMember.createMany({data:members.slice(index,index+1000)});await client.workProjectionState.upsert({where:{accountId_sourceType_stage:{accountId:input.accountId,sourceType:input.sourceType,stage}},create:{accountId:input.accountId,sourceType:input.sourceType,stage,state:"READY",lastAppliedTaskVersion:Math.max(0,...affected.map(task=>task.version))},update:{state:"READY",lastAppliedTaskVersion:Math.max(0,...affected.map(task=>task.version)),errorSummary:null}});results[stage]={groupCount:rows.length,memberCount:members.length};
   }
   return results;
 }
 
 export async function ensureWorkGroupProjection(input: { accountId: string; sourceType: ProjectionSource; stage: WorkStage }, client: Client = prisma) {
   const activeStatuses = ["READY", "IN_PROGRESS", "PROBLEM"] as const;
-  const [active, projectedActive,groups] = await Promise.all([
+  const [active, projectedActive,groups,state] = await Promise.all([
     client.workTask.count({ where: { ...input, status: { in: [...activeStatuses] } } }),
     client.workGroupMember.count({ where: { projection: input, task: { status: { in: [...activeStatuses] } } } }),
-    client.workGroupProjection.count({where:input})
+    client.workGroupProjection.count({where:input}),client.workProjectionState.findUnique({where:{accountId_sourceType_stage:input}})
   ]);
-  if (active !== projectedActive || (!active && groups)) await rebuildWorkGroupProjection(input, client);
+  return { active, projectedActive, groups, state:state?.state??"UNINITIALIZED", consistent: state?.state==="READY"&&active === projectedActive && Boolean(active || !groups) };
 }

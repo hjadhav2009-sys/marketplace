@@ -39,7 +39,8 @@ assert.match(packing, /data-customer-order-packing/, "Legacy customer packing is
 assert.match(packing, /canUseScanner[\s\S]*redirect\(roleHomePath/, "Users without scanner permissions are rejected");
 assert.match(actions, /getAuthorizedWorkAccounts/);
 assert.match(actions, /This account is no longer assigned to you/);
-assert.match(actions, /ORDER_PICK[\s\S]*markCustomerOrdersPickedSafely/, "Universal Order Pick uses the shared picking service");
+assert.match(actions, /ORDER_PICK[\s\S]*legacy Pick action was retired[\s\S]*Choose the next route/, "Universal legacy Order Pick is rejected instead of bypassing route selection");
+assert.match(actions, /ORDER_PICK_ROUTE[\s\S]*completePickWithNextRoute/, "Universal route-aware Order Pick uses the authoritative route service");
 assert.match(orderPicking, /assertWorkerAccountAccess[\s\S]*\$transaction[\s\S]*assertWorkerAccountAccess/, "Order Pick re-authorizes inside its transaction");
 assert.match(actions, /packCustomerOrderShipmentSafely/);
 assert.match(packScope, /unpickedCount[\s\S]*problemCount[\s\S]*packable/);

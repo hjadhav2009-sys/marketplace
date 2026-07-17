@@ -18,8 +18,10 @@ assert.equal(hasWorkPermission({ role: "OWNER", ...permissionDefaults }, "canMan
 assert.equal(hasWorkPermission({ role: "PACKER", ...permissionDefaults, canManageMarkingLibrary: true }, "canManageMarkingLibrary"), true, "Explicit marking manager permission works");
 assert.equal(hasWorkPermission({ role: "PICKER", ...permissionDefaults, canMark: true }, "canManageMarkingLibrary"), false, "Marking stage permission does not imply library management");
 assert.equal(hasWorkPermission({ role: "PACKER", ...permissionDefaults, canAssemble: true }, "canManageProcessRules"), false, "Assembly stage permission does not imply rule management");
-assert.equal(hasWorkPermission({ role: "PICKER", ...permissionDefaults }, "canPick"), true, "Existing picker role still picks");
-assert.equal(hasWorkPermission({ role: "PACKER", ...permissionDefaults }, "canPack"), true, "Existing packer role still packs");
+assert.equal(hasWorkPermission({ role: "PICKER", ...permissionDefaults }, "canPick"), false, "Picker role label does not override an explicit disabled flag");
+assert.equal(hasWorkPermission({ role: "PICKER", ...permissionDefaults, canPick: true }, "canPick"), true, "Migrated picker flag preserves existing behavior");
+assert.equal(hasWorkPermission({ role: "PACKER", ...permissionDefaults }, "canPack"), false, "Packer role label does not override an explicit disabled flag");
+assert.equal(hasWorkPermission({ role: "PACKER", ...permissionDefaults, canPack: true }, "canPack"), true, "Migrated packer flag preserves existing behavior");
 
 assert.equal(normalizeListingIdentifier(IdentifierType.SELLER_SKU, " sku- 01 "), "SKU- 01", "SKU normalization is deterministic without destructive hyphen removal");
 assert.equal(normalizeListingIdentifier(IdentifierType.GTIN, " 123-456 789 "), "123456789", "Barcode-like identifiers remove harmless spaces and hyphens");

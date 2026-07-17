@@ -6,7 +6,6 @@ import { getAuthorizedWorkAccounts } from "./universal-resolver";
 import { packCustomerOrderShipmentSafely } from "./order-pack-scope";
 import { claimOrderAssemblyTask, completeOrderAssemblyTask, reportOrderAssemblyProblem, sendOrderToAssembly } from "./order-assembly";
 import { completePickWithNextRoute } from "./route-selection";
-import { markCustomerOrdersPickedSafely } from "./order-picking";
 import { completeOrderMarkingTask } from "./order-route-tasks";
 
 type Client = PrismaClient;
@@ -54,12 +53,9 @@ export async function applyUniversalCandidateAction(input: {
   });
   if (!order) throw new Error("Order is no longer available in this account.");
 
-  // Backward-compatible non-UI action for already deployed clients. New web UI always uses ORDER_PICK_ROUTE.
   if (input.action === "ORDER_PICK") {
     if (!hasWorkPermission(scope.user, "canPick")) throw new Error("Order picking permission is required.");
-    if (order.pickStatus === "PICKED") return { updatedCount: 0, idempotent: true };
-    const result = await markCustomerOrdersPickedSafely({ actorUserId: input.actorUserId, accountId: input.accountId, where: { id: input.sourceId }, source: "universal-scan", expectedStatus: input.expectedStatus, clientRequestId: input.clientRequestId }, client);
-    return { updatedCount: result.updatedCount, idempotent: result.idempotent };
+    throw new Error("Work changed: this legacy Pick action was retired. Choose the next route for the exact Order Pick task.");
   }
 
   if (!hasWorkPermission(scope.user, "canPack")) throw new Error("Order packing permission is required.");

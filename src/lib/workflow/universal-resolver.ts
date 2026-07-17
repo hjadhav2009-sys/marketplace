@@ -22,6 +22,7 @@ export type UniversalWorkCandidate = {
   actionType: "ORDER_PICK" | "ORDER_MARK" | "ORDER_PACK" | "ORDER_SEND_TO_ASSEMBLY" | "ORDER_ASSEMBLY" | "ORDER_WAITING_ASSEMBLY" | "CONSIGNMENT_PICK" | "CONSIGNMENT_MARK" | "CONSIGNMENT_ASSEMBLE" | "CONSIGNMENT_PACK" | "PROBLEM" | "READ_ONLY";
   sourceId: string;
   taskId?: string;
+  workGroupKey?: string;
   orderId?: string;
   consignmentLineId?: string;
   accountId: string;
@@ -171,7 +172,7 @@ export function canViewCustomerOrderProblem(
   user: Pick<User, "id" | "role" | "canPack" | "canViewAllWork">,
   problem: { reportedByIds: string[] }
 ) {
-  return user.role === "OWNER" || user.role === "PACKER" || user.canPack || user.canViewAllWork || problem.reportedByIds.includes(user.id);
+  return user.role === "OWNER" || user.canPack || user.canViewAllWork || problem.reportedByIds.includes(user.id);
 }
 
 function orderMatchType(order: { awb: string; trackingId: string | null; orderNo: string; shipmentId: string | null; orderItemId: string | null; sku: string }, code: string) {
@@ -240,24 +241,25 @@ export async function resolveUniversalWork(
     return normalizedValue ? [{ identifierType, normalizedValue }] : [];
   });
 
-  const [orders, identifierRows] = await Promise.all([
-    client.order.findMany({
-      where: orderWhere,
-      select: {
+  const orderSelect = {
         id: true, accountId: true, marketplace: true, shipmentId: true, orderItemId: true, fsn: true, trackingId: true, awb: true, sku: true, qty: true, orderNo: true,
         productDescription: true, imageUrl: true, pickStatus: true, packStatus: true, status: true, packedAt: true,
-        problemOrders: { where: { status: "OPEN" }, select: { reportedById: true } }
-      },
+        problemOrders: { where: { status: "OPEN" as const }, select: { reportedById: true } }
+      } satisfies Prisma.OrderSelect;
+  const [activeOrders, completedOrderRows, identifierRows] = await Promise.all([
+    client.order.findMany({
+      where: {AND:[orderWhere,{packStatus:{not:"PACKED"}}]},select:orderSelect,
       take: limit * 4,
       orderBy: [{ importedAt: "desc" }, { id: "asc" }]
     }),
+    client.order.findMany({where:{AND:[orderWhere,{packStatus:"PACKED"}]},select:orderSelect,take:limit,orderBy:[{packedAt:"desc"},{id:"asc"}]}),
     client.marketplaceListingIdentifier.findMany({
       where: { accountId: { in: accountIds }, active: true, OR: normalizedOr },
       select: { marketplaceListingId: true, identifierType: true, normalizedValue: true },
       take: limit * 8,
       orderBy: [{ marketplaceListingId: "asc" }, { identifierType: "asc" }]
     })
-  ]);
+  ]),orders=[...activeOrders,...completedOrderRows];
 
   const trackedShipments = [...new Map(orders.map((order) => [shipmentKey(order), order]).filter((entry): entry is [string, typeof orders[number]] => Boolean(entry[0]))).values()];
   const shipmentOrders = trackedShipments.length
@@ -289,9 +291,9 @@ export async function resolveUniversalWork(
     gate.tasks.forEach((task) => { if (task.orderId) assemblyTaskByOrder.set(task.orderId, task); });
     gate.policies.forEach((policy, orderId) => assemblyPolicyByOrder.set(orderId, policy));
   }
-  const orderMarkTasks = gateOrders.length ? await client.workTask.findMany({ where: { accountId: { in: accountIds }, sourceType: "ORDER", orderId: { in: gateOrders.map((order) => order.id) }, stage: "MARK", status: { in: ["READY", "IN_PROGRESS", "PROBLEM"] } }, select: { id: true, orderId: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, metadataJson: true, assignedUser: { select: { name: true } } } }) : [];
+  const orderMarkTasks = gateOrders.length ? await client.workTask.findMany({ where: { accountId: { in: accountIds }, sourceType: "ORDER", orderId: { in: gateOrders.map((order) => order.id) }, stage: "MARK", status: { in: ["READY", "IN_PROGRESS", "PROBLEM"] } }, select: { id: true, orderId: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, metadataJson: true, workGroupMembership:{select:{groupKey:true}},assignedUser: { select: { name: true } } } }) : [];
   const orderMarkTaskByOrder = new Map(orderMarkTasks.flatMap((task) => task.orderId ? [[task.orderId, task] as const] : []));
-  const orderPickTasks=gateOrders.length?await client.workTask.findMany({where:{accountId:{in:accountIds},sourceType:"ORDER",orderId:{in:gateOrders.map(order=>order.id)},stage:"PICK"},select:{orderId:true,workCardSnapshotJson:true,routeSnapshotJson:true}}):[],orderPickTaskByOrder=new Map(orderPickTasks.flatMap(task=>task.orderId?[[task.orderId,task] as const]:[]));
+  const orderPickTasks=gateOrders.length?await client.workTask.findMany({where:{accountId:{in:accountIds},sourceType:"ORDER",orderId:{in:gateOrders.map(order=>order.id)},stage:"PICK"},select:{id:true,orderId:true,workCardSnapshotJson:true,routeSnapshotJson:true,workGroupMembership:{select:{groupKey:true}}}}):[],orderPickTaskByOrder=new Map(orderPickTasks.flatMap(task=>task.orderId?[[task.orderId,task] as const]:[]));
 
   const listingIds = [...new Set(identifierRows.map((row) => row.marketplaceListingId))];
   const taskLineMatch: Prisma.ConsignmentLineWhereInput = {
@@ -356,6 +358,8 @@ export async function resolveUniversalWork(
     const common = {
       sourceType: "CUSTOMER_ORDER" as const,
       sourceId: order.id,
+      taskId: pickTask?.id,
+      workGroupKey: pickTask?.workGroupMembership?.groupKey,
       orderId: order.id,
       accountId: order.accountId,
       accountName: account.accountDisplayName ?? account.name,
@@ -396,7 +400,7 @@ export async function resolveUniversalWork(
       const assignedElsewhere = Boolean(markTask.assignedUserId && markTask.assignedUserId !== scope.user.id && scope.user.role !== "OWNER");
       const canMark = hasWorkPermission(scope.user, "canMark");
       const canAct = canMark && !assignedElsewhere && markTask.status !== "PROBLEM" && Boolean(metadata);
-      candidates.push({ ...common, candidateKey: `order-mark:${markTask.id}`, sourceId: markTask.id, taskId: markTask.id, actionType: markTask.status === "PROBLEM" ? "PROBLEM" : "ORDER_MARK", sourceLabel: markTask.status === "PROBLEM" ? "Order marking problem" : "Order Marking", stage: "MARK", status: markTask.status, requiredQuantity: markTask.requiredQuantity, completedQuantity: markTask.completedQuantity, remainingQuantity: markTask.requiredQuantity - markTask.completedQuantity, assignedUserId: markTask.assignedUserId, assignedUserName: markTask.assignedUser?.name, markingMasterDesignId: metadata?.masterDesignId, markingAssetName: metadata?.markingAssetName, markingPosition: metadata?.markingPosition, markingWidthMm: metadata?.markingWidthMm, markingHeightMm: metadata?.markingHeightMm, markingPower: metadata?.powerSetting, markingSpeed: metadata?.speedSetting, markingFrequency: metadata?.frequencySetting, markingPasses: metadata?.passes, markingInstructions: metadata?.instructions, canAct, readOnlyReason: markTask.status === "PROBLEM" ? "Problem requires review." : !metadata ? "Marking instructions are malformed." : assignedElsewhere ? "Marking is assigned to another worker." : canMark ? null : "Read-only work view." });
+      candidates.push({ ...common, candidateKey: `order-mark:${markTask.id}`, sourceId: markTask.id, taskId: markTask.id,workGroupKey:markTask.workGroupMembership?.groupKey, actionType: markTask.status === "PROBLEM" ? "PROBLEM" : "ORDER_MARK", sourceLabel: markTask.status === "PROBLEM" ? "Order marking problem" : "Order Marking", stage: "MARK", status: markTask.status, requiredQuantity: markTask.requiredQuantity, completedQuantity: markTask.completedQuantity, remainingQuantity: markTask.requiredQuantity - markTask.completedQuantity, assignedUserId: markTask.assignedUserId, assignedUserName: markTask.assignedUser?.name, markingMasterDesignId: metadata?.masterDesignId, markingAssetName: metadata?.markingAssetName, markingPosition: metadata?.markingPosition, markingWidthMm: metadata?.markingWidthMm, markingHeightMm: metadata?.markingHeightMm, markingPower: metadata?.powerSetting, markingSpeed: metadata?.speedSetting, markingFrequency: metadata?.frequencySetting, markingPasses: metadata?.passes, markingInstructions: metadata?.instructions, canAct, readOnlyReason: markTask.status === "PROBLEM" ? "Problem requires review." : !metadata ? "Marking instructions are malformed." : assignedElsewhere ? "Marking is assigned to another worker." : canMark ? null : "Read-only work view." });
     }
     const assemblyState = assemblyStateByOrder.get(order.id);
     const assemblyTask = assemblyTaskByOrder.get(order.id);

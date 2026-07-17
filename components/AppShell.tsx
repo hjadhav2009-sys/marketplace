@@ -21,7 +21,7 @@ const ownerLinks = [
   { href: "/work/assembly", label: "Assembly" },
   { href: "/owner/uploads/new", label: "Import" },
   { href: "/owner/imports", label: "Imports" },
-  { href: "/picker", label: "Pick" },
+  { href: "/work/pick?source=ORDER", label: "Pick" },
   { href: "/packing", label: "Pack" },
   { href: "/problems", label: "Problems" },
   { href: "/reports", label: "Reports" },
@@ -63,7 +63,7 @@ function linksForUser(user: NavigationUser) {
 
   const links = [];
   if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canAssemble") || hasWorkPermission(user, "canPack") || user.canViewAllWork) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan / Pack" });
-  if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Order Pick" }, { href: "/work/consignments/pick", label: "Consignment Pick" });
+  if (hasWorkPermission(user, "canPick")) links.push({ href: "/work/pick?source=ORDER", label: "Order Pick" }, { href: "/work/consignments/pick", label: "Consignment Pick" });
   if (hasWorkPermission(user, "canMark")) links.push({ href: "/work/marking", label: "Marking" });
   if (hasWorkPermission(user, "canAssemble") || user.canViewAllWork) links.push({ href: "/work/assembly", label: "Assembly" });
   if (hasWorkPermission(user, "canPack")) links.push({ href: "/packing", label: "Order Pack" }, { href: "/work/consignments/pack", label: "Consignment Pack" });
@@ -79,7 +79,7 @@ function mobileLinksForUser(user: NavigationUser) {
   if (user.role === "OWNER") return [];
   const links = [];
   if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canAssemble") || hasWorkPermission(user, "canPack") || user.canViewAllWork) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan" });
-  if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Pick" });
+  if (hasWorkPermission(user, "canPick")) links.push({ href: "/work/pick?source=ORDER", label: "Pick" });
   if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Problems" });
   links.push({ href: "/accounts", label: "Account" });
   return links;

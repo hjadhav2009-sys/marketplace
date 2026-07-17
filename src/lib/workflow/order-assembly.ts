@@ -6,6 +6,9 @@ import { startOfApplicationDay } from "./dates";
 import { buildOrderAssemblyMetadata, parseOrderAssemblyMetadata } from "./order-assembly-metadata";
 import { resolveOrderAssemblyPolicies, resolveOrderAssemblyPolicy, type OrderAssemblyPolicy } from "./order-assembly-policy";
 import { assertWorkerAccountAccess } from "./worker-access";
+import { createWorkRouteSnapshot, parseWorkRouteSnapshot } from "./dynamic-route";
+import { refreshAffectedWorkGroups } from "./work-group-projection";
+import { reportOrderWorkflowProblem, resolveOrderWorkflowProblem } from "./order-problems";
 
 type Client = PrismaClient;
 type Transaction = Prisma.TransactionClient;
@@ -41,22 +44,59 @@ function taskMetadata(order: AssemblyOrder, policy: Extract<OrderAssemblyPolicy,
   });
 }
 
-async function createTaskIfMissing(tx: Transaction, input: { order: AssemblyOrder; metadata: ReturnType<typeof buildOrderAssemblyMetadata> }) {
-  const existing = await tx.workTask.findUnique({ where: { orderId_stage: { orderId: input.order.id, stage: "ASSEMBLE" } } });
-  if (existing) return { task: existing, created: false };
-  const task = await tx.workTask.create({ data: {
+function safeObject(value: string | null | undefined) {
+  try { return JSON.parse(value ?? "") as Record<string, unknown>; } catch { return {}; }
+}
+
+async function createTaskIfMissing(tx: Transaction, input: { order: AssemblyOrder; metadata: ReturnType<typeof buildOrderAssemblyMetadata>; actorUserId: string }) {
+  const [pick, existing, pack] = await Promise.all([
+    tx.workTask.findUnique({ where: { orderId_stage: { orderId: input.order.id, stage: "PICK" } } }),
+    tx.workTask.findUnique({ where: { orderId_stage: { orderId: input.order.id, stage: "ASSEMBLE" } } }),
+    tx.workTask.findUnique({ where: { orderId_stage: { orderId: input.order.id, stage: "PACK" } } })
+  ]);
+  const source = pick ?? pack;
+  const prior = parseWorkRouteSnapshot(source?.routeSnapshotJson) ?? createWorkRouteSnapshot({ processRoute: "PICK_PACK", currentStage: "PICK" });
+  const now = new Date().toISOString();
+  const routeSnapshotJson = JSON.stringify({
+    ...safeObject(source?.routeSnapshotJson),
+    version: 2,
+    routeVersion: prior.routeVersion + 1,
+    recommendedStages: prior.recommendedStages,
+    actualStages: ["PICK", "ASSEMBLE", "PACK"],
+    completedStages: ["PICK"],
+    currentStage: "ASSEMBLE",
+    selectedNextStage: "ASSEMBLE",
+    selectedActualRoute: "ASSEMBLE",
+    actualProcessRoute: "PICK_ASSEMBLE_PACK",
+    routeDecisionType: "MANUAL_ASSEMBLY_DIVERSION",
+    decisions: [...prior.decisions, { fromStage: "PACK", toStage: "ASSEMBLE", actorUserId: input.actorUserId, decidedAt: now, reason: "WORKER_SELECTION" }]
+  });
+  const workCardSnapshotJson = source?.workCardSnapshotJson ?? JSON.stringify({ version: 2, sellerSku: input.order.sku, productTitle: input.order.productDescription, primaryImage: input.order.imageUrl, workCreatedAt: now });
+  if (pick) await tx.workTask.update({ where: { id: pick.id }, data: { workCardSnapshotJson, routeSnapshotJson } });
+  const task = existing ?? await tx.workTask.create({ data: {
     accountId: input.order.accountId,
     sourceType: "ORDER",
     orderId: input.order.id,
     consignmentLineId: null,
     stage: "ASSEMBLE",
-    sequenceNumber: 1,
+    sequenceNumber: 2,
     requiredQuantity: input.order.qty,
     completedQuantity: 0,
     status: "READY",
-    metadataJson: JSON.stringify(input.metadata)
+    metadataJson: JSON.stringify(input.metadata),
+    workCardSnapshotJson,
+    routeSnapshotJson
   } });
-  return { task, created: true };
+  if (existing) await tx.workTask.update({ where: { id: existing.id }, data: { sequenceNumber: 2, workCardSnapshotJson, routeSnapshotJson } });
+  if (pack) {
+    if (!["LOCKED", "READY"].includes(pack.status) || pack.completedQuantity > 0 || pack.startedAt) throw new Error("Packing already started; this order can no longer be diverted to assembly.");
+    await tx.workTask.update({ where: { id: pack.id }, data: { sequenceNumber: 3, status: "LOCKED", workCardSnapshotJson, routeSnapshotJson } });
+  } else {
+    await tx.workTask.create({ data: { accountId: input.order.accountId, sourceType: "ORDER", orderId: input.order.id, stage: "PACK", sequenceNumber: 3, requiredQuantity: input.order.qty, completedQuantity: 0, status: "LOCKED", metadataJson: JSON.stringify({ version: 1, routeChoice: "ASSEMBLE", processRoute: "PICK_ASSEMBLE_PACK" }), workCardSnapshotJson, routeSnapshotJson } });
+  }
+  await refreshAffectedWorkGroups({ accountId: input.order.accountId, sourceType: "ORDER", stages: ["ASSEMBLE", "PACK"], orderIds: [input.order.id] }, tx);
+  if (!existing) await tx.workChangeEvent.create({ data: { accountId: input.order.accountId, eventType: "ORDER_ASSEMBLY_ROUTED", sourceType: "ORDER", stage: "ASSEMBLE", entityId: task.id } });
+  return { task, created: !existing };
 }
 
 export async function createAutomaticAssemblyTasksAfterPick(tx: Transaction, input: { actorUserId: string; accountId: string; orders: AssemblyOrder[] }) {
@@ -66,7 +106,7 @@ export async function createAutomaticAssemblyTasksAfterPick(tx: Transaction, inp
   for (const order of input.orders) {
     const policy = policies.get(order.id);
     if (policy?.state === "ASSEMBLY_REQUIRED") {
-      const result = await createTaskIfMissing(tx, { order, metadata: taskMetadata(order, policy, input.actorUserId) });
+      const result = await createTaskIfMissing(tx, { order, metadata: taskMetadata(order, policy, input.actorUserId), actorUserId: input.actorUserId });
       if (result.created) {
         createdCount += 1;
         await tx.auditLog.create({ data: { userId: input.actorUserId, accountId: input.accountId, action: "ORDER_ASSEMBLY_TASK_CREATED", entityType: "WorkTask", entityId: result.task.id, metadata: JSON.stringify({ orderId: order.id, source: "PROCESS_RULE" }) } });
@@ -88,8 +128,6 @@ export async function sendOrderToAssembly(input: { actorUserId: string; accountI
       if (!hasWorkPermission(user, "canPack")) throw new Error("Packing permission is required to send an order to assembly.");
       const order = await tx.order.findFirst({ where: { id: input.orderId, accountId: input.accountId }, select: { id: true, accountId: true, sku: true, qty: true, productDescription: true, imageUrl: true, pickStatus: true, packStatus: true, status: true } });
       if (!order) throw new Error("Order is unavailable in the selected account.");
-      const existing = await tx.workTask.findUnique({ where: { orderId_stage: { orderId: order.id, stage: "ASSEMBLE" } } });
-      if (existing) return { task: existing, created: false, idempotent: true };
       if (order.pickStatus !== "PICKED" || order.packStatus !== "READY" || order.status === "PROBLEM") throw new Error("Order must be picked and ready before assembly.");
       const policy = await resolveOrderAssemblyPolicy(order, tx);
       if (policy.state === "UNSUPPORTED_ROUTE" || policy.state === "INVALID_RULE") throw new Error("Assembly configuration needs owner review.");
@@ -106,7 +144,7 @@ export async function sendOrderToAssembly(input: { actorUserId: string; accountI
             requestedByUserId: user.id,
             requiredByRule: false
           });
-      const result = await createTaskIfMissing(tx, { order, metadata });
+      const result = await createTaskIfMissing(tx, { order, metadata, actorUserId: user.id });
       if (result.created) await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_SENT_TO_ASSEMBLY", entityType: "Order", entityId: order.id, metadata: JSON.stringify({ taskId: result.task.id, source: metadata.source, clientRequestId: input.clientRequestId?.slice(0, 160) }) } });
       if (policy.state === "AMBIGUOUS_LISTING") await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_MANUAL_AMBIGUOUS_LISTING", entityType: "Order", entityId: order.id } });
       return { task: result.task, created: result.created, idempotent: !result.created };
@@ -188,8 +226,12 @@ export async function completeOrderAssemblyTask(input: { taskId: string; account
     if (!(["READY", "IN_PROGRESS"] as string[]).includes(task.status) || task.status !== input.expectedStatus) throw new Error("Assembly changed; refresh before completing.");
     const changed = await tx.workTask.updateMany({ where: { id: task.id, status: task.status, assignedUserId: task.assignedUserId }, data: { status: "COMPLETED", assignedUserId: task.assignedUserId ?? user.id, completedQuantity: task.requiredQuantity, startedAt: task.startedAt ?? new Date(), startedByUserId: task.startedByUserId ?? user.id, completedAt: new Date(), completedByUserId: user.id } });
     if (changed.count !== 1) throw new Error(task.assignedUserId ? "Assembly changed; refresh before completing." : "This assembly task was taken by another worker.");
+    const next=await tx.workTask.findFirst({where:{orderId:task.orderId,sequenceNumber:task.sequenceNumber+1}}),routeState=parseWorkRouteSnapshot(task.routeSnapshotJson)??createWorkRouteSnapshot({processRoute:null,currentStage:"ASSEMBLE"}),raw=safeObject(task.routeSnapshotJson),routeSnapshotJson=JSON.stringify({...raw,routeVersion:routeState.routeVersion+1,completedStages:[...new Set([...routeState.completedStages,"ASSEMBLE"])],currentStage:next?.stage??null,selectedNextStage:next?.stage??null});
     await actionLog(tx, { ...input, action: "TASK_COMPLETED", requestKind: "COMPLETE", metadata: { requestFingerprint } });
+    await tx.workTask.updateMany({where:{orderId:task.orderId},data:{routeSnapshotJson}});
     await tx.workTask.updateMany({ where: { orderId: task.orderId, sequenceNumber: task.sequenceNumber + 1, status: "LOCKED" }, data: { status: "READY" } });
+    await tx.workChangeEvent.create({data:{accountId:input.accountId,eventType:"ORDER_ASSEMBLY_COMPLETED",sourceType:"ORDER",stage:"ASSEMBLE",entityId:task.id}});
+    await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"ORDER",stages:["ASSEMBLE",...(next?[next.stage]:[])],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[]},tx);
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_COMPLETED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ orderId: task.orderId, quantity: task.requiredQuantity }) } });
     return { taskId: task.id, status: "COMPLETED" as const, idempotent: false };
   }), replay: () => client.$transaction(async (tx) => {
@@ -201,36 +243,15 @@ export async function completeOrderAssemblyTask(input: { taskId: string; account
 
 export async function reportOrderAssemblyProblem(input: { taskId: string; accountId: string; actorUserId: string; reason: string; note?: string; expectedStatus: string; clientRequestId?: string }, client: Client = prisma) {
   if (!(ORDER_ASSEMBLY_PROBLEM_CATEGORIES as readonly string[]).includes(input.reason)) throw new Error("Select a valid assembly problem reason.");
-  const requestFingerprint = fingerprint({ reason: input.reason, note: input.note?.trim() || null, expectedStatus: input.expectedStatus });
-  return recoverAssemblyReplay({ clientRequestId: input.clientRequestId, mutate: () => client.$transaction(async (tx) => {
-    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
-    if (!hasWorkPermission(user, "canAssemble") || (user.role !== "OWNER" && !user.canReportProblem)) throw new Error("Assembly problem reporting permission is required.");
-    const prior = await replay(tx, { ...input, requestKind: "REPORT_PROBLEM", requestFingerprint }); if (prior) return prior;
-    if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This assembly task was taken by another worker.");
-    if (!(["READY", "IN_PROGRESS"] as string[]).includes(task.status) || task.status !== input.expectedStatus) throw new Error("Assembly changed; refresh before reporting a problem.");
-    const changed = await tx.workTask.updateMany({ where: { id: task.id, status: task.status, assignedUserId: task.assignedUserId }, data: { statusBeforeProblem: task.status, status: "PROBLEM", assignedUserId: task.assignedUserId ?? user.id, problemReason: input.reason, problemReportedAt: new Date(), problemReportedByUserId: user.id } });
-    if (changed.count !== 1) throw new Error("Assembly changed; refresh before reporting a problem.");
-    await actionLog(tx, { ...input, action: "TASK_PROBLEM_REPORTED", requestKind: "REPORT_PROBLEM", note: input.note, metadata: { requestFingerprint, reason: input.reason } });
-    return { taskId: task.id, status: "PROBLEM" as const, idempotent: false };
-  }), replay: () => client.$transaction(async (tx) => {
-    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
-    if (!hasWorkPermission(user, "canAssemble") || (user.role !== "OWNER" && !user.canReportProblem)) throw new Error("Assembly problem reporting permission is required.");
-    return replay(tx, { ...input, taskId: task.id, requestKind: "REPORT_PROBLEM", requestFingerprint });
-  }) });
+  if (!input.clientRequestId) throw new Error("Problem request ID is required.");
+  const task=await client.workTask.findFirst({where:{id:input.taskId,accountId:input.accountId,sourceType:"ORDER",stage:"ASSEMBLE"},select:{id:true,orderId:true,version:true,status:true}});if(!task?.orderId)throw new Error("Assembly task is unavailable.");
+  const result=await reportOrderWorkflowProblem({actorUserId:input.actorUserId,accountId:input.accountId,orderId:task.orderId,taskId:task.id,stage:"ASSEMBLE",reason:input.reason,note:input.note,expectedTaskVersion:task.version,expectedTaskStatus:input.expectedStatus as "READY"|"IN_PROGRESS",clientRequestId:input.clientRequestId},client);
+  return {taskId:task.id,status:"PROBLEM" as const,idempotent:result.idempotent};
 }
 
 export async function resolveOrderAssemblyProblem(input: { taskId: string; accountId: string; actorUserId: string; resolutionNote: string; clientRequestId?: string }, client: Client = prisma) {
   if (!input.resolutionNote.trim()) throw new Error("Resolution note is required.");
-  return client.$transaction(async (tx) => {
-    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
-    if (user.role !== "OWNER") throw new Error("Only an owner can resolve assembly problems.");
-    if (task.status !== "PROBLEM") throw new Error("Assembly problem is unavailable.");
-    const restored = task.completedQuantity > 0 ? "IN_PROGRESS" as const : "READY" as const;
-    await tx.workTask.update({ where: { id: task.id }, data: { status: restored, problemResolutionNote: input.resolutionNote.trim().slice(0, 1_000), problemResolvedAt: new Date(), problemResolvedByUserId: user.id } });
-    await actionLog(tx, { ...input, action: "TASK_PROBLEM_RESOLVED", requestKind: "RESOLVE_PROBLEM", note: input.resolutionNote });
-    await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_PROBLEM_RESOLVED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ restoredStatus: restored }) } });
-    return { taskId: task.id, status: restored, idempotent: false };
-  });
+  if(!input.clientRequestId)throw new Error("Resolution request ID is required.");const problem=await client.problemOrder.findFirst({where:{accountId:input.accountId,workTaskId:input.taskId,status:"OPEN"},select:{id:true}});if(!problem)throw new Error("Assembly problem is unavailable.");const result=await resolveOrderWorkflowProblem({actorUserId:input.actorUserId,accountId:input.accountId,problemId:problem.id,resolutionNote:input.resolutionNote,clientRequestId:input.clientRequestId},client);return{taskId:input.taskId,status:result.restoredStatus,idempotent:false};
 }
 
 export async function skipOrderAssemblyTask(input: { taskId: string; accountId: string; actorUserId: string; reason: string; clientRequestId?: string }, client: Client = prisma) {
@@ -241,8 +262,10 @@ export async function skipOrderAssemblyTask(input: { taskId: string; accountId: 
     if (task.status === "SKIPPED") return { taskId: task.id, status: task.status, idempotent: true };
     if (task.status === "COMPLETED") throw new Error("Completed assembly cannot be skipped.");
     await tx.workTask.update({ where: { id: task.id }, data: { status: "SKIPPED", completedAt: new Date(), completedByUserId: user.id, problemResolutionNote: input.reason.trim().slice(0, 1_000) } });
+    const next=await tx.workTask.findFirst({where:{orderId:task.orderId,sequenceNumber:task.sequenceNumber+1}}),routeState=parseWorkRouteSnapshot(task.routeSnapshotJson)??createWorkRouteSnapshot({processRoute:null,currentStage:"ASSEMBLE"}),routeSnapshotJson=JSON.stringify({...safeObject(task.routeSnapshotJson),routeVersion:routeState.routeVersion+1,completedStages:[...new Set([...routeState.completedStages,"ASSEMBLE"])],currentStage:next?.stage??null,selectedNextStage:next?.stage??null,assemblyOutcome:"SKIPPED"});await tx.workTask.updateMany({where:{orderId:task.orderId},data:{routeSnapshotJson}});await tx.workTask.updateMany({where:{orderId:task.orderId,sequenceNumber:task.sequenceNumber+1,status:"LOCKED"},data:{status:"READY"}});
     await actionLog(tx, { ...input, action: "TASK_COMPLETED", requestKind: "COMPLETE", note: input.reason, metadata: { outcome: "SKIPPED" } });
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_SKIPPED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ orderId: task.orderId, reason: input.reason.trim().slice(0, 500) }) } });
+    await tx.workChangeEvent.create({data:{accountId:input.accountId,eventType:"ORDER_ASSEMBLY_SKIPPED",sourceType:"ORDER",stage:"ASSEMBLE",entityId:task.id}});await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"ORDER",stages:["ASSEMBLE","PACK"],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[]},tx);
     return { taskId: task.id, status: "SKIPPED" as const, idempotent: false };
   });
 }
@@ -257,6 +280,7 @@ export async function reassignOrderAssemblyTask(input: { taskId: string; account
     }
     await tx.workTask.update({ where: { id: task.id }, data: { assignedUserId: input.assignedUserId } });
     await actionLog(tx, { ...input, action: input.assignedUserId ? "TASK_REASSIGNED" : "TASK_UNASSIGNED", requestKind: input.assignedUserId ? "REASSIGN" : "UNASSIGN", metadata: { assignedUserId: input.assignedUserId } });
+    await tx.workChangeEvent.create({data:{accountId:input.accountId,eventType:"ORDER_ASSEMBLY_ASSIGNED",sourceType:"ORDER",stage:"ASSEMBLE",entityId:task.id}});await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"ORDER",stages:["ASSEMBLE"],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[]},tx);
     return { taskId: task.id, assignedUserId: input.assignedUserId };
   });
 }

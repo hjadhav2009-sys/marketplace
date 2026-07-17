@@ -102,7 +102,7 @@ try {
   const problemTask = (await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "problem", manualInstructions: "Fake problem task." }, db)).task;
   await reportOrderAssemblyProblem({ actorUserId: "assembler-a", accountId: "account", taskId: problemTask.id, expectedStatus: "READY", reason: "PART_MISSING", note: "Fake part missing", clientRequestId: "problem-1" }, db);
   assert.equal((await getOrderAssemblyPackingGate({ accountId: "account", orders: [{ id: "problem", accountId: "account", sku: "NO-RULE-PROBLEM" }] }, db)).allowed, false);
-  await resolveOrderAssemblyProblem({ actorUserId: "owner", accountId: "account", taskId: problemTask.id, resolutionNote: "Fake part supplied." }, db);
+  await resolveOrderAssemblyProblem({ actorUserId: "owner", accountId: "account", taskId: problemTask.id, resolutionNote: "Fake part supplied.", clientRequestId: "resolve-problem-1" }, db);
   await skipOrderAssemblyTask({ actorUserId: "owner", accountId: "account", taskId: problemTask.id, reason: "Approved fake exception." }, db);
   assert.equal((await getOrderAssemblyPackingGate({ accountId: "account", orders: [{ id: "problem", accountId: "account", sku: "NO-RULE-PROBLEM" }] }, db)).allowed, true);
 

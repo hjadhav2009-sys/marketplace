@@ -25,6 +25,10 @@ export async function applyUniversalCandidateAction(input: {
   manualInstructions?: string;
   manualImageUrl?: string;
   route?: string;
+  routeReason?: string;
+  routeOtherReason?: string;
+  workerNote?: string;
+  confirmMissingInstructions?: boolean;
 }, client: Client = prisma) {
   if (!UNIVERSAL_ACTIONS.has(input.action) || !input.clientRequestId.trim()) throw new Error("Universal action request is invalid.");
   const scope = await getAuthorizedWorkAccounts(input.actorUserId, client);
@@ -34,8 +38,8 @@ export async function applyUniversalCandidateAction(input: {
   if (input.action === "ASSEMBLY_CLAIM") return claimOrderAssemblyTask({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_COMPLETE") return completeOrderAssemblyTask({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_PROBLEM") return reportOrderAssemblyProblem({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", reason: "OTHER", note: "Reported from universal scanner.", clientRequestId: input.clientRequestId }, client);
-  if (input.action === "TASK_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"CONSIGNMENT", taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedQuantity: input.expectedQuantity ?? -1, route: input.route ?? "", clientRequestId: input.clientRequestId }, client);
-  if (input.action === "ORDER_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"ORDER", orderIds: [input.sourceId], accountId: input.accountId, actorUserId: input.actorUserId, route: input.route ?? "", clientRequestId: input.clientRequestId }, client);
+  if (input.action === "TASK_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"CONSIGNMENT", taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedQuantity: input.expectedQuantity ?? -1, route: input.route ?? "", routeReason:input.routeReason,routeOtherReason:input.routeOtherReason,workerNote:input.workerNote,confirmMissingInstructions:input.confirmMissingInstructions,clientRequestId: input.clientRequestId }, client);
+  if (input.action === "ORDER_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"ORDER", orderIds: [input.sourceId], accountId: input.accountId, actorUserId: input.actorUserId, route: input.route ?? "", routeReason:input.routeReason,routeOtherReason:input.routeOtherReason,workerNote:input.workerNote,confirmMissingInstructions:input.confirmMissingInstructions,clientRequestId: input.clientRequestId }, client);
   if (input.action === "ORDER_MARK_COMPLETE") return completeOrderMarkingTask({ taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedStatus: input.expectedStatus ?? "", clientRequestId: input.clientRequestId }, client);
 
   if (input.action.startsWith("TASK_")) {

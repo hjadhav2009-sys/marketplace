@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import type { Prisma, PrismaClient, User, WorkStage } from "@prisma/client";
+import type { Prisma, PrismaClient, ProcessRoute, User, WorkStage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
@@ -9,7 +9,8 @@ import { parseOrderAssemblyMetadata } from "./order-assembly-metadata";
 import type { OrderAssemblyPolicy } from "./order-assembly-policy";
 import { parseOrderMarkingMetadata } from "./route-task-metadata";
 import { resolveConsignmentLineWorkflowPrerequisites, resolveOrderShipmentWorkflowPrerequisites, type WorkflowPrerequisiteSummary } from "./workflow-prerequisites";
-import { parseImmutableRouteProvenance } from "./route-provenance";
+import { parseImmutableRouteProvenance, type ImmutableRouteProvenance } from "./route-provenance";
+import type { PostPickRoute } from "./route-selection";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type UniversalScanIntent = "ANY" | "PICK" | "MARK" | "ASSEMBLE" | "PACK";
@@ -79,7 +80,40 @@ export type UniversalWorkCandidate = {
   problemReason?: string | null;
   workflowPrerequisites?: WorkflowPrerequisiteSummary;
   missingInstructionStages?: WorkStage[];
+  routeDecision?: UniversalScannerRouteDecision;
 };
+
+export type UniversalScannerRouteDecision = {
+  recommendationSource: "EXPLICIT_SAVED_ROUTE" | "SYSTEM_FALLBACK";
+  savedProcessRoute: ProcessRoute | null;
+  savedRoute: PostPickRoute;
+  options: Array<{ route: PostPickRoute; reasonRequired: boolean; missingInstructionStages: WorkStage[] }>;
+};
+
+const PROCESS_ROUTE_CHOICE: Record<ProcessRoute, PostPickRoute> = {
+  PICK_PACK: "DIRECT_PACK",
+  PICK_MARK_PACK: "MARK",
+  PICK_ASSEMBLE_PACK: "ASSEMBLE",
+  PICK_MARK_ASSEMBLE_PACK: "MARK_ASSEMBLE"
+};
+const SCANNER_ROUTES: PostPickRoute[] = ["DIRECT_PACK", "MARK", "ASSEMBLE", "MARK_ASSEMBLE"];
+function scannerRouteDecision(provenance: ImmutableRouteProvenance | null): UniversalScannerRouteDecision {
+  const explicit = Boolean(provenance?.hasExplicitSavedRoute && provenance.savedProcessRoute);
+  const savedRoute = explicit ? PROCESS_ROUTE_CHOICE[provenance!.savedProcessRoute!] : "DIRECT_PACK";
+  return {
+    recommendationSource: explicit ? "EXPLICIT_SAVED_ROUTE" : "SYSTEM_FALLBACK",
+    savedProcessRoute: explicit ? provenance!.savedProcessRoute : null,
+    savedRoute,
+    options: SCANNER_ROUTES.map((route) => ({
+      route,
+      reasonRequired: explicit && route !== savedRoute,
+      missingInstructionStages: [
+        ...(route === "MARK" || route === "MARK_ASSEMBLE" ? (!provenance?.markingInstructionSnapshot ? ["MARK" as const] : []) : []),
+        ...(route === "ASSEMBLE" || route === "MARK_ASSEMBLE" ? (!provenance?.assemblyInstructionSnapshot ? ["ASSEMBLE" as const] : []) : [])
+      ]
+    }))
+  };
+}
 
 export const LISTING_IDENTIFIER_PRIORITY = [
   "FNSKU",
@@ -318,6 +352,7 @@ export async function resolveUniversalWork(
     const wantsPack = intent === "ANY" || intent === "PACK";
     const wantsAssembly = intent === "ANY" || intent === "ASSEMBLE";
     const isProblem = order.status === "PROBLEM" || order.pickStatus === "PROBLEM" || order.packStatus === "PROBLEM";
+    const pickTask=orderPickTaskByOrder.get(order.id),pickProvenance=parseImmutableRouteProvenance(pickTask?.workCardSnapshotJson)??parseImmutableRouteProvenance(pickTask?.routeSnapshotJson);
     const common = {
       sourceType: "CUSTOMER_ORDER" as const,
       sourceId: order.id,
@@ -341,7 +376,8 @@ export async function resolveUniversalWork(
       completedQuantity: 0,
       remainingQuantity: order.qty,
       packedAt: order.packedAt,
-      missingInstructionStages:(()=>{const pick=orderPickTaskByOrder.get(order.id),provenance=parseImmutableRouteProvenance(pick?.workCardSnapshotJson)??parseImmutableRouteProvenance(pick?.routeSnapshotJson),missing:WorkStage[]=[];if(!provenance?.markingInstructionSnapshot)missing.push("MARK");if(!provenance?.assemblyInstructionSnapshot)missing.push("ASSEMBLE");return missing;})()
+      missingInstructionStages:(()=>{const missing:WorkStage[]=[];if(!pickProvenance?.markingInstructionSnapshot)missing.push("MARK");if(!pickProvenance?.assemblyInstructionSnapshot)missing.push("ASSEMBLE");return missing;})(),
+      routeDecision:scannerRouteDecision(pickProvenance)
     };
     if (order.packStatus === "PACKED") {
       if (intent === "ANY" || intent === "PACK") {const key=shipmentKey(order),shipment=key?shipmentMap.get(key)??[order]:[order];if(!key||!groupedPackKeys.has(key)){if(key)groupedPackKeys.add(key);const totalQuantity=shipment.reduce((sum,item)=>sum+item.qty,0);candidates.push({ ...common,sourceType:key?"CUSTOMER_ORDER_SHIPMENT":"CUSTOMER_ORDER", candidateKey:key?`order-shipment:${order.accountId}:${order.trackingId}:packed`:`order:${order.id}:packed`, actionType: "READ_ONLY", sourceLabel:key?`${order.marketplace === "AMAZON" ? "Amazon" : "Flipkart"} shipment`:"Customer order",productSummary:summarize(shipment.map(item=>item.productDescription??item.sku))??undefined,orderNumber:summarize(shipment.map(item=>item.orderNo)),awb:summarize(shipment.map(item=>item.awb)),shipmentId:summarize(shipment.map(item=>item.shipmentId)), status: "PACKED",requiredQuantity:totalQuantity, completedQuantity: totalQuantity, remainingQuantity: 0, shipmentItemCount: shipment.length, shipmentTotalQuantity: totalQuantity,productCount:new Set(shipment.map(item=>item.sku)).size, canAct: false, readOnlyReason: "Packing is complete. This result is read-only." });}}
@@ -352,7 +388,7 @@ export async function resolveUniversalWork(
       candidates.push({ ...common, candidateKey: `order:${order.id}:problem`, actionType: "PROBLEM", status: "PROBLEM", canAct: false, readOnlyReason: "Problem requires review." });
     }
     if (!isProblem && wantsPick && order.pickStatus === "READY") {
-      const canPick=hasWorkPermission(scope.user,"canPick");candidates.push({ ...common, candidateKey: `order:${order.id}:pick`, actionType: canPick?"ORDER_PICK":"READ_ONLY", stage:"PICK", status: "PICK_PENDING", canAct: false, readOnlyReason: canPick?"Pack locked. Open Details to continue in Pick work.":"Pick pending. Pack is locked; Pick permission is required to open Pick work." });
+      const canPick=hasWorkPermission(scope.user,"canPick");candidates.push({ ...common, candidateKey: `order:${order.id}:pick`, actionType: canPick?"ORDER_PICK":"READ_ONLY", stage:"PICK", status: "PICK_PENDING", canAct: canPick, readOnlyReason: canPick?null:"Pick pending. Pack is locked; Pick permission is required to open Pick work." });
     }
     const markTask = orderMarkTaskByOrder.get(order.id);
     if (!isProblem && wantsMark && markTask) {
@@ -432,7 +468,7 @@ export async function resolveUniversalWork(
     if (!visibleProblem) continue;
     const capabilities = getWorkTaskCapabilities(scope.user, task);
     let workflow=consignmentWorkflowByLine.get(line.id);if(!workflow){workflow=await resolveConsignmentLineWorkflowPrerequisites({accountId:task.accountId,consignmentLineId:line.id},client);consignmentWorkflowByLine.set(line.id,workflow);}
-    const canAct = task.status === "PROBLEM"||task.stage==="PICK" ? false : capabilities.canProgress&&(task.stage!=="PACK"||workflow.packReady);
+    const canAct = task.status !== "PROBLEM" && capabilities.canProgress && (task.stage!=="PACK"||workflow.packReady);
     const matchingRows = identifierRows.filter((row) => row.marketplaceListingId === line.marketplaceListingId);
     let matchType = highestPriorityIdentifierType(matchingRows);
     if (task.id === code) matchType = "WORK_TASK_ID";
@@ -482,6 +518,7 @@ export async function resolveUniversalWork(
       problemReason: task.problemReason,
       workflowPrerequisites:workflow,
       missingInstructionStages,
+      routeDecision:task.stage==="PICK"?scannerRouteDecision(provenance):undefined,
       markingMasterDesignId: asset?.masterDesignId,
       markingAssetName: asset?.name,
       markingPosition: asset?.markingPosition,

@@ -22,8 +22,6 @@ export type WorkPermissionUser = Pick<
 
 export function hasWorkPermission(user: WorkPermissionUser, permission: WorkPermission) {
   if (user.role === "OWNER") return true;
-  if (permission === "canPick" && user.role === "PICKER") return true;
-  if (permission === "canPack" && user.role === "PACKER") return true;
   return user[permission];
 }
 

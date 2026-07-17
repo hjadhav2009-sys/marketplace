@@ -12,9 +12,7 @@ import {
 } from "@/lib/mobile-api";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validators";
-
-const MAX_FAILED_LOGINS = 5;
-const LOCK_MINUTES = 15;
+import { clearSecurityDimensions, consumeSecurityDimensions } from "@/lib/security-throttle";
 
 export async function POST(request: Request) {
   const limited = checkMobileRateLimit(request, "mobile-login", 10, 60_000);
@@ -39,6 +37,7 @@ export async function POST(request: Request) {
   }
 
   const requestMeta = getMobileRequestMeta(request);
+  const throttle=await consumeSecurityDimensions({scope:"mobile-login",username:parsed.data.username,ipAddress:requestMeta.ipAddress,usernameLimit:50,ipLimit:10,windowMs:15*60_000,blockMs:5*60_000});if(!throttle.allowed)return mobileError("invalid_login","Invalid username or password.",401);
   const user = await prisma.user.findUnique({
     where: { username: parsed.data.username }
   });
@@ -47,13 +46,10 @@ export async function POST(request: Request) {
   if (!user || loginCheck === "invalid_credentials") {
     if (user) {
       const failedLoginCount = user.failedLoginCount + 1;
-      const lockedUntil = failedLoginCount >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCK_MINUTES * 60 * 1000) : null;
-
       await prisma.user.update({
         where: { id: user.id },
         data: {
-          failedLoginCount,
-          lockedUntil
+          failedLoginCount
         }
       });
 
@@ -63,14 +59,14 @@ export async function POST(request: Request) {
         action: "MOBILE_LOGIN_FAILURE",
         entityType: "User",
         entityId: user.id,
-        metadata: { reason: lockedUntil ? "locked_after_failures" : "bad_password", failedLoginCount },
+        metadata: { reason: "bad_password", failedLoginCount, throttleKeyHashes: throttle.keyHashes },
         request: requestMeta
       });
     } else {
       await recordAuditLog({
         action: "MOBILE_LOGIN_FAILURE",
         entityType: "User",
-        metadata: { reason: "bad_password", failedLoginCount: 0, username: parsed.data.username },
+        metadata: { reason: "bad_password", failedLoginCount: 0, throttleKeyHashes: throttle.keyHashes },
         request: requestMeta
       });
     }
@@ -115,6 +111,7 @@ export async function POST(request: Request) {
       lastUserAgent: requestMeta.userAgent
     }
   });
+  await clearSecurityDimensions("mobile-login",parsed.data.username,requestMeta.ipAddress);
   const session = await createSession(user.id, requestMeta);
 
   await recordAuditLog({

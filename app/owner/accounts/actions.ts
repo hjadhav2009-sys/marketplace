@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser, setSelectedAccount } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { assertAccountMarketplaceChangeAllowed, setAccountActiveSafely } from "@/lib/account-lifecycle";
 import { getRequestMeta } from "@/lib/request-context";
 import { ownerAccountSchema } from "@/lib/validators";
 
@@ -33,6 +34,8 @@ export async function saveOwnerAccountAction(formData: FormData) {
   const accountName = accountInput.accountDisplayName;
   const accountCode = accountInput.accountCode;
   const isNewAccount = !accountInput.accountId;
+
+  if(accountInput.accountId){try{await assertAccountMarketplaceChangeAllowed(accountInput.accountId,accountInput.marketplace,prisma);}catch(error){redirectWithError(error instanceof Error&&error.message==="ACCOUNT_MARKETPLACE_LOCKED"?"marketplace-locked":"invalid");}}
 
   try {
     const account = accountInput.accountId
@@ -102,10 +105,7 @@ export async function toggleOwnerAccountActiveAction(formData: FormData) {
     redirectWithError("invalid");
   }
 
-  const account = await prisma.account.update({
-    where: { id: accountId },
-    data: { active }
-  });
+  let account;try{account=await setAccountActiveSafely({accountId,active,confirmation:String(formData.get("confirmation")??"")},prisma);}catch(error){redirectWithError(error instanceof Error&&error.message==="ACCOUNT_CONFIRMATION_REQUIRED"?"confirmation-required":"invalid");}
 
   await recordAuditLog({
     userId: user.id,

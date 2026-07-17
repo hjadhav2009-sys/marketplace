@@ -5,6 +5,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
+import { consumeSecurityAttempt } from "@/lib/security-throttle";
 import {
   canUseFirstRunSetup,
   isValidSetupAccountCode,
@@ -55,6 +56,8 @@ function readSetupForm(formData: FormData) {
 
 export async function createFirstOwnerAction(formData: FormData) {
   const request = await getRequestMeta();
+  const throttle = await consumeSecurityAttempt({ scope: "first-run-setup", identity: request.ipAddress ?? "unknown", limit: 5, windowMs: 15 * 60_000, blockMs: 30 * 60_000 });
+  if (!throttle.allowed) redirect("/setup?error=rate-limited");
   const parsed = readSetupForm(formData);
 
   if (!parsed) {

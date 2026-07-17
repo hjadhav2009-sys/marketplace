@@ -32,8 +32,8 @@ type PermissionUser = Pick<User, "role" | "canPick" | "canPack" | "canReportProb
 
 export function getMobilePermissions(user: PermissionUser): MobilePermissionSet {
   const isOwner = user.role === "OWNER";
-  const canPick = isOwner || user.role === "PICKER" || user.canPick;
-  const canPack = isOwner || user.role === "PACKER" || user.canPack;
+  const canPick = isOwner || user.canPick;
+  const canPack = isOwner || user.canPack;
   const canReportProblem = isOwner || user.canReportProblem || user.role === "PICKER" || user.role === "PACKER";
 
   return {

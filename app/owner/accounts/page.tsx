@@ -213,6 +213,7 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
                               <form action={toggleOwnerAccountActiveAction}>
                                 <input type="hidden" name="accountId" value={account.id} />
                                 <input type="hidden" name="active" value={String(!account.active)} />
+                                {account.active?<input name="confirmation" aria-label={`Type ${account.code} to confirm deactivation`} placeholder={`Type ${account.code}`} className="mr-2 min-h-10 w-32 rounded-md border px-2 text-sm"/>:null}
                                 <button className="min-h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 shadow-sm">
                                   {account.active ? "Deactivate" : "Reactivate"}
                                 </button>

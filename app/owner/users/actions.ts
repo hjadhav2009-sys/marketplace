@@ -7,6 +7,7 @@ import { requireAccount, requireUser } from "@/lib/auth";
 import { normalizeUsername } from "@/lib/auth-helpers";
 import { recordAuditLog } from "@/lib/audit";
 import { hashPassword } from "@/lib/password";
+import { consumeSecurityAttempt } from "@/lib/security-throttle";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import {
@@ -31,8 +32,8 @@ function parseUserForm(formData: FormData) {
   const legacyAccountId = String(formData.get("accountId") ?? "").trim();
   const uniqueAccountIds = [...new Set([...accountIds, legacyAccountId].filter(Boolean))];
   const active = formData.getAll("active").includes("on");
-  const canPick = role === "OWNER" || role === "PICKER" || formData.getAll("canPick").includes("on");
-  const canPack = role === "OWNER" || role === "PACKER" || formData.getAll("canPack").includes("on");
+  const canPick = role === "OWNER" || formData.getAll("canPick").includes("on");
+  const canPack = role === "OWNER" || formData.getAll("canPack").includes("on");
   const canReportProblem = role === "OWNER" || formData.getAll("canReportProblem").includes("on");
   const canMark = role === "OWNER" || formData.getAll("canMark").includes("on");
   const canAssemble = role === "OWNER" || formData.getAll("canAssemble").includes("on");
@@ -267,6 +268,8 @@ export async function changeUserPasswordAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const mustChangePassword = formData.get("mustChangePassword") === "on";
   const passwordResult = validateWorkerPassword(password);
+  const throttle = await consumeSecurityAttempt({ scope: "owner-password-reset", identity: `${owner.id}:${userId}:${request.ipAddress ?? "unknown"}`, limit: 10, windowMs: 15 * 60_000, blockMs: 15 * 60_000 });
+  if (!throttle.allowed) redirect("/owner/users?error=rate-limited");
 
   if (!userId || !passwordResult.valid) {
     redirect("/owner/users?error=password");

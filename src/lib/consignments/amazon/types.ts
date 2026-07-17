@@ -34,8 +34,8 @@ export type AmazonConsignmentSourceRow = {
   sourceProfile: AmazonSourceProfile;
 };
 
-export type AmazonParserIssue = { rowNumber?: number; sheet?: string; issueType: string; severity: "INFO" | "WARNING" | "ERROR"; message: string };
-export type AmazonParsedTable = { sheet: string; sheetUsage: AmazonSheetUsage; sheetPriority: number; headers: string[]; profile: AmazonSourceProfile; fileType: ConsignmentImportFileType; confidence: number; headerRow: number; labelRow?: number; dataRow: number; rows: AmazonConsignmentSourceRow[]; issues: AmazonParserIssue[] };
+export type AmazonParserIssue = { rowNumber?: number; sheet?: string; issueType: string; severity: "INFO" | "WARNING" | "ERROR"; message: string; safeData?:Record<string,string|null> };
+export type AmazonParsedTable = { sheet: string; sheetUsage: AmazonSheetUsage; sheetPriority: number; headers: string[]; profile: AmazonSourceProfile; fileType: ConsignmentImportFileType; confidence: number; headerRow: number; labelRow?: number; dataRow: number; rows: AmazonConsignmentSourceRow[]; issues: AmazonParserIssue[]; sourceRowCount?:number; skippedZeroRows?:number };
 export type AmazonParsedFile = { fileName: string; tables: AmazonParsedTable[]; fileType: ConsignmentImportFileType; shipmentCandidateCount: number; totalRows: number };
 
 export type AmazonListingEnrichmentV1 = {

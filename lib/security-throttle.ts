@@ -36,10 +36,10 @@ export async function clearSecurityAttempt(scope: string, identity: string, clie
 }
 
 export async function consumeSecurityDimensions(input:{scope:string;username:string;ipAddress?:string;usernameLimit:number;ipLimit:number;windowMs:number;blockMs:number},client:Client=prisma){
- const ip=input.ipAddress??"unknown",[username,ipAttempt]=await Promise.all([consumeSecurityAttempt({scope:`${input.scope}:username`,identity:input.username,limit:input.usernameLimit,windowMs:input.windowMs,blockMs:input.blockMs},client),consumeSecurityAttempt({scope:`${input.scope}:ip`,identity:ip,limit:input.ipLimit,windowMs:input.windowMs,blockMs:input.blockMs},client)]);return{allowed:username.allowed&&ipAttempt.allowed,keyHashes:[username.keyHash,ipAttempt.keyHash],usernameIdentity:input.username,ipIdentity:ip};
+ const username=await consumeSecurityAttempt({scope:`${input.scope}:username`,identity:input.username,limit:input.usernameLimit,windowMs:input.windowMs,blockMs:input.blockMs},client),ipAttempt=input.ipAddress?await consumeSecurityAttempt({scope:`${input.scope}:ip`,identity:input.ipAddress,limit:input.ipLimit,windowMs:input.windowMs,blockMs:input.blockMs},client):null;return{allowed:username.allowed&&(ipAttempt?.allowed??true),keyHashes:[username.keyHash,...(ipAttempt?[ipAttempt.keyHash]:[])],usernameIdentity:input.username,ipIdentity:input.ipAddress??null};
 }
 
-export async function clearSecurityDimensions(scope:string,username:string,ipAddress?:string,client:Client=prisma){await Promise.all([clearSecurityAttempt(`${scope}:username`,username,client),clearSecurityAttempt(`${scope}:ip`,ipAddress??"unknown",client)]);}
+export async function clearSecurityDimensions(scope:string,username:string,client:Client=prisma){await clearSecurityAttempt(`${scope}:username`,username,client);}
 
 export async function pruneSecurityThrottles(before = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), client: Client = prisma) {
   return client.securityThrottle.deleteMany({ where: { lastAttemptAt: { lt: before }, OR: [{ blockedUntil: null }, { blockedUntil: { lt: new Date() } }] } });

@@ -243,10 +243,6 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
                                 className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
                               />
                             </label>
-                            <label className="flex min-h-11 items-center gap-2 rounded-md bg-slate-50 px-3 text-sm font-medium text-slate-700">
-                              <input name="active" type="checkbox" defaultChecked={account.active} className="h-5 w-5 accent-pink-700" />
-                              Active
-                            </label>
                             <div className="lg:col-span-2 xl:col-span-4">
                               <SubmitButton pendingText="Saving..." variant="secondary">
                                 Save account

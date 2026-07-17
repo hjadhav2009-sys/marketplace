@@ -34,7 +34,7 @@ export function getMobilePermissions(user: PermissionUser): MobilePermissionSet 
   const isOwner = user.role === "OWNER";
   const canPick = isOwner || user.canPick;
   const canPack = isOwner || user.canPack;
-  const canReportProblem = isOwner || user.canReportProblem || user.role === "PICKER" || user.role === "PACKER";
+  const canReportProblem = isOwner || user.canReportProblem;
 
   return {
     canPick,

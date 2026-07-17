@@ -99,7 +99,7 @@ export async function loginAction(formData: FormData) {
       lastUserAgent: request.userAgent
     }
   });
-  await clearSecurityDimensions("web-login", parsed.data.username, request.ipAddress);
+  await clearSecurityDimensions("web-login", parsed.data.username);
   let session;
 
   try {

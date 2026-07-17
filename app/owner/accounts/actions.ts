@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser, setSelectedAccount } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
-import { assertAccountMarketplaceChangeAllowed, setAccountActiveSafely } from "@/lib/account-lifecycle";
+import { setAccountActiveSafely, updateAccountDetailsSafely } from "@/lib/account-lifecycle";
 import { getRequestMeta } from "@/lib/request-context";
 import { ownerAccountSchema } from "@/lib/validators";
 
@@ -35,23 +35,9 @@ export async function saveOwnerAccountAction(formData: FormData) {
   const accountCode = accountInput.accountCode;
   const isNewAccount = !accountInput.accountId;
 
-  if(accountInput.accountId){try{await assertAccountMarketplaceChangeAllowed(accountInput.accountId,accountInput.marketplace,prisma);}catch(error){redirectWithError(error instanceof Error&&error.message==="ACCOUNT_MARKETPLACE_LOCKED"?"marketplace-locked":"invalid");}}
-
   try {
     const account = accountInput.accountId
-      ? await prisma.account.update({
-          where: { id: accountInput.accountId },
-          data: {
-            name: accountName,
-            code: accountCode,
-            companyName: accountInput.companyName,
-            marketplace: accountInput.marketplace,
-            accountDisplayName: accountName,
-            accountCode,
-            active: accountInput.active,
-            notes: accountInput.notes
-          }
-        })
+      ? await updateAccountDetailsSafely({accountId:accountInput.accountId,name:accountName,code:accountCode,companyName:accountInput.companyName,marketplace:accountInput.marketplace,notes:accountInput.notes},prisma)
       : await prisma.account.create({
           data: {
             name: accountName,
@@ -86,8 +72,8 @@ export async function saveOwnerAccountAction(formData: FormData) {
       await prisma.user.update({ where: { id: user.id }, data: { accountId: account.id } });
       await setSelectedAccount(account.id);
     }
-  } catch {
-    redirectWithError("duplicate");
+  } catch (error) {
+    redirectWithError(error instanceof Error&&error.message==="ACCOUNT_MARKETPLACE_LOCKED"?"marketplace-locked":"duplicate");
   }
 
   revalidatePath("/owner/accounts");

@@ -4,14 +4,13 @@ import { getAvailableAccounts, getCurrentSessionState, getSelectedAccount } from
 import { getMobilePermissions, getMobileTabs, type MobilePermissionSet } from "@/lib/mobile-permissions";
 import { getSafeClientIp, shouldTrustProxyHeaders, type RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
+import { consumeSecurityAttempt } from "@/lib/security-throttle";
 import type { MobileAccount, MobileApiError, MobileUser } from "@/src/lib/mobile-api/types";
 
 const MOBILE_JSON_HEADERS = {
   "Cache-Control": "no-store",
   "Content-Type": "application/json"
 };
-
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 export function mobileJson<T>(data: T, init?: ResponseInit) {
   return NextResponse.json(data, {
@@ -58,24 +57,10 @@ export function getMobileRequestMeta(request: Request): RequestMeta {
   };
 }
 
-export function checkMobileRateLimit(request: Request, scope: string, limit: number, windowMs: number) {
+export async function checkMobileRateLimit(request: Request, scope: string, limit: number, windowMs: number) {
   const meta = getMobileRequestMeta(request);
-  const key = `${scope}:${meta.ipAddress ?? "unknown"}`;
-  const now = Date.now();
-  const bucket = rateBuckets.get(key);
-
-  if (!bucket || bucket.resetAt <= now) {
-    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
-    return null;
-  }
-
-  bucket.count += 1;
-
-  if (bucket.count > limit) {
-    return mobileError("rate_limited", "Too many requests. Try again shortly.", 429);
-  }
-
-  return null;
+  if(!meta.ipAddress)return null;
+  const attempt=await consumeSecurityAttempt({scope:`mobile-endpoint:${scope}:ip`,identity:meta.ipAddress,limit,windowMs,blockMs:windowMs});return attempt.allowed?null:mobileError("rate_limited", "Too many requests. Try again shortly.", 429);
 }
 
 export function serializeMobileAccount(account: Account): MobileAccount {
@@ -106,22 +91,6 @@ export async function serializeMobileUser(user: User): Promise<MobileUser> {
     selectedAccount: selectedAccount ? serializeMobileAccount(selectedAccount) : null,
     accounts: accounts.map(serializeMobileAccount)
   };
-}
-
-function roleAllowsPermission(role: Role, permission: keyof MobilePermissionSet) {
-  if (role === "OWNER") {
-    return true;
-  }
-
-  if (role === "PICKER") {
-    return permission === "canPick" || permission === "canReportProblem" || permission === "canViewAssignedProblems";
-  }
-
-  if (role === "PACKER") {
-    return permission === "canPack" || permission === "canReportProblem" || permission === "canViewAssignedProblems";
-  }
-
-  return false;
 }
 
 export async function getMobileUser(roles?: Role[]) {
@@ -202,7 +171,7 @@ export async function getMobilePermissionAccountContext(request: Request, permis
 
   const permissions = getMobilePermissions(auth.user);
 
-  if (!permissions[permission] && !roleAllowsPermission(auth.user.role, permission)) {
+  if (!permissions[permission]) {
     return { ok: false as const, response: mobileError("forbidden", "This mobile action is not allowed for your permissions.", 403) };
   }
 
@@ -229,7 +198,7 @@ export async function getMobilePermissionUser(permission: keyof MobilePermission
 
   const permissions = getMobilePermissions(auth.user);
 
-  if (!permissions[permission] && !roleAllowsPermission(auth.user.role, permission)) {
+  if (!permissions[permission]) {
     return { ok: false as const, response: mobileError("forbidden", "This mobile action is not allowed for your permissions.", 403) };
   }
 

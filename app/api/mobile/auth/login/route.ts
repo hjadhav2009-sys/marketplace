@@ -15,7 +15,7 @@ import { loginSchema } from "@/lib/validators";
 import { clearSecurityDimensions, consumeSecurityDimensions } from "@/lib/security-throttle";
 
 export async function POST(request: Request) {
-  const limited = checkMobileRateLimit(request, "mobile-login", 10, 60_000);
+  const limited = await checkMobileRateLimit(request, "mobile-login", 10, 60_000);
 
   if (limited) {
     return limited;
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       lastUserAgent: requestMeta.userAgent
     }
   });
-  await clearSecurityDimensions("mobile-login",parsed.data.username,requestMeta.ipAddress);
+  await clearSecurityDimensions("mobile-login",parsed.data.username);
   const session = await createSession(user.id, requestMeta);
 
   await recordAuditLog({

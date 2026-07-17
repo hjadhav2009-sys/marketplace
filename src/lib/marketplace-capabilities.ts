@@ -5,7 +5,7 @@ export type MarketplaceCapabilities = { productCatalog: boolean; dailyOrders: bo
 const CAPABILITIES: Record<Marketplace, MarketplaceCapabilities> = {
   FLIPKART: { productCatalog: true, dailyOrders: true, consignments: true },
   AMAZON: { productCatalog: true, dailyOrders: false, consignments: true },
-  MEESHO: { productCatalog: true, dailyOrders: true, consignments: false },
+  MEESHO: { productCatalog: true, dailyOrders: false, consignments: false },
   MYNTRA: { productCatalog: false, dailyOrders: false, consignments: false },
   SHOPIFY: { productCatalog: false, dailyOrders: false, consignments: false },
   WOOCOMMERCE: { productCatalog: false, dailyOrders: false, consignments: false },

@@ -5,10 +5,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { retainedImportJobFileExists, startImportJob } from "@/src/lib/import-jobs/runner";
+import { retainedImportJobFileExists } from "@/src/lib/import-jobs/runner";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
 import { cancelProductInventoryJobAction, retryImportJobAction } from "./actions";
-import { startProductInventoryJob } from "@/src/lib/product-inventory/jobs";
 
 type ImportJobPageProps = {
   params: Promise<{
@@ -31,9 +30,6 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
 
   const account = await prisma.account.findFirst({ where: { id: job.accountId, active: true }, select: { name: true, accountDisplayName: true, marketplace: true } });
 
-  if (job.status === "QUEUED" || job.status === "RUNNING") {
-    if(job.importType.endsWith("PRODUCT_INVENTORY"))startProductInventoryJob(job.id);else startImportJob(job.id);
-  }
   const canRetry = !job.importType.endsWith("PRODUCT_INVENTORY") && (job.status === "FAILED" || job.status === "CANCELLED") && (await retainedImportJobFileExists(job.filePath));
   const issueCount = job.errorRows + job.warningRows + job.missingListingRows + job.missingImageRows;
 

@@ -35,6 +35,14 @@ export type ImportJobRecord = {
   reportJson: string | null;
   cancelRequestedAt: Date | null;
   mergeStartedAt: Date | null;
+  runnerId: string | null;
+  leaseExpiresAt: Date | null;
+  heartbeatAt: Date | null;
+  attemptNumber: number;
+  checkpointJson: string | null;
+  currentEntryId: string | null;
+  currentChunk: number;
+  mergeCompletedEntryIdsJson: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -61,6 +69,10 @@ type ImportJobDbRow = Omit<
   | "processedFiles"
   | "cancelRequestedAt"
   | "mergeStartedAt"
+  | "leaseExpiresAt"
+  | "heartbeatAt"
+  | "attemptNumber"
+  | "currentChunk"
 > & {
   importType: string;
   status: string;
@@ -82,6 +94,10 @@ type ImportJobDbRow = Omit<
   processedFiles: number | bigint;
   cancelRequestedAt: Date | string | null;
   mergeStartedAt: Date | string | null;
+  leaseExpiresAt: Date | string | null;
+  heartbeatAt: Date | string | null;
+  attemptNumber: number | bigint;
+  currentChunk: number | bigint;
 };
 
 export type ImportJobCreateInput = {
@@ -138,6 +154,10 @@ function normalizeJob(row: ImportJobDbRow): ImportJobRecord {
     updatedAt: new Date(row.updatedAt)
     ,cancelRequestedAt: dateValue(row.cancelRequestedAt)
     ,mergeStartedAt: dateValue(row.mergeStartedAt)
+    ,leaseExpiresAt: dateValue(row.leaseExpiresAt)
+    ,heartbeatAt: dateValue(row.heartbeatAt)
+    ,attemptNumber: numberValue(row.attemptNumber)
+    ,currentChunk: numberValue(row.currentChunk)
   };
 }
 
@@ -214,6 +234,14 @@ export async function findImportJobById(id: string) {
       "reportJson",
       "cancelRequestedAt",
       "mergeStartedAt",
+      "runnerId",
+      "leaseExpiresAt",
+      "heartbeatAt",
+      "attemptNumber",
+      "checkpointJson",
+      "currentEntryId",
+      "currentChunk",
+      "mergeCompletedEntryIdsJson",
       "createdAt",
       "updatedAt"
     FROM "ImportJob"
@@ -258,6 +286,14 @@ export async function listRecentImportJobs(accountId: string, limit = 20) {
       "reportJson",
       "cancelRequestedAt",
       "mergeStartedAt",
+      "runnerId",
+      "leaseExpiresAt",
+      "heartbeatAt",
+      "attemptNumber",
+      "checkpointJson",
+      "currentEntryId",
+      "currentChunk",
+      "mergeCompletedEntryIdsJson",
       "createdAt",
       "updatedAt"
     FROM "ImportJob"
@@ -327,6 +363,8 @@ export async function updateImportJobProgress(id: string, progress: ImportJobPro
       "missingImageRows" = COALESCE(${missingImageRows}, "missingImageRows"),
       "updatedAt" = ${now}
     WHERE "id" = ${id}
+      AND "runnerId" IS NOT NULL
+      AND "leaseExpiresAt" > ${now}
   `;
 }
 

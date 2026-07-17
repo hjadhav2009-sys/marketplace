@@ -10,11 +10,8 @@ import { importFlipkartListingRows, importFlipkartOrderRows } from "@/src/lib/ma
 import { applyAdaptiveRows } from "@/src/lib/imports/adaptive-rows";
 import { definitionForImportJob } from "@/src/lib/imports/import-purpose-definitions";
 import {
-  completeImportJob,
   createImportJob,
-  failImportJob,
   findImportJobById,
-  markImportJobRunning,
   type ImportJobRecord,
   type ImportJobType
 } from "./store";
@@ -111,7 +108,7 @@ export function startImportJob(jobId: string, request?: RequestMeta) {
 
   running.add(jobId);
   void processImportJob(jobId, request)
-    .catch((error) => failImportJob(jobId, error))
+    .catch(() => undefined)
     .finally(() => {
       running.delete(jobId);
     });
@@ -133,9 +130,10 @@ async function loadJobActors(job: ImportJobRecord) {
 async function applyAdaptiveHeaderProfile(job:ImportJobRecord,rows:RawImportRow[],account:Account){const definition=definitionForImportJob(job);return definition?applyAdaptiveRows({jobId:job.id,accountId:account.id,marketplace:definition.marketplace,purpose:definition.purpose,rows}):rows;}
 
 export async function processImportJob(jobId: string, request?: RequestMeta) {
+  const now=new Date(),runnerId=`import-runner:${randomUUID()}`,claimed=await prisma.importJob.updateMany({where:{id:jobId,attemptNumber:{lt:10},OR:[{status:"QUEUED"},{status:"RUNNING",OR:[{leaseExpiresAt:null},{leaseExpiresAt:{lt:now}}]}]},data:{status:"RUNNING",stage:"PARSING",startedAt:now,runnerId,heartbeatAt:now,leaseExpiresAt:new Date(now.getTime()+120000),attemptNumber:{increment:1},lastError:null}});if(claimed.count!==1)return;
   const job = await findImportJobById(jobId);
 
-  if (!job || job.status === "COMPLETED" || job.status === "FAILED" || job.status === "CANCELLED") {
+  if (!job) {
     return;
   }
 
@@ -143,11 +141,11 @@ export async function processImportJob(jobId: string, request?: RequestMeta) {
     throw new Error("Import job file is missing.");
   }
 
-  await markImportJobRunning(job.id);
-  let rows = await parseSpreadsheetRowsFromPath(job.filePath);
+  try {
+  if(await finishIfCancelled(job.id,runnerId))return;let rows = await parseSpreadsheetRowsFromPath(job.filePath);if(await finishIfCancelled(job.id,runnerId))return;await heartbeat(job.id,runnerId,"MAPPING");
   const { account, user } = await loadJobActors(job);
 
-  const mappedRows=await applyAdaptiveHeaderProfile(job,rows,account);if(!mappedRows)return;rows=mappedRows;
+  const mappedRows=await applyAdaptiveHeaderProfile(job,rows,account);if(!mappedRows){await prisma.importJob.updateMany({where:{id:job.id,runnerId},data:{runnerId:null,leaseExpiresAt:null}});return;}rows=mappedRows;await heartbeat(job.id,runnerId,"IMPORTING");
 
   if (job.importType === "FLIPKART_LISTING_MASTER") {
     const batch = await importFlipkartListingRows({
@@ -158,7 +156,7 @@ export async function processImportJob(jobId: string, request?: RequestMeta) {
       request,
       jobId: job.id
     });
-    await completeImportJob(job.id, batch.id);
+    await completeOwned(job.id,runnerId,batch.id);
     return;
   }
 
@@ -171,9 +169,14 @@ export async function processImportJob(jobId: string, request?: RequestMeta) {
       request,
       jobId: job.id
     });
-    await completeImportJob(job.id, batch.id);
+    await completeOwned(job.id,runnerId,batch.id);
     return;
   }
 
   throw new Error(`Unsupported import job type: ${job.importType}`);
+  }catch(error){const message=(error instanceof Error?error.message:"Import failed.").replace(/[A-Z]:\\[^\s]+/gi,"[private path]").slice(0,500);await prisma.importJob.updateMany({where:{id:job.id,runnerId},data:{status:"FAILED",stage:"FAILED",lastError:message,finishedAt:new Date(),runnerId:null,leaseExpiresAt:null}});throw error;}
 }
+
+async function heartbeat(id:string,runnerId:string,stage:string){const now=new Date(),result=await prisma.importJob.updateMany({where:{id,runnerId},data:{stage,heartbeatAt:now,leaseExpiresAt:new Date(now.getTime()+120000)}});if(result.count!==1)throw new Error("Import runner lease was lost.");}
+async function completeOwned(id:string,runnerId:string,batchId:string){const result=await prisma.importJob.updateMany({where:{id,runnerId},data:{status:"COMPLETED",stage:"COMPLETED",batchId,finishedAt:new Date(),runnerId:null,leaseExpiresAt:null}});if(result.count!==1)throw new Error("Import runner lease was lost before completion.");}
+async function finishIfCancelled(id:string,runnerId:string){const current=await prisma.importJob.findFirst({where:{id,runnerId},select:{cancelRequestedAt:true}});if(!current)throw new Error("Import runner lease was lost.");if(!current.cancelRequestedAt)return false;await prisma.importJob.updateMany({where:{id,runnerId},data:{status:"CANCELLED",stage:"CANCELLED",finishedAt:new Date(),runnerId:null,leaseExpiresAt:null}});return true;}

@@ -3,6 +3,7 @@ import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { normalizeSkuForMatching } from "@/lib/sku";
+import { assertMarketplaceCapability } from "@/src/lib/marketplace-capabilities";
 
 export type ParsedOrderImportRow = {
   rowNumber?: number;
@@ -186,6 +187,8 @@ export async function importParsedOrderRows(input: {
   batchId?: string;
   heldRows?: number;
 }) {
+  assertMarketplaceCapability(input.account.marketplace,"dailyOrders");
+  if(input.account.marketplace!=="FLIPKART")throw new Error(`${input.account.marketplace} legacy Order import is review-only and cannot create production work.`);
   const batch = input.batchId
     ? await prisma.uploadBatch.update({
         where: { id: input.batchId },

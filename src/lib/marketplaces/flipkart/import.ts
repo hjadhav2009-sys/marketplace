@@ -139,6 +139,7 @@ export async function importFlipkartOrderRows(input: {
       },
       select: {
         id: true,
+        batchId: true,
         awb: true,
         sku: true,
         qty: true,
@@ -150,7 +151,8 @@ export async function importFlipkartOrderRows(input: {
         shipmentId: true,
         orderItemId: true,
         fsn: true,
-        trackingId: true
+        trackingId: true,
+        workTasks:{select:{id:true,status:true,completedQuantity:true,assignedUserId:true,startedAt:true,stage:true}}
       }
     }),
     prisma.marketplaceListing.findMany({
@@ -217,7 +219,7 @@ export async function importFlipkartOrderRows(input: {
     const existing = existingByKey.get(internalKey);
     const orderData = {
       accountId: input.account.id,
-      batchId: batch.id,
+      batchId: existing?.batchId ?? batch.id,
       marketplace: "FLIPKART",
       shipmentId: order.shipmentId ?? null,
       orderItemId: order.orderItemId ?? null,
@@ -253,6 +255,9 @@ export async function importFlipkartOrderRows(input: {
         }
       });
     } else {
+      const operationalChanged=existing.batchId!==orderData.batchId||existing.sku!==orderData.sku||existing.qty!==orderData.qty||existing.trackingId!==orderData.trackingId||existing.shipmentId!==orderData.shipmentId||existing.orderItemId!==orderData.orderItemId;
+      const workStarted=existing.workTasks.some(task=>task.status==="IN_PROGRESS"||task.status==="COMPLETED"||task.status==="PROBLEM"||task.completedQuantity>0||task.assignedUserId||task.startedAt);
+      if(operationalChanged&&workStarted){persistedOrderId=existing.id;mappingIssues.push({rowNumber:order.rowNumber,issueType:"ACTIVE_WORK_IDENTITY_CONFLICT",message:"Order identity, SKU, Tracking ID or quantity changed after workflow started. Existing Order and immutable tasks were preserved for owner review.",rawData:order.rawData??{}});processedRows+=1;continue;}
       await prisma.order.update({
         where: { id: existing.id },
         data: orderData
@@ -263,6 +268,7 @@ export async function importFlipkartOrderRows(input: {
 
     const savedRule=listing?.processRules[0]??null,route=(savedRule?.route??"PICK_PACK") as ProcessRoute,provenance=createImmutableRouteProvenance({route,rule:savedRule});
     pickTaskCandidates.push({accountId:input.account.id,sourceType:"ORDER",orderId:persistedOrderId,stage:"PICK",sequenceNumber:1,requiredQuantity:order.quantity??1,status:"READY",metadataJson:JSON.stringify({version:1,recommendedProcessRoute:route}),workCardSnapshotJson:JSON.stringify({version:2,productTitle:listing?.productTitle??order.productTitle??null,primaryImage:listing?.mainImageUrl??null,sellerSku:sku,operationalBarcode:order.trackingId??internalKey,marketplaceIdentifiers:{fsn:order.fsn??listing?.fsn??null,listingId:listing?.listingId??null,orderItemId:order.orderItemId??null,trackingId:order.trackingId??null},category:listing?.liveCategory??null,brand:listing?.liveBrand??null,variantIdentity:null,...provenance}),routeSnapshotJson:JSON.stringify({...createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}),...provenance})});
+    const candidate=pickTaskCandidates[pickTaskCandidates.length-1];if(existing&&candidate){await prisma.workTask.updateMany({where:{orderId:existing.id,status:{in:["LOCKED","READY"]},completedQuantity:0,assignedUserId:null,startedAt:null},data:{requiredQuantity:candidate.requiredQuantity,workCardSnapshotJson:candidate.workCardSnapshotJson,routeSnapshotJson:candidate.routeSnapshotJson}});}
 
     processedRows += 1;
     if (input.jobId && processedRows % 500 === 0) {
@@ -285,8 +291,9 @@ export async function importFlipkartOrderRows(input: {
 
   await writeIssues(batch.id, mappingIssues);
 
-  const errorRows = parsed.issues.length;
-  const reviewRows = parsed.issues.length + duplicateIssues.length + missingImageRows;
+  const identityConflictRows=mappingIssues.filter(issue=>issue.issueType==="ACTIVE_WORK_IDENTITY_CONFLICT").length;
+  const errorRows = parsed.issues.length+identityConflictRows;
+  const reviewRows = parsed.issues.length + duplicateIssues.length + mappingIssues.length;
   const updatedBatch = await prisma.uploadBatch.update({
     where: { id: batch.id },
     data: {
@@ -295,7 +302,7 @@ export async function importFlipkartOrderRows(input: {
       updatedRows,
       duplicateRows: duplicateRows + duplicateIssues.length,
       missingImageRows,
-      skippedRows: duplicateRows + duplicateIssues.length + parsed.issues.length,
+      skippedRows: duplicateRows + duplicateIssues.length + parsed.issues.length + identityConflictRows,
       errorRows,
       notes: orderNotes({
         parser: "flipkart-orders-xlsx",

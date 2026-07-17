@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { startImportJob } from "@/src/lib/import-jobs/runner";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
-import { startProductInventoryJob } from "@/src/lib/product-inventory/jobs";
 
 type ImportJobStatusRouteProps = {
   params: Promise<{
@@ -26,10 +24,6 @@ export async function GET(_request: Request, { params }: ImportJobStatusRoutePro
 
   if (!job) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (job.status === "QUEUED" || job.status === "RUNNING") {
-    if(job.importType.endsWith("PRODUCT_INVENTORY"))startProductInventoryJob(job.id);else startImportJob(job.id);
   }
 
   return NextResponse.json({ job });

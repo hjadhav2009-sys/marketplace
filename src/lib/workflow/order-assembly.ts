@@ -197,6 +197,8 @@ async function recoverAssemblyReplay<T>(input: { clientRequestId?: string; mutat
   }
 }
 
+async function retryAssemblyMutation<T>(action:()=>Promise<T>){let last:unknown;for(let attempt=0;attempt<6;attempt+=1){try{return await action();}catch(error){last=error;const transient=error instanceof Error&&(/database is locked|unique constraint|write conflict|P2002|P2034/i.test(error.message)||"code" in error&&["P2002","P2034"].includes(String((error as{code?:string}).code)));if(!transient||attempt===5)throw error;await new Promise(resolve=>setTimeout(resolve,20*(attempt+1)));}}throw last;}
+
 async function actionLog(tx: Transaction, input: { taskId: string; accountId: string; actorUserId: string; action: "TASK_CLAIMED" | "TASK_COMPLETED" | "TASK_PROBLEM_REPORTED" | "TASK_PROBLEM_RESOLVED" | "TASK_REASSIGNED" | "TASK_UNASSIGNED"; requestKind: WorkRequestKind; clientRequestId?: string; note?: string; metadata?: Record<string, unknown> }) {
   await tx.workActionLog.create({ data: { taskId: input.taskId, accountId: input.accountId, actorUserId: input.actorUserId, action: input.action, requestKind: input.clientRequestId ? input.requestKind : null, clientRequestId: input.clientRequestId || null, note: input.note?.slice(0, 1_000) || null, metadataJson: input.metadata ? JSON.stringify(input.metadata) : null } });
 }
@@ -262,7 +264,7 @@ export async function resolveOrderAssemblyProblem(input: { taskId: string; accou
 
 export async function skipOrderAssemblyTask(input: { taskId: string; accountId: string; actorUserId: string; reason: string; clientRequestId?: string }, client: Client = prisma) {
   if (!input.reason.trim()) throw new Error("Skip reason is required.");
-  const execute=()=>client.$transaction(async (tx) => {
+  const execute=()=>retryAssemblyMutation(()=>client.$transaction(async (tx) => {
     const { user, task } = await orderAssemblyTaskForMutation(tx, input);
     if (user.role !== "OWNER") throw new Error("Only an owner can skip assembly.");
     const requestFingerprint=fingerprint({taskId:task.id,reason:input.reason.trim().slice(0,1000)}),receipt=input.clientRequestId?await beginWorkflowActionReceipt<{taskId:string;status:"SKIPPED";idempotent:boolean}>(tx,{accountId:input.accountId,actorUserId:user.id,requestKind:"ORDER_ASSEMBLY_SKIP",clientRequestId:input.clientRequestId,requestFingerprint,sourceType:"ORDER",stage:"ASSEMBLE"}):null;
@@ -275,12 +277,12 @@ export async function skipOrderAssemblyTask(input: { taskId: string; accountId: 
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_SKIPPED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ orderId: task.orderId, reason: input.reason.trim().slice(0, 500) }) } });
     await tx.workChangeEvent.create({data:{accountId:input.accountId,eventType:"ORDER_ASSEMBLY_SKIPPED",sourceType:"ORDER",stage:"ASSEMBLE",entityId:task.id}});await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"ORDER",stages:["ASSEMBLE","PACK"],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[]},tx);
     const result={ taskId: task.id, status: "SKIPPED" as const, idempotent: false };return receipt?completeWorkflowActionReceipt(tx,receipt.receiptId,result):result;
-  });
+  }));
   return input.clientRequestId?withWorkflowActionRequestGate([input.accountId,input.actorUserId,"ORDER_ASSEMBLY_SKIP",input.clientRequestId].join(":"),execute):execute();
 }
 
 export async function reassignOrderAssemblyTask(input: { taskId: string; accountId: string; actorUserId: string; assignedUserId: string | null; clientRequestId?: string }, client: Client = prisma) {
-  const execute=()=>client.$transaction(async (tx) => {
+  const execute=()=>retryAssemblyMutation(()=>client.$transaction(async (tx) => {
     const { user, task } = await orderAssemblyTaskForMutation(tx, input);
     if (user.role !== "OWNER") throw new Error("Only an owner can assign assembly work.");
     const requestFingerprint=fingerprint({taskId:task.id,assignedUserId:input.assignedUserId}),receipt=input.clientRequestId?await beginWorkflowActionReceipt<{taskId:string;assignedUserId:string|null;idempotent:boolean}>(tx,{accountId:input.accountId,actorUserId:user.id,requestKind:"ORDER_ASSEMBLY_REASSIGN",clientRequestId:input.clientRequestId,requestFingerprint,sourceType:"ORDER",stage:"ASSEMBLE"}):null;
@@ -293,7 +295,7 @@ export async function reassignOrderAssemblyTask(input: { taskId: string; account
     await actionLog(tx, { ...input, action: input.assignedUserId ? "TASK_REASSIGNED" : "TASK_UNASSIGNED", requestKind: input.assignedUserId ? "REASSIGN" : "UNASSIGN", metadata: { assignedUserId: input.assignedUserId } });
     await tx.workChangeEvent.create({data:{accountId:input.accountId,eventType:"ORDER_ASSEMBLY_ASSIGNED",sourceType:"ORDER",stage:"ASSEMBLE",entityId:task.id}});await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"ORDER",stages:["ASSEMBLE"],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[]},tx);
     const result={ taskId: task.id, assignedUserId: input.assignedUserId,idempotent:false };return receipt?completeWorkflowActionReceipt(tx,receipt.receiptId,result):result;
-  });
+  }));
   return input.clientRequestId?withWorkflowActionRequestGate([input.accountId,input.actorUserId,"ORDER_ASSEMBLY_REASSIGN",input.clientRequestId].join(":"),execute):execute();
 }
 

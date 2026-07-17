@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { assertWorkerAccountAccess } from "./worker-access";
 import { assertOrderAssemblyPackingEligible } from "./order-assembly";
+import { refreshAffectedWorkGroups } from "./work-group-projection";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -108,7 +109,7 @@ export function maskOperationalCode(value: string | null | undefined) {
   return value.length <= 4 ? value : `...${value.slice(-4)}`;
 }
 
-export type CustomerOrderPackSource = "universal-scan" | "packing-search-card" | "packing-detail" | "mobile-api";
+export type CustomerOrderPackSource = "universal-scan" | "packing-search-card" | "packing-detail" | "mobile-api" | "grouped-work";
 
 function auditActionForSource(source: CustomerOrderPackSource) {
   if (source === "universal-scan") return "UNIVERSAL_ORDER_PACKED";
@@ -129,8 +130,20 @@ export async function packCustomerOrderShipmentSafely(
 ) {
   const initialAccess = await assertWorkerAccountAccess(input.actorUserId, input.accountId, client);
   if (!hasWorkPermission(initialAccess.user, "canPack")) throw new Error("Order packing permission is required.");
+  return client.$transaction(tx => packCustomerOrderShipmentSafelyInTransaction(input, tx));
+}
 
-  return client.$transaction(async (tx) => {
+export async function packCustomerOrderShipmentSafelyInTransaction(
+  input: {
+    actorUserId: string;
+    accountId: string;
+    orderId: string;
+    expectedStatus?: string;
+    source: CustomerOrderPackSource;
+    clientRequestId?: string;
+  },
+  tx: Prisma.TransactionClient
+) {
     const access = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
     if (!hasWorkPermission(access.user, "canPack")) throw new Error("Order packing permission is required.");
 
@@ -159,7 +172,8 @@ export async function packCustomerOrderShipmentSafely(
     });
     if (update.count !== verifiedOrderIds.length) throw new Error("Shipment changed; scan again before packing.");
     const packTasks = await tx.workTask.findMany({ where: { accountId: input.accountId, sourceType: "ORDER", orderId: { in: verifiedOrderIds }, stage: "PACK", status: { in: ["READY", "IN_PROGRESS"] } }, select: { id: true, requiredQuantity: true } });
-    for (const task of packTasks) await tx.workTask.update({ where: { id: task.id }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, completedAt: new Date(), completedByUserId: access.user.id } });
+    const completedAt = new Date();
+    for (const task of packTasks) await tx.workTask.update({ where: { id: task.id }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, assignedUserId: access.user.id, startedAt: completedAt, startedByUserId: access.user.id, completedAt, completedByUserId: access.user.id, version: { increment: 1 } } });
 
     await tx.scanLog.createMany({
       data: scope.shipmentOrders.map((order) => ({
@@ -187,13 +201,14 @@ export async function packCustomerOrderShipmentSafely(
         })
       }
     });
+    await refreshAffectedWorkGroups({ accountId: input.accountId, sourceType: "ORDER", stages: ["PACK"], taskIds:packTasks.map(task=>task.id),orderIds:verifiedOrderIds }, tx);
 
     return {
       packedCount: update.count,
       skippedCount: 0,
       scopedCount: verifiedOrderIds.length,
       totalQuantity: scope.totalQuantity,
+      packTaskIds: packTasks.map(task => task.id),
       idempotent: false
     };
-  });
 }

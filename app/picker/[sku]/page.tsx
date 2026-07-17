@@ -159,6 +159,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
                   <option value="" disabled>Choose next route</option><option value="DIRECT_PACK">Direct to Pack</option><option value="MARK">Marking</option><option value="ASSEMBLE">Assembly</option><option value="MARK_ASSEMBLE">Marking + Assembly</option>
                 </select>
               </label>
+              <RouteDecisionFields />
               <div className="mt-3"><SubmitButton pendingText="Completing pick...">Complete pick and route</SubmitButton></div>
             </form>
 
@@ -272,8 +273,8 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-7xl grid-cols-[1.4fr_1fr] gap-2">
+      <div className="fixed inset-x-0 bottom-0 z-30 max-h-[70vh] overflow-y-auto border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-7xl gap-2">
           <form action={markSkuGroupPickedAction}>
             <input type="hidden" name="sku" value={sku} />
             <input type="hidden" name="color" value={hiddenColor} />
@@ -282,6 +283,7 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
             <select name="route" required defaultValue="" aria-label="After picking" className="mb-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-bold">
               <option value="" disabled>Choose next route</option><option value="DIRECT_PACK">Direct to Pack</option><option value="MARK">Marking</option><option value="ASSEMBLE">Assembly</option><option value="MARK_ASSEMBLE">Marking + Assembly</option>
             </select>
+            <RouteDecisionFields compact />
             <button type="submit" className="min-h-14 w-full rounded-md bg-berry px-4 py-3 text-base font-black text-white shadow-sm">
               Complete pick
             </button>
@@ -293,4 +295,8 @@ export default async function PickerSkuDetailPage({ params, searchParams }: Pick
       </div>
     </AppShell>
   );
+}
+
+function RouteDecisionFields({compact=false}:{compact?:boolean}) {
+  return <div className={`grid gap-2 ${compact?"mb-2":"mt-3"}`}><select name="routeReason" defaultValue="" aria-label="Route-change reason" className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="">Reason only when changing a saved route</option>{["Assembly required","Marking required","Wrong saved route","Special order requirement","Product needs correction","Other"].map(reason=><option key={reason}>{reason}</option>)}</select><input name="routeOtherReason" maxLength={240} placeholder="Other reason (if selected)" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm"/><textarea name="workerNote" maxLength={240} placeholder="Optional downstream note" className="min-h-20 rounded-md border border-slate-300 p-3 text-sm"/><label className="flex min-h-11 items-center gap-2 text-sm font-bold"><input type="checkbox" name="confirmMissingInstructions" value="1"/>Continue if saved instructions are unavailable</label></div>;
 }

@@ -41,7 +41,7 @@ export async function markSkuGroupPickedAction(formData: FormData) {
   if (!hasWorkPermission(user, "canPick")) redirect("/dashboard");
   const group = groupWhere(account.id, formData);
   const orders = await prisma.order.findMany({ where: group.where, select: { id: true } });
-  const result = await completePickWithNextRoute({ sourceType:"ORDER", actorUserId: user.id, accountId: account.id, orderIds: orders.map((order) => order.id), route: String(formData.get("route") ?? ""), clientRequestId: String(formData.get("clientRequestId") ?? "") || undefined });
+  const result = await completePickWithNextRoute({ sourceType:"ORDER", actorUserId: user.id, accountId: account.id, orderIds: orders.map((order) => order.id), route: String(formData.get("route") ?? ""), routeReason:String(formData.get("routeReason")??""),routeOtherReason:String(formData.get("routeOtherReason")??""),workerNote:String(formData.get("workerNote")??""),confirmMissingInstructions:String(formData.get("confirmMissingInstructions")??"")==="1",clientRequestId: String(formData.get("clientRequestId") ?? "") || undefined });
 
   revalidatePath("/picker");
   redirect(`${pickerDetailPath(group.sku, group.color, group.size)}&picked=${result.updatedCount > 0 ? "1" : "already"}`);

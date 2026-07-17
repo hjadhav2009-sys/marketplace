@@ -266,6 +266,7 @@ model User {
   workTasksAssigned            WorkTask[]                @relation("WorkTaskAssignedUser")
   workTasksStarted             WorkTask[]                @relation("WorkTaskStartedBy")
   workTasksCompleted           WorkTask[]                @relation("WorkTaskCompletedBy")
+  workRouteDecisions           WorkRouteDecision[]       @relation("WorkRouteDecisionActor")
   workTaskProblemsReported     WorkTask[]                @relation("WorkTaskProblemReportedBy")
   workTaskProblemsResolved     WorkTask[]                @relation("WorkTaskProblemResolvedBy")
   workActionLogs               WorkActionLog[]           @relation("WorkActionActor")
@@ -357,6 +358,8 @@ model Account {
   consignmentLines    ConsignmentLine[]
   fileProfiles        MarketplaceFileProfile[]
   workChangeEvents    WorkChangeEvent[]
+  workGroupProjections WorkGroupProjection[]
+  workRouteDecisions  WorkRouteDecision[]
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
 
@@ -637,6 +640,7 @@ model WorkTask {
   routeSnapshotJson       String?
   version                 Int              @default(1)
   actionLogs              WorkActionLog[]
+  workGroupMembership     WorkGroupMember?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
@@ -667,6 +671,83 @@ model WorkChangeEvent {
 
   @@index([accountId, id])
   @@index([accountId, stage, id])
+  @@index([accountId, createdAt])
+}
+
+model WorkGroupProjection {
+  groupKey              String         @id
+  accountId             String
+  account               Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceType            WorkSourceType
+  stage                 WorkStage
+  sourceBatchId         String
+  marketplace           String
+  sellerSku             String
+  variantHash           String
+  instructionHash       String
+  routeHash             String
+  assignmentKey         String
+  assignedUserId        String?
+  assignedUserName      String?
+  productTitle          String?
+  productImageUrl       String?
+  operationalIdentifier String?
+  reference             String
+  memberCount           Int
+  requiredQuantity      Int
+  completedQuantity     Int
+  completeMemberCount  Int            @default(0)
+  partialMemberCount   Int            @default(0)
+  problemCount          Int
+  status                String
+  oldestWaitingAt       DateTime
+  recommendedNextStage  WorkStage?
+  hasExplicitSavedRoute Boolean        @default(false)
+  savedProcessRoute     ProcessRoute?
+  groupVersion          String
+  members               WorkGroupMember[]
+  updatedAt             DateTime       @updatedAt
+
+  @@index([accountId, stage, sourceType, status, assignmentKey, oldestWaitingAt])
+  @@index([accountId, stage, sourceType, groupVersion])
+  @@index([accountId, stage, sourceType, assignedUserId, oldestWaitingAt, groupKey])
+  @@index([accountId, sellerSku, stage])
+}
+
+model WorkGroupMember {
+  groupKey   String
+  projection WorkGroupProjection @relation(fields: [groupKey], references: [groupKey], onDelete: Cascade)
+  taskId     String   @unique
+  task       WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([groupKey, taskId])
+  @@index([groupKey])
+}
+
+model WorkRouteDecision {
+  id                     String         @id @default(cuid())
+  accountId              String
+  account                Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  taskId                  String?
+  sourceType              WorkSourceType
+  sourceId                String
+  sellerSku               String
+  reference               String
+  savedRoute              ProcessRoute?
+  savedNextStage          WorkStage?
+  selectedNextStage       WorkStage?
+  decisionType            String
+  reason                  String?
+  workerNote              String?
+  missingInstructionStage WorkStage?
+  actorUserId             String
+  actorUser               User           @relation("WorkRouteDecisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  createdAt               DateTime       @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([accountId, decisionType, createdAt])
+  @@index([accountId, sellerSku, createdAt])
+  @@index([missingInstructionStage, createdAt])
 }
 
 model WorkActionLog {

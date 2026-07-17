@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { buildTaskPlan } from "./tasks";
 import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutateStage, userCanResolveConsignmentProblems } from "./worker-access";
 import { createWorkRouteSnapshot } from "./dynamic-route";
+import { refreshAffectedWorkGroups } from "./work-group-projection";
 
 type Transaction = Prisma.TransactionClient;
 type Client = PrismaClient;
@@ -63,6 +64,11 @@ function activationRoute(line: NonNullable<Awaited<ReturnType<typeof validateCon
   return savedRule?.route ?? (routeSupported(line.processRoute) ? line.processRoute : "PICK_PACK");
 }
 
+function activationHasExplicitSavedRoute(line: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"][number]) {
+  const ruleMatches = line.processRule?.active && line.processRule.accountId === line.accountId && line.processRule.marketplaceListingId === line.marketplaceListingId;
+  return Boolean(ruleMatches ? line.processRule : line.marketplaceListing?.processRules[0]);
+}
+
 async function writeSnapshotChunk(tx: Transaction, lines: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"]) {
   const ids = lines.map((line) => line.id);
   const cases = <T>(get: (line: typeof lines[number]) => T) => Prisma.join(lines.map((line) => Prisma.sql`WHEN ${line.id} THEN ${get(line)}`), " ");
@@ -106,7 +112,7 @@ export async function activateConsignmentBatch(input: { batchId: string; account
         completedQuantity: 0,
         status: "READY",
         metadataJson: JSON.stringify({ version: 1, recommendedProcessRoute: route }),
-        workCardSnapshotJson:JSON.stringify({version:1,productTitle:line.marketplaceListing?.productTitle??line.productNameSource??null,primaryImage:line.marketplaceListing?.mainImageUrl??line.productImageSnapshot??null,sellerSku:line.marketplaceListing?.sellerSkuId??line.sellerSkuSource??null,operationalBarcode:validation.batch.marketplace==="AMAZON"?identifier("FNSKU")??line.fnskuSource??identifier("ASIN")??line.asinSource:identifier("EAN")??identifier("UPC")??identifier("GTIN")??line.barcodeSource??line.fsnSource??line.marketplaceListing?.listingId,marketplaceIdentifiers:{fsn:line.marketplaceListing?.fsn??line.fsnSource??null,listingId:line.marketplaceListing?.listingId??null,asin:identifier("ASIN")??line.asinSource??null,fnsku:identifier("FNSKU")??line.fnskuSource??null,externalId:identifier("EXTERNAL_ID")??line.externalIdSource??null},variantIdentity:{color:line.colorSource??null,size:line.sizeSource??null},routeRecommendation:route}),
+        workCardSnapshotJson:JSON.stringify({version:1,productTitle:line.marketplaceListing?.productTitle??line.productNameSource??null,primaryImage:line.marketplaceListing?.mainImageUrl??line.productImageSnapshot??null,sellerSku:line.marketplaceListing?.sellerSkuId??line.sellerSkuSource??null,operationalBarcode:validation.batch.marketplace==="AMAZON"?identifier("FNSKU")??line.fnskuSource??identifier("ASIN")??line.asinSource:identifier("EAN")??identifier("UPC")??identifier("GTIN")??line.barcodeSource??line.fsnSource??line.marketplaceListing?.listingId,marketplaceIdentifiers:{fsn:line.marketplaceListing?.fsn??line.fsnSource??null,listingId:line.marketplaceListing?.listingId??null,asin:identifier("ASIN")??line.asinSource??null,fnsku:identifier("FNSKU")??line.fnskuSource??null,externalId:identifier("EXTERNAL_ID")??line.externalIdSource??null},variantIdentity:{color:line.colorSource??null,size:line.sizeSource??null},routeRecommendation:route,hasExplicitSavedRoute:activationHasExplicitSavedRoute(line),routeRecommendationSource:activationHasExplicitSavedRoute(line)?"PRODUCT_RULE":"SYSTEM_FALLBACK"}),
         routeSnapshotJson:JSON.stringify(createWorkRouteSnapshot({processRoute:route,currentStage:"PICK"}))
       });});
       for (let index = 0; index < validation.batch.lines.length; index += 200) await writeSnapshotChunk(tx, validation.batch.lines.slice(index, index + 200));
@@ -187,6 +193,8 @@ function isTransientWorkflowConflict(error: unknown) {
   return /database is locked|socket timeout|transaction.*(?:closed|conflict|timeout)|write conflict/i.test(message);
 }
 
+async function refreshTaskProjection(tx:Transaction,task:{id:string;accountId:string;sourceType:"ORDER"|"CONSIGNMENT";stage:"PICK"|"MARK"|"ASSEMBLE"|"PACK";orderId:string|null;consignmentLineId:string|null}){await refreshAffectedWorkGroups({accountId:task.accountId,sourceType:task.sourceType,stages:[task.stage],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[],consignmentLineIds:task.consignmentLineId?[task.consignmentLineId]:[]},tx);}
+
 export async function claimWorkTask(input: { taskId: string; accountId: string; actorUserId: string; clientRequestId?: string }, client: Client = prisma) {
   const mutate=()=>client.$transaction(async (tx) => {
     const { user, task } = await taskForMutation(tx, input);
@@ -197,6 +205,7 @@ export async function claimWorkTask(input: { taskId: string; accountId: string; 
       const claimed = await tx.workTask.updateMany({ where: { id: task.id, assignedUserId: null, status: task.status }, data: { assignedUserId: user.id, status: "IN_PROGRESS", startedAt: task.startedAt ?? new Date(), startedByUserId: task.startedByUserId ?? user.id } });
       if (claimed.count !== 1) throw new Error("This work was taken by another worker.");
       await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_CLAIMED", requestKind: "CLAIM", before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId });
+      await refreshTaskProjection(tx,task);
     }
     return { completedQuantity: task.completedQuantity, completed: false, idempotent: Boolean(task.assignedUserId) };
   });
@@ -256,6 +265,7 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
       await unlockNextTask(tx, task.consignmentLineId!, task.sequenceNumber);
       await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id, completedLineId: task.stage === "PACK" ? line.id : undefined });
     }
+    await refreshTaskProjection(tx,task);
     return { completedQuantity: targetQuantity, completed: nextStatus === "COMPLETED", idempotent: false };
   });
   return recoverIdempotentReplay({clientRequestId:input.clientRequestId,mutate,replay:async() => {
@@ -296,6 +306,7 @@ export async function reportWorkTaskProblem(input: { taskId: string; accountId: 
     if (changed.count !== 1) throw new Error("Task changed; refresh before reporting a problem.");
     await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_PROBLEM_REPORTED", requestKind: "REPORT_PROBLEM",fingerprint, before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId, note: input.note, metadata: { reason: input.reason } });
     await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id });
+    await refreshTaskProjection(tx,task);
     return { completedQuantity: task.completedQuantity, completed: false, idempotent: false };
   }), replay: () => client.$transaction(async (tx) => {
     const { user, task } = await taskForMutation(tx, input);
@@ -320,6 +331,7 @@ export async function resolveWorkTaskProblem(input: { taskId: string; accountId:
     await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_PROBLEM_RESOLVED", requestKind: "RESOLVE_PROBLEM",fingerprint, before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId, note: input.resolutionNote });
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "CONSIGNMENT_TASK_PROBLEM_RESOLVED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ restoredStatus: restored }) } });
     await recalculateConsignmentCompletion(tx, { batchId: task.consignmentLine.consignmentBatchId, actorUserId: user.id });
+    await refreshTaskProjection(tx,task);
     return { completedQuantity: task.completedQuantity, completed: false, idempotent: false };
   }), replay: () => client.$transaction(async (tx) => {
     const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
@@ -346,6 +358,7 @@ export async function reassignWorkTask(input: { taskId: string; accountId: strin
     const before = task.assignedUserId;
     await tx.workTask.update({ where: { id: task.id }, data: { assignedUserId: input.assignedUserId } });
     await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: input.assignedUserId ? "TASK_REASSIGNED" : "TASK_UNASSIGNED", requestKind,fingerprint, clientRequestId: input.clientRequestId, metadata: { previousUserId: before, assignedUserId: input.assignedUserId } });
+    await refreshTaskProjection(tx,task);
     return { assignedUserId: input.assignedUserId, idempotent: false };
   }), replay: () => client.$transaction(async (tx) => {
     const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
@@ -380,6 +393,7 @@ export async function reassignConsignmentStage(input: { batchId: string; account
     }
     await tx.workTask.updateMany({ where: { id: { in: tasks.map((task) => task.id) } }, data: { assignedUserId: input.assignedUserId } });
     await tx.workActionLog.createMany({ data: tasks.map((task) => ({ accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: input.assignedUserId ? "TASK_REASSIGNED" as const : "TASK_UNASSIGNED" as const,requestKind:input.clientRequestId?"BULK_ASSIGN" as const:null,clientRequestId:input.clientRequestId||null, metadataJson: JSON.stringify({ previousUserId: task.assignedUserId, assignedUserId: input.assignedUserId, bulkStage: input.stage,requestFingerprint:fingerprint }) })) });
+    await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"CONSIGNMENT",stages:[input.stage],taskIds:tasks.map(task=>task.id)},tx);
     return { count: tasks.length,idempotent:false };
   }), replay: () => client.$transaction(async (tx) => {
     const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);

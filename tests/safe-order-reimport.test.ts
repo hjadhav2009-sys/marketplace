@@ -10,7 +10,7 @@ const { importFlipkartOrderRows }=await import("../src/lib/marketplaces/flipkart
 
 const row=(values:Record<string,string>={})=>({"Shipment ID":"SHIP-1","ORDER ITEM ID":"ITEM-1","Order Id":"ORDER-1",FSN:"FSN-1",SKU:"SKU-1",Product:"Initial title",Quantity:"1",City:"Synthetic City",State:"Synthetic State","Tracking ID":"TRACK-1",...values});
 try{
- const account=await prisma.account.create({data:{id:"account",name:"Synthetic",code:"SYN",marketplace:"FLIPKART"}}),user=await prisma.user.create({data:{id:"owner",username:"safe-reimport-owner",passwordHash:"x",name:"Owner",role:"OWNER"}});
+ const account=await prisma.account.create({data:{id:"account",name:"Synthetic",code:"SYN",marketplace:"FLIPKART"}}),user=await prisma.user.create({data:{id:"owner",username:"safe-reimport-owner",passwordHash:"x",name:"Owner",role:"OWNER"}});await prisma.marketplaceListing.createMany({data:[{accountId:"account",marketplace:"FLIPKART",sellerSkuId:"SKU-1",sku:"SKU-1"},{accountId:"account",marketplace:"FLIPKART",sellerSkuId:"ROLLBACK-CHANGED",sku:"ROLLBACK-CHANGED"}]});
  await importFlipkartOrderRows({rows:[row()],fileName:"initial.csv",account,user});
  const order=await prisma.order.findUniqueOrThrow({where:{accountId_awb:{accountId:"account",awb:"FLIPKART:ORDER_ITEM:ITEM-1"}}}),pick=await prisma.workTask.findFirstOrThrow({where:{orderId:order.id,stage:"PICK"}});assert.equal(pick.requiredQuantity,1);
  await importFlipkartOrderRows({rows:[row({Quantity:"3",Product:"Refreshed title","Tracking ID":"TRACK-2"})],fileName:"untouched-refresh.csv",account,user});

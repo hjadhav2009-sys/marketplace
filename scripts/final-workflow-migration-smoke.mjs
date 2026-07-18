@@ -7,17 +7,17 @@ const root = process.cwd();
 const temporaryRoot = resolve(root, ".codex-tmp");
 const migrationsRoot = resolve(root, "prisma", "migrations");
 const base = "20260717000400_final_workflow_correctness";
-const latest = "20260718000400_security_throttle";
+const latest = "20260718000500_projection_import_manual_catalog";
 mkdirSync(temporaryRoot, { recursive: true });
 const entries = readdirSync(migrationsRoot, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
-assert.equal(entries.at(-1), latest, "Phase 7.3.4 security migration must remain the latest additive SQLite migration.");
+assert.equal(entries.at(-1), latest, "Phase 7.3.6 catalog/import migration must remain the latest additive SQLite migration.");
 const phaseMigrations=entries.filter(name=>name>base);
 const apply = (database, name) => database.exec(readFileSync(join(migrationsRoot, name, "migration.sql"), "utf8"));
 const open = (name) => { const file = resolve(temporaryRoot, name); rmSync(file, { force: true }); const database = new DatabaseSync(file); database.exec("PRAGMA foreign_keys=ON;"); return { database, file }; };
 
 const fresh = open("final-workflow-fresh.db");
 for (const entry of entries) apply(fresh.database, entry);
-for (const table of ["WorkflowActionReceipt", "WorkRouteDecisionRejection", "WorkProjectionState", "SecurityThrottle"]) assert.ok(fresh.database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table), `Fresh database creates ${table}.`);
+for (const table of ["WorkflowActionReceipt", "WorkRouteDecisionRejection", "WorkProjectionState", "SecurityThrottle", "MarketplaceListingAttribute"]) assert.ok(fresh.database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table), `Fresh database creates ${table}.`);
 fresh.database.close();
 
 const existing = open("final-workflow-existing.db");
@@ -36,8 +36,8 @@ assert.ok(existing.database.prepare("SELECT name FROM sqlite_master WHERE type='
 existing.database.close();
 
 const postgresSql = phaseMigrations.map(name=>readFileSync(resolve(root,"prisma","migrations-postgres",name,"migration.sql"),"utf8")).join("\n");
-for (const table of ["WorkProjectionState", "SecurityThrottle"]) assert.match(postgresSql, new RegExp(`CREATE TABLE "${table}"`), `PostgreSQL migration includes ${table}.`);
-for(const column of ["runnerId","leaseExpiresAt","fieldProvenanceJson","interruptedStage"])assert.match(postgresSql,new RegExp(`"${column}"`),`PostgreSQL migration includes ${column}.`);
+for (const table of ["WorkProjectionState", "SecurityThrottle", "MarketplaceListingAttribute"]) assert.match(postgresSql, new RegExp(`CREATE TABLE "${table}"`), `PostgreSQL migration includes ${table}.`);
+for(const column of ["runnerId","leaseExpiresAt","fieldProvenanceJson","interruptedStage","safeDataJson","formSchemaJson","alreadyImportedRows"])assert.match(postgresSql,new RegExp(`"${column}"`),`PostgreSQL migration includes ${column}.`);
 assert.match(postgresSql,/ImportJob_status_leaseExpiresAt_idx/,"PostgreSQL migration includes lease claim index parity.");
 
 rmSync(fresh.file, { force: true });

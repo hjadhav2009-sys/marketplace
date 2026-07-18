@@ -133,7 +133,10 @@ export async function refreshAffectedWorkGroups(input:{accountId:string;sourceTy
     const oldGroupKeys=[...new Set(oldMemberships.map(item=>item.groupKey))],oldMembers=oldGroupKeys.length?await client.workGroupMember.findMany({where:{groupKey:{in:oldGroupKeys}},select:{taskId:true}}):[],oldMemberIds=oldMembers.map(item=>item.taskId);
     const cohortOr:Prisma.WorkTaskWhereInput[]=[];
     for(const task of affected){if(task.order){if(stage==="PACK")cohortOr.push(task.order.trackingId?{order:{trackingId:task.order.trackingId}}:{order:{awb:task.order.awb}});else cohortOr.push({order:{batchId:task.order.batchId,sku:task.order.sku}});}else if(task.consignmentLine){cohortOr.push(stage==="PACK"?{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId}}:{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId,OR:[{sellerSkuSnapshot:task.consignmentLine.sellerSkuSnapshot},{sellerSkuSource:task.consignmentLine.sellerSkuSource}]}});}}
-    const candidates=await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage,status:{in:["READY","IN_PROGRESS","PROBLEM","COMPLETED"]},OR:[...(oldMemberIds.length?[{id:{in:oldMemberIds}}]:[]),...cohortOr]},include:INCLUDE,orderBy:[{createdAt:"asc"},{id:"asc"}]});
+    const uniqueCohorts=[...new Map(cohortOr.map(where=>[JSON.stringify(where),where])).values()],candidateMap=new Map<string,ProjectionTask>();
+    if(oldMemberIds.length){for(const task of await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage,status:{in:["READY","IN_PROGRESS","PROBLEM","COMPLETED"]},id:{in:oldMemberIds}},include:INCLUDE}))candidateMap.set(task.id,task);}
+    for(let index=0;index<uniqueCohorts.length;index+=40){for(const task of await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage,status:{in:["READY","IN_PROGRESS","PROBLEM","COMPLETED"]},OR:uniqueCohorts.slice(index,index+40)},include:INCLUDE}))candidateMap.set(task.id,task);}
+    const candidates=[...candidateMap.values()].sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()||a.id.localeCompare(b.id));
     const relevantIds=new Set([...affectedIds,...oldMemberIds]),{rows,members}=buildProjectionData({accountId:input.accountId,sourceType:input.sourceType,stage,marketplace:String(account.marketplace)},candidates,relevantIds),replaceKeys=[...new Set([...oldGroupKeys,...rows.map(row=>row.groupKey)])];
     if(replaceKeys.length)await client.workGroupProjection.deleteMany({where:{groupKey:{in:replaceKeys},accountId:input.accountId,sourceType:input.sourceType,stage}});for(let index=0;index<rows.length;index+=500)await client.workGroupProjection.createMany({data:rows.slice(index,index+500)});for(let index=0;index<members.length;index+=1000)await client.workGroupMember.createMany({data:members.slice(index,index+1000)});const stateKey={accountId:input.accountId,sourceType:input.sourceType,stage},prior=await client.workProjectionState.findUnique({where:{accountId_sourceType_stage:stateKey},select:{lastAppliedTaskVersion:true}}),lastAppliedTaskVersion=Math.max(prior?.lastAppliedTaskVersion??0,...affected.map(task=>task.version),0);await client.workProjectionState.upsert({where:{accountId_sourceType_stage:stateKey},create:{...stateKey,state:"READY",lastAppliedTaskVersion},update:{state:"READY",lastAppliedTaskVersion,errorSummary:null}});results[stage]={groupCount:rows.length,memberCount:members.length};
   }
@@ -147,5 +150,12 @@ export async function ensureWorkGroupProjection(input: { accountId: string; sour
     client.workGroupMember.count({ where: { projection: input, task: { status: { in: [...activeStatuses] } } } }),
     client.workGroupProjection.count({where:input}),client.workProjectionState.findUnique({where:{accountId_sourceType_stage:input}})
   ]);
-  return { active, projectedActive, groups, state:state?.state??"UNINITIALIZED", consistent: state?.state==="READY"&&active === projectedActive && Boolean(active || !groups) };
+  // A brand-new account/stage with no tasks is a healthy empty queue. Requiring
+  // an administrative projection state row here made the first worker visit fail
+  // closed even though there was nothing to repair.
+  if (active === 0 && groups === 0) {
+    return { active, projectedActive, groups, state: state?.state === "READY" ? "READY_EMPTY" : "EMPTY", consistent: true };
+  }
+
+  return { active, projectedActive, groups, state:state?.state??"UNINITIALIZED", consistent: state?.state==="READY"&&active === projectedActive };
 }

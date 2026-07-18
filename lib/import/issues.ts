@@ -50,8 +50,8 @@ export function parseImportIssueRawData(value: string | null | undefined) {
   }
 }
 
-export function safeImportIssueContext(rawData: string | null | undefined): SafeImportIssueContext {
-  const row = parseImportIssueRawData(rawData);
+export function safeImportIssueContext(rawData: string | null | undefined, safeDataJson?: string | null): SafeImportIssueContext {
+  const row = parseImportIssueRawData(safeDataJson) ?? parseImportIssueRawData(rawData);
 
   if (!row) {
     return {
@@ -62,7 +62,7 @@ export function safeImportIssueContext(rawData: string | null | undefined): Safe
   }
 
   return {
-    sku: firstText(row, ["sku", "SKU", "Seller SKU Id", "Seller SKU ID", "sellerSkuId"]),
+    sku: firstText(row, ["sellerSku", "sku", "SKU", "Seller SKU Id", "Seller SKU ID", "sellerSkuId"]),
     shipmentKey: maskOperationalKey(firstText(row, ["shipmentId", "Shipment ID", "Shipment Id"])),
     orderItemKey: maskOperationalKey(firstText(row, ["orderItemId", "ORDER ITEM ID", "Order Item ID"]))
   };

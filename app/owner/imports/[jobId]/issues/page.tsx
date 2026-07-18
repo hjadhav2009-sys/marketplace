@@ -80,7 +80,7 @@ export default async function ImportIssuesPage({ params, searchParams }: ImportI
     AND: importIssueKindWhere(query?.kind) as Prisma.ImportRowIssueWhereInput | undefined,
     issueType: query?.issueType || undefined,
     rowNumber: Number.isFinite(rowNumber) ? rowNumber : undefined,
-    rawData: sku ? { contains: sku } : undefined
+    OR: sku ? [{ rawData: { contains: sku } }, { safeDataJson: { contains: sku } }] : undefined
   };
 
   for (const [key, value] of Object.entries({
@@ -113,6 +113,7 @@ export default async function ImportIssuesPage({ params, searchParams }: ImportI
       issueType: true,
       message: true,
       rawData: true,
+      safeDataJson: true,
       createdAt: true
     },
     orderBy: [{ createdAt: "desc" }, { rowNumber: "asc" }],
@@ -219,7 +220,7 @@ export default async function ImportIssuesPage({ params, searchParams }: ImportI
         ) : (
           <>
           <div className="grid gap-3 p-3 md:hidden">
-            {issues.map((issue) => { const context = safeImportIssueContext(issue.rawData); const kind = importIssueKind(issue.issueType); return <article key={issue.id} className={`rounded-md border p-3 ${kind === "warning" ? "border-amber-200 bg-amber-50" : "border-rose-200 bg-rose-50"}`}><div className="flex items-start justify-between gap-2"><p className="font-black text-slate-950">{issue.issueType.replaceAll("_", " ")}</p><span className="rounded-full bg-white px-2 py-1 text-xs font-bold">{kind === "warning" ? "Warning" : "Blocking"}</span></div><p className="mt-2 text-sm text-slate-700">{issue.message}</p><div className="mt-3 grid gap-1 text-xs text-slate-600"><p>Row: {issue.rowNumber ?? "-"}</p><p className="break-all">SKU: {context.sku ?? "-"}</p><p>{formatDateTime(issue.createdAt)}</p></div></article>; })}
+            {issues.map((issue) => { const context = safeImportIssueContext(issue.rawData, issue.safeDataJson); const kind = importIssueKind(issue.issueType); return <article key={issue.id} className={`rounded-md border p-3 ${kind === "warning" ? "border-amber-200 bg-amber-50" : "border-rose-200 bg-rose-50"}`}><div className="flex items-start justify-between gap-2"><p className="font-black text-slate-950">{issue.issueType.replaceAll("_", " ")}</p><span className="rounded-full bg-white px-2 py-1 text-xs font-bold">{kind === "warning" ? "Warning" : "Blocking"}</span></div><p className="mt-2 text-sm text-slate-700">{issue.message}</p><div className="mt-3 grid gap-1 text-xs text-slate-600"><p>Row: {issue.rowNumber ?? "-"}</p><p className="break-all">SKU: {context.sku ?? "-"}</p><p>{formatDateTime(issue.createdAt)}</p></div></article>; })}
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full table-fixed text-left text-sm">
@@ -236,7 +237,7 @@ export default async function ImportIssuesPage({ params, searchParams }: ImportI
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {issues.map((issue) => {
-                  const context = safeImportIssueContext(issue.rawData);
+                  const context = safeImportIssueContext(issue.rawData, issue.safeDataJson);
 
                   return (
                     <tr key={issue.id} className="align-top">

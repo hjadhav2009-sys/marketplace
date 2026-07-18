@@ -120,6 +120,8 @@ export async function activateConsignmentBatch(input: { batchId: string; account
       });});
       for (let index = 0; index < validation.batch.lines.length; index += 200) await writeSnapshotChunk(tx, validation.batch.lines.slice(index, index + 200));
       for (let index = 0; index < tasks.length; index += 500) await tx.workTask.createMany({ data: tasks.slice(index, index + 500) });
+      await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"CONSIGNMENT",stages:["PICK"],taskIds:tasks.flatMap(task=>task.id?[task.id]:[]),consignmentLineIds:validation.batch.lines.map(line=>line.id)},tx);
+      await tx.workChangeEvent.create({data:{accountId:input.accountId,eventType:"CONSIGNMENT_ACTIVATED",sourceType:"CONSIGNMENT",stage:"PICK",entityId:input.batchId}});
       await tx.consignmentBatch.update({ where: { id: input.batchId }, data: { status: "ACTIVE", activatedAt: new Date(), activatedByUserId: input.actorUserId } });
       await tx.auditLog.createMany({ data: [
         { userId: input.actorUserId, accountId: input.accountId, action: "CONSIGNMENT_TASKS_CREATED", entityType: "ConsignmentBatch", entityId: input.batchId, metadata: JSON.stringify({ taskCount: tasks.length, lineCount: validation.batch.lines.length }) },

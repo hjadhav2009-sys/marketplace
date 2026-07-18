@@ -104,13 +104,14 @@ export async function GET(request: Request) {
         issueType: true,
         message: true,
         rawData: true,
+        safeDataJson: true,
         createdAt: true
       },
       orderBy: [{ issueType: "asc" }, { rowNumber: "asc" }]
     });
     const headers = ["rowNumber", "issueType", "message", "sku", "shipmentKey", "orderItemKey", "createdAt"];
     const rows = issues.map((issue) => {
-      const safe = safeImportIssueContext(issue.rawData);
+      const safe = safeImportIssueContext(issue.safeDataJson ?? issue.rawData);
       return [issue.rowNumber, issue.issueType, issue.message, safe.sku, safe.shipmentKey, safe.orderItemKey, issue.createdAt] satisfies CsvValue[];
     });
     return responseFor(format, headers, rows, filenameBase);

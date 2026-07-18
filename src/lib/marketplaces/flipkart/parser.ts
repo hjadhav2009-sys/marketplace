@@ -7,6 +7,10 @@ export type FlipkartParseIssue = {
   issueType: string;
   message: string;
   rawData: FlipkartRawRow;
+  severity?: "INFORMATION" | "WARNING" | "BLOCKING_ERROR";
+  safeData?: Record<string, unknown>;
+  sourceType?: string;
+  sourceId?: string;
 };
 
 export type FlipkartDuplicateKey =
@@ -486,14 +490,14 @@ export function flipkartOrderDuplicateKey(order: Pick<FlipkartOrderLine, "orderI
   if (order.orderItemId) {
     return {
       strategy: "ORDER_ITEM_ID",
-      value: order.orderItemId
+      value: order.orderItemId.normalize("NFKC").trim().toUpperCase()
     };
   }
 
   if (order.shipmentId && order.sku) {
     return {
       strategy: "SHIPMENT_ID_SKU",
-      value: `${order.shipmentId}::${order.sku}`
+      value: `${order.shipmentId.normalize("NFKC").trim().toUpperCase()}::${order.sku.normalize("NFKC").trim().toUpperCase()}`
     };
   }
 

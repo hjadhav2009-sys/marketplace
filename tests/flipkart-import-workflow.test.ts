@@ -119,9 +119,10 @@ assert.equal(
   "Image 2 1366URL alias is parsed before Image URL2"
 );
 
-assert.equal(deduped.importableOrders.length, 4, "Duplicate ORDER ITEM ID row is skipped from importable rows");
-assert.equal(deduped.duplicateIssues.length, 1, "Duplicate ORDER ITEM ID is detected");
-assert.equal(deduped.duplicateIssues[0]?.rowNumber, 5, "Duplicate issue keeps the original Excel row number");
+assert.equal(deduped.importableOrders.length, 3, "Conflicting duplicate ORDER ITEM ID holds the complete identity from import");
+assert.equal(deduped.duplicateIssues.length, 1, "Conflicting duplicate ORDER ITEM ID is detected once");
+assert.equal(deduped.duplicateIssues[0]?.issueType, "DUPLICATE_IDENTITY_CONFLICT", "Conflicting duplicate receives a blocking identity issue");
+assert.equal((deduped.duplicateIssues[0]?.safeData?.rowNumbers as number[] | undefined)?.length, 2, "Conflict retains both safe source row numbers");
 
 const aliasListing = aliasListingResult.listings[0];
 
@@ -203,12 +204,12 @@ const dryRunSummary = buildFlipkartDryRunSummary({
 });
 assert.equal(dryRunSummary.listingRowsTotal, 4, "Dry-run counts listing rows");
 assert.equal(dryRunSummary.orderRowsTotal, 6, "Dry-run counts order rows");
-assert.equal(dryRunSummary.orderRowsValid, 4, "Dry-run counts valid deduped order rows");
+assert.equal(dryRunSummary.orderRowsValid, 3, "Dry-run excludes the complete conflicting duplicate identity");
 assert.equal(dryRunSummary.heldRows, 1, "Dry-run counts held order rows");
 assert.equal(dryRunSummary.duplicateRows, 1, "Dry-run counts duplicate order rows");
 assert.equal(dryRunSummary.missingListingCount, 1, "Dry-run counts missing listing SKUs");
 assert.equal(dryRunSummary.missingImageCount, 1, "Dry-run counts listing rows with missing image for ordered SKUs");
-assert.equal(dryRunSummary.multiItemTrackingIds[0]?.trackingId, "FMPC0000000001", "Dry-run reports multi-item Tracking IDs");
+assert.equal(dryRunSummary.multiItemTrackingIds.length, 0, "Held conflicting identities are excluded from actionable multi-item packages");
 assert.equal(dryRunSummary.listingImageDiagnostics.image1366Url1NonEmpty, 2, "Dry-run counts Image 1 1366 URL rows");
 assert.equal(dryRunSummary.listingImageDiagnostics.imageUrl1NonEmpty, 3, "Dry-run counts Image URL 1 rows");
 assert.equal(dryRunSummary.listingImageDiagnostics.image1366Url2NonEmpty, 0, "Dry-run counts Image 2 1366 URL rows");
@@ -257,10 +258,10 @@ const trackingMatches = findAwbSearchMatches({
   limit: 10
 });
 
-assert.equal(trackingMatches.length, 2, "Tracking ID search returns multiple shipment items");
+assert.equal(trackingMatches.length, 1, "Tracking ID search excludes rows held by a conflicting duplicate identity");
 assert.deepEqual(
   trackingMatches.map((match) => match.matchedField),
-  ["TRACKING_ID", "TRACKING_ID"],
+  ["TRACKING_ID"],
   "Tracking ID search marks the matched field"
 );
 const trackingMatchesWithListings = trackingMatches.map((match) => ({

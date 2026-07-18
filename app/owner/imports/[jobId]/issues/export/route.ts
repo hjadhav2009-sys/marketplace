@@ -89,7 +89,7 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
     batchId: job.batchId,
     issueType,
     rowNumber: Number.isFinite(rowNumber) ? rowNumber : undefined,
-    rawData: sku ? { contains: sku } : undefined
+    OR: sku ? [{ rawData: { contains: sku } }, { safeDataJson: { contains: sku } }] : undefined
   };
   const issues = await prisma.importRowIssue.findMany({
     where,
@@ -98,6 +98,7 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
       issueType: true,
       message: true,
       rawData: true,
+      safeDataJson: true,
       createdAt: true
     },
     orderBy: [{ issueType: "asc" }, { rowNumber: "asc" }],
@@ -105,7 +106,7 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
   });
   const headers = ["rowNumber", "issueType", "message", "sku", "shipmentKey", "orderItemKey", "createdAt"];
   const rows = issues.map((issue) => {
-    const safe = safeImportIssueContext(issue.rawData);
+    const safe = safeImportIssueContext(issue.safeDataJson ?? issue.rawData);
     return [
       issue.rowNumber,
       issue.issueType,

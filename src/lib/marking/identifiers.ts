@@ -1,4 +1,4 @@
-import type { IdentifierType, Marketplace, MarketplaceListing } from "@prisma/client";
+import type { IdentifierType, Marketplace, MarketplaceListing, Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const MAX_IDENTIFIER_LENGTH = 160;
@@ -24,7 +24,8 @@ export type ListingMatchResult =
   | { status: "INVALID"; candidates: []; identifier: null }
   | { status: "NOT_FOUND"; candidates: []; identifier: { type: IdentifierType; normalizedValue: string } }
   | { status: "EXACT_UNIQUE"; candidates: MarketplaceListing[]; identifier: { type: IdentifierType; normalizedValue: string } }
-  | { status: "EXACT_MULTIPLE"; candidates: MarketplaceListing[]; identifier: { type: IdentifierType; normalizedValue: string } };
+  | { status: "EXACT_MULTIPLE"; candidates: MarketplaceListing[]; identifier: { type: IdentifierType; normalizedValue: string } }
+  | { status: "IDENTIFIER_CONFLICT"; candidates: MarketplaceListing[]; identifier: { type: IdentifierType; normalizedValue: string } };
 
 export function normalizeListingIdentifier(type: IdentifierType, value: unknown) {
   const raw = String(value ?? "").normalize("NFKC").trim();
@@ -120,7 +121,7 @@ export async function syncIdentifiersForImportedListings(input: { accountId: str
   return { syncedListings, syncedIdentifiers };
 }
 
-export async function findListingMatchesByIdentifiers(input: { accountId: string; identifiers: ListingIdentifierInput[] }): Promise<ListingMatchResult> {
+export async function findListingMatchesByIdentifiers(input: { accountId: string; marketplace?: Marketplace; identifiers: ListingIdentifierInput[] }, client: PrismaClient | Prisma.TransactionClient = prisma): Promise<ListingMatchResult> {
   const ordered = [...input.identifiers]
     .map((item) => ({ type: item.type, normalizedValue: normalizeListingIdentifier(item.type, item.value) }))
     .filter((item): item is { type: IdentifierType; normalizedValue: string } => Boolean(item.normalizedValue))
@@ -128,15 +129,24 @@ export async function findListingMatchesByIdentifiers(input: { accountId: string
 
   if (!ordered.length) return { status: "INVALID", candidates: [], identifier: null };
 
+  const matches: Array<{identifier: typeof ordered[number]; candidates: MarketplaceListing[]}> = [];
   for (const identifier of ordered) {
-    const rows = await prisma.marketplaceListingIdentifier.findMany({
-      where: { accountId: input.accountId, identifierType: identifier.type, normalizedValue: identifier.normalizedValue, active: true },
+    const rows = await client.marketplaceListingIdentifier.findMany({
+      where: { accountId: input.accountId, marketplace: input.marketplace, identifierType: identifier.type, normalizedValue: identifier.normalizedValue, active: true },
       include: { marketplaceListing: true },
       take: 25
     });
     const candidates = [...new Map(rows.map((row) => [row.marketplaceListing.id, row.marketplaceListing])).values()];
-    if (candidates.length === 1) return { status: "EXACT_UNIQUE", candidates, identifier };
-    if (candidates.length > 1) return { status: "EXACT_MULTIPLE", candidates, identifier };
+    if (candidates.length) matches.push({identifier,candidates});
+  }
+
+  if(matches.length){
+    const first=matches[0],union=[...new Map(matches.flatMap(match=>match.candidates).map(candidate=>[candidate.id,candidate])).values()];
+    const intersection=first.candidates.filter(candidate=>matches.every(match=>match.candidates.some(item=>item.id===candidate.id)));
+    if(intersection.length===1)return{status:"EXACT_UNIQUE",candidates:intersection,identifier:first.identifier};
+    if(union.length===1)return{status:"EXACT_UNIQUE",candidates:union,identifier:first.identifier};
+    if(matches.length>1&&intersection.length===0)return{status:"IDENTIFIER_CONFLICT",candidates:union,identifier:first.identifier};
+    return{status:"EXACT_MULTIPLE",candidates:union,identifier:first.identifier};
   }
 
   return { status: "NOT_FOUND", candidates: [], identifier: ordered[0] };

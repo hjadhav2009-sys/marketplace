@@ -2,12 +2,14 @@ import { normalizeSkuForMatching } from "@/lib/sku";
 import { flipkartInternalOrderKey, type FlipkartOrderLine, type FlipkartParseIssue, type FlipkartRawRow } from "./parser";
 
 export const FLIPKART_DUPLICATE_ROW = "DUPLICATE_FLIPKART_ROW";
+export const FLIPKART_DUPLICATE_IDENTITY_CONFLICT = "DUPLICATE_IDENTITY_CONFLICT";
 export const FLIPKART_MISSING_LISTING_MAPPING = "MISSING_FLIPKART_LISTING_MAPPING";
 export const FLIPKART_LISTING_IMAGE_MISSING = "FLIPKART_LISTING_IMAGE_MISSING";
 
 export type FlipkartOrderDedupeResult = {
   importableOrders: FlipkartOrderLine[];
   duplicateIssues: FlipkartParseIssue[];
+  repeatedSourceRows: number;
 };
 
 export type FlipkartIssueRawContext = {
@@ -51,31 +53,53 @@ export function flipkartIssueRawContext(row: FlipkartRawRow | Record<string, unk
 
 export function dedupeFlipkartOrderRows(orders: FlipkartOrderLine[]): FlipkartOrderDedupeResult {
   const duplicateIssues: FlipkartParseIssue[] = [];
-  const seenKeys = new Set<string>();
-  const importableOrders = orders.filter((order) => {
+  const groups = new Map<string, FlipkartOrderLine[]>();
+  for (const order of orders) {
     const key = flipkartInternalOrderKey(order);
+    if (!key) continue;
+    groups.set(key, [...(groups.get(key) ?? []), order]);
+  }
 
-    if (!key) {
-      return false;
-    }
-
-    if (seenKeys.has(key)) {
-      duplicateIssues.push({
-        rowNumber: order.rowNumber,
-        issueType: FLIPKART_DUPLICATE_ROW,
-        message: `Duplicate Flipkart row skipped for ${key}.`,
-        rawData: order.rawData ?? {}
-      });
-      return false;
-    }
-
-    seenKeys.add(key);
-    return true;
+  const operationalFingerprint = (order: FlipkartOrderLine) => JSON.stringify({
+    orderItemId: order.orderItemId ?? null,
+    shipmentId: order.shipmentId ?? null,
+    orderId: order.orderId ?? null,
+    sellerSku: normalizeSkuForMatching(order.sku),
+    quantity: order.quantity ?? 1,
+    trackingId: order.trackingId ?? null
   });
+  const importableOrders: FlipkartOrderLine[] = [];
+  let repeatedSourceRows = 0;
+
+  for (const [key, rows] of groups) {
+    const fingerprints = new Set(rows.map(operationalFingerprint));
+    if (fingerprints.size === 1) {
+      const canonical=rows.reduce((best,row)=>(row.productTitle?.trim().length??0)>(best.productTitle?.trim().length??0)?row:best,rows[0]);
+      importableOrders.push(canonical);
+      repeatedSourceRows += rows.length - 1;
+      continue;
+    }
+
+    duplicateIssues.push({
+      rowNumber: rows[0].rowNumber,
+      issueType: FLIPKART_DUPLICATE_IDENTITY_CONFLICT,
+      severity: "BLOCKING_ERROR",
+      message: `Conflicting rows use the same Flipkart order identity ${key}; no Order or work was created for this identity.`,
+      rawData: {},
+      safeData: {
+        rowNumbers: rows.map((row) => row.rowNumber),
+        sellerSku: normalizeSkuForMatching(rows[0].sku),
+        orderItemId: rows[0].orderItemId ?? null,
+        shipmentId: rows[0].shipmentId ?? null,
+        issueCode: FLIPKART_DUPLICATE_IDENTITY_CONFLICT
+      }
+    });
+  }
 
   return {
     importableOrders,
-    duplicateIssues
+    duplicateIssues,
+    repeatedSourceRows
   };
 }
 
@@ -105,6 +129,7 @@ export function flipkartOrderMappingIssue(
     return {
       rowNumber: order.rowNumber,
       issueType: FLIPKART_LISTING_IMAGE_MISSING,
+      severity: "WARNING",
       message: `Listing found but image missing for SKU: ${sku}`,
       rawData: order.rawData ?? {}
     };
@@ -113,6 +138,7 @@ export function flipkartOrderMappingIssue(
   return {
     rowNumber: order.rowNumber,
     issueType: FLIPKART_MISSING_LISTING_MAPPING,
+    severity: "BLOCKING_ERROR",
     message: `Missing Flipkart listing mapping for SKU: ${sku}`,
     rawData: order.rawData ?? {}
   };

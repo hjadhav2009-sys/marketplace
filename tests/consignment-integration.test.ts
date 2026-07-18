@@ -40,6 +40,7 @@ try {
  assert.equal(await db.workTask.count({where:{sourceType:"ORDER"}}),0,"No customer Order WorkTasks were created");
  const second=await activateConsignmentBatch({batchId:"batch-a",accountId:"acct-a",actorUserId:"owner-fake"},db);assert.equal(second.alreadyActive,true);assert.equal(second.taskCount,1);
  await db.markingAsset.create({data:{id:"asset-no-file",name:"Fake Marking",status:"ACTIVE",active:true,instructions:"Use the fake operational settings."}});
+ await db.markingAssetListingLink.create({data:{id:"asset-no-file-link",markingAssetId:"asset-no-file",marketplaceListingId:"listing-c",accountId:"acct-a",marketplace:"FLIPKART",matchMethod:"SYNTHETIC_TEST",active:true}});
  const markRule=await db.productProcessRule.create({data:{id:"rule-c",accountId:"acct-a",marketplaceListingId:"listing-c",route:"PICK_MARK_PACK",markingRequired:true,markingAssetId:"asset-no-file",active:true}});
  await db.consignmentBatch.create({data:{id:"batch-mark",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-MARK",displayName:"Fake Mark",status:"READY_TO_ACTIVATE",sourceFileName:"fake.csv",sourceFileSha256:"sha-mark"}});
  await db.consignmentLine.create({data:{id:"line-mark",consignmentBatchId:"batch-mark",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",fsnSource:"FSN-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU",processRoute:"PICK_MARK_PACK",processRuleId:markRule.id,markingAssetId:"asset-no-file"}});
@@ -58,17 +59,52 @@ try {
  const defaultLine=await db.consignmentLine.findUniqueOrThrow({where:{id:"line-default"}});assert.equal(defaultLine.processRuleId,null);assert.equal(defaultLine.processRoute,"PICK_PACK");
  const defaultTasks=await db.workTask.findMany({where:{consignmentLineId:"line-default"},orderBy:{sequenceNumber:"asc"}});assert.deepEqual(defaultTasks.map((task)=>task.stage),["PICK"]);
  assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_PACK"),true);assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_MARK_PACK"),true);assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_ASSEMBLE_PACK"),true);assert.equal(isConsignmentRouteCurrentlyEnabled("PICK_MARK_ASSEMBLE_PACK"),true);
- await db.productProcessRule.update({where:{id:markRule.id},data:{active:true,route:"PICK_ASSEMBLE_PACK",markingRequired:false,assemblyRequired:true}});
- await db.consignmentBatch.create({data:{id:"batch-assembly-blocked",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-ASSEMBLY",displayName:"Fake Assembly",status:"READY_TO_ACTIVATE",sourceFileName:"fake-assembly.csv",sourceFileSha256:"sha-assembly",totalRequiredQuantity:1}});
- await db.consignmentLine.create({data:{id:"line-assembly-blocked",consignmentBatchId:"batch-assembly-blocked",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
- const assemblyValidation=await validateConsignmentActivation("batch-assembly-blocked","acct-a",db);assert.equal(assemblyValidation.problems.length,0);
- await activateConsignmentBatch({batchId:"batch-assembly-blocked",accountId:"acct-a",actorUserId:"owner-fake"},db);
- assert.equal(await db.workTask.count({where:{consignmentLineId:"line-assembly-blocked",stage:"PICK"}}),1,"Assembly recommendation still creates only the initial Pick task");
- await db.productProcessRule.update({where:{id:markRule.id},data:{route:"PICK_MARK_ASSEMBLE_PACK",markingRequired:true,assemblyRequired:true}});
- await db.consignmentBatch.create({data:{id:"batch-mark-assembly-blocked",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-MARK-ASSEMBLY",displayName:"Fake Mark Assembly",status:"READY_TO_ACTIVATE",sourceFileName:"fake-mark-assembly.csv",sourceFileSha256:"sha-mark-assembly",totalRequiredQuantity:1}});
- await db.consignmentLine.create({data:{id:"line-mark-assembly-blocked",consignmentBatchId:"batch-mark-assembly-blocked",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
- const markAssemblyValidation=await validateConsignmentActivation("batch-mark-assembly-blocked","acct-a",db);assert.equal(markAssemblyValidation.problems.length,0);
- await activateConsignmentBatch({batchId:"batch-mark-assembly-blocked",accountId:"acct-a",actorUserId:"owner-fake"},db);
- assert.equal(await db.workTask.count({where:{stage:"ASSEMBLE",sourceType:"CONSIGNMENT"}}),0,"No consignment Assembly task is created");
+ await db.productProcessRule.update({where:{id:markRule.id},data:{active:true,route:"PICK_ASSEMBLE_PACK",markingRequired:false,markingAssetId:null,assemblyRequired:true,assemblyTitle:"Synthetic Assembly",assemblyInstructions:"Attach the synthetic component."}});
+ await db.consignmentBatch.create({data:{id:"batch-assembly",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-ASSEMBLY",displayName:"Fake Assembly",status:"READY_TO_ACTIVATE",sourceFileName:"fake-assembly.csv",sourceFileSha256:"sha-assembly",totalRequiredQuantity:1}});
+ await db.consignmentLine.create({data:{id:"line-assembly",consignmentBatchId:"batch-assembly",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
+ const assemblyValidation=await validateConsignmentActivation("batch-assembly","acct-a",db);assert.equal(assemblyValidation.problems.length,0);
+ await activateConsignmentBatch({batchId:"batch-assembly",accountId:"acct-a",actorUserId:"owner-fake"},db);
+ assert.equal(await db.workTask.count({where:{consignmentLineId:"line-assembly",stage:"PICK"}}),1,"Assembly recommendation creates the initial Pick task");
+ await db.productProcessRule.update({where:{id:markRule.id},data:{route:"PICK_MARK_ASSEMBLE_PACK",markingRequired:true,markingAssetId:"asset-no-file",assemblyRequired:true,assemblyTitle:"Synthetic Mark Assembly",assemblyInstructions:"Attach the marked synthetic component."}});
+ await db.consignmentBatch.create({data:{id:"batch-mark-assembly",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-MARK-ASSEMBLY",displayName:"Fake Mark Assembly",status:"READY_TO_ACTIVATE",sourceFileName:"fake-mark-assembly.csv",sourceFileSha256:"sha-mark-assembly",totalRequiredQuantity:1}});
+ await db.consignmentLine.create({data:{id:"line-mark-assembly",consignmentBatchId:"batch-mark-assembly",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-C",requiredQuantity:1,marketplaceListingId:"listing-c",matchStatus:"EXACT_SKU"}});
+ const markAssemblyValidation=await validateConsignmentActivation("batch-mark-assembly","acct-a",db);assert.equal(markAssemblyValidation.problems.length,0);
+ await activateConsignmentBatch({batchId:"batch-mark-assembly",accountId:"acct-a",actorUserId:"owner-fake"},db);
+ assert.equal(await db.workTask.count({where:{consignmentLineId:"line-mark-assembly",stage:{not:"PICK"}}}),0,"Downstream Mark and Assembly tasks are created only after the explicit Pick route action");
+
+ await db.consignmentBatch.create({data:{id:"batch-invalid-source-row",accountId:"acct-a",marketplace:"FLIPKART",externalConsignmentNumber:"CN-INVALID-SOURCE",displayName:"Fake Invalid Source",status:"READY_TO_ACTIVATE",sourceFileName:"fake-invalid.csv",sourceFileSha256:"sha-invalid-source",totalSourceRows:2,totalValidLines:1,totalRequiredQuantity:1,matchedLines:1,readyMadeLines:1,createdByUserId:"owner-fake"}});
+ await db.consignmentLine.create({data:{id:"line-invalid-source-valid",consignmentBatchId:"batch-invalid-source-row",accountId:"acct-a",rowNumber:2,sellerSkuSource:"SKU-A",fsnSource:"FSN-A",requiredQuantity:1,marketplaceListingId:"listing-a",matchStatus:"EXACT_SKU",processRoute:"PICK_PACK",processRuleId:rule.id}});
+ await db.consignmentImportIssue.create({data:{id:"invalid-source-quantity",consignmentBatchId:"batch-invalid-source-row",rowNumber:3,issueType:"INVALID_QUANTITY",severity:"ERROR",message:"Quantity Sent must be a positive whole number."}});
+ const invalidSourceValidation=await validateConsignmentActivation("batch-invalid-source-row","acct-a",db);
+ assert.ok(invalidSourceValidation.problems.some((problem)=>problem.code==="UNRESOLVED_IMPORT_ERROR"&&problem.rowNumber===3),"An invalid source row without a ConsignmentLine blocks activation with safe row evidence");
+ await assert.rejects(activateConsignmentBatch({batchId:"batch-invalid-source-row",accountId:"acct-a",actorUserId:"owner-fake"},db),/source import error has no valid work line/i);
+ assert.equal((await db.consignmentBatch.findUniqueOrThrow({where:{id:"batch-invalid-source-row"}})).status,"READY_TO_ACTIVATE","Failed activation rolls the batch claim back");
+ assert.equal(await db.workTask.count({where:{consignmentLine:{consignmentBatchId:"batch-invalid-source-row"}}}),0,"A partial batch creates no worker task");
+ assert.equal((await db.consignmentLine.findUniqueOrThrow({where:{id:"line-invalid-source-valid"}})).activated,false,"The valid subset is not activated alone");
+
+ const genericReviewAttempt=await db.consignmentImportIssue.updateMany({where:{id:"invalid-source-quantity",resolved:false,severity:{not:"ERROR"}},data:{resolved:true,resolvedAt:new Date(),resolvedByUserId:"owner-fake"}});
+ assert.equal(genericReviewAttempt.count,0,"The generic reviewed predicate cannot resolve a blocking ERROR");
+ assert.equal((await db.consignmentImportIssue.findUniqueOrThrow({where:{id:"invalid-source-quantity"}})).resolved,false);
+ await db.consignmentImportIssue.update({where:{id:"invalid-source-quantity"},data:{resolved:true,resolvedAt:new Date(),resolvedByUserId:"owner-fake"}});
+ const legacyResolvedInvalidValidation=await validateConsignmentActivation("batch-invalid-source-row","acct-a",db);
+ assert.ok(legacyResolvedInvalidValidation.problems.some((problem)=>problem.code==="SOURCE_IMPORT_ERROR_REQUIRES_REPARSE"),"A historically manual-resolved invalid source row still requires source replacement or reparse");
+ await assert.rejects(activateConsignmentBatch({batchId:"batch-invalid-source-row",accountId:"acct-a",actorUserId:"owner-fake"},db),/source import error has no valid work line/i);
+
+ const injectedInternalFailure=new Error("C:\\private warehouse\\consignments.db PrismaClientKnownRequestError P2002 SQLITE_CONSTRAINT");
+ const failingActivationClient={
+  $transaction:async()=>{throw injectedInternalFailure;},
+  auditLog:db.auditLog
+ } as unknown as PrismaClient;
+ await assert.rejects(activateConsignmentBatch({batchId:"batch-invalid-source-row",accountId:"acct-a",actorUserId:"owner-fake"},failingActivationClient),/private warehouse/);
+ const sanitizedFailureAudit=await db.auditLog.findFirstOrThrow({where:{action:"CONSIGNMENT_ACTIVATION_FAILED",entityId:"batch-invalid-source-row"},orderBy:{createdAt:"desc"}});
+ assert.equal(JSON.parse(sanitizedFailureAudit.metadata??"{}").reason,"Import failed. Review the job and retry when safe.","Activation AuditLog metadata never stores filesystem or database internals");
+ assert.doesNotMatch(sanitizedFailureAudit.metadata??"",/private warehouse|P2002|SQLITE_CONSTRAINT/i);
+
+ const issueActionSource=readFileSync(resolve(process.cwd(),"app","owner","consignments","actions.ts"),"utf8");
+ assert.match(issueActionSource,/severity:\s*\{\s*not:\s*"ERROR"\s*\}/,"The generic server action atomically excludes ERROR issues");
+ assert.match(issueActionSource,/if \(changed\.count !== 1\) redirect\([^\n]+blocking-source/,"Rejected generic issue resolution returns controlled blocking guidance");
+ const issuePageSource=readFileSync(resolve(process.cwd(),"app","owner","consignments","[batchId]","issues","page.tsx"),"utf8");
+ assert.match(issuePageSource,/!issue\.resolved&&issue\.severity!=="ERROR"\?<form action=\{resolveConsignmentIssueAction\}/,"The issue UI never offers Mark reviewed for ERROR issues");
+ assert.match(issuePageSource,/Correct or replace the source and reparse it to clear this blocking error\./,"The issue UI directs blocking source errors to the reviewed correction flow");
 } finally { await db.$disconnect(); rmSync(file,{force:true}); }
 console.log("Consignment temporary-database integration tests passed.");

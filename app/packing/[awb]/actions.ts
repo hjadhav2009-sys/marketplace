@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { problemOrderSchema } from "@/lib/validators";
 import { packCustomerOrderShipmentSafely } from "@/src/lib/workflow/order-pack-scope";
@@ -12,7 +12,7 @@ import { reportOrderWorkflowProblem } from "@/src/lib/workflow/order-problems";
 export async function confirmPackedAction(formData: FormData) {
   const user = await requireUser();
   const account = await requireAccount(user);
-  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
+  if (!hasWorkPermission(user, "canPack")) redirect(capabilityHomePath(user));
   const orderId = String(formData.get("orderId") ?? "");
 
   const order = await prisma.order.findFirst({
@@ -50,7 +50,7 @@ export async function confirmPackedAction(formData: FormData) {
 export async function reportProblemFromScanAction(formData: FormData) {
   const user = await requireUser();
   const account = await requireAccount(user);
-  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
+  if (!hasWorkPermission(user, "canPack")) redirect(capabilityHomePath(user));
   const parsed = problemOrderSchema.safeParse({
     orderId: formData.get("orderId"),
     reason: formData.get("reason"),

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import type { User } from "@prisma/client";
 import { AppNav, MobileBottomNav } from "@/components/AppNav";
-import { clearSession, getSelectedAccount, requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, clearSession, getSelectedAccount, requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { getRequestMeta } from "@/lib/request-context";
 import { hasWorkPermission } from "@/lib/work-permissions";
@@ -99,7 +99,7 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
     <div className="min-h-screen bg-stone-50 text-slate-950">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 sm:py-3">
-          <Link href={account ? roleHomePath(user.role) : "/owner/accounts"} prefetch className="min-w-0">
+          <Link href={account ? capabilityHomePath(user) : user.role === "OWNER" ? "/owner/accounts" : "/accounts"} prefetch className="min-w-0">
             <p className="hidden text-xs font-semibold uppercase tracking-wide text-berry sm:block">Marketplace Pick & Pack</p>
             <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account ? `${account.companyName} / ${accountName}` : accountName}</p>
             <p className="truncate text-xs font-medium text-slate-500 sm:hidden">

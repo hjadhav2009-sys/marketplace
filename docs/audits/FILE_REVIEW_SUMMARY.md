@@ -1,7 +1,7 @@
 # File Review Summary
 
-The per-file evidence is generated into `.codex-tmp/production-audit/file-inventory.jsonl`. It records path, type, size or lines, subsystem, generated/asset classification, review passes, sensitivity, findings, deterministic large-file ranges and final status.
+The committed audit manifest is a path/byte/range/SHA-256 integrity inventory. Its current-tree test recomputes each tracked non-self hash and validates the manifest generator; this establishes byte-level coverage, not semantic correctness or completed human review.
 
-Supporting maps cover findings, write paths, routes, APIs and tests. They are regenerated after the final tracked-file set is known. The final report compares `git ls-files` with completed receipts; any difference means the audit is incomplete.
+Semantic findings and supporting write-path, route, API and test maps are maintained separately under ignored `.codex-tmp` audit storage while work is in progress. They are not implied by the committed integrity inventory. The final report must distinguish file-integrity coverage from semantic review evidence and must not claim either against stale hashes.
 
 Binary assets are classified separately. Generated history is format, secret, absolute-path and duplication scanned and its generator validated.

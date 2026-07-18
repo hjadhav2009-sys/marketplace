@@ -36,7 +36,7 @@ assert.match(panel, /No action was performed/);
 assert.match(packing, /UniversalScannerPanel/);
 assert.match(packing, /canPack\s*\?[\s\S]*getPackingDashboard/, "Packing counts are queried only for pack-authorized users");
 assert.match(packing, /data-customer-order-packing/, "Legacy customer packing is a separate authorized section");
-assert.match(packing, /canUseScanner[\s\S]*redirect\(roleHomePath/, "Users without scanner permissions are rejected");
+assert.match(packing, /canUseScanner[\s\S]*redirect\(capabilityHomePath\(user\)\)/, "Users without scanner permissions are rejected to a route allowed by their current capability flags");
 assert.match(actions, /getAuthorizedWorkAccounts/);
 assert.match(actions, /This account is no longer assigned to you/);
 assert.match(actions, /ORDER_PICK[\s\S]*legacy Pick action was retired[\s\S]*Choose the next route/, "Universal legacy Order Pick is rejected instead of bypassing route selection");

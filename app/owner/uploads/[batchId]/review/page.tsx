@@ -21,7 +21,7 @@ import { prisma } from "@/lib/prisma";
 import { picklistSummaryProductNameLabel } from "@/lib/product-image";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { flipkartIssueRawContext } from "@/src/lib/marketplaces/flipkart";
-import { confirmParsedBatchAction, prepareBatchProductImagesAction, repairMissingSkuImageMappingAction } from "../../actions";
+import { prepareBatchProductImagesAction, repairMissingSkuImageMappingAction } from "../../actions";
 
 const REVIEW_PAGE_SIZE = 50;
 
@@ -582,13 +582,14 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
   const visibleImportedOrders = batch.orders.slice(0, REVIEW_PAGE_SIZE);
   const crossCheckIssueCount = batch.issues.filter((issue) => /MISMATCH|NOT_IN/i.test(issue.issueType)).length;
   const importableRows = importReviewStats.importableOrderRows;
-  const confirmImportButtonText = `${importableRows} ${importSourceLabel} row${importableRows === 1 ? "" : "s"} will import`;
   const importStats = notes.importStats;
   const exactErrorMessage =
     filters?.error === "parse-failed"
       ? notes.failureReason ?? parserWarnings[0] ?? "Parsing failed before review rows could be created."
       : filters?.error === "no-importable-rows"
         ? "No rows are importable yet. Review missing AWB, missing SKU, and low confidence issues."
+        : filters?.error === "legacy-review-only"
+          ? "Legacy PDF results are review-only and cannot create production Orders or warehouse work."
         : filters?.error
           ? "Import could not be completed. Review the issue list and try again."
           : null;
@@ -890,20 +891,14 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
         <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-semibold text-slate-950">Confirm import</h2>
+              <h2 className="font-semibold text-slate-950">Compatibility review only</h2>
               <p className="mt-1 text-sm text-slate-600">
-                {importableRows} {importSourceLabel} row{importableRows === 1 ? "" : "s"} will import through the duplicate-safe AWB workflow.
+                {importableRows} parsed {importSourceLabel} row{importableRows === 1 ? "" : "s"} are available for review. They cannot create production Orders or Work Hub tasks.
               </p>
               <p className="mt-1 text-sm font-medium text-amber-800">
                 Low confidence rows are not imported until fixed/reviewed.
               </p>
             </div>
-            {importableRows > 0 ? (
-              <form action={confirmParsedBatchAction}>
-                <input type="hidden" name="batchId" value={batch.id} />
-                <SubmitButton pendingText="Importing...">{confirmImportButtonText}</SubmitButton>
-              </form>
-            ) : null}
           </div>
         </section>
       ) : null}

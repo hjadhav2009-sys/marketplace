@@ -191,12 +191,13 @@ export async function syncIdentifiersForMarketplaceListing(listing: Pick<Marketp
   return rows.length;
 }
 
-export async function syncIdentifiersForImportedListings(input: { accountId: string; importedAt: Date }) {
+export async function syncIdentifiersForImportedListings(input: { accountId: string; importedAt: Date; assertLease?: () => Promise<void> }) {
   let cursor: string | undefined;
   let syncedListings = 0;
   let syncedIdentifiers = 0;
 
   while (true) {
+    await input.assertLease?.();
     const listings = await prisma.marketplaceListing.findMany({
       where: { accountId: input.accountId, lastImportedAt: input.importedAt },
       select: { id: true, accountId: true, marketplace: true, sellerSkuId: true, sku: true, fsn: true, listingId: true },
@@ -208,6 +209,7 @@ export async function syncIdentifiersForImportedListings(input: { accountId: str
 
     const ids = listings.map((listing) => listing.id);
     const rows = listings.flatMap(listingIdentifierRows);
+    await input.assertLease?.();
     await prisma.$transaction([
       prisma.marketplaceListingIdentifier.deleteMany({ where: { marketplaceListingId: { in: ids }, source: { in: ["LISTING_IMPORT", "BACKFILL_20260711"] } } }),
       ...(rows.length ? [prisma.marketplaceListingIdentifier.createMany({ data: rows })] : [])

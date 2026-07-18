@@ -8,6 +8,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { requireWorkPermission } from "@/lib/work-permissions";
+import { sanitizePublicActionError } from "@/src/lib/import-jobs/safe-error";
 import { markingAssetAccessWhere } from "@/src/lib/marking/access";
 import { addMarkingAssetFileVersion, createMarkingAsset, linkMarkingAssetToListing, normalizeMasterDesignId } from "@/src/lib/marking/library";
 
@@ -41,16 +42,22 @@ async function accessibleAsset(user: Awaited<ReturnType<typeof requireWorkPermis
   return prisma.markingAsset.findFirst({ where: { id: assetId, ...markingAssetAccessWhere(user, accountId) } });
 }
 
+function safeMarkingError(error: unknown, fallback: string) {
+  return sanitizePublicActionError(error, fallback) ?? fallback;
+}
+
 export async function createMarkingAssetAction(formData: FormData) {
   const user = await requireWorkPermission("canManageMarkingLibrary");
   const account = await requireAccount(user);
   const request = await getRequestMeta();
+  let assetId: string;
   try {
     const asset = await createMarkingAsset({ name: text(formData, "name", 160) ?? "", masterDesignId: text(formData, "masterDesignId", 80), description: text(formData, "description"), actorUserId: user.id, accountId: account.id, request });
-    redirect(`/owner/marking-library/${asset.id}?created=1`);
+    assetId = asset.id;
   } catch (error) {
-    redirect(`/owner/marking-library/new?error=${encodeURIComponent(error instanceof Error ? error.message : "Could not create asset.")}`);
+    redirect(`/owner/marking-library/new?error=${encodeURIComponent(safeMarkingError(error, "Could not create asset."))}`);
   }
+  redirect(`/owner/marking-library/${assetId}?created=1`);
 }
 
 export async function updateMarkingAssetAction(formData: FormData) {
@@ -89,10 +96,10 @@ export async function updateMarkingAssetAction(formData: FormData) {
     });
     await recordAuditLog({ userId: user.id, accountId: account.id, action: "MARKING_ASSET_UPDATED", entityType: "MarkingAsset", entityId: asset.id, metadata: { masterDesignId: asset.masterDesignId, status: asset.status }, request });
     revalidatePath(`/owner/marking-library/${asset.id}`);
-    redirect(`/owner/marking-library/${asset.id}?updated=1`);
   } catch (error) {
-    redirect(`/owner/marking-library/${assetId}?error=${encodeURIComponent(error instanceof Error ? error.message : "Could not update asset.")}`);
+    redirect(`/owner/marking-library/${assetId}?error=${encodeURIComponent(safeMarkingError(error, "Could not update asset."))}`);
   }
+  redirect(`/owner/marking-library/${assetId}?updated=1`);
 }
 
 export async function uploadMarkingAssetFileAction(formData: FormData) {
@@ -109,10 +116,10 @@ export async function uploadMarkingAssetFileAction(formData: FormData) {
   try {
     await addMarkingAssetFileVersion({ markingAssetId: assetId, attachmentType, file, actorUserId: user.id, accountId: account.id, request });
     revalidatePath(`/owner/marking-library/${assetId}`);
-    redirect(`/owner/marking-library/${assetId}?uploaded=1`);
   } catch (error) {
-    redirect(`/owner/marking-library/${assetId}?error=${encodeURIComponent(error instanceof Error ? error.message : "Upload failed.")}`);
+    redirect(`/owner/marking-library/${assetId}?error=${encodeURIComponent(safeMarkingError(error, "Upload failed."))}`);
   }
+  redirect(`/owner/marking-library/${assetId}?uploaded=1`);
 }
 
 export async function linkMarkingListingAction(formData: FormData) {
@@ -125,10 +132,10 @@ export async function linkMarkingListingAction(formData: FormData) {
   try {
     await linkMarkingAssetToListing({ markingAssetId: assetId, marketplaceListingId: listingId, accountId: account.id, actorUserId: user.id, matchMethod: text(formData, "matchMethod", 60) ?? "OWNER_SELECTED", request });
     revalidatePath(`/owner/marking-library/${assetId}`);
-    redirect(`/owner/marking-library/${assetId}?linked=1`);
   } catch (error) {
-    redirect(`/owner/marking-library/${assetId}?error=${encodeURIComponent(error instanceof Error ? error.message : "Could not link listing.")}`);
+    redirect(`/owner/marking-library/${assetId}?error=${encodeURIComponent(safeMarkingError(error, "Could not link listing."))}`);
   }
+  redirect(`/owner/marking-library/${assetId}?linked=1`);
 }
 
 export async function unlinkMarkingListingAction(formData: FormData) {

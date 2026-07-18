@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
-import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { prisma } from "@/lib/prisma";
 import { parseConsignmentCatalogSnapshot } from "@/src/lib/consignments/amazon/catalog-snapshot";
@@ -11,7 +11,7 @@ import { WORK_TASK_INCLUDE } from "@/src/lib/workflow/queues";
 import { WorkTaskCard } from "../../WorkTaskCard";
 
 export default async function MarkingTaskDetailPage({params}:{params:Promise<{taskId:string}>}){
- const user=await requireUser();const account=await requireAccount(user);if(!(hasWorkPermission(user,"canMark")||user.canViewAllWork))redirect(roleHomePath(user.role));const {taskId}=await params;
+ const user=await requireUser();const account=await requireAccount(user);if(!(hasWorkPermission(user,"canMark")||user.canViewAllWork))redirect(capabilityHomePath(user));const {taskId}=await params;
  const task=await prisma.workTask.findFirst({where:{id:taskId,accountId:account.id,sourceType:"CONSIGNMENT",stage:"MARK",...(user.role==="OWNER"||user.canViewAllWork?{}:{OR:[{assignedUserId:null},{assignedUserId:user.id}]})},include:WORK_TASK_INCLUDE});if(!task?.consignmentLine)notFound();
  const line=task.consignmentLine;const catalog=parseConsignmentCatalogSnapshot(line.catalogSnapshotJson);const images=catalog?.imageUrls?.slice(0,10)??[line.productImageSnapshot].filter((value):value is string=>Boolean(value));
  return <AppShell><PageHeader eyebrow={`${line.consignmentBatch.marketplace} marking`} title={line.productTitleSnapshot??catalog?.title??line.sellerSkuSnapshot??"Marking task"} description={`${line.consignmentBatch.externalConsignmentNumber} / ${line.sellerSkuSnapshot??"No SKU"}`}><Link href="/work/marking" className="min-h-11 rounded-md border px-4 py-2 text-sm font-bold">Back to Marking</Link></PageHeader>

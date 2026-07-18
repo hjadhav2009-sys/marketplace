@@ -127,6 +127,24 @@ assert.equal(
   "Missing required duplicate fields creates a row issue"
 );
 
+for (const [label, quantity] of [
+  ["blank", ""],
+  ["text", "not-a-number"],
+  ["zero", "0"],
+  ["negative", "-2"],
+  ["decimal", "1.9"],
+  ["decimal notation", "1.0"],
+  ["exponent notation", "1e3"],
+  ["malformed grouping", "1,00"]
+] as const) {
+  const invalidQuantity = parseFlipkartOrderRows([{ ...fakeOrderRow, "ORDER ITEM ID": `OI-QTY-${label}`, Quantity: quantity }]);
+  assert.equal(invalidQuantity.orders.length, 0, `${label} Quantity creates no importable Order.`);
+  assert.equal(invalidQuantity.issues[0]?.issueType, "INVALID_QUANTITY", `${label} Quantity is a blocking row issue.`);
+}
+
+const largeWholeQuantity = parseFlipkartOrderRows([{ ...fakeOrderRow, "ORDER ITEM ID": "OI-QTY-COMMA", Quantity: "1,000" }]);
+assert.equal(largeWholeQuantity.orders[0]?.quantity, 1000, "A positive comma-formatted whole Quantity remains valid.");
+
 const missingSkuResult = parseFlipkartListingRows([{ "Product Title": "No SKU", "Image URL 1": "https://example.invalid/image.jpg" }]);
 assert.equal(missingSkuResult.listings.length, 0, "Missing Seller SKU listing row is held from mapping import");
 assert.equal(missingSkuResult.issues[0]?.issueType, "MISSING_SELLER_SKU_ID", "Missing Seller SKU Id creates a listing row issue");

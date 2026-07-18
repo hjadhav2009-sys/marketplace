@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, getSelectedAccount, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, getCurrentUser, getSelectedAccount } from "@/lib/auth";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -14,5 +14,5 @@ export default async function HomePage() {
     redirect("/accounts");
   }
 
-  redirect(roleHomePath(user.role));
+  redirect(capabilityHomePath(user));
 }

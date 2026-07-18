@@ -1,4 +1,4 @@
-name: Phase 7.3.4 audit
+name: Phase 7.3.6 Release Candidate
 
 on:
   pull_request:
@@ -8,35 +8,96 @@ permissions:
   contents: read
 
 jobs:
-  synthetic-audit:
+  release-candidate:
+    name: Phase 7.3.6 Release Candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
-      DATABASE_URL: file:${{ github.workspace }}/.ci-phase734.db
+      DATABASE_URL: file:${{ github.workspace }}/.ci-phase736-rc.db
       SESSION_SECRET: ci-only-synthetic-session-secret-000000000000
       SESSION_COOKIE_SECURE: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+      SKIP_PRISMA_MIGRATE: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out reviewed source
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: |
             package-lock.json
             mobile-app/package-lock.json
-      - run: npm ci
+      - name: Install locked root dependencies
+        run: npm ci
       - name: Install mobile type dependencies
         run: npm ci --prefix mobile-app --ignore-scripts
-      - run: npx prisma validate --schema prisma/schema.prisma
-      - run: npx prisma generate --schema prisma/schema.prisma
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run production-audit-hardening:test
-      - run: npm run grouped-pack-safety:test
-      - run: npm run direct-stage-actions:test
-      - run: npm run grouped-details:test
-      - run: npm run product-inventory-import:test
-      - run: npm run import-recovery:test
-      - run: npm run permission:test
-      - run: npm run security:test
-      - run: npm run adaptive-import:test
+      - name: Validate SQLite Prisma schema
+        run: npm run prisma:validate
+      - name: Validate PostgreSQL Prisma schema
+        run: npx prisma validate --schema prisma/schema.postgres.prisma
+        env:
+          DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:9/synthetic
+      - name: Generate SQLite Prisma client
+        run: npx prisma generate --schema prisma/schema.prisma
+      - name: Typecheck web and mobile source boundaries
+        run: npm run typecheck
+      - name: Lint complete source tree
+        run: npm run lint
+      - name: Run validators and parser integrations
+        run: npm run test:validators
+      - name: Verify projection lifecycle
+        run: npm run projection-lifecycle:test
+      # import-privacy:test is the exact same rolling-order-import.test.ts
+      # invocation, so this named step executes both coverages once.
+      - name: Verify rolling Order imports and import privacy
+        run: npm run rolling-order-import:test
+      - name: Verify legacy Order upload remains review-only
+        run: npm run legacy-order-review:test
+      - name: Verify authoritative manual listings
+        run: npm run manual-listing:test
+      - name: Verify missing-listing resolution
+        run: npm run missing-listing-resolution:test
+      - name: Verify dynamic catalog forms
+        run: npm run dynamic-catalog-form:test
+      - name: Verify production import and workflow flow
+        run: npm run production-flow:test
+      - name: Verify recovery correctness
+        run: npm run recovery-correctness:test
+      - name: Verify authoritative write paths and production hardening
+        run: npm run production-audit-hardening:test
+      - name: Verify server-action redirect and public-error boundaries
+        run: npm run server-action-boundaries:test
+      - name: Verify grouped Packing safety
+        run: npm run grouped-pack-safety:test
+      - name: Verify direct stage actions
+        run: npm run direct-stage-actions:test
+      - name: Verify Flipkart and Amazon Consignment Assembly routes
+        run: npm run consignment-assembly-routes:test
+      - name: Verify bounded grouped Details
+        run: npm run grouped-details:test
+      - name: Verify Product Inventory import
+        run: npm run product-inventory-import:test
+      - name: Verify import lease recovery
+        run: npm run import-recovery:test
+      - name: Verify permissions and account lifecycle
+        run: npm run permission:test
+      # recovery-correctness:test already executes security-throttle.test.ts.
+      # Run the remaining authorization and public-DTO security suites once.
+      - name: Verify security authorization controls
+        run: npx tsx tests/phase7-security.test.ts && npx tsx tests/import-job-public-dto.test.ts
+      - name: Verify adaptive imports
+        run: npm run adaptive-import:test
+      - name: Smoke test Marking migrations
+        run: npm run marking:migration-smoke
+      - name: Smoke test Consignment migrations
+        run: npm run consignment:migration-smoke
+      - name: Smoke test workflow migrations
+        run: npm run workflow:migration-smoke
+      - name: Smoke test final SQLite migrations and PostgreSQL SQL parity
+        run: npm run final-workflow:migration-smoke
+      - name: Build production web application
+        run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev

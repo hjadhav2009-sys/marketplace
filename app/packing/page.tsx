@@ -2,7 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { AwbBarcodeScanner } from "@/components/AwbBarcodeScanner";
 import { PageHeader } from "@/components/PageHeader";
 import { UniversalScannerPanel } from "@/components/UniversalScannerPanel";
-import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { getLatestImportedBatch, getPackingDashboard } from "@/lib/data";
 import { redirect } from "next/navigation";
@@ -33,7 +33,7 @@ export default async function PackingAwbPage({ searchParams }: PackingPageProps)
     || hasWorkPermission(user, "canPack")
     || hasWorkPermission(user, "canViewAllWork")
     || hasWorkPermission(user, "canManageConsignments");
-  if (!canUseScanner) redirect(roleHomePath(user.role));
+  if (!canUseScanner) redirect(capabilityHomePath(user));
   const account = await requireAccount(user);
   const params = await searchParams;
   const canPack = hasWorkPermission(user, "canPack");

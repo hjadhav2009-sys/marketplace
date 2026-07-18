@@ -6,8 +6,10 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { retainedImportJobFileExists } from "@/src/lib/import-jobs/runner";
+import { toPublicImportJob } from "@/src/lib/import-jobs/public-job";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
-import { cancelProductInventoryJobAction, retryImportJobAction } from "./actions";
+import { retainedProductInventoryJobDirectoryExists } from "@/src/lib/product-inventory/jobs";
+import { cancelProductInventoryJobAction, retryImportJobAction, retryProductInventoryJobAction } from "./actions";
 
 type ImportJobPageProps = {
   params: Promise<{
@@ -30,7 +32,10 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
 
   const account = await prisma.account.findFirst({ where: { id: job.accountId, active: true }, select: { name: true, accountDisplayName: true, marketplace: true } });
 
-  const canRetry = !job.importType.endsWith("PRODUCT_INVENTORY") && (job.status === "FAILED" || job.status === "CANCELLED") && (await retainedImportJobFileExists(job.filePath));
+  const productInventoryJob = job.importType.endsWith("PRODUCT_INVENTORY");
+  const staleProductInventoryRun = productInventoryJob && job.status === "RUNNING" && (!job.leaseExpiresAt || job.leaseExpiresAt.getTime() < Date.now());
+  const canRetry = !productInventoryJob && (job.status === "FAILED" || job.status === "CANCELLED") && (await retainedImportJobFileExists(job.filePath));
+  const canRetryProductInventory = productInventoryJob && (job.status === "FAILED" || staleProductInventoryRun) && (await retainedProductInventoryJobDirectoryExists(job.filePath));
   const issueCount = job.errorRows + job.warningRows + job.missingListingRows + job.missingImageRows;
 
   return (
@@ -53,7 +58,7 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
         </div>
       ) : null}
 
-      <ImportJobProgress initialJob={job} accountLabel={account?.accountDisplayName ?? account?.name ?? "Unavailable account"} />
+      <ImportJobProgress initialJob={toPublicImportJob(job)} accountLabel={account?.accountDisplayName ?? account?.name ?? "Unavailable account"} />
 
       <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="font-semibold text-slate-950">Issue and retry actions</h2>
@@ -69,12 +74,21 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
               <input type="hidden" name="jobId" value={job.id} />
               <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Retry import</button>
             </form>
+          ) : canRetryProductInventory ? (
+            <form action={retryProductInventoryJobAction}>
+              <input type="hidden" name="jobId" value={job.id} />
+              <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Resume Product Inventory</button>
+            </form>
+          ) : productInventoryJob && job.status === "CANCELLED" ? (
+            <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+              Cancelled Product Inventory jobs require a new upload.
+            </span>
           ) : job.status === "FAILED" || job.status === "CANCELLED" ? (
             <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
               Retry unavailable because source file was cleaned up.
             </span>
           ) : null}
-          {job.importType.endsWith("PRODUCT_INVENTORY") && ["QUEUED","RUNNING"].includes(job.status) && !job.mergeStartedAt ? <form action={cancelProductInventoryJobAction}><input type="hidden" name="jobId" value={job.id}/><button className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-700">Cancel before merge</button></form>:null}
+          {job.importType.endsWith("PRODUCT_INVENTORY") && ["QUEUED","RUNNING"].includes(job.status) && !staleProductInventoryRun ? <form action={cancelProductInventoryJobAction}><input type="hidden" name="jobId" value={job.id}/><button className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-700">Cancel import safely</button></form>:null}
         </div>
       </section>
     </AppShell>

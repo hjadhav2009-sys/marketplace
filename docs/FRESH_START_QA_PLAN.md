@@ -12,7 +12,7 @@ Run `prisma:validate`, `typecheck`, `lint`, validator tests, marking/consignment
 
 Customer workflow scenarios: Pick to Pack; Pick to Assembly to Pack; problem reporting and resolution; multi-item Flipkart shipment safety; duplicate action replay; assignment contention; completed history.
 
-Consignment scenarios: Pick to Pack; Pick to Mark to Pack; missing optional default becomes Pick to Pack; assembly routes remain blocked; assignment, view-only, duplicate-action, and cross-account rules; Flipkart and Amazon imports.
+Consignment scenarios: Pick to Pack; Pick to Mark to Pack; Pick to Assembly to Pack; Pick to Mark to Assembly to Pack; missing optional default becomes Pick to Pack; assignment, view-only, duplicate-action, instruction-confirmation, and cross-account rules; Flipkart and Amazon imports.
 
 Scanner scenarios: AWB, tracking ID, seller SKU, FSN, listing ID, ASIN, FNSKU, barcode, task ID, consignment number, identifiers duplicated across accounts, completed-only result, and no result.
 
@@ -24,6 +24,6 @@ Concurrency reporting must remain precise: request levels 2/5/10/20 stress dupli
 
 Run only the small full-resolver preset and representative query-plan checks on the owner PC. Medium, large, and full generators exist, but a medium-or-larger run on stronger hardware remains mandatory for production. Do not invent timing or query-plan coverage beyond executed checks.
 
-Manual responsive browser checks remain required at 360, 390, 430, 768, 1024, and 1440 pixels. Sanitized warehouse testing must cover Pick, Mark, Assembly, Pack, problems, assignment contention, scanner devices, file downloads, empty states, and recovery. Backup/restore rehearsal and deliberate migration state review are production gates.
+Manual responsive browser checks remain required at 360, 390, 430, 768, 1024, and 1440 pixels. Sanitized warehouse testing must cover Pick, Mark, Assembly, Pack, problems, assignment contention, scanner devices, file downloads, empty states, and recovery. A process-stopped, sidecar-aware database plus matching private-storage restore rehearsal, deliberate migration review, and production-hardware verification are later release gates.
 
-Phase 7.2B is not implemented on this checkpoint branch. Phase 7.2C is not implemented. Native React Native/Expo work waits for browser and warehouse QA approval; it must be fully native with no WebView. Expo testing precedes APK/AAB work.
+Phase 7.2B Product Inventory Refresh and Phase 7.2C multi-route worker flow are implemented in the Phase 7.3.6 draft release candidate, but their independent review and manual release gates are not complete. The required order is final pushed-commit CI, browser QA, two-worker QA, copied-database/restore rehearsal, production-hardware verification, controlled staging/pilot, and backend/API contract freeze. Only then may fully native React Native/Expo work begin; WebView remains forbidden, and Expo testing precedes APK/AAB work.

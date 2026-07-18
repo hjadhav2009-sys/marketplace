@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatDateTime } from "@/lib/format";
 import { importJobElapsedSeconds, importJobEstimatedRemainingSeconds, importJobProgressPercent, importJobRowsPerSecond, isTerminalImportJobStatus } from "@/src/lib/import-jobs/progress";
-import type { ImportJobRecord } from "@/src/lib/import-jobs/store";
+import type { PublicImportJobRecord } from "@/src/lib/import-jobs/public-job";
 
 type ImportJobProgressProps = {
-  initialJob: ImportJobRecord;
+  initialJob: PublicImportJobRecord;
   accountLabel: string;
 };
 
-type ImportJobJson = Omit<ImportJobRecord, "startedAt" | "finishedAt" | "createdAt" | "updatedAt"> & {
+type ImportJobJson = Omit<PublicImportJobRecord, "startedAt" | "finishedAt" | "createdAt" | "updatedAt"> & {
   startedAt: string | null;
   finishedAt: string | null;
   createdAt: string;
@@ -31,7 +31,7 @@ function purposeForImportType(importType: string) {
   return "Marketplace Import";
 }
 
-function reviewHref(job: ImportJobJson | ImportJobRecord) {
+function reviewHref(job: ImportJobJson | PublicImportJobRecord) {
   if (!job.batchId) {
     return null;
   }

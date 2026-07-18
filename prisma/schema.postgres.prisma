@@ -766,10 +766,11 @@ model WorkGroupProjection {
   members               WorkGroupMember[]
   updatedAt             DateTime          @updatedAt
 
-  @@index([accountId, stage, sourceType, status, assignmentKey, oldestWaitingAt])
-  @@index([accountId, stage, sourceType, groupVersion])
-  @@index([accountId, stage, sourceType, assignedUserId, oldestWaitingAt, groupKey])
-  @@index([accountId, sellerSku, stage])
+  // PostgreSQL truncates the migration's 69-byte declared index name to this 63-byte physical name.
+  @@index([accountId, stage, sourceType, status, assignmentKey, oldestWaitingAt], map: "WorkGroupProjection_account_stage_source_status_assignment_olde")
+  @@index([accountId, stage, sourceType, groupVersion], map: "WorkGroupProjection_account_stage_source_version_idx")
+  @@index([accountId, stage, sourceType, assignedUserId, oldestWaitingAt, groupKey], map: "WorkGroupProjection_assigned_pagination_idx")
+  @@index([accountId, sellerSku, stage], map: "WorkGroupProjection_account_sku_stage_idx")
 }
 
 model WorkGroupMember {
@@ -1070,6 +1071,7 @@ model UploadBatch {
 
   @@index([accountId, createdAt])
   @@index([accountId, importType, createdAt])
+  @@index([fileProfileId], map: "UploadBatch_fileProfileId_idx")
 }
 
 model WorkflowActionReceipt {

@@ -6,7 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import { SubmitButton } from "@/components/SubmitButton";
-import { requireAccount,requireUser,roleHomePath } from "@/lib/auth";
+import { capabilityHomePath,requireAccount,requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { getGroupedWorkDetails,type GroupedWorkSource } from "@/src/lib/workflow/grouped-work";
 import { GroupedWorkCard } from "../../../GroupedWorkCard";
@@ -22,7 +22,7 @@ export default async function GroupDetailsPage({params,searchParams}:{params:Pro
  const route=await params,query=await searchParams,stage=route.stage.toUpperCase() as WorkStage,source=query.source as GroupedWorkSource;
  if(!STAGES.has(stage)||!(["ORDER","CONSIGNMENT"] as string[]).includes(source))notFound();
  const user=await requireUser(),account=await requireAccount(user),permission=stage==="PICK"?"canPick":stage==="MARK"?"canMark":stage==="ASSEMBLE"?"canAssemble":"canPack";
- if(!hasWorkPermission(user,permission)&&!user.canViewAllWork)redirect(roleHomePath(user.role));
+ if(!hasWorkPermission(user,permission)&&!user.canViewAllWork)redirect(capabilityHomePath(user));
  const page=Math.max(1,Number(query.page)||1),historyPage=Math.max(1,Number(query.historyPage)||1);let details;try{details=await getGroupedWorkDetails({actorUserId:user.id,accountId:account.id,stage,sourceType:source,groupKey:route.groupKey,page,historyPage});}catch{notFound();}
  const {card,tasks,history}=details,canAct=hasWorkPermission(user,permission),first=tasks[0],snapshot=first?.workCardSnapshot??{},routeSnapshot=first?.routeSnapshot??{},instructions=first?.instructions??{},maxPartial=card.requiredQuantity-1,needsMissingConfirmation=Boolean(card.recommendedNextStage&&card.missingInstructionStages.includes(card.recommendedNextStage));
  return <AppShell>

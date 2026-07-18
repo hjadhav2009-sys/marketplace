@@ -1,18 +1,69 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname } from "node:path";
 
-const output="docs/audits/phase-7-3-5-file-review-manifest.jsonl";
-const listed=execFileSync("git",["ls-files","--cached","--others","--exclude-standard","-z"],{encoding:"buffer"}).toString("utf8").split("\0").filter(Boolean).sort();
-if(!listed.includes(output))listed.push(output);
-const generated=/^(?:package-lock\.json|docs\/history\/)/,binary=/\.(?:png|jpe?g|gif|webp|ico|pdf|zip|woff2?)$/i,security=/(?:auth|security|password|session|permission|api|middleware|upload|import|prisma|migration)/i,mutation=/(?:action|service|store|workflow|import|merge|account|prisma|migration|script)/i;
-const records=listed.sort().map(path=>{
- if(path===output)return{path,sha256:null,hashPolicy:"SELF_REFERENTIAL_MANIFEST",type:"jsonl",bytes:0,lines:0,reviewedRanges:[],reviewPasses:["AUDIT_EVIDENCE"],findingIds:[],securitySensitive:false,mutationSensitive:false,finalStatus:"GENERATED_VALIDATED"};
- const body=readFileSync(path),text=binary.test(path)?null:body.toString("utf8"),lines=text===null?0:(text.match(/\n/g)?.length??0)+(text.length?1:0),ranges=[];
- for(let start=1;start<=lines;start+=500)ranges.push(`${start}-${Math.min(lines,start+499)}`);
- const type=extname(path).slice(1).toLowerCase()||"text",isGenerated=generated.test(path),isBinary=binary.test(path);
- return{path,sha256:createHash("sha256").update(body).digest("hex"),type,bytes:body.length,lines,reviewedRanges:ranges,reviewPasses:isBinary?["ASSET_INVENTORY"]:isGenerated?["GENERATED_FORMAT","SECRET_PATH_SCAN"]:["ARCHITECTURE","SECURITY","WORKFLOW_MUTATIONS","IMPORTS_CATALOG","FRONTEND_OPERATIONS","TESTS_DOCUMENTATION"],findingIds:[],securitySensitive:security.test(path),mutationSensitive:mutation.test(path),finalStatus:isBinary?"NON_EXECUTABLE_ASSET":isGenerated?"GENERATED_VALIDATED":"REVIEWED_OK"};
+const output = "docs/audits/phase-7-3-5-file-review-manifest.jsonl";
+const evidenceScope = "FILE_INTEGRITY_INVENTORY_NOT_SEMANTIC_REVIEW";
+const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { encoding: "buffer" })
+  .toString("utf8")
+  .split("\0")
+  .filter((path) => Boolean(path) && existsSync(path))
+  .sort();
+if (!listed.includes(output)) listed.push(output);
+
+const generated = /^(?:package-lock\.json|docs\/history\/)/;
+const binary = /\.(?:png|jpe?g|gif|webp|ico|pdf|zip|7z|gz|tar|woff2?|ttf|otf|xlsx?|xlsm|docx?|pptx?|mp4|webm|mp3|wav)$/i;
+const security = /(?:auth|security|password|session|permission|api|middleware|upload|import|prisma|migration)/i;
+const mutation = /(?:action|service|store|workflow|import|merge|account|prisma|migration|script)/i;
+const records = listed.sort().map((path) => {
+  if (path === output) {
+    return {
+      path,
+      sha256: null,
+      hashPolicy: "SELF_REFERENTIAL_MANIFEST",
+      evidenceScope,
+      type: "jsonl",
+      bytes: 0,
+      lines: 0,
+      inventoryRanges: [],
+      reviewedRanges: [],
+      inventoryPasses: ["PATH_INVENTORY"],
+      reviewPasses: [],
+      findingIds: [],
+      securitySensitive: false,
+      mutationSensitive: false,
+      finalStatus: "SELF_REFERENTIAL_INVENTORY_RECORD"
+    };
+  }
+  const body = readFileSync(path);
+  const isBinary = binary.test(path);
+  const text = isBinary ? null : body.toString("utf8").replace(/\r\n/g, "\n");
+  const hashBody = text === null ? body : Buffer.from(text, "utf8");
+  const lines = text === null ? 0 : (text.match(/\n/g)?.length ?? 0) + (text.length ? 1 : 0);
+  const inventoryRanges = [];
+  for (let start = 1; start <= lines; start += 500) inventoryRanges.push(`${start}-${Math.min(lines, start + 499)}`);
+  const type = extname(path).slice(1).toLowerCase() || "text";
+  const isGenerated = generated.test(path);
+  return {
+    path,
+    sha256: createHash("sha256").update(hashBody).digest("hex"),
+    hashPolicy: isBinary ? "RAW_BYTES" : "LF_NORMALIZED_TEXT",
+    evidenceScope,
+    type,
+    bytes: hashBody.length,
+    lines,
+    inventoryRanges,
+    reviewedRanges: [],
+    inventoryPasses: isBinary ? ["PATH_INVENTORY", "CONTENT_HASH"] : ["PATH_INVENTORY", "CONTENT_HASH", "LINE_RANGE_INVENTORY"],
+    reviewPasses: [],
+    findingIds: [],
+    securitySensitive: security.test(path),
+    mutationSensitive: mutation.test(path),
+    finalStatus: isBinary ? "NON_EXECUTABLE_ASSET_INVENTORIED" : isGenerated ? "GENERATED_FILE_INVENTORIED" : "INTEGRITY_INVENTORIED"
+  };
 });
-mkdirSync(dirname(output),{recursive:true});writeFileSync(output,records.map(record=>JSON.stringify(record)).join("\n")+"\n");
-console.log(JSON.stringify({trackedAndUntrackedFiles:records.length,completed:records.filter(record=>record.finalStatus).length,output},null,2));
+
+mkdirSync(dirname(output), { recursive: true });
+writeFileSync(output, `${records.map((record) => JSON.stringify(record)).join("\n")}\n`);
+console.log(JSON.stringify({ trackedAndUntrackedFiles: records.length, integrityInventoried: records.length, evidenceScope, output }, null, 2));

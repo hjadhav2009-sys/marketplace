@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireUser, roleHomePath } from "./auth";
+import { capabilityHomePath, requireUser } from "./auth";
 import { hasWorkPermission } from "./work-permissions";
 
 export type ConsignmentAccess = "view" | "import" | "manage";
@@ -11,6 +11,6 @@ export async function requireConsignmentAccess(access: ConsignmentAccess) {
     : access === "import"
       ? hasWorkPermission(user, "canImportConsignments") || hasWorkPermission(user, "canManageConsignments")
       : hasWorkPermission(user, "canManageConsignments");
-  if (!allowed) redirect(roleHomePath(user.role));
+  if (!allowed) redirect(capabilityHomePath(user));
   return user;
 }

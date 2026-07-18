@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/format";
 import { safeImportIssueContext } from "@/lib/import/issues";
 import { prisma } from "@/lib/prisma";
 import { importJobProgressPercent } from "@/src/lib/import-jobs/progress";
+import { sanitizePublicImportJobError } from "@/src/lib/import-jobs/public-job";
 
 const formats = new Set(["csv", "xlsx", "txt"]);
 const exportTypes = new Set(["summary", "issues"]);
@@ -163,7 +164,7 @@ export async function GET(request: Request) {
     formatDateTime(job.startedAt),
     formatDateTime(job.finishedAt),
     formatDateTime(job.updatedAt),
-    job.lastError
+    sanitizePublicImportJobError(job.lastError)
   ] satisfies CsvValue[]];
 
   return responseFor(format, headers, rows, filenameBase);

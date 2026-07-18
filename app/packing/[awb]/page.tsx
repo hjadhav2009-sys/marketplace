@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
-import { requireAccount, requireUser } from "@/lib/auth";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { getOrderWithImage } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +34,14 @@ type ScanResultPageProps = {
 
 export default async function ScanResultPage({ params, searchParams }: ScanResultPageProps) {
   const user = await requireUser();
+  const canUseScanner = user.role === "OWNER"
+    || hasWorkPermission(user, "canPick")
+    || hasWorkPermission(user, "canMark")
+    || hasWorkPermission(user, "canAssemble")
+    || hasWorkPermission(user, "canPack")
+    || hasWorkPermission(user, "canViewAllWork")
+    || hasWorkPermission(user, "canManageConsignments");
+  if (!canUseScanner) redirect(capabilityHomePath(user));
   const account = await requireAccount(user);
   const userCanPack = hasWorkPermission(user, "canPack");
   const { awb: encodedAwb } = await params;

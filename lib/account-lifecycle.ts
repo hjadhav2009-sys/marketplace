@@ -3,7 +3,7 @@ import type { Marketplace, Prisma, PrismaClient } from "@prisma/client";
 type Client = PrismaClient | Prisma.TransactionClient;
 
 export async function assertAccountMarketplaceChangeAllowed(accountId:string,marketplace:Marketplace,client:Client){
- const existing=await client.account.findUnique({where:{id:accountId},select:{marketplace:true,_count:{select:{marketplaceListings:true,orders:true,importJobs:true,consignmentBatches:true,workTasks:true,fileProfiles:true,processRules:true}}}});if(!existing)throw new Error("ACCOUNT_INVALID");if(existing.marketplace!==marketplace&&Object.values(existing._count).some(count=>count>0))throw new Error("ACCOUNT_MARKETPLACE_LOCKED");return existing;
+ const existing=await client.account.findUnique({where:{id:accountId},select:{marketplace:true,_count:{select:{marketplaceListings:true,skuImageMappings:true,uploadBatches:true,orders:true,importJobs:true,consignmentBatches:true,workTasks:true,fileProfiles:true,processRules:true}}}});if(!existing)throw new Error("ACCOUNT_INVALID");if(existing.marketplace!==marketplace&&Object.values(existing._count).some(count=>count>0))throw new Error("ACCOUNT_MARKETPLACE_LOCKED");return existing;
 }
 
 export async function updateAccountDetailsSafely(input:{accountId:string;companyName:string;marketplace:Marketplace;name:string;code:string;notes?:string|null},client:PrismaClient){

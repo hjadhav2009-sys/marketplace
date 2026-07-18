@@ -432,6 +432,12 @@ function integerValue(row: FlipkartRawRow, header: string) {
   return parsed === undefined ? undefined : Math.trunc(parsed);
 }
 
+function positiveWholeQuantity(value: string | undefined) {
+  if (!value || !/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(value)) return null;
+  const parsed = Number(value.replace(/,/g, ""));
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function isHttpUrl(value: string | undefined) {
   if (!value || (!value.startsWith("http://") && !value.startsWith("https://"))) {
     return false;
@@ -548,6 +554,9 @@ export function parseFlipkartOrderRows(rows: FlipkartRawRow[], fileName = "flipk
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
+    const quantityText = text(row, orderColumns.quantity);
+    const parsedQuantity = positiveWholeQuantity(quantityText);
+    const validQuantity = parsedQuantity !== null;
     const order: FlipkartOrderLine = {
       marketplace: "FLIPKART",
       rowNumber,
@@ -570,7 +579,7 @@ export function parseFlipkartOrderRows(rows: FlipkartRawRow[], fileName = "flipk
       invoiceAmount: numberValue(row, orderColumns.invoiceAmount),
       sellingPricePerItem: numberValue(row, orderColumns.sellingPricePerItem),
       shippingCharge: numberValue(row, orderColumns.shippingCharge),
-      quantity: integerValue(row, orderColumns.quantity) ?? 1,
+      quantity: parsedQuantity ?? undefined,
       buyerName: text(row, orderColumns.buyerName),
       shipToName: text(row, orderColumns.shipToName),
       city: text(row, orderColumns.city),
@@ -593,6 +602,16 @@ export function parseFlipkartOrderRows(rows: FlipkartRawRow[], fileName = "flipk
         rowNumber,
         issueType: "MISSING_SKU",
         message: "Flipkart order row is missing SKU.",
+        rawData: row
+      });
+      return;
+    }
+
+    if (!validQuantity) {
+      issues.push({
+        rowNumber,
+        issueType: "INVALID_QUANTITY",
+        message: "Flipkart order Quantity must be a positive whole integer.",
         rawData: row
       });
       return;

@@ -67,7 +67,7 @@ function pageHref(params: URLSearchParams, page: number) {
 }
 
 export default async function ProblemOrdersPage({ searchParams }: ProblemsPageProps) {
-  const user = await requireUser(["OWNER", "PACKER"]);
+  const user = await requireUser(["OWNER"]);
   const selectedAccount = await requireAccount(user);
   const [params, accounts] = await Promise.all([searchParams, getAvailableAccounts(user)]);
   const tab = params?.tab === "resolved" ? "resolved" : "open";

@@ -6,11 +6,10 @@ import type { PaymentType } from "@prisma/client";
 import { recordAuditLog } from "@/lib/audit";
 import { requireAccount, requireUser } from "@/lib/auth";
 import { cacheProductCardImage, imageCacheNeedsRefresh } from "@/lib/image-cache";
-import { importParsedOrderRows, type ParsedOrderImportRow } from "@/lib/import/orders";
+import { importParsedOrderRows } from "@/lib/import/orders";
 import {
   buildPreviewImportStats,
   getPreviewImportSourceType,
-  selectPreviewRowsForImport,
   type ImportPreviewSourceType
 } from "@/lib/import/preview";
 import {
@@ -24,6 +23,7 @@ import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { createFlipkartImportJobFromFile, startImportJob } from "@/src/lib/import-jobs/runner";
+import { sanitizePublicActionError } from "@/src/lib/import-jobs/safe-error";
 import { FLIPKART_IMPORT_MAX_BYTES, PDF_UPLOAD_MAX_BYTES, isUploadTooLarge } from "@/lib/upload-limits";
 import { accountSelectionSchema, flipkartOrderImportFileSchema, skuImageMappingSchema, uploadBatchSchema } from "@/lib/validators";
 import { parseAmazonOrderReport } from "@/lib/parsers/amazon-orders";
@@ -89,19 +89,6 @@ function parseStoredIssues(value: string | null) {
     return Array.isArray(parsed) ? (parsed as ParseIssue[]) : [];
   } catch {
     return [] as ParseIssue[];
-  }
-}
-
-function parsePreferredImportSourceType(notes: string | null) {
-  if (!notes) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(notes) as { stats?: { importSourceType?: string } };
-    return parsed.stats?.importSourceType;
-  } catch {
-    return undefined;
   }
 }
 
@@ -597,7 +584,7 @@ export async function repairMissingSkuImageMappingAction(formData: FormData) {
       metadata: {
         batchId: batch.id,
         sku: parsed.data.sku,
-        message: error instanceof Error ? error.message : "Unknown repair error"
+        message: sanitizePublicActionError(error, "Image mapping repair failed.") ?? "Image mapping repair failed."
       },
       request
     });
@@ -633,6 +620,10 @@ export async function createUploadBatchAction(formData: FormData) {
     redirect("/owner/uploads/new?error=account");
   }
 
+  if (account.marketplace !== "MEESHO") {
+    redirect("/owner/uploads/new?error=legacy-pdf-review-only");
+  }
+
   if (files.length === 0) {
     redirect("/owner/uploads/new?error=missing-file");
   }
@@ -661,7 +652,7 @@ export async function createUploadBatchAction(formData: FormData) {
         results.push(await parseUploadedPdf(file));
       } catch (error) {
         failedDiagnostics.push(
-          buildFailedDiagnostic(file.name, error instanceof Error ? error.message : "Unknown PDF parse error.")
+          buildFailedDiagnostic(file.name, sanitizePublicActionError(error, "PDF parsing failed.") ?? "PDF parsing failed.")
         );
       }
     }
@@ -863,7 +854,7 @@ export async function createUploadBatchAction(formData: FormData) {
     revalidatePath("/owner");
     redirectTo = `/owner/uploads/${batch.id}/review`;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown parse error";
+    const message = sanitizePublicActionError(error, "PDF parsing failed.") ?? "PDF parsing failed.";
 
     if (!createdBatchId) {
       try {
@@ -989,121 +980,18 @@ export async function createAmazonOrderImportAction(formData: FormData) {
 export async function confirmParsedBatchAction(formData: FormData) {
   const user = await requireUser(["OWNER"]);
   const account = await requireAccount(user);
-  const request = await getRequestMeta();
   const batchId = String(formData.get("batchId") ?? "");
 
   if (!batchId) {
     redirect("/owner/uploads/new?error=invalid-batch");
   }
 
-  let redirectTo = `/owner/uploads/${batchId}/review?error=confirm-failed`;
-
-  try {
-    const batch = await prisma.uploadBatch.findFirst({
-      where: {
-        id: batchId,
-        accountId: account.id
-      },
-      include: {
-        previewRows: {
-          orderBy: [{ sourceType: "asc" }, { pageNumber: "asc" }, { createdAt: "asc" }]
-        }
-      }
-    });
-
-    if (!batch) {
-      redirectTo = "/owner/uploads/new?error=invalid-batch";
-    } else {
-      const preferredImportSourceType = parsePreferredImportSourceType(batch.notes);
-      const selected = selectPreviewRowsForImport(
-        batch.previewRows.map((row) => ({
-          ...row,
-          parsedIssues: parseStoredIssues(row.issues)
-        })),
-        preferredImportSourceType
-      );
-      const importedPreviewIds: string[] = selected.rows.map((row) => row.id);
-      const rows: ParsedOrderImportRow[] = [];
-
-      for (const preview of selected.rows) {
-        rows.push({
-          rowNumber: preview.pageNumber ?? undefined,
-          awb: preview.awb,
-          courier: preview.courier,
-          sku: preview.sku,
-          qty: preview.qty,
-          color: preview.color,
-          size: preview.size,
-          orderNo: preview.orderNo,
-          productDescription: preview.productDescription,
-          paymentType: preview.paymentType,
-          city: null,
-          state: null
-        });
-      }
-
-      if (rows.length === 0) {
-        await prisma.uploadBatch.update({
-          where: { id: batch.id },
-          data: {
-            status: "REVIEWED"
-          }
-        });
-        redirectTo = `/owner/uploads/${batch.id}/review?error=no-importable-rows`;
-      } else {
-        await importParsedOrderRows({
-          batchId: batch.id,
-          rows,
-          fileName: batch.fileName,
-          account,
-          user,
-          request,
-          heldRows: selected.heldBlockingRows
-        });
-
-        await prisma.uploadPreviewRow.updateMany({
-          where: {
-            id: { in: importedPreviewIds },
-            batchId: batch.id
-          },
-          data: {
-            imported: true
-          }
-        });
-
-        if (selected.heldBlockingRows > 0) {
-          await prisma.uploadBatch.update({
-            where: { id: batch.id },
-            data: {
-              status: "REVIEWED"
-            }
-          });
-        }
-
-        redirectTo = `/owner/uploads/${batch.id}/review?imported=1`;
-      }
-
-      revalidatePath("/dashboard");
-      revalidatePath("/owner");
-      revalidatePath(`/owner/uploads/${batch.id}/review`);
-    }
-  } catch (error) {
-    await recordAuditLog({
-      userId: user.id,
-      accountId: account.id,
-      action: "BATCH_IMPORT",
-      entityType: "UploadBatch",
-      entityId: batchId,
-      metadata: {
-        phase: "confirm-failed",
-        message: error instanceof Error ? error.message : "Unknown import error"
-      },
-      request
-    });
-    redirectTo = `/owner/uploads/${batchId}/review?error=confirm-failed`;
-  }
-
-  redirect(redirectTo);
+  const batch = await prisma.uploadBatch.findFirst({
+    where: { id: batchId, accountId: account.id },
+    select: { id: true }
+  });
+  if (!batch) redirect("/owner/uploads/new?error=invalid-batch");
+  redirect(`/owner/uploads/${batch.id}/review?error=legacy-review-only`);
 }
 
 export async function prepareBatchProductImagesAction(formData: FormData) {

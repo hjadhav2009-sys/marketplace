@@ -24,9 +24,9 @@ ProductProcessRule is optional. Missing rules default to Pick to Pack. MarkingAs
 
 ## 13–17. Customer, assembly, consignment, Flipkart, and Amazon workflows
 
-Customer orders retain their established pick/pack fields while WorkTask represents staged work. Supported routes include Pick-Pack, Pick-Mark-Pack, Pick-Assembly-Pack, and Pick-Mark-Assembly-Pack for customer work where enabled. Task sequence, locks, assignments, quantities, problems, completions, and immutable action logs enforce safe progression.
+WorkTask state and the central stage-transition/Packing services are authoritative for active customer-order workflow. The established Order pick/pack fields remain compatibility projections and must not be mutated as an independent workflow. Supported routes include Pick-Pack, Pick-Mark-Pack, Pick-Assembly-Pack, and Pick-Mark-Assembly-Pack for customer work where enabled. Task sequence, locks, assignments, quantities, problems, completions, and immutable action logs enforce safe progression.
 
-Consignments import shipment lines, resolve exact catalog matches, snapshot identifiers/content, review issues, select optional processing, and activate tasks. Flipkart and Amazon parsers have marketplace-specific evidence and safety policies. Amazon reference worksheets are excluded by default and submitted worksheet selections are revalidated server-side. Consignment assembly remains intentionally blocked.
+Consignments import shipment lines, resolve exact catalog matches, snapshot identifiers/content, review issues, select optional processing, and explicitly activate Pick work. Unmatched Flipkart and Amazon rows retain their source work quantity as blocking `NOT_FOUND` issues; import does not auto-create catalog placeholders or worker tasks. Flipkart and Amazon consignments support Pick-Pack, Pick-Mark-Pack, Pick-Assembly-Pack, and Pick-Mark-Assembly-Pack. Marking and Assembly instructions are frozen into downstream work when Pick is completed; missing instructions require a visible worker confirmation. Amazon reference worksheets are excluded by default and submitted worksheet selections are revalidated server-side.
 
 ## 18–22. Scanner, packing, problems, imports, and images
 
@@ -36,7 +36,7 @@ ImportJob records background import progress, reports, cancellation, and recover
 
 ## 23–28. Backup, reset, security, idempotency, concurrency, performance
 
-Real-database migrations use inspect, verified backup, copied-database deployment tests, unchanged-source proof, explicit typed confirmation, and post-migration verification. The fresh-start workflow adds exact owner selection, complete dynamic table inventory, database/storage backup, disposable reset proof, three typed confirmations, and a manual restore helper.
+Repository tooling provides real-database inspection, database-only backup, copied-database migration tests, unchanged-source proof, explicit typed confirmation, and post-migration verification. It does not yet provide an approved, rehearsed restore procedure covering the SQLite main file, sidecars, and matching private storage; production migration and rollback therefore remain blocked. The fresh-start workflow adds exact owner selection, dynamic table inventory, backup evidence, disposable reset proof, and three typed confirmations, but it is not a substitute for that missing production restore gate.
 
 Security depends on server-side authentication, account/capability authorization, bounded upload/archive/parser limits, safe file paths, input validation, and private ignored operational data. Client request IDs and task/action uniqueness make replay idempotent. Quantity progress uses bounded retry and safe replay recovery; some older action paths retain narrower transaction-based replay behavior and must not be described as universally transaction-free.
 
@@ -46,13 +46,13 @@ The measured resolver result is for the small preset: 2 accounts, 5,000 listings
 
 Responsive manual checks are mandatory at 360, 390, 430, 768, 1024, and 1440 pixels. Warehouse tests must use sanitized fixtures and cover every stage, problems, assignments, contention, files, and scanner hardware. Automated approval does not approve production rollout.
 
-Current limitations include unproven 800,000-listing performance, representative rather than exhaustive query-plan proof, high-concurrency 2/5/10/20 coverage specific to duplicate quantity increments, and older replay callbacks in some action families. Phase 7.2B is not implemented on this checkpoint branch, and Phase 7.2C is not implemented.
+Current limitations include unproven 800,000-listing performance, representative rather than exhaustive query-plan proof, high-concurrency 2/5/10/20 coverage specific to duplicate quantity increments, and older replay callbacks in some action families. Phase 7.2B Product Inventory Refresh and Phase 7.2C multi-route worker flow are implemented in the Phase 7.3.6 draft release candidate; independent review and the manual production gates remain incomplete.
 
-The future mobile application must be fully native React Native/Expo with no WebView. Begin only after browser and warehouse approval; test in Expo before any final APK/AAB build.
+The future mobile application must be fully native React Native/Expo with no WebView. Begin only after final pushed-commit CI, browser and two-worker approval, copied-database/restore rehearsal, production-hardware verification, controlled staging/pilot, and backend/API contract freeze; test in Expo before any final APK/AAB build.
 
 ## 34–38. Troubleshooting, commands, glossary, timeline, roadmap
 
-If a migration/reset proof is stale, stop writers, inspect again, create a new backup, and repeat the disposable test. If integrity or foreign keys fail, do not reset or restore automatically. If a scan is ambiguous, confirm account and identifier source. If a task is busy, retry through the supported UI rather than editing the database. If private storage is missing, restore the matching database and storage snapshot together after reviewing newer-data loss.
+If a migration/reset proof is stale, stop writers, inspect again, create a new backup, and repeat the disposable test. If integrity or foreign keys fail, do not reset or restore automatically. If a scan is ambiguous, confirm account and identifier source. If a task is busy, retry through the supported UI rather than editing the database. If private storage is missing, keep access closed; restore a matching database-and-storage recovery set only through a separately reviewed and rehearsed sidecar-aware procedure. No such production procedure is approved in RC1.
 
 Core commands are documented in `README.md`, `docs/REAL_DATABASE_BACKUP_AND_MIGRATION.md`, `docs/FRESH_START_DATABASE_RESET.md`, and `docs/FRESH_START_QA_PLAN.md`. Important terms: account (seller scope), listing (marketplace catalog row), identifier (exact lookup value), route (ordered stages), task (one stage), consignment (marketplace shipment batch), snapshot (activation-time catalog evidence), idempotency (safe replay), and fresh start (one owner, no operational rows, unchanged schema/migrations).
 

@@ -88,6 +88,16 @@ try {
   const otherAccount = await prisma.account.create({ data: { id: "flipkart-other", name: "QA Flipkart Other", code: "QA-FK-2", marketplace: "FLIPKART" } });
   const owner = await prisma.user.create({ data: { id: "owner", username: "phase736-resolution-owner", passwordHash: "x", name: "Owner", role: "OWNER" } });
   const otherOwner = await prisma.user.create({ data: { id: "other-owner", username: "phase736-resolution-other-owner", passwordHash: "x", name: "Other owner", role: "OWNER" } });
+  const replayOwner = await prisma.user.create({
+    data: {
+      id: "replay-owner",
+      username: "phase736-resolution-replay-owner",
+      passwordHash: "x",
+      name: "Replay owner",
+      role: "OWNER",
+      assignedAccounts: { connect: { id: account.id } }
+    }
+  });
   const manager = await prisma.user.create({
     data: {
       id: "import-manager",
@@ -259,12 +269,22 @@ try {
   );
   assert.equal(await prisma.workflowActionReceipt.count({ where: { actorUserId: otherOwner.id, clientRequestId: concurrentInput.clientRequestId } }), 0);
 
-  // Authorization is rechecked before replaying a completed result.
+  // Import permission alone cannot create Product Inventory or release held Order work.
   const access = await createHeldOrderIssue(account, manager, "ACCESS", "SKU-ACCESS");
   const accessInput = resolutionInput(access, manager.id, account.id, "resolve-access");
-  await resolveMissingListing(accessInput);
-  await prisma.user.update({ where: { id: manager.id }, data: { assignedAccounts: { disconnect: { id: account.id } } } });
-  await expectControlledRejection(() => resolveMissingListing(accessInput), /not assigned|access|unavailable/i);
+  await expectControlledRejection(() => resolveMissingListing(accessInput), /owner access/i);
+  await assertHeldResolutionRolledBack(access);
+  assert.equal(await prisma.workflowActionReceipt.count({ where: { actorUserId: manager.id, clientRequestId: accessInput.clientRequestId } }), 0);
+
+  // Current authorization is rechecked before replaying a completed owner result.
+  const replayAccess = await createHeldOrderIssue(account, replayOwner, "REPLAY-ACCESS", "SKU-REPLAY-ACCESS");
+  const replayAccessInput = resolutionInput(replayAccess, replayOwner.id, account.id, "resolve-replay-access");
+  await resolveMissingListing(replayAccessInput);
+  await prisma.user.update({
+    where: { id: replayOwner.id },
+    data: { role: "PICKER", assignedAccounts: { disconnect: { id: account.id } } }
+  });
+  await expectControlledRejection(() => resolveMissingListing(replayAccessInput), /not assigned|access|unavailable/i);
 
   // A second browser tab with a fresh request ID receives a controlled stale/resolved response.
   const stale = await createHeldOrderIssue(account, owner, "STALE", "SKU-STALE");
@@ -325,6 +345,29 @@ try {
   await expectControlledRejection(() => resolveMissingListing(invalidAttributeInput), /attribute|unsupported|profile|key/i);
   await assertHeldResolutionRolledBack(invalidAttribute);
 
+  // A visually blank optional price remains absent instead of becoming a
+  // manually locked zero through JavaScript's Number(" ") coercion.
+  const blankPrice = await createHeldOrderIssue(account, owner, "BLANK-PRICE", "SKU-BLANK-PRICE");
+  const blankPriceResult = await resolveMissingListing(resolutionInput(blankPrice, owner.id, account.id, "resolve-blank-price", {
+    common: { productTitle: "Blank price product", sellingPrice: "   ", images: [] },
+    attributes: []
+  }));
+  const blankPriceListing = await prisma.marketplaceListing.findUniqueOrThrow({ where: { id: blankPriceResult.listingId } });
+  assert.equal(blankPriceListing.sellingPrice, null);
+  assert.doesNotMatch(blankPriceListing.fieldProvenanceJson ?? "", /sellingPrice/, "Blank price must not create manual provenance or a lock");
+
+  // HTTP credentials are private data and must not be retained in listing or
+  // dynamic URL fields. A rejected save leaves the held workflow untouched.
+  const credentialUrl = await createHeldOrderIssue(account, owner, "CREDENTIAL-URL", "SKU-CREDENTIAL-URL");
+  await expectControlledRejection(
+    () => resolveMissingListing(resolutionInput(credentialUrl, owner.id, account.id, "resolve-credential-url", {
+      common: { productTitle: "Credential URL product", images: ["https://user:secret@example.invalid/image.jpg"] },
+      attributes: []
+    })),
+    /embedded credentials|credential/i
+  );
+  await assertHeldResolutionRolledBack(credentialUrl);
+
   // An account-scoped identifier conflict rolls back every domain write.
   const conflictOwner = await prisma.marketplaceListing.create({
     data: { accountId: account.id, marketplace: "FLIPKART", sellerSkuId: "SKU-CONFLICT-OWNER", sku: "SKU-CONFLICT-OWNER", fsn: "FSN-CONFLICT" }
@@ -371,6 +414,115 @@ try {
   const isolatedResult = await resolveMissingListing(resolutionInput(isolated, owner.id, account.id, "resolve-isolated", { attributes: [] }));
   assert.notEqual(isolatedResult.listingId, isolatedOtherListing.id);
   assert.equal(await prisma.marketplaceListingIdentifier.count({ where: { identifierType: "FSN", normalizedValue: normalizeListingIdentifier("FSN", "FSN-ISOLATED")! } }), 2);
+
+  // A real import with multiple exact registry matches remains held until the owner
+  // selects one of the exact account-scoped candidates captured by the import.
+  const ambiguousIdentity = "SKU--AMBIGUOUS";
+  const ambiguousCandidateA = await prisma.marketplaceListing.create({
+    data: { accountId: account.id, marketplace: "FLIPKART", sellerSkuId: "CATALOG-CANDIDATE-A", sku: "CATALOG-CANDIDATE-A", productTitle: "Candidate A" }
+  });
+  const ambiguousCandidateB = await prisma.marketplaceListing.create({
+    data: { accountId: account.id, marketplace: "FLIPKART", sellerSkuId: "CATALOG-CANDIDATE-B", sku: "CATALOG-CANDIDATE-B", productTitle: "Candidate B" }
+  });
+  for (const listingId of [ambiguousCandidateA.id, ambiguousCandidateB.id]) {
+    await prisma.marketplaceListingIdentifier.create({
+      data: {
+        accountId: account.id,
+        marketplaceListingId: listingId,
+        marketplace: "FLIPKART",
+        identifierType: "SELLER_SKU",
+        rawValue: ambiguousIdentity,
+        normalizedValue: normalizeListingIdentifier("SELLER_SKU", ambiguousIdentity)!,
+        source: "TEST"
+      }
+    });
+  }
+  await importFlipkartOrderRows({
+    rows: [{
+      "Shipment ID": "SHIP-AMBIGUOUS",
+      "ORDER ITEM ID": "ITEM-AMBIGUOUS",
+      "Order Id": "ORDER-AMBIGUOUS",
+      FSN: "FSN-AMBIGUOUS",
+      SKU: ambiguousIdentity,
+      Product: "Ambiguous catalog product",
+      Quantity: "3",
+      "Tracking ID": "TRACK-AMBIGUOUS"
+    }],
+    fileName: "ambiguous.csv",
+    account,
+    user: owner
+  });
+  const ambiguousOrder = await prisma.order.findFirstOrThrow({ where: { accountId: account.id, orderItemId: "ITEM-AMBIGUOUS" } });
+  const ambiguousIssue = await prisma.importRowIssue.findFirstOrThrow({ where: { sourceId: ambiguousOrder.id, issueType: "AMBIGUOUS_LISTING", resolved: false } });
+  const ambiguousSafe = JSON.parse(ambiguousIssue.safeDataJson ?? "{}") as { sellerSku?: string; listingIds?: string[] };
+  assert.equal(ambiguousSafe.sellerSku, ambiguousIdentity);
+  assert.deepEqual(new Set(ambiguousSafe.listingIds), new Set([ambiguousCandidateA.id, ambiguousCandidateB.id]));
+  assert.equal(await prisma.workTask.count({ where: { orderId: ambiguousOrder.id } }), 0);
+
+  const unrelatedCandidate = await prisma.marketplaceListing.create({
+    data: { accountId: account.id, marketplace: "FLIPKART", sellerSkuId: "UNRELATED-CANDIDATE", sku: "UNRELATED-CANDIDATE" }
+  });
+  const ambiguousHeld = { order: ambiguousOrder, issue: ambiguousIssue, sellerSku: ambiguousIdentity, fsn: "FSN-AMBIGUOUS" };
+  await expectControlledRejection(
+    () => resolveMissingListing(resolutionInput(ambiguousHeld, owner.id, account.id, "resolve-ambiguous-unrelated", {
+      action: "LINK_EXISTING" as const,
+      listingId: unrelatedCandidate.id,
+      common: undefined,
+      attributes: []
+    })),
+    /exact saved candidates|exact saved candidate/i
+  );
+  await expectControlledRejection(
+    () => resolveMissingListing(resolutionInput(ambiguousHeld, owner.id, account.id, "resolve-ambiguous-create", {
+      action: "CREATE_MINIMAL" as const,
+      common: undefined,
+      attributes: []
+    })),
+    /exact saved candidate|ambiguous/i
+  );
+  await expectControlledRejection(
+    () => resolveMissingListing({
+      ...resolutionInput(ambiguousHeld, owner.id, account.id, "resolve-ambiguous-stale", {
+        action: "LINK_EXISTING" as const,
+        listingId: ambiguousCandidateA.id,
+        common: undefined,
+        attributes: []
+      }),
+      expectedIssueVersion: ambiguousIssue.version + 1
+    }),
+    /changed|refresh/i
+  );
+  const ambiguousResult = await resolveMissingListing(resolutionInput(ambiguousHeld, owner.id, account.id, "resolve-ambiguous-exact", {
+    action: "LINK_EXISTING" as const,
+    listingId: ambiguousCandidateB.id,
+    common: undefined,
+    attributes: []
+  }));
+  assert.equal(ambiguousResult.listingId, ambiguousCandidateB.id);
+  assert.ok(ambiguousResult.taskId);
+  assert.equal(await prisma.workTask.count({ where: { orderId: ambiguousOrder.id, stage: "PICK" } }), 1);
+  assert.equal(await prisma.workGroupMember.count({ where: { taskId: ambiguousResult.taskId! } }), 1);
+  assert.equal(await prisma.workChangeEvent.count({ where: { accountId: account.id, eventType: "MISSING_LISTING_RESOLVED", entityId: ambiguousOrder.id } }), 1);
+  assert.equal(await prisma.auditLog.count({ where: { action: "MISSING_LISTING_RESOLVED", entityId: ambiguousIssue.id } }), 1);
+
+  // Repeated punctuation is operational identity, not formatting noise.
+  const punctuation = await createHeldOrderIssue(account, owner, "PUNCTUATION", "SKU--PUNCT__EXACT", "FSN-PUNCTUATION", 8);
+  const punctuationSafe = JSON.parse(punctuation.issue.safeDataJson ?? "{}") as { sellerSku?: string };
+  assert.equal(punctuation.order.sku, "SKU--PUNCT__EXACT");
+  assert.equal(punctuationSafe.sellerSku, "SKU--PUNCT__EXACT");
+  const punctuationResult = await resolveMissingListing(resolutionInput(punctuation, owner.id, account.id, "resolve-punctuation", {
+    action: "CREATE_MINIMAL" as const,
+    common: undefined,
+    attributes: []
+  }));
+  const punctuationListing = await prisma.marketplaceListing.findUniqueOrThrow({ where: { id: punctuationResult.listingId } });
+  const punctuationIdentifier = await prisma.marketplaceListingIdentifier.findFirstOrThrow({
+    where: { marketplaceListingId: punctuationResult.listingId, identifierType: "SELLER_SKU" }
+  });
+  const punctuationTask = await prisma.workTask.findUniqueOrThrow({ where: { id: punctuationResult.taskId! } });
+  assert.equal(punctuationListing.sellerSkuId, "SKU--PUNCT__EXACT");
+  assert.equal(punctuationIdentifier.rawValue, "SKU--PUNCT__EXACT");
+  assert.equal((JSON.parse(punctuationTask.workCardSnapshotJson ?? "{}") as { sellerSku?: string }).sellerSku, "SKU--PUNCT__EXACT");
 } finally {
   await prisma.$disconnect();
   fixture.cleanup();

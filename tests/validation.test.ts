@@ -733,7 +733,12 @@ assert.deepEqual(
   "Import issue context extracts only SKU and masked operational keys"
 );
 assert.equal(JSON.stringify(safeIssueContext).includes("PRIVATE"), false, "Import issue context excludes private customer raw data");
-assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs", "fake.xlsx")), true, "Import retry accepts retained files under storage/import-jobs");
+const retainedJobArtifact = join(repoRoot, "storage", "import-jobs", "job_11111111-1111-4111-8111-111111111111-fake.xlsx");
+assert.equal(isRetainedImportJobFilePath(retainedJobArtifact), true, "Import retry accepts a direct job-owned retained artifact");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs")), false, "Import cleanup rejects the storage root");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage")), false, "Import cleanup rejects a storage ancestor");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs", "nested", "job_11111111-1111-4111-8111-111111111111-fake.xlsx")), false, "Import cleanup rejects nested non-job paths");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "other-imports", "job_11111111-1111-4111-8111-111111111111-fake.xlsx")), false, "Import cleanup rejects sibling storage");
 assert.equal(isRetainedImportJobFilePath(join(repoRoot, "private-test-data", "fake.xlsx")), false, "Import retry rejects files outside private retained import-job storage");
 assert.equal(normalizeReportStatus("missing-image"), "missing-image", "Report status accepts current missing image filter");
 assert.equal(normalizeReportStatus("not-real"), "", "Report status falls back safely");
@@ -1230,9 +1235,11 @@ assert.match(uploadActions, /isUploadTooLarge\(file, FLIPKART_IMPORT_MAX_BYTES\)
 assert.match(skuMappingImportActions, /isUploadTooLarge\(file, FLIPKART_IMPORT_MAX_BYTES\)/, "Flipkart Listing Master import checks file size before retaining");
 assert.match(uploadActions, /ownerUploadAccount/, "Upload actions use the chosen seller account instead of a stale account cookie");
 assert.match(uploadActions, /revalidatePath\("\/dashboard"\)/, "Upload actions refresh the dashboard route after imports");
-assert.match(uploadActions, /selectPreviewRowsForImport/, "Confirm import uses centralized label-over-manifest source selection");
+assert.doesNotMatch(uploadActions, /selectPreviewRowsForImport/, "Legacy PDF actions expose no hidden preview-to-production import path");
+assert.match(uploadActions, /confirmParsedBatchAction[\s\S]*legacy-review-only/, "Legacy confirmation compatibility action redirects to review-only guidance");
+assert.doesNotMatch(reviewPage, /confirmParsedBatchAction/, "Legacy review UI exposes no production confirmation form");
 assert.match(importPreview, /rows\.some\(\(row\) => row\.sourceType === "LABEL"\)[\s\S]*"MANIFEST_ORDER"/, "Preview import source prefers labels over manifest rows");
-assert.match(importPreview, /seenAwbs\.has/, "Confirm import skips duplicate AWB rows inside one preview batch");
+assert.match(importPreview, /seenAwbs\.has/, "Review-only preview analysis identifies duplicate AWB rows inside one batch");
 assert.match(importOrders, /heldRows/, "Order import stats include held-for-review rows");
 assert.match(reviewPage, /Held for review/, "Import result shows held-for-review count");
 assert.match(dashboardPage, /requireUser\(\["OWNER"\]\)/, "Dashboard route remains owner-only");
@@ -1266,7 +1273,10 @@ assert.doesNotMatch(sourceBetween(importJobExportRoute, "const headers = [\"rowN
 assert.match(importJobDetailPage, /retainedImportJobFileExists/, "Import job detail checks retained source file availability before retry");
 assert.match(importJobRetryActions, /retainedImportJobFileExists[\s\S]*createRetryImportJob[\s\S]*startImportJob/, "Retry action starts a safe new job only when the retained file exists");
 assert.match(importJobRunnerSource, /IMPORT_JOB_STORAGE_DIR[\s\S]*storage", "import-jobs"/, "Import jobs retain uploaded files in private import-job storage");
-assert.match(importJobRunnerSource, /isRetainedImportJobFilePath[\s\S]*resolvedStorage[\s\S]*startsWith/, "Retry only accepts source files inside retained import-job storage");
+assert.match(importJobRunnerSource, /export function retainedImportJobArtifactPath/, "Retry resolves retained artifacts through the canonical path validator");
+assert.match(importJobRunnerSource, /path\.dirname\(resolvedFile\) !== resolvedStorage/, "Retry requires retained artifacts to be direct children of private import-job storage");
+assert.match(importJobRunnerSource, /IMPORT_JOB_ARTIFACT_NAME\.test\(path\.basename\(resolvedFile\)\)/, "Retry requires an owned import-job artifact name and rejects the storage root or arbitrary siblings");
+assert.match(importJobRunnerSource, /retainedImportJobArtifactPath\(filePath\) !== null/, "Retry accepts only paths validated as exact retained import-job artifacts");
 assert.match(importIssuesPage, /Row issue drill-down/, "Import issues page exists");
 assert.match(importIssuesPage, /IMPORT_ISSUE_PAGE_SIZES[\s\S]*issueType[\s\S]*row[\s\S]*sku/, "Import issues page has page-size, issue type, row, and SKU filters");
 assert.match(importIssuesPage, /safeImportIssueContext/, "Import issues page uses safe issue context extraction");
@@ -1368,8 +1378,9 @@ assert.match(oldPendingPage, /Old pending orders remain in history and reports/,
 assert.match(oldPendingPage, /Keep pending[\s\S]*Carry forward[\s\S]*Archive from today[\s\S]*Move to problem/, "Old pending page exposes owner review actions");
 assert.doesNotMatch(oldPendingPage, /Buyer name|Address Line|phone/i, "Old pending page avoids private customer fields");
 assert.match(oldPendingActions, /oldPendingReviewStatus: reviewStatus/, "Old pending action updates review state");
-assert.match(oldPendingActions, /status: "PROBLEM"[\s\S]*pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"/, "Old pending move-to-problem updates order state");
-assert.match(oldPendingActions, /problemOrder\.create/, "Old pending move-to-problem creates an open problem when needed");
+assert.match(oldPendingActions, /reportOrderWorkflowProblem\s*\(/, "Old pending move-to-problem delegates to the authoritative stage-aware problem service");
+assert.doesNotMatch(oldPendingActions, /pickStatus:\s*"PROBLEM"|packStatus:\s*"PROBLEM"|problemOrder\.create/, "Old pending actions do not directly desynchronize workflow status or problem records");
+assert.match(oldPendingActions, /order\.updateMany[\s\S]*noActiveOrderWorkflowProblem/, "Old pending non-problem review writes close the active-stage-problem race");
 assert.match(productImageRoute, /getCurrentUser/, "Cached image route checks session without login redirect");
 assert.match(productImageRoute, /verifySignedCachedImageUrl/, "Cached image route verifies signed image URLs");
 assert.equal(productImageRoute.indexOf("verifySignedCachedImageUrl") < productImageRoute.indexOf("const user = await getCurrentUser"), true, "Signed cached image route avoids database auth before serving normal image requests");

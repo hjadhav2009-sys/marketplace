@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createTempWorkflowDb } from "./temp-workflow-db";
+import { noActiveOrderWorkflowProblem } from "../lib/operations/work-queue";
 import { reportOrderWorkflowProblem, resolveOrderWorkflowProblem } from "../src/lib/workflow/order-problems";
 import { completeWorkTask, incrementWorkTaskProgress, setWorkTaskProgress } from "../src/lib/workflow/task-store";
 
@@ -38,6 +40,35 @@ try {
     assert.equal(restoredOrder.pickStatus, stage === "PICK" ? "READY" : "PICKED");
     assert.equal(restoredOrder.packStatus, "READY");
   }
+
+  const oldImportedAt = new Date("2000-01-01T00:00:00.000Z");
+  await db.order.createMany({ data: [
+    { id: "old-pending-actionable", accountId: "account", batchId: "batch", marketplace: "FLIPKART", awb: "OLD-ACTIONABLE", sku: "OLD-SKU-A", qty: 1, orderNo: "OLD-A", packStatus: "READY", importedAt: oldImportedAt },
+    { id: "old-pending-problem", accountId: "account", batchId: "batch", marketplace: "FLIPKART", awb: "OLD-PROBLEM", sku: "OLD-SKU-P", qty: 1, orderNo: "OLD-P", packStatus: "READY", status: "PROBLEM", importedAt: oldImportedAt }
+  ] });
+  await db.workTask.createMany({ data: [
+    { id: "old-pending-actionable-task", accountId: "account", sourceType: "ORDER", orderId: "old-pending-actionable", stage: "PICK", sequenceNumber: 1, requiredQuantity: 1, status: "READY" },
+    { id: "old-pending-problem-task", accountId: "account", sourceType: "ORDER", orderId: "old-pending-problem", stage: "MARK", sequenceNumber: 2, requiredQuantity: 1, status: "PROBLEM", problemReason: "Synthetic active stage problem" }
+  ] });
+  const actionableOldPending = await db.order.findMany({ where: { accountId: "account", packStatus: "READY", importedAt: { lt: new Date() }, ...noActiveOrderWorkflowProblem }, select: { id: true }, orderBy: { id: "asc" } });
+  assert.ok(actionableOldPending.some((order) => order.id === "old-pending-actionable"), "A clean old-pending Order remains actionable");
+  assert.equal(actionableOldPending.some((order) => order.id === "old-pending-problem"), false, "An active stage problem locks the Order out of old-pending review actions");
+  await db.workTask.update({ where: { id: "old-pending-actionable-task" }, data: { status: "PROBLEM", problemReason: "Problem reported after the old-pending page loaded" } });
+  const staleReviewWrite = await db.order.updateMany({
+    where: { id: "old-pending-actionable", accountId: "account", packStatus: "READY", importedAt: { lt: new Date() }, ...noActiveOrderWorkflowProblem },
+    data: { oldPendingReviewStatus: "ARCHIVED", oldPendingReviewedAt: new Date() }
+  });
+  assert.equal(staleReviewWrite.count, 0, "A problem reported after page load closes the conditional old-pending write");
+  assert.equal((await db.order.findUniqueOrThrow({ where: { id: "old-pending-actionable" } })).oldPendingReviewStatus, "NONE", "A stale review action cannot mark problem work as archived");
+
+  const oldPendingActionSource = readFileSync("app/owner/old-pending/actions.ts", "utf8");
+  const oldPendingPageSource = readFileSync("app/owner/old-pending/page.tsx", "utf8");
+  assert.match(oldPendingActionSource, /reportOrderWorkflowProblem\s*\(/, "Old-pending problems delegate to the authoritative stage-aware service");
+  assert.doesNotMatch(oldPendingActionSource, /pickStatus:\s*["']PROBLEM["']|packStatus:\s*["']PROBLEM["']/, "Old-pending actions cannot directly corrupt all Order stage statuses");
+  assert.match(oldPendingPageSource, /name=["']clientRequestId["']/, "Old-pending problem submissions carry a bounded replay identifier");
+  assert.match(oldPendingActionSource, /noActiveOrderWorkflowProblem/, "The action rechecks that no current stage problem exists");
+  assert.match(oldPendingActionSource, /order\.updateMany[\s\S]*noActiveOrderWorkflowProblem/, "Non-problem old-pending actions use a conditional write that closes the stage-problem race");
+  assert.ok((oldPendingPageSource.match(/noActiveOrderWorkflowProblem/g) ?? []).length >= 3, "Old-pending rows and summary counts exclude active stage problems");
 } finally {
   await cleanup();
 }

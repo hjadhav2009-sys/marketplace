@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma, type IdentifierType, type Marketplace, type PrismaClient, type ProcessRoute } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { normalizeSkuForMatching } from "@/lib/sku";
+import { canonicalSkuIdentity } from "@/lib/sku";
 import type { DynamicListingField, DynamicListingFormSchema } from "./dynamic-form-profiles";
 import { preferredFlipkartGallery } from "./dynamic-form-profiles";
 import {
@@ -67,15 +67,26 @@ export type ResolveConsignmentMissingListingInput = ProfileBoundInput & {
   lineId: string;
   expectedLineUpdatedAt: string;
   clientRequestId: string;
-  action: "CREATE_MINIMAL" | "CREATE_FULL";
+  action: "LINK_EXISTING" | "CREATE_MINIMAL" | "CREATE_FULL";
+  listingId?: string;
   common?: CommonFields;
   identifiers?: IdentifierInput[];
   attributes?: DynamicAttributeInput[];
   manualLocked?: boolean;
 };
 
+export type ClearConsignmentListingInput = {
+  actorUserId: string;
+  accountId: string;
+  batchId: string;
+  lineId: string;
+  expectedLineUpdatedAt: string;
+  clientRequestId: string;
+};
+
 type OrderResolutionResult = { listingId: string; taskId: string | null; idempotent: boolean };
 type ConsignmentResolutionResult = { listingId: string; lineId: string; requiredQuantity: number; idempotent: boolean };
+type ConsignmentClearResult = { lineId: string; requiredQuantity: number; idempotent: boolean };
 
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e\u2066-\u2069\ufffe\uffff]/i;
 const PRIVATE_PATH = /(?:^|\s)(?:[a-z]:[\\/]|\\\\[^\\]|file:\/\/)/i;
@@ -115,9 +126,11 @@ function optionalText(value: unknown, label: string, max: number, multiline = fa
 }
 
 function nonNegativeNumber(value: unknown, label: string) {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined) return null;
   if (typeof value !== "string" && typeof value !== "number") throw new Error(`${label} must be numeric.`);
-  const parsed = Number(value);
+  const normalized = typeof value === "string" ? value.normalize("NFKC").trim() : value;
+  if (normalized === "") return null;
+  const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > Number.MAX_SAFE_INTEGER) throw new Error(`${label} must be a valid non-negative number.`);
   return parsed;
 }
@@ -128,6 +141,7 @@ function safeUrl(value: unknown, label = "Image or product URL") {
   let url: URL;
   try { url = new URL(result); } catch { throw new Error(`${label} must be a valid HTTP or HTTPS URL.`); }
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`${label} must use HTTP or HTTPS.`);
+  if (url.username || url.password) throw new Error(`${label} must not contain embedded credentials.`);
   return result;
 }
 
@@ -136,6 +150,39 @@ function safeJson(value: string | null) {
     const parsed = JSON.parse(value ?? "{}");
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
   } catch { return {}; }
+}
+
+function protectedCandidateIds(safe: Record<string, unknown>) {
+  if (safe.listingIds === undefined) return [];
+  if (!Array.isArray(safe.listingIds) || safe.listingIds.length > 25) throw new Error("Saved listing candidates are invalid; re-import or repair the issue before resolving it.");
+  const ids = safe.listingIds.map((value) => boundedId(value, "Saved listing candidate ID"));
+  if (new Set(ids).size !== ids.length) throw new Error("Saved listing candidates are invalid; re-import or repair the issue before resolving it.");
+  return ids;
+}
+
+function matchingListingIdentifier(
+  listing: {
+    sellerSkuId: string;
+    sku: string;
+    fsn: string | null;
+    listingId: string | null;
+    identifiers: Array<{ identifierType: IdentifierType; normalizedValue: string }>;
+  },
+  sources: ListingIdentifierInput[]
+) {
+  const direct: Partial<Record<IdentifierType, Array<string | null>>> = {
+    SELLER_SKU: [listing.sellerSkuId],
+    INTERNAL_SKU: [listing.sku],
+    FSN: [listing.fsn],
+    LISTING_ID: [listing.listingId]
+  };
+  for (const source of sources) {
+    const normalized = normalizeListingIdentifier(source.type, source.value);
+    if (!normalized) continue;
+    if ((direct[source.type] ?? []).some((value) => normalizeListingIdentifier(source.type, value) === normalized)) return { type: source.type, value: normalized };
+    if (listing.identifiers.some((identifier) => identifier.identifierType === source.type && identifier.normalizedValue === normalized)) return { type: source.type, value: normalized };
+  }
+  return null;
 }
 
 function commonListingData(common: CommonFields | undefined, manualLocked: boolean) {
@@ -212,6 +259,8 @@ function scalarAttributeValue(attribute: DynamicAttributeInput, field: DynamicLi
   if (["number", "decimal", "integer"].includes(field.dataType)) {
     const parsed = Number(valueText);
     if (!Number.isFinite(parsed) || (field.dataType === "integer" && !Number.isInteger(parsed))) throw new Error(`${field.label} has an invalid numeric value.`);
+    const priceLike = /(?:^|[^a-z])(price|mrp|amount|cost)(?:[^a-z]|$)/i.test(`${field.technicalKey} ${field.label}`);
+    if (priceLike && parsed < 0) throw new Error(`${field.label} must be a valid non-negative price or amount.`);
   }
   if (field.dataType === "boolean" && !["true", "false", "1", "0"].includes(valueText.toLowerCase())) throw new Error(`${field.label} must be true or false.`);
   const valueJson = JSON.stringify(attribute.value);
@@ -298,9 +347,9 @@ async function writeDynamicAttributes(tx: Prisma.TransactionClient, input: {
 async function authorize(client: PrismaClient | Prisma.TransactionClient, actorUserId: string, accountId: string, kind: "ORDER" | "CONSIGNMENT") {
   const access = await assertWorkerAccountAccess(actorUserId, accountId, client);
   const permitted = kind === "ORDER"
-    ? access.user.role === "OWNER" || access.user.canImportConsignments
+    ? access.user.role === "OWNER"
     : access.user.role === "OWNER" || access.user.canManageConsignments;
-  if (!permitted) throw new Error(kind === "ORDER" ? "Catalog issue management permission is required." : "Consignment management permission is required.");
+  if (!permitted) throw new Error(kind === "ORDER" ? "Owner access is required to resolve Order catalog issues." : "Consignment management permission is required.");
   const account = await client.account.findFirst({ where: { id: accountId, active: true }, select: { id: true, marketplace: true } });
   if (!account) throw new Error("Selected account is unavailable.");
   return { user: access.user, account };
@@ -410,7 +459,7 @@ export async function resolveMissingListing(input: ResolveMissingListingInput, c
     });
     if (receipt.replay) return { ...receipt.replay, idempotent: true };
     const issue = await tx.importRowIssue.findFirst({
-      where: { id: issueId, batch: { accountId }, issueType: "MISSING_FLIPKART_LISTING_MAPPING", sourceType: "ORDER" },
+      where: { id: issueId, batch: { accountId }, issueType: { in: ["MISSING_FLIPKART_LISTING_MAPPING", "AMBIGUOUS_LISTING"] }, sourceType: "ORDER" },
       include: { batch: { include: { account: true } } }
     });
     if (!issue?.sourceId) throw new Error("Missing-listing issue is unavailable.");
@@ -418,19 +467,27 @@ export async function resolveMissingListing(input: ResolveMissingListingInput, c
     if (issue.version !== input.expectedIssueVersion) throw new Error("Missing-listing issue changed; refresh before saving.");
     if (issue.batch.account.marketplace !== account.marketplace) throw new Error("Missing-listing issue marketplace does not match the selected account.");
     const safe = safeJson(issue.safeDataJson);
-    const sellerSku = normalizeSkuForMatching(optionalText(safe.sellerSku, "Protected Seller SKU", 160) ?? "");
+    const sellerSku = canonicalSkuIdentity(optionalText(safe.sellerSku, "Protected Seller SKU", 160));
     if (!sellerSku) throw new Error("The held source row has no valid Seller SKU identity.");
     const marketplace = account.marketplace;
+    const ambiguous = issue.issueType === "AMBIGUOUS_LISTING";
+    const candidateIds = ambiguous ? protectedCandidateIds(safe) : [];
+    if (ambiguous && input.action !== "LINK_EXISTING") throw new Error("Choose one exact saved candidate to resolve this ambiguous Order listing.");
+    if (ambiguous && candidateIds.length < 2) throw new Error("Saved listing candidates are unavailable; re-import or repair the issue before resolving it.");
     let listing;
     let created = false;
     if (input.action === "LINK_EXISTING") {
       const listingId = boundedId(input.listingId, "Existing listing ID");
       listing = await tx.marketplaceListing.findFirst({ where: { id: listingId, accountId, marketplace } });
       if (!listing) throw new Error("The selected listing is not available in this account and marketplace.");
-      const protectedSku = normalizeListingIdentifier("SELLER_SKU", sellerSku);
-      const identityMatches = normalizeListingIdentifier("SELLER_SKU", listing.sellerSkuId) === protectedSku
-        || Boolean(protectedSku && await tx.marketplaceListingIdentifier.findFirst({ where: { marketplaceListingId: listing.id, accountId, marketplace, identifierType: "SELLER_SKU", normalizedValue: protectedSku, active: true }, select: { id: true } }));
-      if (!identityMatches) throw new Error("The selected listing does not match the protected Seller SKU identity.");
+      if (ambiguous) {
+        if (!candidateIds.includes(listing.id)) throw new Error("Choose one of the exact saved candidates for this ambiguous Order.");
+      } else {
+        const protectedSku = normalizeListingIdentifier("SELLER_SKU", sellerSku);
+        const identityMatches = normalizeListingIdentifier("SELLER_SKU", listing.sellerSkuId) === protectedSku
+          || Boolean(protectedSku && await tx.marketplaceListingIdentifier.findFirst({ where: { marketplaceListingId: listing.id, accountId, marketplace, identifierType: "SELLER_SKU", normalizedValue: protectedSku, active: true }, select: { id: true } }));
+        if (!identityMatches) throw new Error("The selected listing does not match the protected Seller SKU identity.");
+      }
     } else {
       listing = await tx.marketplaceListing.findFirst({ where: { accountId, marketplace, sellerSkuId: sellerSku } });
       if (listing) throw new Error("This Seller SKU already has a Product Inventory listing. Link the existing listing instead.");
@@ -449,7 +506,7 @@ export async function resolveMissingListing(input: ResolveMissingListingInput, c
       ...(safe.fsn ? [{ type: "FSN" as const, value: safe.fsn }] : []),
       ...validatedIdentifiers(input.identifiers)
     ];
-    await syncMarketplaceListingIdentifiersInTransaction(tx, { listing, extraIdentifiers: sourceIdentifiers, source: "MANUAL_OWNER", replaceManagedTypes: false });
+    if (!ambiguous) await syncMarketplaceListingIdentifiersInTransaction(tx, { listing, extraIdentifiers: sourceIdentifiers, source: "MANUAL_OWNER", replaceManagedTypes: false });
     if (created && input.action === "CREATE_FULL") await writeDynamicAttributes(tx, { accountId, marketplace, listingId: listing.id, actorUserId: user.id, profileId: input.profileId, expectedProfileTechnicalFingerprint: input.expectedProfileTechnicalFingerprint, attributes: input.attributes });
     const taskId = await releaseHeldOrder(tx, { accountId, orderId: issue.sourceId, listingId: listing.id });
     const changed = await tx.importRowIssue.updateMany({ where: { id: issue.id, resolved: false, version: input.expectedIssueVersion }, data: { resolved: true, resolvedAt: new Date(), resolvedByUserId: user.id, resolutionAction: input.action, version: { increment: 1 } } });
@@ -485,42 +542,142 @@ export async function resolveConsignmentMissingListing(input: ResolveConsignment
     if (!line) throw new Error("Consignment line is unavailable or was already resolved.");
     if (line.updatedAt.getTime() !== expectedLineUpdatedAt.getTime()) throw new Error("Consignment line changed; refresh before saving.");
     if (line.consignmentBatch.marketplace !== account.marketplace) throw new Error("Consignment marketplace does not match the selected account.");
-    const unresolvedIssue = await tx.consignmentImportIssue.findFirst({ where: { consignmentLineId: line.id, consignmentBatchId: batchId, issueType: { in: ["NOT_FOUND", "EXACT_MULTIPLE", "IDENTIFIER_CONFLICT"] }, resolved: false }, select: { id: true } });
+    const unresolvedIssue = await tx.consignmentImportIssue.findFirst({ where: { consignmentLineId: line.id, consignmentBatchId: batchId, issueType: { in: ["NOT_FOUND", "EXACT_MULTIPLE", "IDENTIFIER_CONFLICT"] }, resolved: false }, select: { id: true, issueType: true, safeDataJson: true } });
     if (!unresolvedIssue) throw new Error("The Consignment listing issue is unavailable or already resolved.");
-    const sellerSku = normalizeSkuForMatching(optionalText(line.sellerSkuSource, "Protected Seller SKU", 160) ?? "");
-    if (!sellerSku) throw new Error("A stable Seller SKU or Merchant SKU is required before creating a listing.");
+    const sellerSku = canonicalSkuIdentity(optionalText(line.sellerSkuSource, "Protected Seller SKU", 160));
     const marketplace = account.marketplace;
-    const existingListing = await tx.marketplaceListing.findFirst({ where: { accountId, marketplace, sellerSkuId: sellerSku } });
-    if (existingListing) throw new Error("This Seller SKU already has a Product Inventory listing. Select the existing listing instead.");
-    const fallback = {
-      productTitle: optionalText(line.productNameSource, "Source product title", 500),
-      listingStatus: "NEEDS_ENRICHMENT",
-      fieldProvenanceJson: JSON.stringify(line.productNameSource ? { productTitle: { sourceProfile: "CONSIGNMENT_FALLBACK", authority: 100, importedAt: new Date().toISOString(), sourceAuthority: "CONSIGNMENT_FALLBACK" } } : {}),
-      manualLocksJson: "{}"
-    };
-    const listing = await tx.marketplaceListing.create({ data: {
-      accountId,
-      marketplace,
-      sellerSkuId: sellerSku,
-      sku: sellerSku,
-      fsn: optionalText(line.fsnSource, "Source FSN", 160),
-      ...(input.action === "CREATE_FULL" ? commonListingData(input.common, input.manualLocked !== false) : fallback)
-    } });
-    const created = true;
     const sourceIdentifiers: ListingIdentifierInput[] = [
-      { type: "SELLER_SKU", value: sellerSku },
+      ...(sellerSku ? [{ type: "SELLER_SKU" as const, value: sellerSku }] : []),
       ...(line.fsnSource ? [{ type: "FSN" as const, value: line.fsnSource }] : []),
       ...(line.asinSource ? [{ type: "ASIN" as const, value: line.asinSource }] : []),
       ...(line.fnskuSource ? [{ type: "FNSKU" as const, value: line.fnskuSource }] : []),
       ...(line.externalIdSource ? [{ type: "EXTERNAL_ID" as const, value: line.externalIdSource }] : []),
       ...validatedIdentifiers(input.identifiers)
     ];
-    await syncMarketplaceListingIdentifiersInTransaction(tx, { listing, extraIdentifiers: sourceIdentifiers, source: "MANUAL_OWNER", replaceManagedTypes: false });
+    let listing;
+    let selectedIdentifier: { type: IdentifierType; value: string };
+    let selectedRule: { id: string; route: ProcessRoute; markingAssetId: string | null } | null = null;
+    let created = false;
+    if (input.action === "LINK_EXISTING") {
+      const listingId = boundedId(input.listingId, "Existing listing ID");
+      listing = await tx.marketplaceListing.findFirst({
+        where: { id: listingId, accountId, marketplace },
+        include: {
+          identifiers: { where: { active: true }, select: { identifierType: true, normalizedValue: true } },
+          processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, route: true, markingAssetId: true } }
+        }
+      });
+      if (!listing) throw new Error("The selected listing is not available in this account and marketplace.");
+      const candidates = protectedCandidateIds(safeJson(unresolvedIssue.safeDataJson));
+      if (candidates.length && !candidates.includes(listing.id)) throw new Error("Choose one of the exact saved candidates for this Consignment line.");
+      const match = matchingListingIdentifier(listing, sourceIdentifiers);
+      if (!match) throw new Error("The selected listing does not match a protected Consignment identifier.");
+      selectedIdentifier = match;
+      selectedRule = listing.processRules[0] ?? null;
+    } else {
+      if (!sellerSku) throw new Error("A stable Seller SKU or Merchant SKU is required before creating a listing.");
+      const existingListing = await tx.marketplaceListing.findFirst({ where: { accountId, marketplace, sellerSkuId: sellerSku } });
+      if (existingListing) throw new Error("This Seller SKU already has a Product Inventory listing. Select the existing listing instead.");
+      const fallback = {
+        productTitle: optionalText(line.productNameSource, "Source product title", 500),
+        listingStatus: "NEEDS_ENRICHMENT",
+        fieldProvenanceJson: JSON.stringify(line.productNameSource ? { productTitle: { sourceProfile: "CONSIGNMENT_FALLBACK", authority: 100, importedAt: new Date().toISOString(), sourceAuthority: "CONSIGNMENT_FALLBACK" } } : {}),
+        manualLocksJson: "{}"
+      };
+      listing = await tx.marketplaceListing.create({ data: {
+        accountId,
+        marketplace,
+        sellerSkuId: sellerSku,
+        sku: sellerSku,
+        fsn: optionalText(line.fsnSource, "Source FSN", 160),
+        ...(input.action === "CREATE_FULL" ? commonListingData(input.common, input.manualLocked !== false) : fallback)
+      } });
+      created = true;
+      selectedIdentifier = { type: "SELLER_SKU", value: normalizeListingIdentifier("SELLER_SKU", sellerSku)! };
+      await syncMarketplaceListingIdentifiersInTransaction(tx, { listing, extraIdentifiers: sourceIdentifiers, source: "MANUAL_OWNER", replaceManagedTypes: false });
+    }
     if (created && input.action === "CREATE_FULL") await writeDynamicAttributes(tx, { accountId, marketplace, listingId: listing.id, actorUserId: user.id, profileId: input.profileId, expectedProfileTechnicalFingerprint: input.expectedProfileTechnicalFingerprint, attributes: input.attributes });
-    const changed = await tx.consignmentLine.updateMany({ where: { id: line.id, accountId, consignmentBatchId: batchId, activated: false, marketplaceListingId: null, updatedAt: expectedLineUpdatedAt }, data: { marketplaceListingId: listing.id, matchStatus: "OWNER_SELECTED", matchIdentifierType: "SELLER_SKU", matchIdentifierValue: sellerSku, matchMessage: `${input.action === "CREATE_FULL" ? "Full" : "Minimal"} listing created by owner. Source quantity preserved.`, processRoute: null, processRuleId: null, markingAssetId: null } });
+    const matchMessage = input.action === "LINK_EXISTING"
+      ? "Existing listing selected by manager. Source quantity preserved."
+      : `${input.action === "CREATE_FULL" ? "Full" : "Minimal"} listing created by manager. Source quantity preserved.`;
+    const changed = await tx.consignmentLine.updateMany({ where: { id: line.id, accountId, consignmentBatchId: batchId, activated: false, marketplaceListingId: null, updatedAt: expectedLineUpdatedAt }, data: { marketplaceListingId: listing.id, matchStatus: "OWNER_SELECTED", matchIdentifierType: selectedIdentifier.type, matchIdentifierValue: selectedIdentifier.value, matchMessage, processRoute: selectedRule?.route ?? null, processRuleId: selectedRule?.id ?? null, markingAssetId: selectedRule?.markingAssetId ?? null } });
     if (changed.count !== 1) throw new Error("Consignment line changed; refresh before saving.");
     await tx.consignmentImportIssue.updateMany({ where: { consignmentLineId: line.id, issueType: { in: ["NOT_FOUND", "EXACT_MULTIPLE", "IDENTIFIER_CONFLICT"] }, resolved: false }, data: { resolved: true, resolvedAt: new Date(), resolvedByUserId: user.id } });
     await tx.auditLog.create({ data: { userId: user.id, accountId, action: "CONSIGNMENT_MISSING_LISTING_RESOLVED", entityType: "ConsignmentLine", entityId: line.id, metadata: JSON.stringify({ batchId, listingId: listing.id, requiredQuantity: line.requiredQuantity, action: input.action }) } });
     return completeWorkflowActionReceipt(tx, receipt.receiptId, { listingId: listing.id, lineId: line.id, requiredQuantity: line.requiredQuantity, idempotent: false });
+  }));
+}
+
+export async function clearConsignmentListingMatch(input: ClearConsignmentListingInput, client: Client = prisma) {
+  const actorUserId = boundedId(input.actorUserId, "Actor user ID");
+  const accountId = boundedId(input.accountId, "Account ID");
+  const batchId = boundedId(input.batchId, "Consignment batch ID");
+  const lineId = boundedId(input.lineId, "Consignment line ID");
+  const clientRequestId = boundedId(input.clientRequestId, "Client request ID");
+  const expectedLineUpdatedAt = parseExpectedDate(input.expectedLineUpdatedAt, "Expected Consignment line version");
+  const requestFingerprint = hash({ batchId, lineId, expectedLineUpdatedAt: expectedLineUpdatedAt.toISOString() });
+  await authorize(client, actorUserId, accountId, "CONSIGNMENT");
+  const gateKey = [accountId, actorUserId, "CONSIGNMENT_LISTING_CLEAR", clientRequestId].join(":");
+
+  return withWorkflowActionRequestGate(gateKey, () => runSerializable(client, async (tx) => {
+    const { user, account } = await authorize(tx, actorUserId, accountId, "CONSIGNMENT");
+    const receipt = await beginCatalogReceipt<ConsignmentClearResult>(tx, {
+      accountId,
+      actorUserId: user.id,
+      requestKind: "CONSIGNMENT_LISTING_CLEAR",
+      clientRequestId,
+      requestFingerprint,
+      sourceType: "CONSIGNMENT"
+    });
+    if (receipt.replay) return { ...receipt.replay, idempotent: true };
+    const line = await tx.consignmentLine.findFirst({
+      where: { id: lineId, consignmentBatchId: batchId, accountId, activated: false, marketplaceListingId: { not: null } },
+      include: { consignmentBatch: true, workTasks: { select: { id: true }, take: 1 } }
+    });
+    if (!line) throw new Error("Consignment line is unavailable or its listing match was already cleared.");
+    if (line.updatedAt.getTime() !== expectedLineUpdatedAt.getTime()) throw new Error("Consignment line changed; refresh before clearing its listing match.");
+    if (line.consignmentBatch.marketplace !== account.marketplace) throw new Error("Consignment marketplace does not match the selected account.");
+    if (line.workTasks.length) throw new Error("Consignment work already exists; its listing match cannot be cleared.");
+    const changed = await tx.consignmentLine.updateMany({
+      where: { id: line.id, accountId, consignmentBatchId: batchId, activated: false, marketplaceListingId: line.marketplaceListingId, updatedAt: expectedLineUpdatedAt },
+      data: {
+        marketplaceListingId: null,
+        matchStatus: "NOT_FOUND",
+        matchIdentifierType: null,
+        matchIdentifierValue: null,
+        matchMessage: "Manager cleared the listing match; catalog resolution is required again.",
+        processRoute: null,
+        processRuleId: null,
+        markingAssetId: null
+      }
+    });
+    if (changed.count !== 1) throw new Error("Consignment line changed; refresh before clearing its listing match.");
+    const unresolved = await tx.consignmentImportIssue.findFirst({
+      where: { consignmentLineId: line.id, consignmentBatchId: batchId, issueType: { in: ["NOT_FOUND", "EXACT_MULTIPLE", "IDENTIFIER_CONFLICT"] }, resolved: false },
+      select: { id: true }
+    });
+    if (!unresolved) {
+      await tx.consignmentImportIssue.create({ data: {
+        consignmentBatchId: batchId,
+        consignmentLineId: line.id,
+        rowNumber: line.rowNumber,
+        issueType: "NOT_FOUND",
+        severity: "ERROR",
+        message: "The listing match was cleared by a manager; choose or create an account-scoped listing before activation."
+      } });
+    }
+    await tx.consignmentBatch.updateMany({
+      where: { id: batchId, accountId, status: { in: ["DRAFT", "PARSING", "REVIEW_REQUIRED", "READY_TO_ACTIVATE", "FAILED"] } },
+      data: { status: "REVIEW_REQUIRED" }
+    });
+    await tx.auditLog.create({ data: {
+      userId: user.id,
+      accountId,
+      action: "CONSIGNMENT_LISTING_MATCH_CLEARED",
+      entityType: "ConsignmentLine",
+      entityId: line.id,
+      metadata: JSON.stringify({ batchId, priorListingId: line.marketplaceListingId, requiredQuantity: line.requiredQuantity })
+    } });
+    return completeWorkflowActionReceipt(tx, receipt.receiptId, { lineId: line.id, requiredQuantity: line.requiredQuantity, idempotent: false });
   }));
 }

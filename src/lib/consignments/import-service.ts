@@ -4,13 +4,13 @@ import { recordAuditLog } from "@/lib/audit";
 import type { RequestMeta } from "@/lib/network";
 import { prisma } from "@/lib/prisma";
 import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
-import { ensureMinimalCatalogPlaceholder } from "@/src/lib/product-inventory/placeholder";
 import { inspectFlipkartConsignmentZip } from "./flipkart/archive";
 import { classifyConsignmentTextFile, isConsignmentDetailsHeaders, parseCsvRecords, parseFlipkartConsignmentCsv, type ParsedConsignmentLine } from "./flipkart/parser";
 import { decideConsignmentListingMatch, type MatchCandidate } from "./matching";
 import { removeConsignmentBatchFiles, sanitizeConsignmentFileName, storeConsignmentBuffer, validateConsignmentUpload } from "./storage";
 import { resolveAdaptiveRows } from "@/src/lib/imports/adaptive-rows";
 import { completeConsignmentHeaderMapping, pauseConsignmentForHeaderMapping } from "./adaptive-mapping";
+import { sanitizeImportJobError } from "@/src/lib/import-jobs/safe-error";
 
 const CHUNK_SIZE = 400;
 function rowsToCsv(rows:Record<string,unknown>[]){const headers=[...new Set(rows.flatMap(row=>Object.keys(row)))],cell=(value:unknown)=>`"${String(value??"").replaceAll('"','""')}"`;return[headers.map(cell).join(","),...rows.map(row=>headers.map(header=>cell(row[header])).join(","))].join("\n");}
@@ -164,15 +164,13 @@ export async function importFlipkartConsignmentDraft(input: {
     if(adaptive.state==="NEEDS_MAPPING"){const job=await pauseConsignmentForHeaderMapping({batchId,accountId:account.id,actorUserId:input.user.id,marketplace:"FLIPKART",purpose:"CONSIGNMENT_QUANTITY",fileName:mainName,mappingRequest:adaptive.mappingRequest});return{batchId,requiresMainSelection:false,needsMapping:true,mappingJobId:job.id};}
     const parsed = parseFlipkartConsignmentCsv(adaptive.profileId?rowsToCsv(adaptive.rows):mainData.toString("utf8"));
     await completeConsignmentHeaderMapping({batchId,profileId:adaptive.profileId});
-    let matches = await matchConsignmentLines(account.id, parsed.lines);
-    for(const item of matches){if(item.decision.status==="NOT_FOUND"&&item.line.requiredQuantity>0&&item.line.sellerSkuSource){await ensureMinimalCatalogPlaceholder({accountId:account.id,marketplace:"FLIPKART",sellerSku:item.line.sellerSkuSource,title:item.line.productNameSource,fsn:item.line.fsnSource,sourceRow:item.line.rowNumber});}}
-    if(matches.some(item=>item.decision.status==="NOT_FOUND"&&item.line.requiredQuantity>0&&item.line.sellerSkuSource))matches=await matchConsignmentLines(account.id,parsed.lines);
+    const matches = await matchConsignmentLines(account.id, parsed.lines);
     const selectedIds = [...new Set(matches.flatMap((match) => match.decision.listing ? [match.decision.listing.id] : []))];
     const listings = await prisma.marketplaceListing.findMany({
       where: { accountId: account.id, id: { in: selectedIds } },
       select: {
         id: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true,
-        processRules: { where: { active: true }, take: 1, select: { id: true, route: true, markingAssetId: true, markingAsset: { select: { id: true, active: true, masterDesignId: true, instructions: true, files: { where: { attachmentType: "MARKING_FILE", activeVersion: true }, take: 1, select: { id: true } } } } } }
+        processRules: { where: { active: true }, take: 1, select: { id: true, route: true, markingAssetId: true, assemblyTitle: true, assemblyInstructions: true, markingAsset: { select: { id: true, active: true, masterDesignId: true, instructions: true, files: { where: { attachmentType: "MARKING_FILE", activeVersion: true }, take: 1, select: { id: true } } } } } }
       }
     });
     const listingMap = new Map(listings.map((listing) => [listing.id, listing]));
@@ -201,10 +199,12 @@ export async function importFlipkartConsignmentDraft(input: {
       });
       if (item.decision.warning) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: item.decision.status, severity: item.decision.status === "EXACT_SKU" || item.decision.status === "EXACT_FSN" ? "WARNING" : "ERROR", message: item.decision.warning, safeDataJson: "candidates" in item.decision ? JSON.stringify({ listingIds: item.decision.candidates.map((candidate) => candidate.id) }) : undefined });
       if (listing && !rule) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MISSING_PROCESS_RULE", severity: "WARNING", message: "No saved default processing; Direct to Pack will be used." });
-      if (rule?.route === "PICK_MARK_PACK" && !rule.markingAsset?.active) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_ASSET_MISSING", severity: "WARNING", message: "No active marking asset is saved; manager guidance is required." });
-      if (rule?.route === "PICK_MARK_PACK" && rule.markingAsset?.active && !rule.markingAsset.instructions?.trim() && !rule.markingAsset.masterDesignId?.trim()) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_INSTRUCTIONS_MISSING", severity: "WARNING", message: "No marking instructions or Master Design ID are saved." });
-      if (rule?.route === "PICK_MARK_PACK" && rule.markingAsset?.files.length) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_FILE_STORED_FUTURE_USE", severity: "INFO", message: "A marking file is stored in the owner library for future integration; worker download is not required." });
-      if (rule && rule.route !== "PICK_PACK" && rule.route !== "PICK_MARK_PACK") issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "UNSUPPORTED_ROUTE", severity: "ERROR", message: "Assembly routes are not activated for Flipkart consignments in Phase 2." });
+      const markingRoute = rule?.route === "PICK_MARK_PACK" || rule?.route === "PICK_MARK_ASSEMBLE_PACK";
+      const assemblyRoute = rule?.route === "PICK_ASSEMBLE_PACK" || rule?.route === "PICK_MARK_ASSEMBLE_PACK";
+      if (markingRoute && !rule.markingAsset?.active) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_ASSET_MISSING", severity: "WARNING", message: "No active marking asset is saved; manager guidance is required." });
+      if (markingRoute && rule.markingAsset?.active && !rule.markingAsset.instructions?.trim() && !rule.markingAsset.masterDesignId?.trim()) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_INSTRUCTIONS_MISSING", severity: "WARNING", message: "No marking instructions or Master Design ID are saved." });
+      if (markingRoute && rule.markingAsset?.files.length) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "MARKING_FILE_STORED_FUTURE_USE", severity: "INFO", message: "A marking file is stored in the owner library for future integration; worker download is not required." });
+      if (assemblyRoute && (!rule.assemblyTitle?.trim() || !rule.assemblyInstructions?.trim())) issues.push({ consignmentBatchId: batchId, consignmentLineId: lineId, rowNumber: item.line.rowNumber, issueType: "ASSEMBLY_INSTRUCTIONS_MISSING", severity: "WARNING", message: "Saved Assembly title and instructions are incomplete; the worker must confirm a manual-instruction route before continuing." });
     }
     for (const issue of parsed.issues) issues.push({ consignmentBatchId: batchId, consignmentLineId: issue.rowNumber ? lineIds.get(issue.rowNumber) : undefined, rowNumber: issue.rowNumber, issueType: issue.issueType, severity: issue.severity, message: issue.message, safeDataJson: issue.safeData ? JSON.stringify(issue.safeData) : undefined });
 
@@ -227,17 +227,18 @@ export async function importFlipkartConsignmentDraft(input: {
         unmatchedLines: lineData.filter((line) => line.matchStatus === "NOT_FOUND").length,
         ambiguousLines: lineData.filter((line) => line.matchStatus === "EXACT_MULTIPLE").length,
         conflictLines: lineData.filter((line) => line.matchStatus === "IDENTIFIER_CONFLICT").length,
-        markingLines: lineData.filter((line) => line.processRoute === "PICK_MARK_PACK").length,
+        markingLines: lineData.filter((line) => line.processRoute === "PICK_MARK_PACK" || line.processRoute === "PICK_MARK_ASSEMBLE_PACK").length,
         readyMadeLines: lineData.filter((line) => line.processRoute === "PICK_PACK").length
       }
     });
     await recordAuditLog({ userId: input.user.id, accountId: account.id, action: input.existingBatchId ? "CONSIGNMENT_REPARSED" : "CONSIGNMENT_PARSED", entityType: "ConsignmentBatch", entityId: batchId, metadata: { sourceRows: parsed.sourceRows, validLines: lineData.length, requiredQuantity: lineData.reduce((sum, line) => sum + line.requiredQuantity, 0), issueCount: issues.length }, request: input.request });
     return { batchId, requiresMainSelection: false };
   } catch (error) {
+    const safeFailure = sanitizeImportJobError(error) ?? "Consignment import failed.";
     await prisma.consignmentBatch.update({ where: { id: batchId }, data: { status: "FAILED" } }).catch(() => undefined);
-    await prisma.consignmentImportIssue.create({ data: { consignmentBatchId: batchId, issueType: "IMPORT_FAILED", severity: "ERROR", message: error instanceof Error ? error.message.slice(0, 500) : "Consignment import failed." } }).catch(() => undefined);
+    await prisma.consignmentImportIssue.create({ data: { consignmentBatchId: batchId, issueType: "IMPORT_FAILED", severity: "ERROR", message: safeFailure } }).catch(() => undefined);
     await recordAuditLog({ userId: input.user.id, accountId: account.id, action: "CONSIGNMENT_ACTIVATION_FAILED", entityType: "ConsignmentBatch", entityId: batchId, metadata: { stage: "parse" }, request: input.request }).catch(() => undefined);
-    throw error;
+    throw new Error(safeFailure);
   }
 }
 

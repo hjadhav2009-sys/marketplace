@@ -13,7 +13,9 @@ try{
   {id:"owner",username:"owner",passwordHash:"fake",name:"Owner",role:"OWNER",active:true,accountId:"acct"},
   {id:"picker1",username:"picker1",passwordHash:"fake",name:"Picker One",role:"PICKER",active:true,accountId:"acct",canPick:true},
   {id:"picker2",username:"picker2",passwordHash:"fake",name:"Picker Two",role:"PICKER",active:true,accountId:"acct",canPick:true},
+  {id:"disabled-picker",username:"disabled-picker",passwordHash:"fake",name:"Disabled Picker",role:"PICKER",active:true,accountId:"acct",canPick:false},
   {id:"packer",username:"packer",passwordHash:"fake",name:"Packer",role:"PACKER",active:true,accountId:"acct",canPack:true},
+  {id:"disabled-packer",username:"disabled-packer",passwordHash:"fake",name:"Disabled Packer",role:"PACKER",active:true,accountId:"acct",canPack:false},
   {id:"marker",username:"marker",passwordHash:"fake",name:"Marker",role:"PACKER",active:true,accountId:"acct",canMark:true},
   {id:"manager",username:"manager",passwordHash:"fake",name:"Manager",role:"PACKER",active:true,accountId:"acct",canManageConsignments:true,canViewAllWork:true},
   {id:"viewer",username:"viewer",passwordHash:"fake",name:"View All",role:"PICKER",active:true,accountId:"acct",canViewAllWork:true,canPick:true,canPack:true},
@@ -29,6 +31,8 @@ try{
  await assert.rejects(()=>claimWorkTask({taskId:"pick",accountId:"acct",actorUserId:"inactive"},db),/unavailable/i);
  await assert.rejects(()=>claimWorkTask({taskId:"pick",accountId:"acct",actorUserId:"unassigned"},db),/assigned/i);
  await assert.rejects(()=>claimWorkTask({taskId:"pick",accountId:"acct",actorUserId:"packer"},db),/permission/i);
+ await assert.rejects(()=>getWorkerTaskQueue({actorUserId:"disabled-picker",accountId:"acct",stage:"PICK"},db),/permission/i,"A disabled PICKER cannot read the Pick mutation queue");
+ await assert.rejects(()=>claimWorkTask({taskId:"pick",accountId:"acct",actorUserId:"disabled-picker"},db),/permission/i,"A disabled PICKER cannot claim Consignment Pick work");
  const claims=await Promise.allSettled([claimWorkTask({taskId:"pick",accountId:"acct",actorUserId:"picker1",clientRequestId:"claim-a"},db),claimWorkTask({taskId:"pick",accountId:"acct",actorUserId:"picker2",clientRequestId:"claim-b"},db)]);assert.equal(claims.filter((result)=>result.status==="fulfilled").length,1,"One concurrent claimant succeeds");const claimed=await db.workTask.findUniqueOrThrow({where:{id:"pick"}});assert.ok(["picker1","picker2"].includes(claimed.assignedUserId??""));const worker=claimed.assignedUserId!;
  const other=worker==="picker1"?"picker2":"picker1";await assert.rejects(()=>incrementWorkTaskProgress({taskId:"pick",accountId:"acct",actorUserId:other,expectedQuantity:0,increment:1},db),/taken/i);
  let result=await incrementWorkTaskProgress({taskId:"pick",accountId:"acct",actorUserId:worker,expectedQuantity:0,increment:1,clientRequestId:"inc-1"},db);assert.equal(result.completedQuantity,1);
@@ -41,6 +45,8 @@ try{
  await assert.rejects(()=>incrementWorkTaskProgress({taskId:"pick",accountId:"acct",actorUserId:"unassigned",expectedQuantity:1,increment:1,clientRequestId:"inc-1"},db),/assigned/i);
  const concurrent=await Promise.all([incrementWorkTaskProgress({taskId:"pick",accountId:"acct",actorUserId:worker,expectedQuantity:6,increment:1,clientRequestId:"inc-concurrent"},db),incrementWorkTaskProgress({taskId:"pick",accountId:"acct",actorUserId:worker,expectedQuantity:6,increment:1,clientRequestId:"inc-concurrent"},db)]);assert.deepEqual(concurrent.map((item)=>item.completedQuantity),[7,7]);assert.equal(await db.workActionLog.count({where:{taskId:"pick",clientRequestId:"inc-concurrent"}}),1,"Concurrent replay mutates once");
  await completeWorkTask({taskId:"pick",accountId:"acct",actorUserId:worker,expectedQuantity:7,clientRequestId:"complete-pick"},db);assert.equal((await db.workTask.findUniqueOrThrow({where:{id:"pack"}})).status,"READY");
+ await assert.rejects(()=>getWorkerTaskQueue({actorUserId:"disabled-packer",accountId:"acct",stage:"PACK"},db),/permission/i,"A disabled PACKER cannot read the Pack mutation queue");
+ await assert.rejects(()=>completeWorkTask({taskId:"pack",accountId:"acct",actorUserId:"disabled-packer",expectedQuantity:0,clientRequestId:"disabled-pack"},db),/permission/i,"A disabled PACKER cannot complete Consignment Pack work");
  await assert.rejects(()=>incrementWorkTaskProgress({taskId:"pick",accountId:"acct",actorUserId:worker,expectedQuantity:10,increment:1},db),/current status|range/i);
  const problemRequest={taskId:"pack",accountId:"acct",actorUserId:"packer",expectedQuantity:0,reason:"PACKING_BLOCKED",note:"Fake blocked",clientRequestId:"problem-1"};await Promise.all([reportWorkTaskProblem(problemRequest,db),reportWorkTaskProblem(problemRequest,db)]);let problem=await db.workTask.findUniqueOrThrow({where:{id:"pack"}});assert.equal(problem.status,"PROBLEM");assert.equal(problem.completedQuantity,0);assert.equal((await db.consignmentBatch.findUniqueOrThrow({where:{id:"batch"}})).status,"PROBLEM");assert.equal(await db.workActionLog.count({where:{taskId:"pack",clientRequestId:"problem-1"}}),1,"Concurrent problem retry records one action");
  const viewerProblems=await getWorkerTaskQueue({actorUserId:"viewer",accountId:"acct",stage:"PACK",status:"problem"},db);assert.equal(viewerProblems.tasks.length,1,"View-all worker can read account problems");

@@ -1,0 +1,25 @@
+import { SubmitButton } from "@/components/SubmitButton";
+
+type ListingFormValue = {
+  id: string;
+  sellerSkuId: string;
+  productTitle: string | null;
+  subCategory: string | null;
+  fsn: string | null;
+  listingId: string | null;
+  listingStatus: string | null;
+  mrp: number | null;
+  sellingPrice: number | null;
+  liveBrand: string | null;
+  liveCategory: string | null;
+  description: string | null;
+  mainImageUrl: string | null;
+  updatedAt: Date;
+};
+
+export function ListingForm({ action, marketplace, clientRequestId, listing }: { action: (data: FormData) => Promise<void>; marketplace: string; clientRequestId: string; listing?: ListingFormValue }) {
+  return <form action={action} className="space-y-4 rounded-md border bg-white p-4"><input type="hidden" name="clientRequestId" value={clientRequestId}/>{listing?<><input type="hidden" name="marketplaceListingId" value={listing.id}/><input type="hidden" name="expectedUpdatedAt" value={listing.updatedAt.toISOString()}/></>:null}<div className="grid gap-3 sm:grid-cols-2"><Read label="Marketplace" value={marketplace}/><label className="font-bold">Seller SKU<input name="sellerSku" required maxLength={160} readOnly={Boolean(listing)} defaultValue={listing?.sellerSkuId} className="mt-1 min-h-11 w-full rounded-md border px-3 read-only:bg-slate-100"/></label><Field name="productTitle" label="Title" value={listing?.productTitle} maxLength={500}/><Field name="brand" label="Brand" value={listing?.liveBrand} maxLength={240}/><Field name="category" label="Category" value={listing?.liveCategory} maxLength={240}/><Field name="subCategory" label="Sub-category" value={listing?.subCategory} maxLength={240}/><Field name="fsn" label="FSN / ASIN" value={listing?.fsn} maxLength={160}/><Field name="listingIdentifier" label="Listing ID" value={listing?.listingId} maxLength={160}/><Field name="listingStatus" label="Listing status" value={listing?.listingStatus} maxLength={80}/><Field name="mrp" label="MRP" value={listing?.mrp}/><Field name="sellingPrice" label="Selling price" value={listing?.sellingPrice}/><Field name="mainImageUrl" label="Main image URL" value={listing?.mainImageUrl} maxLength={2048}/><label className="sm:col-span-2 font-bold">Description<textarea name="description" defaultValue={listing?.description??""} maxLength={12000} rows={5} className="mt-1 w-full rounded-md border px-3 py-2"/></label></div><label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="manualLocked" defaultChecked/> Protect entered values from automated refresh</label><SubmitButton pendingText="Saving listing...">Save Listing</SubmitButton></form>;
+}
+
+function Field({name,label,value,maxLength}:{name:string;label:string;value?:string|number|null;maxLength?:number}){return <label className="font-bold">{label}<input name={name} defaultValue={value??""} maxLength={maxLength} className="mt-1 min-h-11 w-full min-w-0 rounded-md border px-3"/></label>}
+function Read({label,value}:{label:string;value:string}){return <div className="rounded-md bg-slate-50 p-3"><p className="text-xs font-bold uppercase text-slate-500">{label}</p><p className="font-black">{value}</p></div>}

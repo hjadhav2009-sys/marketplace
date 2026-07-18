@@ -77,10 +77,13 @@ function buildProjectionData(input:{accountId:string;sourceType:ProjectionSource
   for (const group of taskGroups(input, tasks)) {
     if(relevantTaskIds&&!group[1].tasks.some(task=>relevantTaskIds.has(task.id)))continue;
     const actionable = group[1].tasks.filter(task => task.status !== "PROBLEM" && task.status !== "COMPLETED");
-    if (!actionable.length) continue;
-    const all = group[1].tasks, nonProblem = all.filter(task => task.status !== "PROBLEM"), first = actionable[0], order = first.order, line = first.consignmentLine;
+    const all = group[1].tasks, problems = all.filter(task => task.status === "PROBLEM"), nonProblem = all.filter(task => task.status !== "PROBLEM");
+    const visible = actionable.length ? actionable : problems;
+    if (!visible.length) continue;
+    const first = visible[0], order = first.order, line = first.consignmentLine;
     const snapshot = safeWorkSnapshot(first.workCardSnapshotJson), parsedRoute = parseWorkRouteSnapshot(first.routeSnapshotJson) ?? createWorkRouteSnapshot({ processRoute: line?.processRoute ?? null, currentStage: input.stage });
-    const groupKey = sha(group[1].parts), required = nonProblem.reduce((sum, task) => sum + task.requiredQuantity, 0), completed = nonProblem.reduce((sum, task) => sum + task.completedQuantity, 0);
+    const quantityTasks = nonProblem.length ? nonProblem : problems;
+    const groupKey = sha(group[1].parts), required = quantityTasks.reduce((sum, task) => sum + task.requiredQuantity, 0), completed = quantityTasks.reduce((sum, task) => sum + task.completedQuantity, 0);
     rows.push({
       groupKey, accountId: input.accountId, sourceType: input.sourceType, stage: input.stage,
       sourceBatchId: group[1].parts[4], marketplace: group[1].parts[1], sellerSku: group[1].sku,
@@ -91,11 +94,11 @@ function buildProjectionData(input:{accountId:string;sourceType:ProjectionSource
       operationalIdentifier: String(snapshot.operationalBarcode ?? order?.trackingId ?? order?.awb ?? line?.fnskuSnapshot ?? line?.fnskuSource ?? line?.barcodeSnapshot ?? line?.fsnSnapshot ?? line?.listingIdSnapshot ?? "") || null,
       reference: order?.trackingId ?? order?.orderNo ?? line?.consignmentBatch.externalConsignmentNumber ?? "",
       memberCount: all.length, requiredQuantity: required, completedQuantity: completed,
-      completeMemberCount: nonProblem.filter(task => task.completedQuantity >= task.requiredQuantity).length,
-      partialMemberCount: nonProblem.filter(task => task.completedQuantity > 0 && task.completedQuantity < task.requiredQuantity).length,
+      completeMemberCount: quantityTasks.filter(task => task.completedQuantity >= task.requiredQuantity).length,
+      partialMemberCount: quantityTasks.filter(task => task.completedQuantity > 0 && task.completedQuantity < task.requiredQuantity).length,
       problemCount: all.length - nonProblem.length,
-      status: actionable.some(task => task.status === "IN_PROGRESS") ? "IN_PROGRESS" : "READY",
-      oldestWaitingAt: actionable.reduce((oldest, task) => task.createdAt < oldest ? task.createdAt : oldest, first.createdAt),
+      status: actionable.some(task => task.status === "IN_PROGRESS") ? "IN_PROGRESS" : actionable.length ? "READY" : "PROBLEM",
+      oldestWaitingAt: visible.reduce((oldest, task) => task.createdAt < oldest ? task.createdAt : oldest, first.createdAt),
       recommendedNextStage: input.stage === "PACK" ? null : recommendedNextStage(parsedRoute, input.stage),
       hasExplicitSavedRoute: snapshot.hasExplicitSavedRoute === true,
       savedProcessRoute: snapshot.hasExplicitSavedRoute === true ? String(snapshot.routeRecommendation) as ProcessRoute : null,
@@ -138,7 +141,7 @@ export async function refreshAffectedWorkGroups(input:{accountId:string;sourceTy
     for(let index=0;index<uniqueCohorts.length;index+=40){for(const task of await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage,status:{in:["READY","IN_PROGRESS","PROBLEM","COMPLETED"]},OR:uniqueCohorts.slice(index,index+40)},include:INCLUDE}))candidateMap.set(task.id,task);}
     const candidates=[...candidateMap.values()].sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()||a.id.localeCompare(b.id));
     const relevantIds=new Set([...affectedIds,...oldMemberIds]),{rows,members}=buildProjectionData({accountId:input.accountId,sourceType:input.sourceType,stage,marketplace:String(account.marketplace)},candidates,relevantIds),replaceKeys=[...new Set([...oldGroupKeys,...rows.map(row=>row.groupKey)])];
-    if(replaceKeys.length)await client.workGroupProjection.deleteMany({where:{groupKey:{in:replaceKeys},accountId:input.accountId,sourceType:input.sourceType,stage}});for(let index=0;index<rows.length;index+=500)await client.workGroupProjection.createMany({data:rows.slice(index,index+500)});for(let index=0;index<members.length;index+=1000)await client.workGroupMember.createMany({data:members.slice(index,index+1000)});const stateKey={accountId:input.accountId,sourceType:input.sourceType,stage},prior=await client.workProjectionState.findUnique({where:{accountId_sourceType_stage:stateKey},select:{lastAppliedTaskVersion:true}}),lastAppliedTaskVersion=Math.max(prior?.lastAppliedTaskVersion??0,...affected.map(task=>task.version),0);await client.workProjectionState.upsert({where:{accountId_sourceType_stage:stateKey},create:{...stateKey,state:"READY",lastAppliedTaskVersion},update:{state:"READY",lastAppliedTaskVersion,errorSummary:null}});results[stage]={groupCount:rows.length,memberCount:members.length};
+    if(replaceKeys.length)await client.workGroupProjection.deleteMany({where:{groupKey:{in:replaceKeys},accountId:input.accountId,sourceType:input.sourceType,stage}});for(let index=0;index<rows.length;index+=500)await client.workGroupProjection.createMany({data:rows.slice(index,index+500)});for(let index=0;index<members.length;index+=1000)await client.workGroupMember.createMany({data:members.slice(index,index+1000)});const stateKey={accountId:input.accountId,sourceType:input.sourceType,stage},prior=await client.workProjectionState.findUnique({where:{accountId_sourceType_stage:stateKey},select:{lastAppliedTaskVersion:true}}),lastAppliedTaskVersion=Math.max(prior?.lastAppliedTaskVersion??0,...affected.map(task=>task.version),0);await client.workProjectionState.upsert({where:{accountId_sourceType_stage:stateKey},create:{...stateKey,state:"READY",lastAppliedTaskVersion},update:{lastAppliedTaskVersion}});results[stage]={groupCount:rows.length,memberCount:members.length};
   }
   return results;
 }

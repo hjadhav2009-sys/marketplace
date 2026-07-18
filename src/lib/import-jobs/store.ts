@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { PrismaClient } from "@prisma/client";
+import { sanitizeImportJobError } from "./safe-error";
 
 export type ImportJobStatus = "QUEUED" | "RUNNING" | "NEEDS_MAPPING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
 export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER" | "FLIPKART_PRODUCT_INVENTORY" | "AMAZON_ALL_LISTINGS" | "AMAZON_CATEGORY_CATALOG" | "AMAZON_PRODUCT_INVENTORY" | "FLIPKART_CONSIGNMENT_QUANTITY" | "FLIPKART_CONSIGNMENT_ENRICHMENT" | "AMAZON_CONSIGNMENT_QUANTITY" | "AMAZON_CONSIGNMENT_ENRICHMENT";
@@ -363,15 +364,15 @@ export async function completeImportJob(id: string, batchId?: string | null) {
   `;
 }
 
-export async function failImportJob(id: string, error: unknown) {
+export async function failImportJob(id: string, error: unknown, client: PrismaClient = prisma) {
   const now = new Date();
-  const message = error instanceof Error ? error.message : "Import failed.";
+  const message = sanitizeImportJobError(error, 1000) ?? "Import failed.";
 
-  await prisma.$executeRaw`
+  await client.$executeRaw`
     UPDATE "ImportJob"
     SET
       "status" = ${"FAILED"},
-      "lastError" = ${message.slice(0, 1000)},
+      "lastError" = ${message},
       "finishedAt" = ${now},
       "updatedAt" = ${now}
     WHERE "id" = ${id}

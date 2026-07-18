@@ -1,4 +1,4 @@
-import { normalizeSkuForMatching } from "@/lib/sku";
+import { canonicalSkuIdentity } from "@/lib/sku";
 import { flipkartInternalOrderKey, type FlipkartOrderLine, type FlipkartParseIssue, type FlipkartRawRow } from "./parser";
 
 export const FLIPKART_DUPLICATE_ROW = "DUPLICATE_FLIPKART_ROW";
@@ -64,14 +64,14 @@ export function dedupeFlipkartOrderRows(orders: FlipkartOrderLine[]): FlipkartOr
     orderItemId: order.orderItemId ?? null,
     shipmentId: order.shipmentId ?? null,
     orderId: order.orderId ?? null,
-    sellerSku: normalizeSkuForMatching(order.sku),
+    sellerSku: canonicalSkuIdentity(order.sku),
     quantity: order.quantity ?? 1,
     trackingId: order.trackingId ?? null
   });
   const importableOrders: FlipkartOrderLine[] = [];
   let repeatedSourceRows = 0;
 
-  for (const [key, rows] of groups) {
+  for (const rows of groups.values()) {
     const fingerprints = new Set(rows.map(operationalFingerprint));
     if (fingerprints.size === 1) {
       const canonical=rows.reduce((best,row)=>(row.productTitle?.trim().length??0)>(best.productTitle?.trim().length??0)?row:best,rows[0]);
@@ -84,11 +84,11 @@ export function dedupeFlipkartOrderRows(orders: FlipkartOrderLine[]): FlipkartOr
       rowNumber: rows[0].rowNumber,
       issueType: FLIPKART_DUPLICATE_IDENTITY_CONFLICT,
       severity: "BLOCKING_ERROR",
-      message: `Conflicting rows use the same Flipkart order identity ${key}; no Order or work was created for this identity.`,
+      message: "Conflicting rows use the same Flipkart order identity; no Order or work was created for this identity.",
       rawData: {},
       safeData: {
         rowNumbers: rows.map((row) => row.rowNumber),
-        sellerSku: normalizeSkuForMatching(rows[0].sku),
+        sellerSku: canonicalSkuIdentity(rows[0].sku),
         orderItemId: rows[0].orderItemId ?? null,
         shipmentId: rows[0].shipmentId ?? null,
         issueCode: FLIPKART_DUPLICATE_IDENTITY_CONFLICT
@@ -119,7 +119,7 @@ export function flipkartOrderMappingIssue(
     return null;
   }
 
-  const sku = normalizeSkuForMatching(order.sku);
+  const sku = canonicalSkuIdentity(order.sku);
 
   if (!sku) {
     return null;

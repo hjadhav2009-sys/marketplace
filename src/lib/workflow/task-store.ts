@@ -8,6 +8,7 @@ import { refreshAffectedWorkGroups } from "./work-group-projection";
 import { createImmutableRouteProvenance } from "./route-provenance";
 import { deriveOrderWorkflowPrerequisites } from "./workflow-prerequisites";
 import { beginWorkflowActionReceipt, completeWorkflowActionReceipt, withWorkflowActionRequestGate } from "./workflow-action-receipt";
+import { sanitizeImportJobError } from "@/src/lib/import-jobs/safe-error";
 
 type Transaction = Prisma.TransactionClient;
 type Client = PrismaClient;
@@ -29,7 +30,21 @@ export function createConsignmentTaskPlan(input: { lineId: string; accountId: st
 export async function validateConsignmentActivation(batchId: string, accountId: string, client: PrismaClient | Transaction = prisma) {
   const batch = await client.consignmentBatch.findFirst({
     where: { id: batchId, accountId },
-    include: { lines: { orderBy: { rowNumber: "asc" }, include: {
+    include: {
+      issues: {
+        where: {
+          severity: "ERROR",
+          OR: [
+            { resolved: false },
+            { consignmentLineId: null },
+            { issueType: "INVALID_QUANTITY" }
+          ]
+        },
+        orderBy: [{ rowNumber: "asc" }, { createdAt: "asc" }],
+        take: 50,
+        select: { consignmentLineId: true, rowNumber: true, issueType: true, resolved: true }
+      },
+      lines: { orderBy: { rowNumber: "asc" }, include: {
       marketplaceListing: { select: { id: true, accountId: true, marketplace: true, sellerSkuId: true, fsn: true, listingId: true, productTitle: true, mainImageUrl: true, identifiers: { where: { active: true }, select: { identifierType: true, rawValue: true } }, processRules: { where: { active: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, updatedAt: true, markingRequired: true, markingAssetId: true, markingAsset: { select: { id: true, name: true, masterDesignId: true, material: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true, speedSetting: true, frequencySetting: true, passes: true, instructions: true } }, assemblyRequired: true, assemblyTitle: true, assemblyInstructions: true, assemblyImageUrl: true } } } },
       processRule: { select: { id: true, accountId: true, marketplaceListingId: true, active: true, route: true, updatedAt: true, markingRequired: true, markingAssetId: true, markingAsset: { select: { id: true, name: true, masterDesignId: true, material: true, markingPosition: true, markingWidthMm: true, markingHeightMm: true, powerSetting: true, speedSetting: true, frequencySetting: true, passes: true, instructions: true } }, assemblyRequired: true, assemblyTitle: true, assemblyInstructions: true, assemblyImageUrl: true } },
       markingAsset: { select: { id: true, active: true, masterDesignId: true, instructions: true, listingLinks: { where: { active: true }, select: { accountId: true, marketplaceListingId: true } } } },
@@ -39,6 +54,17 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
   if (!batch) return { batch: null, problems: [{ code: "NOT_FOUND", message: "Consignment is not available in the selected account." }] as ActivationProblem[], warnings: [] as ActivationProblem[] };
   const problems: ActivationProblem[] = [];
   const warnings: ActivationProblem[] = [];
+  for (const issue of batch.issues) {
+    const sourceRowWasNotRetained = issue.consignmentLineId === null || issue.issueType === "INVALID_QUANTITY";
+    problems.push({
+      lineId: issue.consignmentLineId ?? undefined,
+      rowNumber: issue.rowNumber ?? undefined,
+      code: sourceRowWasNotRetained && issue.resolved ? "SOURCE_IMPORT_ERROR_REQUIRES_REPARSE" : "UNRESOLVED_IMPORT_ERROR",
+      message: sourceRowWasNotRetained
+        ? "A source import error has no valid work line. Correct or replace the source and reparse before activation."
+        : "A blocking import error remains unresolved. Correct it through the reviewed correction flow before activation."
+    });
+  }
   for (const line of batch.lines) {
     const identify = { lineId: line.id, rowNumber: line.rowNumber };
     const attachedRuleMatches = line.processRule?.active && line.processRule.accountId === line.accountId && line.processRule.marketplaceListingId === line.marketplaceListingId;
@@ -52,8 +78,11 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
     if (line.processRule && (!line.processRule.active || line.processRule.accountId !== line.accountId || line.processRule.marketplaceListingId !== line.marketplaceListingId)) warnings.push({ ...identify, code: "STALE_DEFAULT", message: "The old saved default is no longer applicable; the line route or Direct to Pack will be used." });
     const markingLinked = line.markingAsset?.listingLinks.some((link) => link.accountId === line.accountId && link.marketplaceListingId === line.marketplaceListingId);
     const markingRoute = resolvedRoute === "PICK_MARK_PACK" || resolvedRoute === "PICK_MARK_ASSEMBLE_PACK";
+    const assemblyRoute = resolvedRoute === "PICK_ASSEMBLE_PACK" || resolvedRoute === "PICK_MARK_ASSEMBLE_PACK";
     if (markingRoute && (!line.markingAsset?.active || !markingLinked)) warnings.push({ ...identify, code: "MARKING_ASSET_MISSING", message: "No saved marking asset; the marking worker will need manager guidance." });
     if (markingRoute && line.markingAsset && !line.markingAsset.instructions?.trim() && !line.markingAsset.masterDesignId?.trim()) warnings.push({ ...identify, code: "MARKING_INSTRUCTIONS_MISSING", message: "No saved marking instructions or Master Design ID." });
+    const routeRule = attachedRuleMatches ? line.processRule : line.marketplaceListing?.processRules[0];
+    if (assemblyRoute && (!routeRule?.assemblyRequired || !routeRule.assemblyTitle?.trim() || !routeRule.assemblyInstructions?.trim())) warnings.push({ ...identify, code: "ASSEMBLY_INSTRUCTIONS_MISSING", message: "Saved Assembly title and instructions are incomplete; the worker must confirm a manual-instruction route before continuing." });
     if (!line.marketplaceListing?.mainImageUrl && !line.productImageSnapshot) warnings.push({ ...identify, code: "MISSING_IMAGE", message: "Product image is missing; a placeholder will be shown." });
     if (!line.marketplaceListing?.productTitle && !line.productNameSource) warnings.push({ ...identify, code: "MISSING_TITLE", message: "Product title is missing." });
   }
@@ -130,7 +159,7 @@ export async function activateConsignmentBatch(input: { batchId: string; account
       return { activated: true, alreadyActive: false, taskCount: tasks.length };
     }, { timeout: 30000 });
   } catch (error) {
-    await client.auditLog.create({ data: { userId: input.actorUserId, accountId: input.accountId, action: "CONSIGNMENT_ACTIVATION_FAILED", entityType: "ConsignmentBatch", entityId: input.batchId, metadata: JSON.stringify({ reason: error instanceof Error ? error.message.slice(0, 200) : "validation" }) } }).catch(() => undefined);
+    await client.auditLog.create({ data: { userId: input.actorUserId, accountId: input.accountId, action: "CONSIGNMENT_ACTIVATION_FAILED", entityType: "ConsignmentBatch", entityId: input.batchId, metadata: JSON.stringify({ reason: sanitizeImportJobError(error, 200) ?? "validation" }) } }).catch(() => undefined);
     throw error;
   }
 }

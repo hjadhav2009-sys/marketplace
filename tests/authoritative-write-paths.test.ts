@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import ts from "typescript";
 
 const TRACKED_SOURCE_PATTERN = /^(app|lib|src|scripts)\/.*\.(?:ts|tsx|mjs)$/;
@@ -266,7 +266,7 @@ assert.equal(reviewedMutationPaths.has("app/owner/product-inventory/manual-actio
 
 const tracked = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { encoding: "utf8" })
   .split("\0")
-  .filter(path => TRACKED_SOURCE_PATTERN.test(path));
+  .filter(path => TRACKED_SOURCE_PATTERN.test(path) && existsSync(path));
 const callSites = tracked.flatMap(path => scanSensitiveMutations(path, readFileSync(path, "utf8")));
 const foundPaths = [...new Set(callSites.map(site => site.path))];
 const unreviewed = foundPaths.filter(path => !reviewedMutationPaths.has(path));
@@ -369,7 +369,7 @@ const reviewedRawSqlOccurrences = [
   "src/lib/import-jobs/store.ts:$executeRaw:fdf5aafe0dd292d7b76ccebc60593104122fc96648ab3e3e87f76aad981de19d",
   "src/lib/import-jobs/store.ts:$executeRaw:da5a6fcdea653f138a17ab75e968bd715fac74cfc7ff3e8d7cf534affdb413f5",
   "src/lib/import-jobs/store.ts:$executeRaw:f7397d844aa7bbd01b341ec16b2c462eca150bd62c06ecf6c529f6825378cd8f",
-  "src/lib/import-jobs/store.ts:$executeRaw:137e671e967cb34d4b0c7d8541b3c3b484930364debf96e4222be578ca46cb4e",
+  "src/lib/import-jobs/store.ts:$executeRaw:a2b7ce95c121aced8a11ae23534ff02002bc1e3fa276475b4e4217a1387ad5e6",
   "src/lib/workflow/task-store.ts:$executeRaw:65c6e2710ef47048036807b3d430d8af009e56891343205a78b3f898fa315b6d"
 ] as const;
 const rawSqlId = (site: RawSqlMutation) => `${site.path}:${site.method}:${site.fingerprint}`;

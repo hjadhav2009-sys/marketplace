@@ -1,18 +1,16 @@
 # Workflow Roadmap
 
-Current Phase 7.3.6 sequence: implementation review -> browser QA -> two-worker QA -> copied-database rehearsal -> backend contract freeze -> fully native Expo with no WebView. Older sequence text below is historical and does not approve rollout.
-
-Current sequence: Phase 7.3.4 audit → GitHub review → browser QA → two-worker QA → copied-database rehearsal → contract freeze → fully native Expo (no WebView).
+Current Phase 7.3.6 sequence: final pushed-commit CI -> browser QA -> two-worker QA -> copied-database plus sidecar/storage restore rehearsal -> production-hardware verification -> controlled staging/pilot -> backend/API contract freeze -> fully native Expo with no WebView. Older sequence text below is historical and does not approve rollout.
 
 Marketplace Pick & Pack is a worker workflow system, not an ERP or inventory product.
 
-Phase 7.2B adds periodic asynchronous Flipkart/Amazon Product Inventory Refresh, separate from per-shipment consignment uploads. Phase 7.2C will add worker-selected next routes and final mobile-web simplification; native Expo/APK remains postponed.
+Phase 7.2B periodic asynchronous Flipkart/Amazon Product Inventory Refresh and Phase 7.2C worker-selected routes are implemented in the Phase 7.3.6 draft release candidate. They remain unapproved for production until the release gates pass; native Expo/APK remains postponed.
 
 ## Current Live Flow
 
 - Ready-made customer order: Pick, then Pack.
 - Assembly-required customer order: Pick, Assembly task, then Pack.
-- Existing `Order` pick/pack statuses remain authoritative.
+- `WorkTask` state and central transition/Packing services are authoritative; existing `Order` pick/pack fields are compatibility projections.
 
 ## Phase 1 Foundation
 

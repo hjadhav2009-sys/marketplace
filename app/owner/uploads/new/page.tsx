@@ -44,6 +44,10 @@ function errorText(error: string | undefined) {
     return "The PDF could not be parsed. Use text-based PDFs only; scanned image PDFs need OCR in a later phase.";
   }
 
+  if (error === "legacy-pdf-review-only") {
+    return "Legacy PDF parsing is available only as a Meesho compatibility review and cannot create production work.";
+  }
+
   return error ? "Choose a valid marketplace import file." : null;
 }
 

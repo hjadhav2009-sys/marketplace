@@ -1,5 +1,6 @@
 import { getMobilePermissionAccountContext, mobileError, mobileJson } from "@/lib/mobile-api";
-import { prisma } from "@/lib/prisma";
+import { toPublicImportJob } from "@/src/lib/import-jobs/public-job";
+import { findImportJobById } from "@/src/lib/import-jobs/store";
 
 type RouteContext = {
   params: Promise<{ jobId: string }>;
@@ -13,38 +14,11 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const { jobId } = await context.params;
-  const job = await prisma.importJob.findFirst({
-    where: {
-      id: jobId,
-      accountId: auth.account.id
-    },
-    select: {
-      id: true,
-      marketplace: true,
-      importType: true,
-      fileName: true,
-      status: true,
-      totalRows: true,
-      processedRows: true,
-      createdRows: true,
-      updatedRows: true,
-      unchangedRows: true,
-      duplicateRows: true,
-      warningRows: true,
-      errorRows: true,
-      missingListingRows: true,
-      missingImageRows: true,
-      startedAt: true,
-      finishedAt: true,
-      lastError: true,
-      updatedAt: true,
-      createdAt: true
-    }
-  });
+  const job = await findImportJobById(jobId);
 
-  if (!job) {
+  if (!job || job.accountId !== auth.account.id) {
     return mobileError("not_found", "Import job was not found.", 404);
   }
 
-  return mobileJson({ ok: true, job });
+  return mobileJson({ ok: true, job: toPublicImportJob(job) });
 }

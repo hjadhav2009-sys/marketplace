@@ -1,4 +1,0 @@
-import type { Marketplace } from "@prisma/client";
-import { mergeMarketplaceCatalogRows } from "./merge";
-
-export async function ensureMinimalCatalogPlaceholder(input:{accountId:string;marketplace:Marketplace;sellerSku:string;title?:string|null;fsn?:string|null;asin?:string|null;fnsku?:string|null;externalId?:string|null;ean?:string|null;upc?:string|null;gtin?:string|null;sourceRow:number}){await mergeMarketplaceCatalogRows({accountId:input.accountId,marketplace:input.marketplace,rows:[{version:1,accountId:input.accountId,marketplace:input.marketplace,sourceFileId:"CONSIGNMENT_PLACEHOLDER",sourceTable:"Consignment quantity",sourceRow:input.sourceRow,sourceProfile:input.marketplace==="AMAZON"?"AMAZON_ALL_LISTINGS":"FLIPKART_LISTING_IDENTITY",sourceAuthority:10,sellerSku:input.sellerSku,title:input.title,fsn:input.fsn,asin:input.asin,fnsku:input.fnsku,externalId:input.externalId,ean:input.ean,upc:input.upc,gtin:input.gtin,listingStatus:"NEEDS_ENRICHMENT"}]});}

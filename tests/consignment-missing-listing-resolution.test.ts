@@ -6,7 +6,7 @@ import { createPhase736Database } from "./phase-7-3-6-test-db";
 const fixture = createPhase736Database("consignment-missing-listing-resolution");
 const { prisma } = await import("../lib/prisma");
 const { normalizeListingIdentifier } = await import("../src/lib/marking/identifiers");
-const { resolveConsignmentMissingListing } = await import("../src/lib/catalog/missing-listing-resolution");
+const { clearConsignmentListingMatch, resolveConsignmentMissingListing } = await import("../src/lib/catalog/missing-listing-resolution");
 
 const AMAZON_PROFILE_ID = "amazon-form-profile";
 const AMAZON_PROFILE_FINGERPRINT = "phase736-amazon-technical-v1";
@@ -130,8 +130,30 @@ try {
       marketplaceRequiredGuidance: false,
       locallyOptional: true,
       dynamicAttributeTarget: "bullet_point[language_tag=en_IN]#1.value"
+    }, {
+      canonicalKey: "standard_price#1.value",
+      originalHeader: "Standard price",
+      technicalKey: "standard_price#1.value",
+      label: "Standard price",
+      section: "Pricing",
+      dataType: "decimal",
+      maxLength: 100,
+      marketplaceRequiredGuidance: false,
+      locallyOptional: true,
+      dynamicAttributeTarget: "standard_price#1.value"
+    }, {
+      canonicalKey: "temperature_delta#1.value",
+      originalHeader: "Temperature delta",
+      technicalKey: "temperature_delta#1.value",
+      label: "Temperature delta",
+      section: "Category Attributes",
+      dataType: "decimal",
+      maxLength: 100,
+      marketplaceRequiredGuidance: false,
+      locallyOptional: true,
+      dynamicAttributeTarget: "temperature_delta#1.value"
     }],
-    groups: ["Bullets and Keywords"]
+    groups: ["Bullets and Keywords", "Pricing", "Category Attributes"]
   };
   await prisma.marketplaceFileProfile.create({
     data: {
@@ -313,6 +335,233 @@ try {
   assert.equal(await prisma.consignmentImportIssue.count({ where: { consignmentLineId: conflict.line.id, resolved: false } }), 1);
   assert.equal(await prisma.workTask.count({ where: { consignmentLineId: conflict.line.id } }), 0);
   assert.equal(await prisma.auditLog.count({ where: { action: "CONSIGNMENT_MISSING_LISTING_RESOLVED", entityId: conflict.line.id } }), 0);
+
+  // Price/MRP/amount-like dynamic numeric fields cannot persist negative
+  // marketplace values, while a legitimate signed non-price measurement can.
+  const negativePrice = await createHeldLine(amazon, owner, "NEGATIVE-PRICE", 12);
+  await expectControlledRejection(
+    () => resolveConsignmentMissingListing(resolutionInput(negativePrice, owner.id, amazon.id, "consignment-negative-price", {
+      attributes: [{ technicalKey: "standard_price#1.value", displayLabel: "Standard price", value: "-1.25", manualLocked: true }]
+    })),
+    /non-negative|price|amount/i
+  );
+  assert.equal(await prisma.marketplaceListing.count({ where: { accountId: amazon.id, sellerSkuId: negativePrice.line.sellerSkuSource! } }), 0);
+  assert.equal((await prisma.consignmentLine.findUniqueOrThrow({ where: { id: negativePrice.line.id } })).marketplaceListingId, null);
+  assert.equal(await prisma.consignmentImportIssue.count({ where: { consignmentLineId: negativePrice.line.id, resolved: false } }), 1);
+  assert.equal(await prisma.workTask.count({ where: { consignmentLineId: negativePrice.line.id } }), 0);
+
+  const signedMeasurement = await createHeldLine(amazon, owner, "SIGNED-MEASUREMENT", 14);
+  const signedMeasurementResult = await resolveConsignmentMissingListing(resolutionInput(signedMeasurement, owner.id, amazon.id, "consignment-signed-measurement", {
+    attributes: [{ technicalKey: "temperature_delta#1.value", displayLabel: "Temperature delta", value: "-2.5", manualLocked: true }]
+  }));
+  const signedAttribute = await prisma.marketplaceListingAttribute.findFirstOrThrow({
+    where: { marketplaceListingId: signedMeasurementResult.listingId, technicalKey: "temperature_delta#1.value" }
+  });
+  assert.equal(signedAttribute.valueText, "-2.5");
+  assert.equal((await prisma.consignmentLine.findUniqueOrThrow({ where: { id: signedMeasurement.line.id } })).requiredQuantity, 14);
+  assert.equal(await prisma.workTask.count({ where: { consignmentLineId: signedMeasurement.line.id } }), 0);
+
+  // LINK_EXISTING is the same versioned, receipt-backed transaction as create.
+  const linkConcurrent = await createHeldLine(amazon, owner, "LINK-CONCURRENT", 17);
+  const linkConcurrentListing = await prisma.marketplaceListing.create({
+    data: {
+      accountId: amazon.id,
+      marketplace: "AMAZON",
+      sellerSkuId: linkConcurrent.line.sellerSkuSource!,
+      sku: linkConcurrent.line.sellerSkuSource!,
+      productTitle: "Existing exact listing"
+    }
+  });
+  const linkConcurrentInput = resolutionInput(linkConcurrent, owner.id, amazon.id, "consignment-link-concurrent", {
+    action: "LINK_EXISTING" as const,
+    listingId: linkConcurrentListing.id,
+    common: undefined,
+    attributes: []
+  });
+  const [linkFirst, linkSecond] = await Promise.all([
+    resolveConsignmentMissingListing(linkConcurrentInput),
+    resolveConsignmentMissingListing(linkConcurrentInput)
+  ]);
+  assert.equal(linkFirst.listingId, linkConcurrentListing.id);
+  assert.equal(linkSecond.listingId, linkConcurrentListing.id);
+  assert.deepEqual([linkFirst.idempotent, linkSecond.idempotent].sort(), [false, true]);
+  assert.equal(await prisma.workflowActionReceipt.count({
+    where: { accountId: amazon.id, actorUserId: owner.id, requestKind: "CONSIGNMENT_MISSING_LISTING_RESOLUTION", clientRequestId: linkConcurrentInput.clientRequestId, status: "COMPLETED" }
+  }), 1);
+  assert.equal(await prisma.auditLog.count({ where: { action: "CONSIGNMENT_MISSING_LISTING_RESOLVED", entityId: linkConcurrent.line.id } }), 1);
+  const linkedConcurrentLine = await prisma.consignmentLine.findUniqueOrThrow({ where: { id: linkConcurrent.line.id } });
+  assert.equal(linkedConcurrentLine.marketplaceListingId, linkConcurrentListing.id);
+  assert.equal(linkedConcurrentLine.requiredQuantity, 17);
+  assert.equal(linkedConcurrentLine.activated, false);
+  assert.equal(await prisma.workTask.count({ where: { consignmentLineId: linkConcurrent.line.id } }), 0);
+
+  const changedLinkListing = await prisma.marketplaceListing.create({
+    data: { accountId: amazon.id, marketplace: "AMAZON", sellerSkuId: "LINK-CHANGED-PAYLOAD", sku: "LINK-CHANGED-PAYLOAD" }
+  });
+  await expectControlledRejection(
+    () => resolveConsignmentMissingListing({ ...linkConcurrentInput, listingId: changedLinkListing.id }),
+    /different payload/i
+  );
+
+  // Two different exact selections racing from separate forms produce one final
+  // line mapping, one audit mutation, and a controlled stale response.
+  const selectionRace = await createHeldLine(amazon, owner, "SELECTION-RACE", 19, { asin: "ASIN-SELECTION-RACE" });
+  const selectionA = await prisma.marketplaceListing.create({
+    data: { accountId: amazon.id, marketplace: "AMAZON", sellerSkuId: selectionRace.line.sellerSkuSource!, sku: selectionRace.line.sellerSkuSource! }
+  });
+  const selectionB = await prisma.marketplaceListing.create({
+    data: { accountId: amazon.id, marketplace: "AMAZON", sellerSkuId: "SELECTION-RACE-B", sku: "SELECTION-RACE-B" }
+  });
+  await prisma.marketplaceListingIdentifier.create({
+    data: {
+      accountId: amazon.id,
+      marketplaceListingId: selectionB.id,
+      marketplace: "AMAZON",
+      identifierType: "ASIN",
+      rawValue: "ASIN-SELECTION-RACE",
+      normalizedValue: normalizeListingIdentifier("ASIN", "ASIN-SELECTION-RACE")!,
+      source: "TEST"
+    }
+  });
+  await prisma.consignmentImportIssue.update({
+    where: { id: selectionRace.issue.id },
+    data: { issueType: "EXACT_MULTIPLE", safeDataJson: JSON.stringify({ listingIds: [selectionA.id, selectionB.id] }) }
+  });
+  const selectionInputs = [
+    resolutionInput(selectionRace, owner.id, amazon.id, "consignment-selection-a", {
+      action: "LINK_EXISTING" as const,
+      listingId: selectionA.id,
+      common: undefined,
+      attributes: []
+    }),
+    resolutionInput(selectionRace, owner.id, amazon.id, "consignment-selection-b", {
+      action: "LINK_EXISTING" as const,
+      listingId: selectionB.id,
+      common: undefined,
+      attributes: []
+    })
+  ];
+  const selectionResults = await Promise.allSettled(selectionInputs.map((input) => resolveConsignmentMissingListing(input)));
+  assert.equal(selectionResults.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(selectionResults.filter((result) => result.status === "rejected").length, 1);
+  const selectionFailure = selectionResults.find((result): result is PromiseRejectedResult => result.status === "rejected")!;
+  assert.match(String(selectionFailure.reason instanceof Error ? selectionFailure.reason.message : selectionFailure.reason), /unavailable|resolved|changed|busy|refresh/i);
+  assert.doesNotMatch(String(selectionFailure.reason), /P2002|P2034|PrismaClientKnownRequestError|SQLITE_BUSY/i);
+  const selectedRaceLine = await prisma.consignmentLine.findUniqueOrThrow({ where: { id: selectionRace.line.id } });
+  assert.ok([selectionA.id, selectionB.id].includes(selectedRaceLine.marketplaceListingId!));
+  assert.equal(selectedRaceLine.requiredQuantity, 19);
+  assert.equal(selectedRaceLine.activated, false);
+  assert.equal(await prisma.auditLog.count({ where: { action: "CONSIGNMENT_MISSING_LISTING_RESOLVED", entityId: selectionRace.line.id } }), 1);
+  assert.equal(await prisma.workTask.count({ where: { consignmentLineId: selectionRace.line.id } }), 0);
+
+  // A foreign-account link is rejected without changing the line or issue.
+  const foreignLink = await createHeldLine(amazon, owner, "FOREIGN-LINK", 23);
+  const foreignExact = await prisma.marketplaceListing.create({
+    data: { accountId: otherAmazon.id, marketplace: "AMAZON", sellerSkuId: foreignLink.line.sellerSkuSource!, sku: foreignLink.line.sellerSkuSource! }
+  });
+  await expectControlledRejection(
+    () => resolveConsignmentMissingListing(resolutionInput(foreignLink, owner.id, amazon.id, "consignment-foreign-link", {
+      action: "LINK_EXISTING" as const,
+      listingId: foreignExact.id,
+      common: undefined,
+      attributes: []
+    })),
+    /not available|account|marketplace/i
+  );
+  const foreignLinkAfter = await prisma.consignmentLine.findUniqueOrThrow({ where: { id: foreignLink.line.id } });
+  assert.equal(foreignLinkAfter.marketplaceListingId, null);
+  assert.equal(foreignLinkAfter.requiredQuantity, 23);
+  assert.equal(await prisma.consignmentImportIssue.count({ where: { consignmentLineId: foreignLink.line.id, resolved: false } }), 1);
+
+  // Clearing a manager selection is versioned and idempotent, re-opens a safe
+  // owner issue, and allows a fresh exact selection without activating work.
+  const clearInput = {
+    actorUserId: owner.id,
+    accountId: amazon.id,
+    batchId: linkConcurrent.batch.id,
+    lineId: linkConcurrent.line.id,
+    expectedLineUpdatedAt: linkedConcurrentLine.updatedAt.toISOString(),
+    clientRequestId: "consignment-clear-concurrent"
+  };
+  const [clearFirst, clearSecond] = await Promise.all([
+    clearConsignmentListingMatch(clearInput),
+    clearConsignmentListingMatch(clearInput)
+  ]);
+  assert.deepEqual([clearFirst.idempotent, clearSecond.idempotent].sort(), [false, true]);
+  const clearedLine = await prisma.consignmentLine.findUniqueOrThrow({ where: { id: linkConcurrent.line.id } });
+  const clearedBatch = await prisma.consignmentBatch.findUniqueOrThrow({ where: { id: linkConcurrent.batch.id } });
+  assert.equal(clearedLine.marketplaceListingId, null);
+  assert.equal(clearedLine.matchStatus, "NOT_FOUND");
+  assert.equal(clearedLine.requiredQuantity, 17);
+  assert.equal(clearedLine.activated, false);
+  assert.equal(clearedBatch.status, "REVIEW_REQUIRED");
+  assert.equal(clearedBatch.activatedAt, null);
+  assert.equal(await prisma.consignmentImportIssue.count({ where: { consignmentLineId: clearedLine.id, resolved: false } }), 1);
+  assert.equal(await prisma.auditLog.count({ where: { action: "CONSIGNMENT_LISTING_MATCH_CLEARED", entityId: clearedLine.id } }), 1);
+  assert.equal(await prisma.workTask.count({ where: { consignmentLineId: clearedLine.id } }), 0);
+  await expectControlledRejection(
+    () => clearConsignmentListingMatch({ ...clearInput, lineId: selectionRace.line.id }),
+    /different payload/i
+  );
+  const reselected = await resolveConsignmentMissingListing({
+    ...linkConcurrentInput,
+    expectedLineUpdatedAt: clearedLine.updatedAt.toISOString(),
+    clientRequestId: "consignment-reselect-after-clear"
+  });
+  assert.equal(reselected.listingId, linkConcurrentListing.id);
+  const reselectedLine = await prisma.consignmentLine.findUniqueOrThrow({ where: { id: clearedLine.id } });
+  assert.equal(reselectedLine.requiredQuantity, 17);
+  assert.equal(reselectedLine.activated, false);
+  assert.equal(await prisma.workTask.count({ where: { consignmentLineId: clearedLine.id } }), 0);
+
+  // Clearing an ASIN-based match can also return to the create path when no
+  // Product Inventory listing owns the protected Seller SKU.
+  const recreate = await createHeldLine(amazon, owner, "CLEAR-RECREATE", 29, {
+    sellerSku: "AMZ--RECREATE__SKU",
+    asin: "",
+    fnsku: "",
+    fsn: "FSN-CLEAR-RECREATE"
+  });
+  const asinListing = await prisma.marketplaceListing.create({
+    data: {
+      accountId: amazon.id,
+      marketplace: "AMAZON",
+      sellerSkuId: "FSN-ONLY-CATALOG",
+      sku: "FSN-ONLY-CATALOG",
+      fsn: "FSN-CLEAR-RECREATE"
+    }
+  });
+  await resolveConsignmentMissingListing(resolutionInput(recreate, owner.id, amazon.id, "consignment-recreate-link", {
+    action: "LINK_EXISTING" as const,
+    listingId: asinListing.id,
+    common: undefined,
+    attributes: []
+  }));
+  const recreateLinked = await prisma.consignmentLine.findUniqueOrThrow({ where: { id: recreate.line.id } });
+  await clearConsignmentListingMatch({
+    actorUserId: owner.id,
+    accountId: amazon.id,
+    batchId: recreate.batch.id,
+    lineId: recreate.line.id,
+    expectedLineUpdatedAt: recreateLinked.updatedAt.toISOString(),
+    clientRequestId: "consignment-recreate-clear"
+  });
+  const recreateCleared = await prisma.consignmentLine.findUniqueOrThrow({ where: { id: recreate.line.id } });
+  const recreatedResult = await resolveConsignmentMissingListing(resolutionInput(
+    { ...recreate, line: recreateCleared },
+    owner.id,
+    amazon.id,
+    "consignment-recreate-minimal",
+    { action: "CREATE_MINIMAL" as const, common: undefined, attributes: [] }
+  ));
+  const recreatedListing = await prisma.marketplaceListing.findUniqueOrThrow({ where: { id: recreatedResult.listingId } });
+  const recreatedIdentifier = await prisma.marketplaceListingIdentifier.findFirstOrThrow({
+    where: { marketplaceListingId: recreatedResult.listingId, identifierType: "SELLER_SKU" }
+  });
+  assert.equal(recreatedListing.sellerSkuId, "AMZ--RECREATE__SKU");
+  assert.equal(recreatedIdentifier.rawValue, "AMZ--RECREATE__SKU");
+  assert.equal((await prisma.consignmentLine.findUniqueOrThrow({ where: { id: recreate.line.id } })).requiredQuantity, 29);
+  assert.equal(await prisma.workTask.count({ where: { consignmentLineId: recreate.line.id } }), 0);
 } finally {
   await prisma.$disconnect();
   fixture.cleanup();

@@ -1,0 +1,7 @@
+export const MANUAL_LOCKABLE_CATALOG_FIELDS = [
+  "productTitle", "listingStatus", "liveBrand", "liveCategory", "subCategory", "description",
+  "mrp", "sellingPrice", "mainImageUrl", "imageUrl1", "imageUrl2", "imageUrl3", "imageUrl4",
+  "imageUrl5", "imageUrl6", "imageUrl7", "imageUrl8", "imageUrl9", "imageUrl10"
+] as const;
+
+export type ManualLockableCatalogField = typeof MANUAL_LOCKABLE_CATALOG_FIELDS[number];

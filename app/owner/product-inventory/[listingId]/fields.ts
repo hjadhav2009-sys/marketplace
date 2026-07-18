@@ -1,1 +1,1 @@
-export const LOCKABLE_CATALOG_FIELDS=["productTitle","listingStatus","liveBrand","liveCategory","subCategory","description","mrp","sellingPrice","mainImageUrl","imageUrl1","imageUrl2","imageUrl3","imageUrl4","imageUrl5","imageUrl6","imageUrl7","imageUrl8","imageUrl9","imageUrl10"] as const;
+export { MANUAL_LOCKABLE_CATALOG_FIELDS as LOCKABLE_CATALOG_FIELDS } from "@/src/lib/catalog/manual-listing-fields";

@@ -83,6 +83,105 @@ export function listingIdentifierRows(listing: Pick<MarketplaceListing, "id" | "
   });
 }
 
+type TransactionalIdentifierSyncInput = {
+  listing: Pick<MarketplaceListing, "id" | "accountId" | "marketplace" | "sellerSkuId" | "sku" | "fsn" | "listingId">;
+  extraIdentifiers?: ListingIdentifierInput[];
+  source?: string;
+  replaceManagedTypes?: boolean;
+};
+
+const MANAGED_IDENTITY_TYPES = new Set<IdentifierType>(["SELLER_SKU", "INTERNAL_SKU", "FSN", "LISTING_ID"]);
+
+/**
+ * Synchronize a listing's identifier registry without leaving the caller's
+ * transaction. Callers that need cross-listing conflict guarantees must use a
+ * serializable transaction because the legacy schema has no account-wide
+ * identifier uniqueness constraint.
+ */
+export async function syncMarketplaceListingIdentifiersInTransaction(
+  tx: Prisma.TransactionClient,
+  input: TransactionalIdentifierSyncInput
+) {
+  const marketplace = input.listing.marketplace.toUpperCase() as Marketplace;
+  const source = (input.source ?? "MANUAL_OWNER").normalize("NFKC").trim().slice(0, 80) || "MANUAL_OWNER";
+  if (input.extraIdentifiers !== undefined && !Array.isArray(input.extraIdentifiers)) throw new Error("Listing identifiers must be submitted as a bounded list.");
+  const extras = input.extraIdentifiers ?? [];
+  if (extras.length > 250) throw new Error("Too many listing identifiers were submitted.");
+
+  const baseRows = listingIdentifierRows(input.listing).map((row) => ({ ...row, marketplace, source }));
+  const extraRows = extras.flatMap((item) => {
+    if (!item || typeof item !== "object" || !PRIORITY.includes(item.type)) throw new Error("Identifier type is unsupported.");
+    const normalizedValue = normalizeListingIdentifier(item.type, item.value);
+    if (!normalizedValue) throw new Error(`${item.type} is blank, invalid, or too long.`);
+    const rawValue = String(item.value).normalize("NFKC").trim();
+    return [{
+      accountId: input.listing.accountId,
+      marketplaceListingId: input.listing.id,
+      marketplace,
+      identifierType: item.type,
+      rawValue,
+      normalizedValue,
+      source,
+      active: true
+    }];
+  });
+  const rows = [...new Map([...baseRows, ...extraRows].map((row) => [`${row.identifierType}:${row.normalizedValue}`, row])).values()];
+
+  for (const row of rows) {
+    const conflict = await tx.marketplaceListingIdentifier.findFirst({
+      where: {
+        accountId: input.listing.accountId,
+        marketplace,
+        identifierType: row.identifierType,
+        normalizedValue: row.normalizedValue,
+        active: true,
+        marketplaceListingId: { not: input.listing.id }
+      },
+      select: { id: true }
+    });
+    if (conflict) throw new Error(`${row.identifierType} is already linked to another listing in this account.`);
+    await tx.marketplaceListingIdentifier.upsert({
+      where: {
+        marketplaceListingId_identifierType_normalizedValue: {
+          marketplaceListingId: input.listing.id,
+          identifierType: row.identifierType,
+          normalizedValue: row.normalizedValue
+        }
+      },
+      create: row,
+      update: {
+        accountId: input.listing.accountId,
+        marketplace,
+        rawValue: row.rawValue,
+        source,
+        active: true
+      }
+    });
+  }
+
+  if (input.replaceManagedTypes !== false) {
+    const managedTypes = [...new Set<IdentifierType>([
+      ...MANAGED_IDENTITY_TYPES,
+      ...extras.map((item) => item.type)
+    ])];
+    const desired = new Set(rows.map((row) => `${row.identifierType}:${row.normalizedValue}`));
+    const stale = await tx.marketplaceListingIdentifier.findMany({
+      where: {
+        marketplaceListingId: input.listing.id,
+        accountId: input.listing.accountId,
+        marketplace,
+        identifierType: { in: managedTypes },
+        active: true
+      },
+      select: { id: true, identifierType: true, normalizedValue: true }
+    });
+    const staleIds = stale.filter((row) => !desired.has(`${row.identifierType}:${row.normalizedValue}`)).map((row) => row.id);
+    if (staleIds.length) await tx.marketplaceListingIdentifier.updateMany({ where: { id: { in: staleIds } }, data: { active: false } });
+  }
+
+  return rows.length;
+}
+
 export async function syncIdentifiersForMarketplaceListing(listing: Pick<MarketplaceListing, "id" | "accountId" | "marketplace" | "sellerSkuId" | "sku" | "fsn" | "listingId">) {
   const rows = listingIdentifierRows(listing);
   await prisma.$transaction([

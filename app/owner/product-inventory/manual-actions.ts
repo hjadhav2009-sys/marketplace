@@ -1,16 +1,55 @@
 "use server";
+
 import { redirect } from "next/navigation";
-import { requireAccount,requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { normalizeSkuForMatching } from "@/lib/sku";
-import { syncIdentifiersForMarketplaceListing } from "@/src/lib/marking/identifiers";
+import { requireAccount, requireUser } from "@/lib/auth";
+import {
+  createManualMarketplaceListing,
+  updateManualMarketplaceListing,
+  type ManualListingCommonInput
+} from "@/src/lib/catalog/manual-listing";
 
-const value=(form:FormData,key:string,max=500)=>String(form.get(key)??"").normalize("NFKC").trim().slice(0,max)||null;
-const lastValue=(form:FormData,key:string,max=500)=>String(form.getAll(key).at(-1)??"").normalize("NFKC").trim().slice(0,max)||null;
-const price=(form:FormData,key:string)=>{const raw=value(form,key,40);if(!raw)return null;const parsed=Number(raw);if(!Number.isFinite(parsed)||parsed<0)throw new Error("Prices must be valid non-negative numbers.");return parsed;};
-const url=(form:FormData,key:string)=>{const raw=value(form,key,2048);if(!raw)return null;const parsed=new URL(raw);if(!["http:","https:"].includes(parsed.protocol))throw new Error("Image URL must use HTTP or HTTPS.");return raw;};
-const common=(form:FormData)=>{const fields={productTitle:value(form,"productTitle"),subCategory:value(form,"subCategory"),fsn:value(form,"fsn",160),listingId:lastValue(form,"listingId",160),listingStatus:value(form,"listingStatus",80)??"NEEDS_ENRICHMENT",mrp:price(form,"mrp"),sellingPrice:price(form,"sellingPrice"),liveBrand:value(form,"brand",240),liveCategory:value(form,"category",240),description:value(form,"description",12000),mainImageUrl:url(form,"mainImageUrl")};const entered=Object.entries(fields).filter(([,item])=>item!==null).map(([key])=>key);return{...fields,fieldProvenanceJson:JSON.stringify(Object.fromEntries(entered.map(key=>[key,{sourceAuthority:"MANUAL_OWNER",updatedAt:new Date().toISOString()}]))),manualLocksJson:JSON.stringify(form.get("manualLocked")==="on"?entered:[])};};
+function common(formData: FormData): ManualListingCommonInput {
+  return {
+    productTitle: formData.get("productTitle"),
+    brand: formData.get("brand"),
+    category: formData.get("category"),
+    subCategory: formData.get("subCategory"),
+    fsn: formData.get("fsn"),
+    listingId: formData.get("listingIdentifier"),
+    listingStatus: formData.get("listingStatus"),
+    mrp: formData.get("mrp"),
+    sellingPrice: formData.get("sellingPrice"),
+    mainImageUrl: formData.get("mainImageUrl"),
+    description: formData.get("description")
+  };
+}
 
-export async function createManualListingAction(form:FormData){const user=await requireUser(["OWNER"]),account=await requireAccount(user),sellerSku=normalizeSkuForMatching(String(form.get("sellerSku")??""));if(!sellerSku)throw new Error("Seller SKU is required.");const listing=await prisma.$transaction(async tx=>{const existing=await tx.marketplaceListing.findFirst({where:{accountId:account.id,marketplace:account.marketplace,sellerSkuId:sellerSku},select:{id:true}});if(existing)throw new Error("This Seller SKU already exists in the selected account.");const created=await tx.marketplaceListing.create({data:{accountId:account.id,marketplace:account.marketplace,sellerSkuId:sellerSku,sku:sellerSku,...common(form)}});await tx.auditLog.create({data:{userId:user.id,accountId:account.id,action:"MANUAL_LISTING_CREATED",entityType:"MarketplaceListing",entityId:created.id,metadata:JSON.stringify({marketplace:account.marketplace})}});return created;});await syncIdentifiersForMarketplaceListing(listing);redirect(`/owner/product-inventory/${listing.id}`);}
+export async function createManualListingAction(formData: FormData) {
+  const user = await requireUser(["OWNER"]);
+  const account = await requireAccount(user);
+  const result = await createManualMarketplaceListing({
+    actorUserId: user.id,
+    accountId: account.id,
+    clientRequestId: String(formData.get("clientRequestId") ?? ""),
+    sellerSku: formData.get("sellerSku"),
+    common: common(formData),
+    manualLocked: formData.get("manualLocked") === "on"
+  });
+  redirect(`/owner/product-inventory/${result.listingId}`);
+}
 
-export async function updateManualListingAction(form:FormData){const user=await requireUser(["OWNER"]),account=await requireAccount(user),listingId=String(form.get("listingId")??"");const listing=await prisma.$transaction(async tx=>{const existing=await tx.marketplaceListing.findFirst({where:{id:listingId,accountId:account.id,marketplace:account.marketplace}});if(!existing)throw new Error("Listing is unavailable.");const updated=await tx.marketplaceListing.update({where:{id:existing.id},data:common(form)});await tx.auditLog.create({data:{userId:user.id,accountId:account.id,action:"MANUAL_LISTING_UPDATED",entityType:"MarketplaceListing",entityId:updated.id}});return updated;});await syncIdentifiersForMarketplaceListing(listing);redirect(`/owner/product-inventory/${listing.id}`);}
+export async function updateManualListingAction(formData: FormData) {
+  const user = await requireUser(["OWNER"]);
+  const account = await requireAccount(user);
+  const result = await updateManualMarketplaceListing({
+    actorUserId: user.id,
+    accountId: account.id,
+    clientRequestId: String(formData.get("clientRequestId") ?? ""),
+    marketplaceListingId: String(formData.get("marketplaceListingId") ?? ""),
+    expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+    sellerSku: formData.get("sellerSku"),
+    common: common(formData),
+    manualLocked: formData.get("manualLocked") === "on"
+  });
+  redirect(`/owner/product-inventory/${result.listingId}`);
+}

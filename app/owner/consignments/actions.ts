@@ -18,6 +18,7 @@ import { resolveExistingConsignmentPath } from "@/src/lib/consignments/storage";
 import { setActiveProcessRule } from "@/src/lib/marking/process-rules";
 import { normalizeSkuForMatching } from "@/lib/sku";
 import { syncIdentifiersForMarketplaceListing } from "@/src/lib/marking/identifiers";
+import { resolveConsignmentMissingListing } from "@/src/lib/catalog/missing-listing-resolution";
 import { activateConsignmentBatch, validateConsignmentActivation } from "@/src/lib/workflow/task-store";
 
 function value(formData: FormData, name: string, max = 500) {
@@ -132,6 +133,15 @@ export async function selectConsignmentListingAction(formData: FormData) {
 export async function createConsignmentMinimalListingAction(formData:FormData){
   const user=await requireWorkPermission("canManageConsignments"),account=await requireAccount(user),lineId=value(formData,"lineId",80),batchId=value(formData,"batchId",80);
   const result=await prisma.$transaction(async tx=>{const line=await tx.consignmentLine.findFirst({where:{id:lineId,consignmentBatchId:batchId,accountId:account.id,activated:false},include:{consignmentBatch:true}});if(!line||line.consignmentBatch.marketplace!==account.marketplace)throw new Error("Consignment line is unavailable.");const sellerSku=normalizeSkuForMatching(line.sellerSkuSource);if(!sellerSku)throw new Error("A stable Seller SKU or Merchant SKU is required before creating a listing.");let listing=await tx.marketplaceListing.findFirst({where:{accountId:account.id,marketplace:account.marketplace,sellerSkuId:sellerSku}});if(!listing)listing=await tx.marketplaceListing.create({data:{accountId:account.id,marketplace:account.marketplace,sellerSkuId:sellerSku,sku:sellerSku,productTitle:line.productNameSource,fsn:line.fsnSource,listingStatus:"NEEDS_ENRICHMENT",fieldProvenanceJson:JSON.stringify({productTitle:{sourceAuthority:"CONSIGNMENT_FALLBACK"}}),manualLocksJson:"[]"}});await tx.consignmentLine.update({where:{id:line.id},data:{marketplaceListingId:listing.id,matchStatus:"OWNER_SELECTED",matchIdentifierType:"SELLER_SKU",matchIdentifierValue:sellerSku,matchMessage:"Minimal listing created by owner. Source quantity preserved.",processRoute:null,processRuleId:null,markingAssetId:null}});await tx.consignmentImportIssue.updateMany({where:{consignmentLineId:line.id,issueType:{in:["NOT_FOUND","EXACT_MULTIPLE","IDENTIFIER_CONFLICT"]},resolved:false},data:{resolved:true,resolvedAt:new Date(),resolvedByUserId:user.id}});await tx.auditLog.create({data:{userId:user.id,accountId:account.id,action:"CONSIGNMENT_MINIMAL_LISTING_CREATED",entityType:"ConsignmentLine",entityId:line.id,metadata:JSON.stringify({batchId,listingId:listing.id,requiredQuantity:line.requiredQuantity})}});return{listing,batchId};});await syncIdentifiersForMarketplaceListing(result.listing);await refreshReviewState(result.batchId,account.id);revalidatePath(`/owner/consignments/${batchId}/review`);redirect(`/owner/consignments/${batchId}/review?updated=1`);
+}
+
+export async function createConsignmentFullListingAction(formData:FormData){
+  const user=await requireWorkPermission("canManageConsignments"),account=await requireAccount(user),lineId=value(formData,"issueId",80),batchId=value(formData,"batchId",80);
+  const attributes=[...formData.entries()].flatMap(([key,item])=>key.startsWith("attribute:")&&String(item).trim()?[{technicalKey:key.slice(10),displayLabel:key.slice(10),value:String(item),manualLocked:formData.get("manualLocked")==="on"}]:[]);
+  await resolveConsignmentMissingListing({actorUserId:user.id,accountId:account.id,batchId,lineId,clientRequestId:value(formData,"clientRequestId",160),action:String(formData.get("resolutionAction")??"CREATE_FULL")==="CREATE_MINIMAL"?"CREATE_MINIMAL":"CREATE_FULL",manualLocked:formData.get("manualLocked")==="on",common:{productTitle:formData.get("productTitle"),brand:formData.get("brand"),category:formData.get("category"),subCategory:formData.get("subCategory"),mrp:formData.get("mrp"),sellingPrice:formData.get("sellingPrice"),productHighlights:formData.get("productHighlights"),description:formData.get("description"),specifications:formData.get("specifications"),images:String(formData.get("images")??"").split(/\r?\n/).map(item=>item.trim()).filter(Boolean)},attributes});
+  await refreshReviewState(batchId,account.id);
+  revalidatePath(`/owner/consignments/${batchId}/review`);
+  redirect(`/owner/consignments/${batchId}/review?updated=1`);
 }
 
 export async function clearConsignmentListingAction(formData: FormData) {

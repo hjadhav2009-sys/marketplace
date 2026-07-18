@@ -49,7 +49,7 @@
     "operational-retention:test": "tsx tests/operational-retention.test.ts",
     "projection-lifecycle:test": "tsx tests/projection-lifecycle.test.ts",
     "rolling-order-import:test": "tsx tests/rolling-order-import.test.ts",
-    "missing-listing-resolution:test": "tsx tests/missing-listing-resolution.test.ts",
+    "missing-listing-resolution:test": "tsx tests/missing-listing-resolution.test.ts && tsx tests/consignment-missing-listing-resolution.test.ts",
     "dynamic-catalog-form:test": "tsx tests/dynamic-catalog-form.test.ts && tsx tests/flipkart-category-profiles.test.ts",
     "import-privacy:test": "tsx tests/rolling-order-import.test.ts",
     "production-flow:test": "tsx tests/production-flow.test.ts && tsx tests/amazon-order-import.test.ts && tsx tests/safe-order-reimport.test.ts",

@@ -14,4 +14,6 @@ The Flipkart main Listing Report profile recognizes the meaningful 75-column hea
 
 Amazon template forms detect a human-label row and stable technical-key row independent of filename or row position. One selected template renders common fields first and searchable/collapsed advanced fields; macros, formulas, and external links are never executed by this form-schema logic.
 
+Flipkart and Amazon Consignment review now offer both minimal listing creation and the same selected-profile full form. Resolution preserves `Quantity Sent`/`Shipped`, resolves the exact held line idempotently, and never activates the Consignment or creates worker tasks until the owner explicitly activates the reviewed batch.
+
 Automated evidence is recorded by the Phase 7.3.6 focused commands. Browser checks at 360, 390, 430, 768, 1024, and 1440 and sanitized two-worker warehouse QA remain manual release gates. This document does not approve production rollout, merge, deployment, or native Expo work.

@@ -19,6 +19,11 @@ export type ResolveMissingListingInput={
   action:"LINK_EXISTING"|"CREATE_MINIMAL"|"CREATE_FULL";listingId?:string;common?:CommonFields;identifiers?:IdentifierInput[];attributes?:DynamicAttributeInput[];manualLocked?:boolean;
 };
 
+export type ResolveConsignmentMissingListingInput={
+  actorUserId:string;accountId:string;batchId:string;lineId:string;clientRequestId:string;
+  action:"CREATE_MINIMAL"|"CREATE_FULL";common?:CommonFields;identifiers?:IdentifierInput[];attributes?:DynamicAttributeInput[];manualLocked?:boolean;
+};
+
 const hash=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const text=(value:unknown,max:number)=>String(value??"").normalize("NFKC").trim().slice(0,max)||null;
 const number=(value:unknown)=>{if(value===null||value===undefined||value==="")return null;const parsed=Number(value);if(!Number.isFinite(parsed)||parsed<0)throw new Error("Prices must be valid non-negative numbers.");return parsed;};
@@ -71,5 +76,36 @@ export async function resolveMissingListing(input:ResolveMissingListingInput,cli
     let taskId:string|null=null;if(issue.sourceType==="ORDER"&&issue.sourceId)taskId=await releaseHeldOrder(tx,{accountId:input.accountId,actorUserId:user.id,orderId:issue.sourceId,listingId:listing.id});
     const changed=await tx.importRowIssue.updateMany({where:{id:issue.id,resolved:false,version:input.expectedIssueVersion},data:{resolved:true,resolvedAt:new Date(),resolvedByUserId:user.id,resolutionAction:input.action,version:{increment:1}}});if(changed.count!==1)throw new Error("Missing-listing issue changed; refresh before saving.");
     await tx.auditLog.create({data:{userId:user.id,accountId:input.accountId,action:"MISSING_LISTING_RESOLVED",entityType:"ImportRowIssue",entityId:issue.id,metadata:JSON.stringify({action:input.action,listingId:listing.id,taskId})}});const result={listingId:listing.id,taskId,idempotent:false};await tx.workflowActionReceipt.update({where:{accountId_actorUserId_requestKind_clientRequestId:{accountId:input.accountId,actorUserId:user.id,requestKind:"MISSING_LISTING_RESOLUTION",clientRequestId:input.clientRequestId}},data:{status:"COMPLETED",resultJson:JSON.stringify(result),completedAt:new Date()}});return result;
+  });
+}
+
+export async function resolveConsignmentMissingListing(input:ResolveConsignmentMissingListingInput,client:Client=prisma){
+  if(!input.clientRequestId.trim()||input.clientRequestId.length>160)throw new Error("A bounded client request ID is required.");
+  const requestFingerprint=hash({...input,clientRequestId:undefined});
+  return client.$transaction(async tx=>{
+    const{user}=await assertWorkerAccountAccess(input.actorUserId,input.accountId,tx);
+    if(user.role!=="OWNER"&&!user.canManageConsignments)throw new Error("Consignment management permission is required.");
+    const receiptKey={accountId_actorUserId_requestKind_clientRequestId:{accountId:input.accountId,actorUserId:user.id,requestKind:"CONSIGNMENT_MISSING_LISTING_RESOLUTION",clientRequestId:input.clientRequestId}};
+    const prior=await tx.workflowActionReceipt.findUnique({where:receiptKey});
+    if(prior){if(prior.requestFingerprint!==requestFingerprint)throw new Error("Request ID was already used with a different payload.");if(prior.status==="COMPLETED"&&prior.resultJson)return JSON.parse(prior.resultJson) as {listingId:string;lineId:string;requiredQuantity:number;idempotent:boolean};throw new Error("This listing resolution is already processing.");}
+    const line=await tx.consignmentLine.findFirst({where:{id:input.lineId,consignmentBatchId:input.batchId,accountId:input.accountId,activated:false},include:{consignmentBatch:true}});
+    if(!line)throw new Error("Consignment line is unavailable.");
+    const sellerSku=normalizeSkuForMatching(line.sellerSkuSource);
+    if(!sellerSku)throw new Error("A stable Seller SKU or Merchant SKU is required before creating a listing.");
+    await tx.workflowActionReceipt.create({data:{accountId:input.accountId,actorUserId:user.id,requestKind:"CONSIGNMENT_MISSING_LISTING_RESOLUTION",clientRequestId:input.clientRequestId,requestFingerprint,sourceType:"CONSIGNMENT",status:"IN_PROGRESS"}});
+    const marketplace=line.consignmentBatch.marketplace;
+    let listing=await tx.marketplaceListing.findFirst({where:{accountId:input.accountId,marketplace,sellerSkuId:sellerSku}});
+    const manualData=input.action==="CREATE_FULL"?commonListingData(input.common,input.manualLocked!==false):{productTitle:line.productNameSource,listingStatus:"NEEDS_ENRICHMENT",fieldProvenanceJson:JSON.stringify(line.productNameSource?{productTitle:{sourceAuthority:"CONSIGNMENT_FALLBACK",updatedAt:new Date().toISOString()}}:{}),manualLocksJson:"[]"};
+    if(!listing)listing=await tx.marketplaceListing.create({data:{accountId:input.accountId,marketplace,sellerSkuId:sellerSku,sku:sellerSku,fsn:line.fsnSource,...manualData}});
+    else if(input.action==="CREATE_FULL")listing=await tx.marketplaceListing.update({where:{id:listing.id},data:manualData});
+    const sourceIdentifiers:IdentifierInput[]=[{type:"SELLER_SKU",value:sellerSku},...(line.fsnSource?[{type:"FSN" as const,value:line.fsnSource}]:[]),...(line.asinSource?[{type:"ASIN" as const,value:line.asinSource}]:[]),...(line.fnskuSource?[{type:"FNSKU" as const,value:line.fnskuSource}]:[]),...(line.externalIdSource?[{type:"EXTERNAL_ID" as const,value:line.externalIdSource}]:[])];
+    await syncIdentifiers(tx,listing,[...sourceIdentifiers,...(input.identifiers??[])]);
+    for(const attribute of (input.attributes??[]).slice(0,1000)){const technicalKey=text(attribute.technicalKey,500),displayLabel=text(attribute.displayLabel,500),valueText=text(attribute.value,4000);if(!technicalKey||!displayLabel||!valueText)continue;if(/[<>\u0000-\u001f]/.test(technicalKey))throw new Error("Dynamic attribute keys contain unsupported characters.");await tx.marketplaceListingAttribute.upsert({where:{marketplaceListingId_technicalKey:{marketplaceListingId:listing.id,technicalKey}},create:{marketplaceListingId:listing.id,accountId:input.accountId,marketplace,technicalKey,displayLabel,valueJson:JSON.stringify(attribute.value),valueText,sourceHeader:text(attribute.sourceHeader,500),sourceAuthority:"MANUAL_OWNER",manualLocked:attribute.manualLocked!==false,createdByUserId:user.id,updatedByUserId:user.id},update:{displayLabel,valueJson:JSON.stringify(attribute.value),valueText,sourceHeader:text(attribute.sourceHeader,500),sourceAuthority:"MANUAL_OWNER",manualLocked:attribute.manualLocked!==false,updatedByUserId:user.id}});}
+    await tx.consignmentLine.update({where:{id:line.id},data:{marketplaceListingId:listing.id,matchStatus:"OWNER_SELECTED",matchIdentifierType:"SELLER_SKU",matchIdentifierValue:sellerSku,matchMessage:`${input.action==="CREATE_FULL"?"Full":"Minimal"} listing created by owner. Source quantity preserved.`,processRoute:null,processRuleId:null,markingAssetId:null}});
+    await tx.consignmentImportIssue.updateMany({where:{consignmentLineId:line.id,issueType:{in:["NOT_FOUND","EXACT_MULTIPLE","IDENTIFIER_CONFLICT"]},resolved:false},data:{resolved:true,resolvedAt:new Date(),resolvedByUserId:user.id}});
+    await tx.auditLog.create({data:{userId:user.id,accountId:input.accountId,action:"CONSIGNMENT_MISSING_LISTING_RESOLVED",entityType:"ConsignmentLine",entityId:line.id,metadata:JSON.stringify({batchId:input.batchId,listingId:listing.id,requiredQuantity:line.requiredQuantity,action:input.action})}});
+    const result={listingId:listing.id,lineId:line.id,requiredQuantity:line.requiredQuantity,idempotent:false};
+    await tx.workflowActionReceipt.update({where:receiptKey,data:{status:"COMPLETED",resultJson:JSON.stringify(result),completedAt:new Date()}});
+    return result;
   });
 }

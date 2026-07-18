@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import type { User } from "@prisma/client";
 import { AppNav, MobileBottomNav } from "@/components/AppNav";
-import { clearSession, requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, clearSession, getSelectedAccount, requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { getRequestMeta } from "@/lib/request-context";
 import { hasWorkPermission } from "@/lib/work-permissions";
@@ -11,6 +11,7 @@ import { hasWorkPermission } from "@/lib/work-permissions";
 type AppShellProps = {
   children: ReactNode;
   title?: string;
+  allowNoAccount?: boolean;
 };
 
 const ownerLinks = [
@@ -20,11 +21,12 @@ const ownerLinks = [
   { href: "/work/assembly", label: "Assembly" },
   { href: "/owner/uploads/new", label: "Import" },
   { href: "/owner/imports", label: "Imports" },
-  { href: "/picker", label: "Pick" },
+  { href: "/work/pick?source=ORDER", label: "Pick" },
   { href: "/packing", label: "Pack" },
   { href: "/problems", label: "Problems" },
   { href: "/reports", label: "Reports" },
   { href: "/owner/product-inventory", label: "Product Inventory" },
+  { href: "/owner/catalog/missing", label: "Missing Listings" },
   { href: "/owner/marking-library", label: "Marking Library" },
   { href: "/owner/process-rules", label: "Default Processing" },
   { href: "/owner/consignments", label: "Consignments" },
@@ -39,11 +41,11 @@ async function logoutAction() {
   "use server";
 
   const user = await requireUser();
-  const account = await requireAccount(user);
+  const account = await getSelectedAccount(user);
   const request = await getRequestMeta();
   await recordAuditLog({
     userId: user.id,
-    accountId: account.id,
+    accountId: account?.id,
     action: "LOGOUT",
     entityType: "User",
     entityId: user.id,
@@ -62,7 +64,7 @@ function linksForUser(user: NavigationUser) {
 
   const links = [];
   if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canAssemble") || hasWorkPermission(user, "canPack") || user.canViewAllWork) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan / Pack" });
-  if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Order Pick" }, { href: "/work/consignments/pick", label: "Consignment Pick" });
+  if (hasWorkPermission(user, "canPick")) links.push({ href: "/work/pick?source=ORDER", label: "Order Pick" }, { href: "/work/consignments/pick", label: "Consignment Pick" });
   if (hasWorkPermission(user, "canMark")) links.push({ href: "/work/marking", label: "Marking" });
   if (hasWorkPermission(user, "canAssemble") || user.canViewAllWork) links.push({ href: "/work/assembly", label: "Assembly" });
   if (hasWorkPermission(user, "canPack")) links.push({ href: "/packing", label: "Order Pack" }, { href: "/work/consignments/pack", label: "Consignment Pack" });
@@ -78,18 +80,18 @@ function mobileLinksForUser(user: NavigationUser) {
   if (user.role === "OWNER") return [];
   const links = [];
   if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canAssemble") || hasWorkPermission(user, "canPack") || user.canViewAllWork) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan" });
-  if (hasWorkPermission(user, "canPick")) links.push({ href: "/picker", label: "Pick" });
+  if (hasWorkPermission(user, "canPick")) links.push({ href: "/work/pick?source=ORDER", label: "Pick" });
   if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Problems" });
   links.push({ href: "/accounts", label: "Account" });
   return links;
 }
 
-export async function AppShell({ children, title }: AppShellProps) {
+export async function AppShell({ children, title, allowNoAccount = false }: AppShellProps) {
   const user = await requireUser();
-  const account = await requireAccount(user);
+  const account = allowNoAccount ? await getSelectedAccount(user) : await requireAccount(user);
   const links = linksForUser(user);
-  const accountName = account.accountDisplayName ?? account.name;
-  const accountCode = account.accountCode ?? account.code;
+  const accountName = account ? account.accountDisplayName ?? account.name : "No seller account selected";
+  const accountCode = account ? account.accountCode ?? account.code : "Create or choose an account";
   const mobileLinks = mobileLinksForUser(user);
   const managementMobileLinks = (user.role === "OWNER" ? ownerLinks : links).filter((link) => link.href !== "/change-password");
 
@@ -97,14 +99,14 @@ export async function AppShell({ children, title }: AppShellProps) {
     <div className="min-h-screen bg-stone-50 text-slate-950">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 sm:py-3">
-          <Link href={roleHomePath(user.role)} prefetch className="min-w-0">
+          <Link href={account ? capabilityHomePath(user) : user.role === "OWNER" ? "/owner/accounts" : "/accounts"} prefetch className="min-w-0">
             <p className="hidden text-xs font-semibold uppercase tracking-wide text-berry sm:block">Marketplace Pick & Pack</p>
-            <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account.companyName} / {accountName}</p>
+            <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account ? `${account.companyName} / ${accountName}` : accountName}</p>
             <p className="truncate text-xs font-medium text-slate-500 sm:hidden">
-              {account.marketplace} / {user.role}
+              {account ? account.marketplace : user.role}
             </p>
             <p className="hidden truncate text-xs font-medium text-slate-500 sm:block">
-              {account.marketplace} / {accountCode}
+              {account ? `${account.marketplace} / ${accountCode}` : accountCode}
             </p>
           </Link>
           <div className="flex items-center gap-2">

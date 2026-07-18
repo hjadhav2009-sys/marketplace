@@ -224,7 +224,7 @@ export async function requireUser(roles?: Role[], options?: { allowPasswordChang
   }
 
   if (roles && !roles.includes(user.role)) {
-    redirect(roleHomePath(user.role));
+    redirect(capabilityHomePath(user));
   }
 
   return user;
@@ -316,16 +316,41 @@ export async function getAvailableAccounts(user: User) {
   );
 }
 
-export function roleHomePath(role: Role) {
-  if (role === "OWNER") {
+export type CapabilityHomeUser = Pick<
+  User,
+  | "role"
+  | "canPick"
+  | "canMark"
+  | "canAssemble"
+  | "canPack"
+  | "canReportProblem"
+  | "canManageMarkingLibrary"
+  | "canManageProcessRules"
+  | "canViewAllWork"
+  | "canViewConsignments"
+  | "canImportConsignments"
+  | "canManageConsignments"
+>;
+
+/**
+ * Returns a landing page the current permission flags actually allow.
+ * PICKER/PACKER are compatibility labels only and never grant a route.
+ */
+export function capabilityHomePath(user: CapabilityHomeUser) {
+  if (user.role === "OWNER") {
     return "/dashboard";
   }
 
-  if (role === "PICKER") {
-    return "/picker";
-  }
-
-  return "/packing";
+  if (user.canViewAllWork) return "/work";
+  if (user.canPick) return "/work/pick";
+  if (user.canMark) return "/work/mark";
+  if (user.canAssemble) return "/work/assemble";
+  if (user.canPack) return "/work/pack";
+  if (user.canReportProblem) return "/work/problems";
+  if (user.canViewConsignments || user.canImportConsignments || user.canManageConsignments) return "/owner/consignments";
+  if (user.canManageMarkingLibrary) return "/owner/marking-library";
+  if (user.canManageProcessRules) return "/owner/process-rules";
+  return "/accounts";
 }
 
 export type AuthContext = {

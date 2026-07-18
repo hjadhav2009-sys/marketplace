@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import type { PickerSkuGroup } from "@/lib/operations/picking";
-import { markSkuGroupPickedInlineAction, markSkuGroupProblemInlineAction } from "@/app/picker/[sku]/actions";
+import { markSkuGroupProblemInlineAction } from "@/app/picker/[sku]/actions";
 import { ProductDetailsDrawer } from "./ProductDetailsDrawer";
 import { ProductImageGallery } from "./ProductImageGallery";
 
@@ -33,14 +33,6 @@ function statusLabel(status: string) {
   return status.charAt(0) + status.slice(1).toLowerCase();
 }
 
-function nextStatus(pendingCount: number, problemCount: number) {
-  if (problemCount > 0) {
-    return "PROBLEM";
-  }
-
-  return pendingCount === 0 ? "PICKED" : "READY";
-}
-
 export function PickerProductCard({ group, encodedColor, encodedSize, detailsUrl, activeFilter, compactMode }: PickerProductCardProps) {
   const [local, setLocal] = useState<LocalState>({
     pickedCount: group.pickedCount,
@@ -52,7 +44,6 @@ export function PickerProductCard({ group, encodedColor, encodedSize, detailsUrl
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
   const [problemError, setProblemError] = useState<string | null>(null);
-  const [isPicking, startPickTransition] = useTransition();
   const [isSavingProblem, startProblemTransition] = useTransition();
   const imageStatus =
     group.missingImage ? "No image" : group.mapping?.cacheStatus === "CACHED" ? "Cached image" : "Listing image";
@@ -72,28 +63,7 @@ export function PickerProductCard({ group, encodedColor, encodedSize, detailsUrl
   }
 
   function markPicked() {
-    startPickTransition(async () => {
-      const result = await markSkuGroupPickedInlineAction(formData());
-
-      if (!result.ok) {
-        return;
-      }
-
-      setLocal((current) => {
-        const updatedRows = Math.min(current.pendingCount, result.updatedRows);
-        const pendingCount = Math.max(0, current.pendingCount - updatedRows);
-        const pickedCount = current.pickedCount + updatedRows;
-        const status = nextStatus(pendingCount, current.problemCount);
-
-        return {
-          ...current,
-          pickedCount,
-          pendingCount,
-          status,
-          hidden: activeFilter === "pending" && status !== "READY"
-        };
-      });
-    });
+    window.location.assign(`/picker/${encodeURIComponent(group.sku)}?color=${encodeURIComponent(encodedColor)}&size=${encodeURIComponent(encodedSize)}`);
   }
 
   function saveProblem(event: FormEvent<HTMLFormElement>) {
@@ -193,10 +163,10 @@ export function PickerProductCard({ group, encodedColor, encodedSize, detailsUrl
           <button
             type="button"
             onClick={markPicked}
-            disabled={isPicking || local.pendingCount === 0 || local.status === "PROBLEM"}
+            disabled={local.pendingCount === 0 || local.status === "PROBLEM"}
             className="col-span-2 min-h-12 rounded-md bg-berry px-3 py-2 text-sm font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300 sm:col-span-1"
           >
-            {isPicking ? "Picking..." : "Picked"}
+            Picked
           </button>
           <button
             type="button"

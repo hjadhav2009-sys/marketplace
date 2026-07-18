@@ -4,9 +4,16 @@ export const IMPORT_JOB_PAGE_SIZES = [10, 25, 50, 100] as const;
 export type ImportJobProgressLike = {
   totalRows: number;
   processedRows: number;
+  status?: string | null;
   startedAt?: Date | string | null;
   finishedAt?: Date | string | null;
 };
+
+export const TERMINAL_IMPORT_JOB_STATUSES = ["NEEDS_MAPPING", "COMPLETED", "COMPLETED_WITH_WARNINGS", "FAILED", "CANCELLED"] as const;
+
+export function isTerminalImportJobStatus(status: string | null | undefined) {
+  return TERMINAL_IMPORT_JOB_STATUSES.includes(status as (typeof TERMINAL_IMPORT_JOB_STATUSES)[number]);
+}
 
 export function clampImportJobPage(page: number | string | null | undefined) {
   const parsed = typeof page === "number" ? page : Number.parseInt(page ?? "1", 10);
@@ -32,7 +39,11 @@ export function importJobPageWindow(totalRows: number, page: number | string | n
   };
 }
 
-export function importJobProgressPercent(job: Pick<ImportJobProgressLike, "totalRows" | "processedRows">) {
+export function importJobProgressPercent(job: Pick<ImportJobProgressLike, "totalRows" | "processedRows" | "status">) {
+  if (isTerminalImportJobStatus(job.status)) {
+    return 100;
+  }
+
   if (job.totalRows <= 0) {
     return job.processedRows > 0 ? 100 : 0;
   }

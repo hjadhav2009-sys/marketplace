@@ -2,7 +2,10 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { assertWorkerAccountAccess } from "./worker-access";
-import { assertOrderAssemblyPackingEligible } from "./order-assembly";
+import { refreshAffectedWorkGroups } from "./work-group-projection";
+import { resolveOrderShipmentWorkflowPrerequisites } from "./workflow-prerequisites";
+import { routeFingerprint } from "./dynamic-route";
+import { beginWorkflowActionReceipt, completeWorkflowActionReceipt, withWorkflowActionRequestGate } from "./workflow-action-receipt";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -32,17 +35,15 @@ export async function resolveOrderPackScope(
 
   const shipmentOrders = await client.order.findMany({
     where:
-      primaryOrder.marketplace === "FLIPKART" && primaryOrder.trackingId
+      ["FLIPKART", "AMAZON"].includes(primaryOrder.marketplace) && primaryOrder.trackingId
         ? {
             accountId: input.accountId,
-            marketplace: "FLIPKART",
-            trackingId: primaryOrder.trackingId,
-            packStatus: { not: "PACKED" }
+            marketplace: primaryOrder.marketplace,
+            trackingId: primaryOrder.trackingId
           }
         : {
             id: primaryOrder.id,
-            accountId: input.accountId,
-            packStatus: { not: "PACKED" }
+            accountId: input.accountId
           },
     select: orderPackScopeSelect,
     orderBy: { id: "asc" }
@@ -52,7 +53,7 @@ export async function resolveOrderPackScope(
   const problemCount = shipmentOrders.filter(
     (order) => order.status === "PROBLEM" || order.pickStatus === "PROBLEM" || order.packStatus === "PROBLEM"
   ).length;
-  const allReadyToPack = shipmentOrders.every((order) => order.packStatus === "READY");
+  const workflow = await resolveOrderShipmentWorkflowPrerequisites({ accountId: input.accountId, orderIds: shipmentOrders.map(order => order.id) }, client);
 
   return {
     primaryOrder,
@@ -62,7 +63,8 @@ export async function resolveOrderPackScope(
     allPicked: unpickedCount === 0,
     unpickedCount,
     problemCount,
-    packable: shipmentOrders.length > 0 && unpickedCount === 0 && problemCount === 0 && allReadyToPack
+    workflow: workflow.package,
+    packable: shipmentOrders.length > 0 && workflow.package.packReady && shipmentOrders.every(order => ["READY", "PACKED"].includes(order.packStatus))
   };
 }
 
@@ -71,6 +73,7 @@ export function assertOrderPackScopeEligible(scope: Awaited<ReturnType<typeof re
   if (scope.unpickedCount > 0) {
     throw new Error(`Shipment cannot be packed: ${scope.unpickedCount} item(s) are still waiting for picking.`);
   }
+  if (scope.workflow.blocker) throw new Error(scope.workflow.blocker);
   if (!scope.packable) throw new Error("Shipment changed; scan again before packing.");
 }
 
@@ -79,7 +82,7 @@ export function maskOperationalCode(value: string | null | undefined) {
   return value.length <= 4 ? value : `...${value.slice(-4)}`;
 }
 
-export type CustomerOrderPackSource = "universal-scan" | "packing-search-card" | "packing-detail" | "mobile-api";
+export type CustomerOrderPackSource = "universal-scan" | "packing-search-card" | "packing-detail" | "mobile-api" | "grouped-work";
 
 function auditActionForSource(source: CustomerOrderPackSource) {
   if (source === "universal-scan") return "UNIVERSAL_ORDER_PACKED";
@@ -100,22 +103,35 @@ export async function packCustomerOrderShipmentSafely(
 ) {
   const initialAccess = await assertWorkerAccountAccess(input.actorUserId, input.accountId, client);
   if (!hasWorkPermission(initialAccess.user, "canPack")) throw new Error("Order packing permission is required.");
+  const execute=async()=>{let last:unknown;for(let attempt=0;attempt<6;attempt++){try{return await client.$transaction(tx => packCustomerOrderShipmentSafelyInTransaction(input, tx));}catch(error){last=error;const transient=error instanceof Error&&(/database is locked|unique constraint|write conflict|P2002|P2034/i.test(error.message)||"code" in error&&["P2002","P2034"].includes(String((error as {code?:string}).code)));if(!transient||attempt===5)throw error;await new Promise(resolve=>setTimeout(resolve,20*(attempt+1)));}}throw last;};return input.clientRequestId?withWorkflowActionRequestGate([input.accountId,input.actorUserId,"ORDER_PACK",input.clientRequestId].join(":"),execute):execute();
+}
 
-  return client.$transaction(async (tx) => {
+export async function packCustomerOrderShipmentSafelyInTransaction(
+  input: {
+    actorUserId: string;
+    accountId: string;
+    orderId: string;
+    expectedStatus?: string;
+    source: CustomerOrderPackSource;
+    clientRequestId?: string;
+  },
+  tx: Prisma.TransactionClient
+) {
     const access = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
     if (!hasWorkPermission(access.user, "canPack")) throw new Error("Order packing permission is required.");
+    const receipt = input.clientRequestId ? await beginWorkflowActionReceipt<{ packedCount:number; skippedCount:number; scopedCount:number; totalQuantity:number; packTaskIds?:string[]; idempotent:boolean }>(tx, { accountId: input.accountId, actorUserId: access.user.id, requestKind: "ORDER_PACK", clientRequestId: input.clientRequestId, requestFingerprint: routeFingerprint({ orderId: input.orderId, expectedStatus: input.expectedStatus ?? null, source: input.source }), sourceType: "ORDER", stage: "PACK" }) : null;
+    if (receipt?.replay) return { ...receipt.replay, idempotent: true };
 
     const scope = await resolveOrderPackScope({ accountId: input.accountId, orderId: input.orderId }, tx);
-    if (scope.shipmentOrders.length === 0) {
-      return { packedCount: 0, skippedCount: 0, scopedCount: 0, totalQuantity: 0, idempotent: true };
+    if (scope.shipmentOrders.length === 0 || scope.shipmentOrders.every(order => order.packStatus === "PACKED")) {
+      const result = { packedCount: 0, skippedCount: 0, scopedCount: 0, totalQuantity: 0, packTaskIds: [] as string[], idempotent: true };
+      return receipt ? completeWorkflowActionReceipt(tx, receipt.receiptId, result) : result;
     }
     if (input.expectedStatus && scope.primaryOrder.packStatus !== input.expectedStatus) {
       throw new Error("Order changed; scan again before acting.");
     }
     assertOrderPackScopeEligible(scope);
-    await assertOrderAssemblyPackingEligible({ accountId: input.accountId, orders: scope.shipmentOrders }, tx);
-
-    const verifiedOrderIds = scope.shipmentOrders.map((order) => order.id);
+    const verifiedOrderIds = scope.shipmentOrders.filter(order => order.packStatus !== "PACKED").map((order) => order.id);
     const update = await tx.order.updateMany({
       where: {
         id: { in: verifiedOrderIds },
@@ -127,9 +143,12 @@ export async function packCustomerOrderShipmentSafely(
       data: { status: "PACKED", packStatus: "PACKED", packedAt: new Date() }
     });
     if (update.count !== verifiedOrderIds.length) throw new Error("Shipment changed; scan again before packing.");
+    const packTasks = await tx.workTask.findMany({ where: { accountId: input.accountId, sourceType: "ORDER", orderId: { in: verifiedOrderIds }, stage: "PACK", status: { in: ["READY", "IN_PROGRESS"] } }, select: { id: true, requiredQuantity: true } });
+    const completedAt = new Date();
+    for (const task of packTasks) await tx.workTask.update({ where: { id: task.id }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, assignedUserId: access.user.id, startedAt: completedAt, startedByUserId: access.user.id, completedAt, completedByUserId: access.user.id, version: { increment: 1 } } });
 
     await tx.scanLog.createMany({
-      data: scope.shipmentOrders.map((order) => ({
+      data: scope.shipmentOrders.filter(order => verifiedOrderIds.includes(order.id)).map((order) => ({
         accountId: input.accountId,
         orderId: order.id,
         awb: order.trackingId ?? order.awb,
@@ -154,13 +173,15 @@ export async function packCustomerOrderShipmentSafely(
         })
       }
     });
+    await refreshAffectedWorkGroups({ accountId: input.accountId, sourceType: "ORDER", stages: ["PACK"], taskIds:packTasks.map(task=>task.id),orderIds:verifiedOrderIds }, tx);
 
-    return {
+    const result = {
       packedCount: update.count,
       skippedCount: 0,
       scopedCount: verifiedOrderIds.length,
       totalQuantity: scope.totalQuantity,
+      packTaskIds: packTasks.map(task => task.id),
       idempotent: false
     };
-  });
+    return receipt ? completeWorkflowActionReceipt(tx, receipt.receiptId, result) : result;
 }

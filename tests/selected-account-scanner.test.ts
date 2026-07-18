@@ -1,0 +1,8 @@
+import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync,readFileSync,readdirSync,rmSync } from "node:fs";
+import { join,resolve } from "node:path";
+import { PrismaClient } from "@prisma/client";
+import { resolveUniversalWork } from "../src/lib/workflow/universal-resolver";
+const root=resolve(process.cwd(),".codex-tmp");mkdirSync(root,{recursive:true});const file=resolve(root,"selected-account-scan.db");rmSync(file,{force:true});const sqlite=new DatabaseSync(file);sqlite.exec("PRAGMA foreign_keys=ON;");for(const name of readdirSync(resolve("prisma/migrations"),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort())sqlite.exec(readFileSync(join("prisma/migrations",name,"migration.sql"),"utf8"));sqlite.close();const db=new PrismaClient({datasourceUrl:`file:${file.replace(/\\/g,"/")}`});
+try{await db.account.createMany({data:[{id:"a",name:"A",code:"A",marketplace:"FLIPKART"},{id:"b",name:"B",code:"B",marketplace:"FLIPKART"}]});await db.user.create({data:{id:"owner",username:"scan-selected-owner",passwordHash:"fake",name:"Owner",role:"OWNER",active:true}});await db.order.createMany({data:[{id:"oa",accountId:"a",marketplace:"FLIPKART",awb:"ITEM-A",trackingId:"SHARED",sku:"SKU-A",qty:1,orderNo:"ORDER-A"},{id:"ob",accountId:"b",marketplace:"FLIPKART",awb:"ITEM-B",trackingId:"SHARED",sku:"SKU-B",qty:1,orderNo:"ORDER-B"}]});const result=await resolveUniversalWork({actorUserId:"owner",accountId:"a",code:"SHARED"},db);assert.ok(result.candidates.length);assert.deepEqual(new Set(result.candidates.map(candidate=>candidate.accountId)),new Set(["a"]));}finally{await db.$disconnect();rmSync(file,{force:true});}console.log("Selected-account scanner tests passed.");

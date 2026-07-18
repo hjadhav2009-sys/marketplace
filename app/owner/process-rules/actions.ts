@@ -8,6 +8,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { requireWorkPermission } from "@/lib/work-permissions";
+import { sanitizePublicActionError } from "@/src/lib/import-jobs/safe-error";
 import { setActiveProcessRule } from "@/src/lib/marking/process-rules";
 
 function value(formData: FormData, name: string, max = 8000) { return String(formData.get(name) ?? "").normalize("NFKC").trim().slice(0, max) || null; }
@@ -35,10 +36,11 @@ export async function setProcessRuleAction(formData: FormData) {
     });
     await recordAuditLog({ userId: user.id, accountId: account.id, action: existingRule ? "PROCESS_RULE_UPDATED" : "PROCESS_RULE_CREATED", entityType: "ProductProcessRule", entityId: rule.id, metadata: { marketplaceListingId: listingId, route, replacedRuleId: existingRule?.id ?? null }, request });
     revalidatePath("/owner/process-rules");
-    redirect("/owner/process-rules?updated=1");
   } catch (error) {
-    redirect(`/owner/process-rules?error=${encodeURIComponent(error instanceof Error ? error.message : "Could not save rule.")}`);
+    const message = sanitizePublicActionError(error, "Could not save rule.") ?? "Could not save rule.";
+    redirect(`/owner/process-rules?error=${encodeURIComponent(message)}`);
   }
+  redirect("/owner/process-rules?updated=1");
 }
 
 export async function disableProcessRuleAction(formData: FormData) {

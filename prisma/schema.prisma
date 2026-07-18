@@ -21,6 +21,14 @@ enum BatchStatus {
   REVIEWED
   IMPORTED
   FAILED
+  NEEDS_MAPPING
+}
+
+enum MarketplaceImportPurpose {
+  PRODUCT_CATALOG
+  DAILY_ORDER
+  CONSIGNMENT_QUANTITY
+  CONSIGNMENT_ENRICHMENT
 }
 
 enum ImportType {
@@ -215,58 +223,61 @@ enum ConsignmentIssueSeverity {
 }
 
 model User {
-  id                           String                    @id @default(cuid())
-  username                     String                    @unique
+  id                           String                       @id @default(cuid())
+  username                     String                       @unique
   passwordHash                 String
   name                         String
   role                         Role
-  active                       Boolean                   @default(true)
-  canPick                      Boolean                   @default(false)
-  canPack                      Boolean                   @default(false)
-  canReportProblem             Boolean                   @default(true)
-  canMark                      Boolean                   @default(false)
-  canAssemble                  Boolean                   @default(false)
-  canManageMarkingLibrary      Boolean                   @default(false)
-  canManageProcessRules        Boolean                   @default(false)
-  canViewAllWork               Boolean                   @default(false)
-  canViewConsignments          Boolean                   @default(false)
-  canImportConsignments        Boolean                   @default(false)
-  canManageConsignments        Boolean                   @default(false)
-  mustChangePassword           Boolean                   @default(false)
-  failedLoginCount             Int                       @default(0)
+  active                       Boolean                      @default(true)
+  canPick                      Boolean                      @default(false)
+  canPack                      Boolean                      @default(false)
+  canReportProblem             Boolean                      @default(true)
+  canMark                      Boolean                      @default(false)
+  canAssemble                  Boolean                      @default(false)
+  canManageMarkingLibrary      Boolean                      @default(false)
+  canManageProcessRules        Boolean                      @default(false)
+  canViewAllWork               Boolean                      @default(false)
+  canViewConsignments          Boolean                      @default(false)
+  canImportConsignments        Boolean                      @default(false)
+  canManageConsignments        Boolean                      @default(false)
+  mustChangePassword           Boolean                      @default(false)
+  failedLoginCount             Int                          @default(0)
   lockedUntil                  DateTime?
   lastLoginAt                  DateTime?
   lastLoginIp                  String?
   lastUserAgent                String?
   accountId                    String?
-  account                      Account?                  @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  assignedAccounts             Account[]                 @relation("UserAssignedAccounts")
-  passwordResetRequests        PasswordResetRequest[]    @relation("PasswordResetTarget")
-  handledPasswordResetRequests PasswordResetRequest[]    @relation("PasswordResetHandler")
-  uploadedBatches              UploadBatch[]             @relation("UploadedBatches")
-  scanLogs                     ScanLog[]                 @relation("UserScanLogs")
-  problemOrders                ProblemOrder[]            @relation("ReportedProblems")
+  account                      Account?                     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  assignedAccounts             Account[]                    @relation("UserAssignedAccounts")
+  passwordResetRequests        PasswordResetRequest[]       @relation("PasswordResetTarget")
+  handledPasswordResetRequests PasswordResetRequest[]       @relation("PasswordResetHandler")
+  uploadedBatches              UploadBatch[]                @relation("UploadedBatches")
+  scanLogs                     ScanLog[]                    @relation("UserScanLogs")
+  problemOrders                ProblemOrder[]               @relation("ReportedProblems")
   sessions                     UserDeviceSession[]
   auditLogs                    AuditLog[]
-  markingAssetsCreated         MarkingAsset[]            @relation("MarkingAssetCreatedBy")
-  markingAssetsUpdated         MarkingAsset[]            @relation("MarkingAssetUpdatedBy")
-  markingFilesUploaded         MarkingAssetFile[]        @relation("MarkingAssetFileUploadedBy")
-  markingLinksCreated          MarkingAssetListingLink[] @relation("MarkingAssetLinkCreatedBy")
-  processRulesCreated          ProductProcessRule[]      @relation("ProcessRuleCreatedBy")
-  processRulesUpdated          ProductProcessRule[]      @relation("ProcessRuleUpdatedBy")
-  workTasksAssigned            WorkTask[]                @relation("WorkTaskAssignedUser")
-  workTasksStarted             WorkTask[]                @relation("WorkTaskStartedBy")
-  workTasksCompleted           WorkTask[]                @relation("WorkTaskCompletedBy")
-  workTaskProblemsReported     WorkTask[]                @relation("WorkTaskProblemReportedBy")
-  workTaskProblemsResolved     WorkTask[]                @relation("WorkTaskProblemResolvedBy")
-  workActionLogs               WorkActionLog[]           @relation("WorkActionActor")
-  consignmentsCreated          ConsignmentBatch[]        @relation("ConsignmentCreatedBy")
-  consignmentsActivated        ConsignmentBatch[]        @relation("ConsignmentActivatedBy")
-  consignmentsCompleted        ConsignmentBatch[]        @relation("ConsignmentCompletedBy")
-  consignmentLinesCompleted    ConsignmentLine[]         @relation("ConsignmentLineCompletedBy")
-  consignmentIssuesResolved    ConsignmentImportIssue[]  @relation("ConsignmentIssueResolvedBy")
-  createdAt                    DateTime                  @default(now())
-  updatedAt                    DateTime                  @updatedAt
+  markingAssetsCreated         MarkingAsset[]               @relation("MarkingAssetCreatedBy")
+  markingAssetsUpdated         MarkingAsset[]               @relation("MarkingAssetUpdatedBy")
+  markingFilesUploaded         MarkingAssetFile[]           @relation("MarkingAssetFileUploadedBy")
+  markingLinksCreated          MarkingAssetListingLink[]    @relation("MarkingAssetLinkCreatedBy")
+  processRulesCreated          ProductProcessRule[]         @relation("ProcessRuleCreatedBy")
+  processRulesUpdated          ProductProcessRule[]         @relation("ProcessRuleUpdatedBy")
+  workTasksAssigned            WorkTask[]                   @relation("WorkTaskAssignedUser")
+  workTasksStarted             WorkTask[]                   @relation("WorkTaskStartedBy")
+  workTasksCompleted           WorkTask[]                   @relation("WorkTaskCompletedBy")
+  workRouteDecisions           WorkRouteDecision[]          @relation("WorkRouteDecisionActor")
+  workflowActionReceipts       WorkflowActionReceipt[]      @relation("WorkflowActionReceiptActor")
+  workRouteDecisionRejections  WorkRouteDecisionRejection[] @relation("WorkRouteDecisionRejectionActor")
+  workTaskProblemsReported     WorkTask[]                   @relation("WorkTaskProblemReportedBy")
+  workTaskProblemsResolved     WorkTask[]                   @relation("WorkTaskProblemResolvedBy")
+  workActionLogs               WorkActionLog[]              @relation("WorkActionActor")
+  consignmentsCreated          ConsignmentBatch[]           @relation("ConsignmentCreatedBy")
+  consignmentsActivated        ConsignmentBatch[]           @relation("ConsignmentActivatedBy")
+  consignmentsCompleted        ConsignmentBatch[]           @relation("ConsignmentCompletedBy")
+  consignmentLinesCompleted    ConsignmentLine[]            @relation("ConsignmentLineCompletedBy")
+  consignmentIssuesResolved    ConsignmentImportIssue[]     @relation("ConsignmentIssueResolvedBy")
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
 }
 
 model UserDeviceSession {
@@ -320,34 +331,42 @@ model AuditLog {
 }
 
 model Account {
-  id                  String                         @id @default(cuid())
-  name                String                         @unique
-  code                String                         @unique
-  companyName         String                         @default("Sullery")
-  marketplace         Marketplace                    @default(FLIPKART)
-  accountDisplayName  String?
-  accountCode         String?
-  active              Boolean                        @default(true)
-  notes               String?
-  users               User[]
-  assignedUsers       User[]                         @relation("UserAssignedAccounts")
-  skuImageMappings    SkuImageMapping[]
-  marketplaceListings MarketplaceListing[]
-  uploadBatches       UploadBatch[]
-  importJobs          ImportJob[]
-  orders              Order[]
-  scanLogs            ScanLog[]
-  problemOrders       ProblemOrder[]
-  auditLogs           AuditLog[]
-  listingIdentifiers  MarketplaceListingIdentifier[]
-  markingAssetLinks   MarkingAssetListingLink[]
-  processRules        ProductProcessRule[]
-  workTasks           WorkTask[]
-  workActionLogs      WorkActionLog[]
-  consignmentBatches  ConsignmentBatch[]
-  consignmentLines    ConsignmentLine[]
-  createdAt           DateTime                       @default(now())
-  updatedAt           DateTime                       @updatedAt
+  id                          String                         @id @default(cuid())
+  name                        String                         @unique
+  code                        String                         @unique
+  companyName                 String                         @default("Sullery")
+  marketplace                 Marketplace                    @default(FLIPKART)
+  accountDisplayName          String?
+  accountCode                 String?
+  active                      Boolean                        @default(true)
+  notes                       String?
+  users                       User[]
+  assignedUsers               User[]                         @relation("UserAssignedAccounts")
+  skuImageMappings            SkuImageMapping[]
+  marketplaceListings         MarketplaceListing[]
+  listingAttributes           MarketplaceListingAttribute[]
+  uploadBatches               UploadBatch[]
+  importJobs                  ImportJob[]
+  orders                      Order[]
+  scanLogs                    ScanLog[]
+  problemOrders               ProblemOrder[]
+  auditLogs                   AuditLog[]
+  listingIdentifiers          MarketplaceListingIdentifier[]
+  markingAssetLinks           MarkingAssetListingLink[]
+  processRules                ProductProcessRule[]
+  workTasks                   WorkTask[]
+  workActionLogs              WorkActionLog[]
+  consignmentBatches          ConsignmentBatch[]
+  consignmentLines            ConsignmentLine[]
+  fileProfiles                MarketplaceFileProfile[]
+  workChangeEvents            WorkChangeEvent[]
+  workGroupProjections        WorkGroupProjection[]
+  workProjectionStates        WorkProjectionState[]
+  workRouteDecisions          WorkRouteDecision[]
+  workflowActionReceipts      WorkflowActionReceipt[]
+  workRouteDecisionRejections WorkRouteDecisionRejection[]
+  createdAt                   DateTime                       @default(now())
+  updatedAt                   DateTime                       @updatedAt
 
   @@index([active])
   @@index([companyName])
@@ -355,36 +374,54 @@ model Account {
 }
 
 model ImportJob {
-  id                 String    @id @default(cuid())
-  accountId          String
-  account            Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  createdByUserId    String?
-  marketplace        String
-  importType         String
-  fileName           String
-  filePath           String?
-  batchId            String?
-  status             String    @default("QUEUED")
-  totalRows          Int       @default(0)
-  processedRows      Int       @default(0)
-  createdRows        Int       @default(0)
-  updatedRows        Int       @default(0)
-  unchangedRows      Int       @default(0)
-  duplicateRows      Int       @default(0)
-  warningRows        Int       @default(0)
-  errorRows          Int       @default(0)
-  missingListingRows Int       @default(0)
-  missingImageRows   Int       @default(0)
-  startedAt          DateTime?
-  finishedAt         DateTime?
-  lastError          String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                         String    @id @default(cuid())
+  accountId                  String
+  account                    Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdByUserId            String?
+  marketplace                String
+  importType                 String
+  fileName                   String
+  filePath                   String?
+  batchId                    String?
+  status                     String    @default("QUEUED")
+  totalRows                  Int       @default(0)
+  processedRows              Int       @default(0)
+  createdRows                Int       @default(0)
+  updatedRows                Int       @default(0)
+  unchangedRows              Int       @default(0)
+  duplicateRows              Int       @default(0)
+  warningRows                Int       @default(0)
+  errorRows                  Int       @default(0)
+  missingListingRows         Int       @default(0)
+  missingImageRows           Int       @default(0)
+  startedAt                  DateTime?
+  finishedAt                 DateTime?
+  lastError                  String?
+  stage                      String    @default("QUEUED")
+  currentFile                String?
+  totalFiles                 Int       @default(0)
+  processedFiles             Int       @default(0)
+  manifestJson               String?
+  progressJson               String?
+  reportJson                 String?
+  cancelRequestedAt          DateTime?
+  mergeStartedAt             DateTime?
+  runnerId                   String?
+  leaseExpiresAt             DateTime?
+  heartbeatAt                DateTime?
+  attemptNumber              Int       @default(0)
+  checkpointJson             String?
+  currentEntryId             String?
+  currentChunk               Int       @default(0)
+  mergeCompletedEntryIdsJson String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   @@index([accountId, status, createdAt])
   @@index([accountId, importType, createdAt])
   @@index([accountId, marketplace, importType])
   @@index([batchId])
+  @@index([status, leaseExpiresAt])
 }
 
 model MarketplaceListing {
@@ -436,10 +473,14 @@ model MarketplaceListing {
   image1366Url9             String?
   image1366Url10            String?
   mainImageUrl              String?
+  fieldProvenanceJson       String?
+  manualLocksJson           String?
+  imageCacheStaleAt         DateTime?
   lastImportedAt            DateTime?
   createdAt                 DateTime                       @default(now())
   updatedAt                 DateTime                       @updatedAt
   identifiers               MarketplaceListingIdentifier[]
+  attributes                MarketplaceListingAttribute[]
   markingAssetLinks         MarkingAssetListingLink[]
   processRules              ProductProcessRule[]
   consignmentLines          ConsignmentLine[]
@@ -613,7 +654,11 @@ model WorkTask {
   problemResolvedBy       User?            @relation("WorkTaskProblemResolvedBy", fields: [problemResolvedByUserId], references: [id], onDelete: SetNull)
   statusBeforeProblem     WorkTaskStatus?
   metadataJson            String?
+  workCardSnapshotJson    String?
+  routeSnapshotJson       String?
+  version                 Int              @default(1)
   actionLogs              WorkActionLog[]
+  workGroupMembership     WorkGroupMember?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
@@ -629,6 +674,155 @@ model WorkTask {
   @@index([accountId, assignedUserId, stage, status])
   @@index([accountId, stage, status, completedAt])
   @@index([consignmentLineId, stage, status])
+}
+
+model MarketplaceListingAttribute {
+  id                   String             @id @default(cuid())
+  marketplaceListingId String
+  marketplaceListing   MarketplaceListing @relation(fields: [marketplaceListingId], references: [id], onDelete: Cascade)
+  accountId            String
+  account              Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  marketplace          Marketplace
+  technicalKey         String
+  displayLabel         String
+  valueJson            String
+  valueText            String?
+  sourceProfileId      String?
+  sourceHeader         String?
+  sourceAuthority      String             @default("MANUAL_OWNER")
+  manualLocked         Boolean            @default(true)
+  createdByUserId      String?
+  updatedByUserId      String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([marketplaceListingId, technicalKey])
+  @@index([accountId, marketplace, technicalKey])
+  @@index([accountId, valueText])
+}
+
+model SecurityThrottle {
+  keyHash       String    @id
+  scope         String
+  attempts      Int       @default(0)
+  windowStart   DateTime  @default(now())
+  blockedUntil  DateTime?
+  lastAttemptAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([scope, lastAttemptAt])
+  @@index([blockedUntil])
+}
+
+model WorkChangeEvent {
+  id         Int        @id @default(autoincrement())
+  accountId  String
+  account    Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  eventType  String
+  sourceType String
+  stage      WorkStage?
+  groupKey   String?
+  entityId   String?
+  createdAt  DateTime   @default(now())
+
+  @@index([accountId, id])
+  @@index([accountId, stage, id])
+  @@index([accountId, createdAt])
+}
+
+model WorkGroupProjection {
+  groupKey              String            @id
+  accountId             String
+  account               Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceType            WorkSourceType
+  stage                 WorkStage
+  sourceBatchId         String
+  marketplace           String
+  sellerSku             String
+  variantHash           String
+  instructionHash       String
+  routeHash             String
+  assignmentKey         String
+  assignedUserId        String?
+  assignedUserName      String?
+  productTitle          String?
+  productImageUrl       String?
+  operationalIdentifier String?
+  reference             String
+  memberCount           Int
+  requiredQuantity      Int
+  completedQuantity     Int
+  completeMemberCount   Int               @default(0)
+  partialMemberCount    Int               @default(0)
+  problemCount          Int
+  status                String
+  oldestWaitingAt       DateTime
+  recommendedNextStage  WorkStage?
+  hasExplicitSavedRoute Boolean           @default(false)
+  savedProcessRoute     ProcessRoute?
+  groupVersion          String
+  members               WorkGroupMember[]
+  updatedAt             DateTime          @updatedAt
+
+  @@index([accountId, stage, sourceType, status, assignmentKey, oldestWaitingAt], map: "WorkGroupProjection_account_stage_source_status_assignment_oldest_idx")
+  @@index([accountId, stage, sourceType, groupVersion], map: "WorkGroupProjection_account_stage_source_version_idx")
+  @@index([accountId, stage, sourceType, assignedUserId, oldestWaitingAt, groupKey], map: "WorkGroupProjection_assigned_pagination_idx")
+  @@index([accountId, sellerSku, stage], map: "WorkGroupProjection_account_sku_stage_idx")
+}
+
+model WorkGroupMember {
+  groupKey   String
+  projection WorkGroupProjection @relation(fields: [groupKey], references: [groupKey], onDelete: Cascade)
+  taskId     String              @unique
+  task       WorkTask            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([groupKey, taskId])
+  @@index([groupKey])
+}
+
+model WorkProjectionState {
+  id                     String         @id @default(cuid())
+  accountId              String
+  account                Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceType             WorkSourceType
+  stage                  WorkStage
+  state                  String         @default("READY")
+  lastAppliedTaskVersion Int            @default(0)
+  rebuildLeaseOwner      String?
+  rebuildLeaseExpiresAt  DateTime?
+  errorSummary           String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  @@unique([accountId, sourceType, stage])
+  @@index([state, updatedAt])
+}
+
+model WorkRouteDecision {
+  id                      String         @id @default(cuid())
+  accountId               String
+  account                 Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  taskId                  String?
+  sourceType              WorkSourceType
+  sourceId                String
+  sellerSku               String
+  reference               String
+  savedRoute              ProcessRoute?
+  savedNextStage          WorkStage?
+  selectedNextStage       WorkStage?
+  decisionType            String
+  reason                  String?
+  workerNote              String?
+  missingInstructionStage WorkStage?
+  actorUserId             String
+  actorUser               User           @relation("WorkRouteDecisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  createdAt               DateTime       @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([accountId, decisionType, createdAt])
+  @@index([accountId, sellerSku, createdAt])
+  @@index([missingInstructionStage, createdAt])
 }
 
 model WorkActionLog {
@@ -844,30 +1038,112 @@ model SkuImageMapping {
 }
 
 model UploadBatch {
-  id               String             @id @default(cuid())
-  accountId        String
-  account          Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  createdByUserId  String?            @map("uploadedById")
-  createdBy        User?              @relation("UploadedBatches", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  fileName         String             @map("filename")
-  importType       ImportType         @default(ORDER_LABEL)
-  status           BatchStatus        @default(UPLOADED)
-  totalRows        Int                @default(0)
-  createdRows      Int                @default(0)
-  updatedRows      Int                @default(0)
-  duplicateRows    Int                @default(0)
-  missingImageRows Int                @default(0)
-  skippedRows      Int                @default(0)
-  errorRows        Int                @default(0)
-  notes            String?
-  orders           Order[]
-  issues           ImportRowIssue[]
-  previewRows      UploadPreviewRow[]
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                  String                  @id @default(cuid())
+  accountId           String
+  account             Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdByUserId     String?                 @map("uploadedById")
+  createdBy           User?                   @relation("UploadedBatches", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  fileName            String                  @map("filename")
+  importType          ImportType              @default(ORDER_LABEL)
+  status              BatchStatus             @default(UPLOADED)
+  totalRows           Int                     @default(0)
+  createdRows         Int                     @default(0)
+  updatedRows         Int                     @default(0)
+  duplicateRows       Int                     @default(0)
+  missingImageRows    Int                     @default(0)
+  skippedRows         Int                     @default(0)
+  errorRows           Int                     @default(0)
+  alreadyImportedRows Int                     @default(0)
+  repeatedSourceRows  Int                     @default(0)
+  informationRows     Int                     @default(0)
+  warningRows         Int                     @default(0)
+  blockingErrorRows   Int                     @default(0)
+  notes               String?
+  fileProfileId       String?
+  fileProfile         MarketplaceFileProfile? @relation(fields: [fileProfileId], references: [id], onDelete: SetNull)
+  orders              Order[]
+  issues              ImportRowIssue[]
+  previewRows         UploadPreviewRow[]
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 
   @@index([accountId, createdAt])
   @@index([accountId, importType, createdAt])
+  @@index([fileProfileId], map: "UploadBatch_fileProfileId_idx")
+}
+
+model WorkflowActionReceipt {
+  id                 String         @id @default(cuid())
+  accountId          String
+  account            Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  actorUserId        String
+  actorUser          User           @relation("WorkflowActionReceiptActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  requestKind        String
+  clientRequestId    String
+  requestFingerprint String
+  sourceType         WorkSourceType
+  stage              WorkStage?
+  originalGroupKey   String?
+  status             String         @default("IN_PROGRESS")
+  resultJson         String?
+  completedAt        DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@unique([accountId, actorUserId, requestKind, clientRequestId])
+  @@index([accountId, createdAt])
+  @@index([accountId, originalGroupKey])
+}
+
+model WorkRouteDecisionRejection {
+  id                 String         @id @default(cuid())
+  accountId          String
+  account            Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  actorUserId        String
+  actorUser          User           @relation("WorkRouteDecisionRejectionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  taskId             String?
+  sourceType         WorkSourceType
+  sourceId           String?
+  stage              WorkStage
+  requestFingerprint String?
+  rejectionType      String
+  safeMessage        String
+  createdAt          DateTime       @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([accountId, rejectionType, createdAt])
+}
+
+model MarketplaceFileProfile {
+  id                         String                   @id @default(cuid())
+  accountId                  String?
+  account                    Account?                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  marketplace                Marketplace
+  importPurpose              MarketplaceImportPurpose
+  profileName                String
+  headerFingerprint          String
+  workbookSignatureJson      String?
+  fieldMappingJson           String
+  requiredFieldsJson         String
+  optionalFieldsJson         String?
+  formSchemaJson             String?
+  technicalHeaderFingerprint String?
+  humanHeaderFingerprint     String?
+  templateKind               String?
+  productTypesJson           String?
+  fieldGroupsJson            String?
+  dataSheetRuleJson          String?
+  dataStartRuleJson          String?
+  version                    Int                      @default(1)
+  active                     Boolean                  @default(true)
+  createdByUserId            String?
+  uploadBatches              UploadBatch[]
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+
+  @@unique([marketplace, importPurpose, headerFingerprint, version])
+  @@index([accountId, marketplace, importPurpose, active])
+  @@index([marketplace, importPurpose, active])
 }
 
 model Order {
@@ -945,37 +1221,57 @@ model ScanLog {
 }
 
 model ProblemOrder {
-  id             String        @id @default(cuid())
-  accountId      String
-  account        Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  orderId        String
-  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  reason         String
-  details        String?
-  status         ProblemStatus @default(OPEN)
-  reportedById   String?
-  reportedBy     User?         @relation("ReportedProblems", fields: [reportedById], references: [id], onDelete: SetNull)
-  resolvedAt     DateTime?
-  resolutionNote String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                String          @id @default(cuid())
+  accountId         String
+  account           Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reason            String
+  details           String?
+  interruptedStage  WorkStage?
+  workTaskId        String?
+  taskStatusBefore  WorkTaskStatus?
+  orderStatusBefore OrderStatus?
+  pickStatusBefore  PickStatus?
+  packStatusBefore  PackStatus?
+  clientRequestId   String?
+  status            ProblemStatus   @default(OPEN)
+  reportedById      String?
+  reportedBy        User?           @relation("ReportedProblems", fields: [reportedById], references: [id], onDelete: SetNull)
+  resolvedAt        DateTime?
+  resolutionNote    String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
+  @@unique([accountId, reportedById, clientRequestId])
   @@index([accountId, status])
   @@index([accountId, status, createdAt])
   @@index([orderId])
+  @@index([accountId, interruptedStage, status])
 }
 
 model ImportRowIssue {
-  id        String      @id @default(cuid())
-  batchId   String
-  batch     UploadBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  rowNumber Int?
-  issueType String
-  message   String
-  rawData   String?
-  createdAt DateTime    @default(now())
+  id               String      @id @default(cuid())
+  batchId          String
+  batch            UploadBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber        Int?
+  issueType        String
+  message          String
+  rawData          String?
+  safeDataJson     String?
+  severity         String      @default("WARNING")
+  sourceType       String?
+  sourceId         String?
+  resolved         Boolean     @default(false)
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  resolutionAction String?
+  version          Int         @default(1)
+  createdAt        DateTime    @default(now())
 
   @@index([batchId, issueType])
+  @@index([batchId, severity, resolved])
+  @@index([sourceType, sourceId, resolved])
 }
 
 model UploadPreviewRow {

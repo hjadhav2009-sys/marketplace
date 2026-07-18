@@ -14,10 +14,10 @@ export function canConfirmPacked(order: { packStatus: PackStatus }) {
 
 /** @deprecated Read-only scope compatibility only. Packing mutations must use packCustomerOrderShipmentSafely. */
 export function buildConfirmPackedOrderWhere(order: { id: string; marketplace?: string | null; trackingId?: string | null }, accountId: string) {
-  return order.marketplace === "FLIPKART" && order.trackingId
+  return ["FLIPKART", "AMAZON"].includes(order.marketplace ?? "") && order.trackingId
     ? {
         accountId,
-        marketplace: "FLIPKART",
+        marketplace: order.marketplace,
         trackingId: order.trackingId,
         packStatus: "READY" as const
       }
@@ -33,8 +33,8 @@ export function isInConfirmPackedScope(target: ConfirmPackedScopeOrder, candidat
     return false;
   }
 
-  if (target.marketplace === "FLIPKART" && target.trackingId) {
-    return candidate.marketplace === "FLIPKART" && candidate.trackingId === target.trackingId;
+  if (["FLIPKART", "AMAZON"].includes(target.marketplace ?? "") && target.trackingId) {
+    return candidate.marketplace === target.marketplace && candidate.trackingId === target.trackingId;
   }
 
   return candidate.id === target.id;

@@ -1,13 +1,15 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SubmitButton } from "@/components/SubmitButton";
-import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { getOrderWithImage } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import { packingResultLabel } from "@/lib/operations/packing";
 import { buildListingImageGallery } from "@/lib/product-image";
@@ -15,6 +17,7 @@ import { cacheSkuImageAction } from "@/app/owner/sku-mappings/actions";
 import { confirmPackedAction, reportProblemFromScanAction } from "./actions";
 import { sendOrderToAssemblyAction } from "@/app/work/assembly/actions";
 import { canOfferManualAssemblyDiversion, getOrderAssemblyPackingGate } from "@/src/lib/workflow/order-assembly";
+import { resolveOrderShipmentWorkflowPrerequisites, type WorkflowPrerequisiteState } from "@/src/lib/workflow/workflow-prerequisites";
 
 type ScanResultPageProps = {
   params: Promise<{
@@ -31,8 +34,16 @@ type ScanResultPageProps = {
 
 export default async function ScanResultPage({ params, searchParams }: ScanResultPageProps) {
   const user = await requireUser();
+  const canUseScanner = user.role === "OWNER"
+    || hasWorkPermission(user, "canPick")
+    || hasWorkPermission(user, "canMark")
+    || hasWorkPermission(user, "canAssemble")
+    || hasWorkPermission(user, "canPack")
+    || hasWorkPermission(user, "canViewAllWork")
+    || hasWorkPermission(user, "canManageConsignments");
+  if (!canUseScanner) redirect(capabilityHomePath(user));
   const account = await requireAccount(user);
-  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
+  const userCanPack = hasWorkPermission(user, "canPack");
   const { awb: encodedAwb } = await params;
   const awb = decodeURIComponent(encodedAwb);
   const result = await getOrderWithImage(account.id, awb);
@@ -45,6 +56,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   const { order, mapping, listing } = result;
   const shipmentItems = result.shipmentItems;
   const scopedItems = shipmentItems.length > 0 ? shipmentItems : [order];
+  const workflow = await resolveOrderShipmentWorkflowPrerequisites({ accountId: account.id, orderIds: scopedItems.map(item => item.id) }, prisma);
   const assemblyGate = await getOrderAssemblyPackingGate({
     accountId: account.id,
     orders: scopedItems.map((item) => ({ id: item.id, accountId: account.id, sku: item.sku, productDescription: item.productDescription, imageUrl: item.imageUrl }))
@@ -53,8 +65,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
   const displayScanId = order.trackingId ?? order.awb;
   const scanLabel = order.trackingId ? "Tracking ID" : "AWB";
   const allPicked = scopedItems.every((item) => item.pickStatus === "PICKED");
-  const canPack = order.packStatus === "READY" && allPicked && assemblyGate.allowed;
-  const canReportProblem = order.packStatus === "READY";
+  const canPack = userCanPack && order.packStatus === "READY" && workflow.package.packReady;
+  const canReportProblem = (user.role === "OWNER" || user.canReportProblem) && order.packStatus === "READY";
   const openProblem = order.problemOrders[0];
   const imageUrl = mapping?.cachedImageUrl ?? null;
   const listingTitle = mapping?.productName ?? listing?.productTitle ?? listing?.liveTitle ?? order.productDescription ?? "Product details not mapped";
@@ -99,6 +111,11 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
       {query?.assemblyError ? <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{query.assemblyError}</div> : null}
       {!allPicked && order.packStatus === "READY" ? <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">Shipment cannot be packed while one or more items are waiting for picking.</div> : null}
       {!assemblyGate.allowed ? <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">{assemblyGate.blocker?.message}</div> : null}
+      {workflow.package.blocker ? <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">{workflow.package.blocker} Pack remains locked.</div> : null}
+
+      <section className="mb-5 grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-4">
+        {(["PICK", "MARK", "ASSEMBLE", "PACK"] as const).map(stage => <div key={stage} className="rounded-md bg-slate-50 p-3"><p className="text-xs font-black tracking-wide text-slate-500">{stage}</p><p className="mt-1 text-sm font-bold text-slate-950">{stageStateLabel(workflow.package.stages[stage].state, stage === "PACK" && order.packStatus === "PACKED")}</p></div>)}
+      </section>
 
       {query?.problem === "existing" ? (
         <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
@@ -151,7 +168,8 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
             <div className="flex flex-wrap items-center gap-2">
               {canPack ? (
                 <form action={confirmPackedAction}>
-                  <input type="hidden" name="orderId" value={order.id} />
+                   <input type="hidden" name="orderId" value={order.id} />
+                   <input type="hidden" name="clientRequestId" value={`packing-problem:${order.id}:${randomUUID()}`} />
                   <SubmitButton pendingText="Packing...">Pack</SubmitButton>
                 </form>
               ) : null}
@@ -426,4 +444,14 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
       </div>
     </AppShell>
   );
+}
+
+function stageStateLabel(state: WorkflowPrerequisiteState, packed = false) {
+  if (packed) return "✓ Packed";
+  if (state === "SATISFIED") return "✓ Completed";
+  if (state === "NOT_REQUIRED") return "— Not required";
+  if (state === "PROBLEM") return "! Problem";
+  if (state === "PENDING") return "… Pending";
+  if (state === "MISSING") return "! Missing";
+  return "🔒 Locked";
 }

@@ -1,0 +1,5 @@
+import type { WorkStage } from "@prisma/client";
+import { getCurrentUser,getSelectedAccount } from "@/lib/auth";
+import { getGroupedWork,type GroupedWorkSource } from "@/src/lib/workflow/grouped-work";
+const STAGES=new Set(["PICK","MARK","ASSEMBLE","PACK"]),SOURCES=new Set(["ORDER","CONSIGNMENT"]);
+export async function GET(request:Request,{params}:{params:Promise<{stage:string;groupKey:string}>}){const user=await getCurrentUser();if(!user)return Response.json({error:"Authentication required."},{status:401});const account=await getSelectedAccount(user);if(!account)return Response.json({error:"Select an active seller account."},{status:409});const route=await params,stage=route.stage.toUpperCase() as WorkStage,sourceType=new URL(request.url).searchParams.get("source") as GroupedWorkSource;if(!STAGES.has(stage)||!SOURCES.has(sourceType))return Response.json({error:"Invalid work filter."},{status:400});const result=await getGroupedWork({actorUserId:user.id,accountId:account.id,stage,sourceType,targetGroupKey:route.groupKey});return result.cards[0]?Response.json({card:result.cards[0]}):Response.json({error:"Work group is no longer available."},{status:404});}

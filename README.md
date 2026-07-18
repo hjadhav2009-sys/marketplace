@@ -1,12 +1,18 @@
 # Marketplace Pick & Pack
 
+> Phase 7.3.6 is projection, rolling-import, and missing-listing hardening. Production rollout and fully native Expo remain blocked by [the production gates](docs/audits/PRODUCTION_READINESS_GATES.md).
+
 Multi-marketplace warehouse pick-and-pack app cloned from the working Meesho foundation.
 
 This application manages worker Pick / Mark / Assemble / Pack workflows. It is not inventory-management or ERP software and does not track physical available stock, valuation, receiving, QC, or marketplace stock updates.
 
-Current focus: Flipkart Pick & Pack.
+Current focus: Flipkart and Amazon Product Inventory, consignment, and pick-and-pack workflows.
 
-Future support: Meesho, Amazon, Myntra, and WooCommerce.
+Product Inventory is the account-scoped marketplace catalog, not physical stock. Periodic multi-file refresh is available at `/owner/product-inventory/refresh`; daily orders and shipment/consignment quantity uploads remain separate. Processing defaults are optional and no rule means Direct to Pack.
+
+Owners can create a local catalog draft at `/owner/product-inventory/new` and resolve retained missing-listing work at `/owner/catalog/missing`. A missing listing is held from workers until it is linked or created; resolving safe Order work creates its immutable Pick snapshot and refreshes the worker projection immediately.
+
+Future support: Myntra and WooCommerce; native Expo/APK work remains postponed.
 
 The first marketplace version keeps the stable owner, picker, packer, account, SKU image, upload review, AWB search, scanner, and cleanup foundation. The new marketplace parser namespace lives under `src/lib/marketplaces/`, with Flipkart enabled first and the old Meesho parser preserved for later migration.
 
@@ -32,6 +38,10 @@ Useful validation commands:
 npm run typecheck
 npm run lint
 npm run test:validators
+npm run projection-lifecycle:test
+npm run rolling-order-import:test
+npm run missing-listing-resolution:test
+npm run dynamic-catalog-form:test
 npm run build
 ```
 

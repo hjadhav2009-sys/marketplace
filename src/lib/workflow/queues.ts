@@ -8,6 +8,7 @@ export const WORK_QUEUE_PAGE_SIZE = 50;
 type Client = PrismaClient | Prisma.TransactionClient;
 
 export const WORK_TASK_INCLUDE = {
+  account: { select: { name: true, accountDisplayName: true } },
   assignedUser: { select: { id: true, name: true } },
   problemReportedBy: { select: { id: true, name: true } },
   actionLogs: { where: { action: "TASK_PROBLEM_REPORTED" as const }, orderBy: { createdAt: "desc" as const }, take: 1, select: { note: true } },
@@ -50,7 +51,7 @@ async function exactListingIds(accountId:string, code:string|undefined, client:C
 
 export async function getWorkHubCounts(user: User, accountId: string, client: Client = prisma) {
   await assertWorkerAccountAccess(user.id,accountId,client);
-  const stages=(["PICK","MARK","PACK"] as const).filter((stage)=>userCanMutateStage(user,stage));
+  const stages=(["PICK","MARK","ASSEMBLE","PACK"] as const).filter((stage)=>userCanMutateStage(user,stage));
   const result:Record<string,{ready:number;inProgress:number;mine:number;problems:number;completedToday:number}>={};
   const today=startOfApplicationDay();const accountWide=userCanViewAllConsignmentWork(user);
   for(const stage of stages){

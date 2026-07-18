@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAuditLog } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
-import { startOfWorkDay } from "@/lib/operations/work-queue";
+import { noActiveOrderWorkflowProblem, startOfWorkDay } from "@/lib/operations/work-queue";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
+import { reportOrderWorkflowProblem } from "@/src/lib/workflow/order-problems";
 
 const reviewActions = new Set(["keep", "carry-forward", "archive", "problem"]);
 
@@ -41,7 +42,8 @@ export async function reviewOldPendingOrderAction(formData: FormData) {
     where: {
       id: orderId,
       packStatus: "READY",
-      importedAt: { lt: startOfWorkDay() }
+      importedAt: { lt: startOfWorkDay() },
+      ...noActiveOrderWorkflowProblem
     },
     select: {
       id: true,
@@ -58,48 +60,74 @@ export async function reviewOldPendingOrderAction(formData: FormData) {
   const reviewStatus = reviewStatusForAction(action);
 
   if (action === "problem") {
-    await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          status: "PROBLEM",
-          pickStatus: "PROBLEM",
-          packStatus: "PROBLEM",
-          oldPendingReviewStatus: reviewStatus,
-          oldPendingReviewedAt: new Date(),
-          oldPendingReviewNote: note || "Moved to problem from old pending review."
-        }
-      });
+    const activeTasks = await prisma.workTask.findMany({
+      where: {
+        accountId: order.accountId,
+        orderId: order.id,
+        sourceType: "ORDER",
+        status: { in: ["READY", "IN_PROGRESS"] }
+      },
+      select: { id: true, stage: true, status: true, version: true },
+      orderBy: { sequenceNumber: "asc" },
+      take: 2
+    });
+    const task = activeTasks.length === 1 ? activeTasks[0] : null;
 
-      const existingProblem = await tx.problemOrder.findFirst({
-        where: {
-          orderId: order.id,
-          status: "OPEN"
-        },
-        select: { id: true }
-      });
+    if (!task) {
+      redirect("/owner/old-pending?error=workflow");
+    }
 
-      if (!existingProblem) {
-        await tx.problemOrder.create({
-          data: {
-            accountId: order.accountId,
-            orderId: order.id,
-            reason: "Old pending review",
-            details: note || "Owner moved old pending order to problem review.",
-            reportedById: user.id
-          }
-        });
+    try {
+      await reportOrderWorkflowProblem({
+        actorUserId: user.id,
+        accountId: order.accountId,
+        orderId: order.id,
+        taskId: task.id,
+        stage: task.stage,
+        expectedTaskVersion: task.version,
+        expectedTaskStatus: task.status,
+        reason: "Old pending review",
+        note,
+        clientRequestId: String(formData.get("clientRequestId") ?? "")
+      });
+    } catch {
+      redirect("/owner/old-pending?error=workflow");
+    }
+
+    const marked = await prisma.order.updateMany({
+      where: {
+        id: order.id,
+        accountId: order.accountId,
+        importedAt: { lt: startOfWorkDay() },
+        workTasks: { some: { id: task.id, status: "PROBLEM" } }
+      },
+      data: {
+        oldPendingReviewStatus: reviewStatus,
+        oldPendingReviewedAt: new Date(),
+        oldPendingReviewNote: note || "Moved to the current workflow-stage problem queue."
       }
     });
+    if (marked.count !== 1) {
+      redirect("/owner/old-pending?error=workflow");
+    }
   } else {
-    await prisma.order.update({
-      where: { id: order.id },
+    const updated = await prisma.order.updateMany({
+      where: {
+        id: order.id,
+        accountId: order.accountId,
+        packStatus: "READY",
+        importedAt: { lt: startOfWorkDay() },
+        ...noActiveOrderWorkflowProblem
+      },
       data: {
         oldPendingReviewStatus: reviewStatus,
         oldPendingReviewedAt: new Date(),
         oldPendingReviewNote: note || null
       }
     });
+    if (updated.count !== 1) {
+      redirect("/owner/old-pending?error=workflow");
+    }
   }
 
   await recordAuditLog({

@@ -1,0 +1,8 @@
+import type { WorkStage } from "@prisma/client";
+import { getCurrentUser,getSelectedAccount } from "@/lib/auth";
+import { getGroupedWork, getSmartStageSummary, type GroupedWorkSource } from "@/src/lib/workflow/grouped-work";
+import { getLiveWorkVersion,resolveLiveWorkAccess } from "@/src/lib/workflow/live-work";
+
+export const dynamic="force-dynamic";export const runtime="nodejs";
+const stages=new Set(["PICK","MARK","ASSEMBLE","PACK"]),sources=new Set(["ORDER","CONSIGNMENT"]);
+export async function GET(request:Request){const sessionUser=await getCurrentUser();if(!sessionUser)return Response.json({error:"Authentication required."},{status:401});const account=await getSelectedAccount(sessionUser);if(!account)return Response.json({error:"Select an active seller account."},{status:409});const url=new URL(request.url),rawStage=url.searchParams.get("stage"),rawSource=url.searchParams.get("source");if(rawStage&&!stages.has(rawStage)||rawSource&&!sources.has(rawSource))return Response.json({error:"Invalid work filter."},{status:400});const stage=rawStage as WorkStage|undefined,sourceType=rawSource as GroupedWorkSource|undefined,access=await resolveLiveWorkAccess({actorUserId:sessionUser.id,accountId:account.id,stage,sourceType});if(!access.ok)return Response.json({error:access.error},{status:access.status});const cursor=await getLiveWorkVersion({accountId:account.id,stage,sourceType});const summary=stage?await getSmartStageSummary({actorUserId:sessionUser.id,accountId:account.id,stage}):null;const snapshot=stage&&sourceType?(await getGroupedWork({actorUserId:sessionUser.id,accountId:account.id,stage,sourceType,pageSize:25})).cards:null;return Response.json({cursor,summary,snapshot},{headers:{"Cache-Control":"no-store"}});}

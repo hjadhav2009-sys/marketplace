@@ -27,6 +27,8 @@ const importTypes = [
   { value: "", label: "All import types" },
   { value: "FLIPKART_LISTING_MASTER", label: "Flipkart Listing Master" },
   { value: "FLIPKART_ORDER", label: "Flipkart Daily Orders" }
+  ,{ value: "FLIPKART_PRODUCT_INVENTORY", label: "Flipkart Product Inventory" }
+  ,{ value: "AMAZON_PRODUCT_INVENTORY", label: "Amazon Product Inventory" }
 ];
 
 const statuses = [
@@ -34,6 +36,7 @@ const statuses = [
   { value: "QUEUED", label: "Queued" },
   { value: "RUNNING", label: "Running" },
   { value: "COMPLETED", label: "Completed" },
+  { value: "COMPLETED_WITH_WARNINGS", label: "Completed with warnings" },
   { value: "FAILED", label: "Failed" },
   { value: "CANCELLED", label: "Cancelled" }
 ];
@@ -47,7 +50,7 @@ const marketplaces = [
 ];
 
 function importTypeLabel(importType: string) {
-  return importType === "FLIPKART_LISTING_MASTER" ? "Flipkart Listings" : importType === "FLIPKART_ORDER" ? "Flipkart Orders" : importType;
+  return importType === "FLIPKART_LISTING_MASTER" ? "Flipkart Listings" : importType === "FLIPKART_ORDER" ? "Flipkart Daily Orders" : importType === "FLIPKART_PRODUCT_INVENTORY" ? "Flipkart Product Inventory" : importType === "AMAZON_PRODUCT_INVENTORY" ? "Amazon Product Inventory" : importType;
 }
 
 function reviewHref(job: { importType: string; batchId: string | null }) {
@@ -153,10 +156,26 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
     <AppShell>
       <PageHeader
         eyebrow="Owner"
-        title="Import Progress"
-        description="Track large marketplace imports without freezing the browser. Filter by account, marketplace, status, or file, then open progress or download a safe summary."
-        action={{ href: "/owner/uploads/new", label: "Upload file" }}
+        title="Imports"
+        description="Choose one import purpose. Product catalog, customer orders, and consignments remain separate and never create each other's work."
       />
+
+      <section className="mb-6 grid gap-4 xl:grid-cols-2" aria-label="Import purposes">
+        {["FLIPKART", "AMAZON"].map((marketplace) => {
+          const available = accounts.some((account) => account.marketplace === marketplace);
+          const selected = selectedAccount.marketplace === marketplace;
+          return <article key={marketplace} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black text-slate-950">{marketplace === "FLIPKART" ? "Flipkart" : "Amazon"}</h2><span className={`rounded-full px-2 py-1 text-xs font-bold ${selected ? "bg-teal-50 text-teal-800" : "bg-slate-100 text-slate-600"}`}>{selected ? "Selected account" : available ? "Account available" : "No account"}</span></div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <ImportPurposeLink title={`${marketplace === "FLIPKART" ? "Flipkart" : "Amazon"} Product Inventory`} description="Listings, catalog, identity and image enrichment." href={selected ? "/owner/product-inventory/refresh" : "/accounts"} />
+              <ImportPurposeLink title={`${marketplace === "FLIPKART" ? "Flipkart" : "Amazon"} Daily Orders`} description="Customer-order source files only." href={selected ? "/owner/uploads/new" : "/accounts"} />
+              <ImportPurposeLink title={`${marketplace === "FLIPKART" ? "Flipkart" : "Amazon"} New Consignment`} description="Shipment quantities and optional identity support." href={selected ? "/owner/consignments/new" : "/accounts"} />
+            </div>
+          </article>;
+        })}
+      </section>
+
+      <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-berry">Import History</p><h2 className="text-xl font-black text-slate-950">Recent jobs</h2></div></div>
 
       <form className="mb-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm" action="/owner/imports">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -228,7 +247,7 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
             {jobs.map((job) => {
               const progress = importJobProgressPercent(job);
               const review = reviewHref(job);
-              const issueCount = job.errorRows + job.warningRows + job.missingImageRows + job.missingListingRows;
+              const issueCount = job.errorRows + job.warningRows;
 
               return (
                 <article key={job.id} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
@@ -259,7 +278,7 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
                     <Link href={`/owner/imports/${job.id}`} prefetch className="min-h-10 rounded-md bg-slate-950 px-3 py-2 text-xs font-bold text-white">
                       Open
                     </Link>
-                    {job.status === "COMPLETED" && review ? (
+                    {(job.status === "COMPLETED" || job.status === "COMPLETED_WITH_WARNINGS") && review ? (
                       <Link href={review} prefetch className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
                         Review
                       </Link>
@@ -305,7 +324,7 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
                 {jobs.map((job) => {
                   const progress = importJobProgressPercent(job);
                   const review = reviewHref(job);
-                  const issueCount = job.errorRows + job.warningRows + job.missingImageRows + job.missingListingRows;
+                  const issueCount = job.errorRows + job.warningRows;
 
                   return (
                     <tr key={job.id} className="align-top">
@@ -347,7 +366,7 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
                           <Link href={`/owner/imports/${job.id}`} prefetch className="rounded-md border border-slate-200 px-2 py-1 text-xs font-bold text-slate-800">
                             Open progress
                           </Link>
-                          {job.status === "COMPLETED" && review ? (
+                          {(job.status === "COMPLETED" || job.status === "COMPLETED_WITH_WARNINGS") && review ? (
                             <Link href={review} prefetch className="rounded-md border border-slate-200 px-2 py-1 text-xs font-bold text-slate-800">
                               Open review
                             </Link>
@@ -406,6 +425,10 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
       </section>
     </AppShell>
   );
+}
+
+function ImportPurposeLink({ title, description, href }: { title: string; description: string; href: string }) {
+  return <Link href={href} prefetch className="flex min-h-32 flex-col rounded-md border border-slate-200 bg-slate-50 p-3 transition hover:border-berry hover:bg-white"><span className="font-black text-slate-950">{title}</span><span className="mt-2 text-sm leading-5 text-slate-600">{description}</span><span className="mt-auto pt-3 text-sm font-bold text-berry">Open →</span></Link>;
 }
 
 function SelectField({

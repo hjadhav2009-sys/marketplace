@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
+import { sanitizeImportJobError } from "./safe-error";
 
-export type ImportJobStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
-export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER";
+export type ImportJobStatus = "QUEUED" | "RUNNING" | "NEEDS_MAPPING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
+export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER" | "FLIPKART_PRODUCT_INVENTORY" | "AMAZON_ALL_LISTINGS" | "AMAZON_CATEGORY_CATALOG" | "AMAZON_PRODUCT_INVENTORY" | "FLIPKART_CONSIGNMENT_QUANTITY" | "FLIPKART_CONSIGNMENT_ENRICHMENT" | "AMAZON_CONSIGNMENT_QUANTITY" | "AMAZON_CONSIGNMENT_ENRICHMENT";
 
 export type ImportJobRecord = {
   id: string;
@@ -26,6 +28,23 @@ export type ImportJobRecord = {
   startedAt: Date | null;
   finishedAt: Date | null;
   lastError: string | null;
+  stage: string;
+  currentFile: string | null;
+  totalFiles: number;
+  processedFiles: number;
+  manifestJson: string | null;
+  progressJson: string | null;
+  reportJson: string | null;
+  cancelRequestedAt: Date | null;
+  mergeStartedAt: Date | null;
+  runnerId: string | null;
+  leaseExpiresAt: Date | null;
+  heartbeatAt: Date | null;
+  attemptNumber: number;
+  checkpointJson: string | null;
+  currentEntryId: string | null;
+  currentChunk: number;
+  mergeCompletedEntryIdsJson: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -48,6 +67,14 @@ type ImportJobDbRow = Omit<
   | "finishedAt"
   | "createdAt"
   | "updatedAt"
+  | "totalFiles"
+  | "processedFiles"
+  | "cancelRequestedAt"
+  | "mergeStartedAt"
+  | "leaseExpiresAt"
+  | "heartbeatAt"
+  | "attemptNumber"
+  | "currentChunk"
 > & {
   importType: string;
   status: string;
@@ -65,6 +92,14 @@ type ImportJobDbRow = Omit<
   finishedAt: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  totalFiles: number | bigint;
+  processedFiles: number | bigint;
+  cancelRequestedAt: Date | string | null;
+  mergeStartedAt: Date | string | null;
+  leaseExpiresAt: Date | string | null;
+  heartbeatAt: Date | string | null;
+  attemptNumber: number | bigint;
+  currentChunk: number | bigint;
 };
 
 export type ImportJobCreateInput = {
@@ -113,10 +148,18 @@ function normalizeJob(row: ImportJobDbRow): ImportJobRecord {
     errorRows: numberValue(row.errorRows),
     missingListingRows: numberValue(row.missingListingRows),
     missingImageRows: numberValue(row.missingImageRows),
+    totalFiles: numberValue(row.totalFiles),
+    processedFiles: numberValue(row.processedFiles),
     startedAt: dateValue(row.startedAt),
     finishedAt: dateValue(row.finishedAt),
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt)
+    ,cancelRequestedAt: dateValue(row.cancelRequestedAt)
+    ,mergeStartedAt: dateValue(row.mergeStartedAt)
+    ,leaseExpiresAt: dateValue(row.leaseExpiresAt)
+    ,heartbeatAt: dateValue(row.heartbeatAt)
+    ,attemptNumber: numberValue(row.attemptNumber)
+    ,currentChunk: numberValue(row.currentChunk)
   };
 }
 
@@ -184,6 +227,23 @@ export async function findImportJobById(id: string) {
       "startedAt",
       "finishedAt",
       "lastError",
+      "stage",
+      "currentFile",
+      "totalFiles",
+      "processedFiles",
+      "manifestJson",
+      "progressJson",
+      "reportJson",
+      "cancelRequestedAt",
+      "mergeStartedAt",
+      "runnerId",
+      "leaseExpiresAt",
+      "heartbeatAt",
+      "attemptNumber",
+      "checkpointJson",
+      "currentEntryId",
+      "currentChunk",
+      "mergeCompletedEntryIdsJson",
       "createdAt",
       "updatedAt"
     FROM "ImportJob"
@@ -219,6 +279,23 @@ export async function listRecentImportJobs(accountId: string, limit = 20) {
       "startedAt",
       "finishedAt",
       "lastError",
+      "stage",
+      "currentFile",
+      "totalFiles",
+      "processedFiles",
+      "manifestJson",
+      "progressJson",
+      "reportJson",
+      "cancelRequestedAt",
+      "mergeStartedAt",
+      "runnerId",
+      "leaseExpiresAt",
+      "heartbeatAt",
+      "attemptNumber",
+      "checkpointJson",
+      "currentEntryId",
+      "currentChunk",
+      "mergeCompletedEntryIdsJson",
       "createdAt",
       "updatedAt"
     FROM "ImportJob"
@@ -244,19 +321,15 @@ export async function markImportJobRunning(id: string) {
   `;
 }
 
-export async function setImportJobBatch(id: string, batchId: string) {
-  const now = new Date();
+export async function markImportJobNeedsMapping(id:string,input:{headers:string[];fingerprint:string;requiredFields:string[];optionalFields:string[]}){await prisma.importJob.update({where:{id},data:{status:"NEEDS_MAPPING",stage:"NEEDS_MAPPING",progressJson:JSON.stringify(input),lastError:"Owner header mapping is required.",finishedAt:null}});}
 
-  await prisma.$executeRaw`
-    UPDATE "ImportJob"
-    SET
-      "batchId" = ${batchId},
-      "updatedAt" = ${now}
-    WHERE "id" = ${id}
-  `;
+export async function resumeMappedImportJob(id:string){await prisma.importJob.update({where:{id},data:{status:"QUEUED",stage:"QUEUED",progressJson:null,lastError:null,finishedAt:null}});}
+
+export async function setImportJobBatch(id: string, batchId: string, runnerId?:string) {
+  const now = new Date(),updated=await prisma.importJob.updateMany({where:{id,...(runnerId?{runnerId,leaseExpiresAt:{gt:now}}:{})},data:{batchId,updatedAt:now}});if(updated.count!==1)throw new Error("Import runner lease was lost.");
 }
 
-export async function updateImportJobProgress(id: string, progress: ImportJobProgressUpdate) {
+export async function updateImportJobProgress(id: string, progress: ImportJobProgressUpdate, runnerId?:string) {
   const now = new Date();
   const totalRows = progress.totalRows ?? null;
   const processedRows = progress.processedRows ?? null;
@@ -269,23 +342,10 @@ export async function updateImportJobProgress(id: string, progress: ImportJobPro
   const missingListingRows = progress.missingListingRows ?? null;
   const missingImageRows = progress.missingImageRows ?? null;
 
-  await prisma.$executeRaw`
-    UPDATE "ImportJob"
-    SET
-      "totalRows" = COALESCE(${totalRows}, "totalRows"),
-      "processedRows" = COALESCE(${processedRows}, "processedRows"),
-      "createdRows" = COALESCE(${createdRows}, "createdRows"),
-      "updatedRows" = COALESCE(${updatedRows}, "updatedRows"),
-      "unchangedRows" = COALESCE(${unchangedRows}, "unchangedRows"),
-      "duplicateRows" = COALESCE(${duplicateRows}, "duplicateRows"),
-      "warningRows" = COALESCE(${warningRows}, "warningRows"),
-      "errorRows" = COALESCE(${errorRows}, "errorRows"),
-      "missingListingRows" = COALESCE(${missingListingRows}, "missingListingRows"),
-      "missingImageRows" = COALESCE(${missingImageRows}, "missingImageRows"),
-      "updatedAt" = ${now}
-    WHERE "id" = ${id}
-  `;
+  const updated=await prisma.importJob.updateMany({where:{id,...(runnerId?{runnerId,leaseExpiresAt:{gt:now}}:{})},data:{...(totalRows!==null?{totalRows}:{}),...(processedRows!==null?{processedRows}:{}),...(createdRows!==null?{createdRows}:{}),...(updatedRows!==null?{updatedRows}:{}),...(unchangedRows!==null?{unchangedRows}:{}),...(duplicateRows!==null?{duplicateRows}:{}),...(warningRows!==null?{warningRows}:{}),...(errorRows!==null?{errorRows}:{}),...(missingListingRows!==null?{missingListingRows}:{}),...(missingImageRows!==null?{missingImageRows}:{}),updatedAt:now}});if(updated.count!==1)throw new Error("Import runner lease was lost.");
 }
+
+export async function renewImportJobLease(id:string,runnerId:string,stage:string,leaseMs=120_000,client:PrismaClient=prisma){const now=new Date(),updated=await client.importJob.updateMany({where:{id,runnerId,leaseExpiresAt:{gt:now}},data:{stage,heartbeatAt:now,leaseExpiresAt:new Date(now.getTime()+Math.max(50,leaseMs))}});if(updated.count!==1)throw new Error("Import runner lease was lost.");return updated;}
 
 export async function completeImportJob(id: string, batchId?: string | null) {
   const now = new Date();
@@ -293,7 +353,10 @@ export async function completeImportJob(id: string, batchId?: string | null) {
   await prisma.$executeRaw`
     UPDATE "ImportJob"
     SET
-      "status" = ${"COMPLETED"},
+      "status" = CASE WHEN "errorRows" = 0 AND ("warningRows" > 0 OR "duplicateRows" > 0 OR "missingImageRows" > 0 OR "missingListingRows" > 0)
+        THEN ${"COMPLETED_WITH_WARNINGS"} ELSE ${"COMPLETED"} END,
+      "stage" = ${"COMPLETED"},
+      "processedRows" = CASE WHEN "totalRows" > "processedRows" THEN "totalRows" ELSE "processedRows" END,
       "batchId" = COALESCE(${batchId ?? null}, "batchId"),
       "finishedAt" = ${now},
       "updatedAt" = ${now}
@@ -301,15 +364,15 @@ export async function completeImportJob(id: string, batchId?: string | null) {
   `;
 }
 
-export async function failImportJob(id: string, error: unknown) {
+export async function failImportJob(id: string, error: unknown, client: PrismaClient = prisma) {
   const now = new Date();
-  const message = error instanceof Error ? error.message : "Import failed.";
+  const message = sanitizeImportJobError(error, 1000) ?? "Import failed.";
 
-  await prisma.$executeRaw`
+  await client.$executeRaw`
     UPDATE "ImportJob"
     SET
       "status" = ${"FAILED"},
-      "lastError" = ${message.slice(0, 1000)},
+      "lastError" = ${message},
       "finishedAt" = ${now},
       "updatedAt" = ${now}
     WHERE "id" = ${id}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { SubmitButton } from "@/components/SubmitButton";
 
 type ImportAccount = {
@@ -19,7 +20,7 @@ type WizardAction = (formData: FormData) => void | Promise<void>;
 const marketplaceOptions = [
   { value: "FLIPKART", label: "Flipkart" },
   { value: "MEESHO", label: "Meesho legacy" },
-  { value: "AMAZON", label: "Amazon coming soon" }
+  { value: "AMAZON", label: "Amazon" }
 ];
 
 function accountLabel(account: ImportAccount) {
@@ -104,7 +105,7 @@ export function MarketplaceImportWizard({
               ? "Flipkart imports use Listing Master for product images and Daily Orders for worker tasks."
               : marketplace === "MEESHO"
                 ? "Legacy PDF parser for old Meesho label/manifest workflow. Use only if you still process Meesho PDFs."
-                : "Amazon import is planned for a later phase."}
+                : "Amazon Product Inventory Refresh accepts All Listings, category catalogs, product catalogs, supporting files, and ZIPs."}
           </div>
         </div>
       </div>
@@ -112,6 +113,7 @@ export function MarketplaceImportWizard({
       <div className="space-y-5">
         {marketplace === "FLIPKART" ? (
           <>
+            <div className="rounded-md border border-teal-200 bg-teal-50 p-5"><p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Recommended periodic refresh</p><h2 className="text-lg font-black">Flipkart Product Inventory Refresh</h2><p className="mt-2 text-sm">Upload multiple listing, category, image/detail files, or a ZIP. Catalog refresh is separate from daily orders and new consignments.</p><Link href="/owner/product-inventory/refresh" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 font-bold text-white">Open Product Inventory Refresh</Link></div>
             <form action={listingAction} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
               <input type="hidden" name="importKind" value="flipkart-listing" />
               <input type="hidden" name="accountId" value={accountId} />
@@ -192,10 +194,10 @@ export function MarketplaceImportWizard({
         ) : null}
 
         {marketplace === "AMAZON" ? (
-          <div className="rounded-md border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-600">
-            <h2 className="text-lg font-black text-slate-950">Amazon coming soon</h2>
-            <p className="mt-2">Amazon imports are disabled in this phase. Add seller accounts now, then enable Amazon import types later.</p>
-          </div>
+          <><div className="rounded-md border border-teal-200 bg-white p-5 text-sm leading-6 text-slate-600">
+            <h2 className="text-lg font-black text-slate-950">Amazon Product Inventory Refresh</h2>
+            <p className="mt-2">Upload All Listings, category catalog XLSM/XLSX, product catalog TXT/TSV, supporting CSV files, multiple files, or ZIP. New consignments normally need only the shipment quantity file.</p><Link href="/owner/product-inventory/refresh" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 font-bold text-white">Open Product Inventory Refresh</Link>
+          </div><div className="rounded-md border border-amber-200 bg-amber-50 p-5"><p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Capability disabled</p><h2 className="text-lg font-black">Amazon Daily Orders</h2><p className="mt-2 text-sm text-amber-900">Daily Order imports are disabled for Amazon. Product Catalog refresh and Amazon Consignments remain available.</p></div></>
         ) : null}
       </div>
     </section>

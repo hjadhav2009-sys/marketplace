@@ -331,8 +331,8 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                     </label>
                     <div className="md:col-span-2">
                       <WorkerPermissionChecklist
-                        canPick={user.role === "OWNER" || user.role === "PICKER" || user.canPick}
-                        canPack={user.role === "OWNER" || user.role === "PACKER" || user.canPack}
+                        canPick={user.role === "OWNER" || user.canPick}
+                        canPack={user.role === "OWNER" || user.canPack}
                         canReportProblem={user.role === "OWNER" || user.canReportProblem}
                         canMark={user.role === "OWNER" || user.canMark}
                         canAssemble={user.role === "OWNER" || user.canAssemble}

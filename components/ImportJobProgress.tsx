@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatDateTime } from "@/lib/format";
-import { importJobElapsedSeconds, importJobEstimatedRemainingSeconds, importJobProgressPercent, importJobRowsPerSecond } from "@/src/lib/import-jobs/progress";
-import type { ImportJobRecord } from "@/src/lib/import-jobs/store";
+import { importJobElapsedSeconds, importJobEstimatedRemainingSeconds, importJobProgressPercent, importJobRowsPerSecond, isTerminalImportJobStatus } from "@/src/lib/import-jobs/progress";
+import type { PublicImportJobRecord } from "@/src/lib/import-jobs/public-job";
 
 type ImportJobProgressProps = {
-  initialJob: ImportJobRecord;
+  initialJob: PublicImportJobRecord;
+  accountLabel: string;
 };
 
-type ImportJobJson = Omit<ImportJobRecord, "startedAt" | "finishedAt" | "createdAt" | "updatedAt"> & {
+type ImportJobJson = Omit<PublicImportJobRecord, "startedAt" | "finishedAt" | "createdAt" | "updatedAt"> & {
   startedAt: string | null;
   finishedAt: string | null;
   createdAt: string;
@@ -18,10 +19,19 @@ type ImportJobJson = Omit<ImportJobRecord, "startedAt" | "finishedAt" | "created
 };
 
 function labelForImportType(importType: string) {
+  if(importType==="FLIPKART_PRODUCT_INVENTORY")return "Flipkart Product Inventory Refresh";
+  if(importType==="AMAZON_PRODUCT_INVENTORY")return "Amazon Product Inventory Refresh";
   return importType === "FLIPKART_LISTING_MASTER" ? "Flipkart Listing Master" : "Flipkart Order Excel";
 }
 
-function reviewHref(job: ImportJobJson | ImportJobRecord) {
+function purposeForImportType(importType: string) {
+  if (importType.endsWith("PRODUCT_INVENTORY") || importType.includes("LISTING") || importType.includes("CATALOG")) return "Product Inventory Refresh";
+  if (importType.includes("ORDER")) return "Daily Customer Orders";
+  if (importType.includes("CONSIGNMENT") || importType.includes("SHIPMENT")) return "New Consignment";
+  return "Marketplace Import";
+}
+
+function reviewHref(job: ImportJobJson | PublicImportJobRecord) {
   if (!job.batchId) {
     return null;
   }
@@ -44,7 +54,7 @@ function exportHref(jobId: string, format: "csv" | "xlsx" | "txt", type: "summar
   return `/owner/imports/export?jobId=${encodeURIComponent(jobId)}&format=${format}&type=${type}`;
 }
 
-export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
+export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgressProps) {
   const [job, setJob] = useState<ImportJobJson>(() => ({
     ...initialJob,
     startedAt: initialJob.startedAt?.toISOString() ?? null,
@@ -52,32 +62,38 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
     createdAt: initialJob.createdAt.toISOString(),
     updatedAt: initialJob.updatedAt.toISOString()
   }));
-  const progress = importJobProgressPercent(job);
+  const calculatedProgress = importJobProgressPercent(job);
+  const [progress, setProgress] = useState(calculatedProgress);
   const elapsedSeconds = importJobElapsedSeconds(job);
   const rowsPerSecond = importJobRowsPerSecond(job);
   const remainingSeconds = importJobEstimatedRemainingSeconds(job);
   const href = reviewHref(job);
-  const isDone = job.status === "COMPLETED" || job.status === "FAILED" || job.status === "CANCELLED";
-  const issueCount = job.errorRows + job.warningRows + job.missingImageRows + job.missingListingRows;
+  const isDone = isTerminalImportJobStatus(job.status);
+  const issueCount = job.errorRows + job.warningRows;
   const [refreshState, setRefreshState] = useState<"idle" | "refreshing">("idle");
 
   const stats = useMemo(
     () => [
-      ["Processed", `${job.processedRows} / ${job.totalRows}`],
-      ["Created", job.createdRows],
-      ["Updated", job.updatedRows],
-      ["Unchanged", job.unchangedRows],
-      ["Duplicates", job.duplicateRows],
+      ["Rows read", job.processedRows],
+      ["Rows accepted", Math.max(0, job.processedRows - job.errorRows)],
+      ["Rows inserted", job.createdRows],
+      ["Rows enriched", job.updatedRows],
+      ["Rows unchanged", job.unchangedRows],
+      ["Current stage", job.stage],
+      ["Processed files", `${job.processedFiles} / ${job.totalFiles}`],
+      ["Current file", job.currentFile ?? "-"],
       ["Warnings", job.warningRows],
-      ["Errors", job.errorRows],
-      ["Missing listings", job.missingListingRows],
-      ["Missing images", job.missingImageRows],
+      ["Blocking errors", job.errorRows],
       ["Elapsed", elapsedLabel(elapsedSeconds)],
       ["Rows/sec", rowsPerSecond],
       ["Remaining", remainingSeconds > 0 ? elapsedLabel(remainingSeconds) : isDone ? "Done" : "Calculating"]
     ],
     [elapsedSeconds, isDone, job, remainingSeconds, rowsPerSecond]
   );
+
+  useEffect(() => {
+    setProgress((current) => Math.max(current, calculatedProgress));
+  }, [calculatedProgress]);
 
   useEffect(() => {
     if (isDone) {
@@ -116,22 +132,25 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
         <div>
           <p className="text-sm font-semibold text-berry">{labelForImportType(job.importType)}</p>
           <h2 className="mt-1 break-words text-xl font-bold text-slate-950">{job.fileName}</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Status: <span className="font-semibold text-slate-950">{job.status}</span> / Started {formatDateTime(job.startedAt)}
-          </p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+            <span>Marketplace: <b className="text-slate-950">{job.marketplace}</b></span>
+            <span>Seller account: <b className="text-slate-950">{accountLabel}</b></span>
+            <span>Purpose: <b className="text-slate-950">{purposeForImportType(job.importType)}</b></span>
+          </div>
+          <p className="mt-2 text-sm text-slate-600">Status: <span className={`font-black ${job.status === "COMPLETED" ? "text-teal-700" : job.status === "COMPLETED_WITH_WARNINGS" ? "text-amber-700" : job.status === "FAILED" ? "text-rose-700" : "text-slate-950"}`}>{job.status.replaceAll("_", " ")}</span> / Started {formatDateTime(job.startedAt)}</p>
           <p className="mt-1 text-xs font-medium text-slate-500">
             {isDone ? `Finished ${formatDateTime(job.finishedAt)}` : "Live progress refreshes every 1.5 seconds."}
             {refreshState === "refreshing" ? <span className="ml-2 inline-block h-2 w-12 animate-pulse rounded-full bg-slate-200 align-middle" /> : null}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {job.status === "COMPLETED" && href ? (
+          {(job.status === "COMPLETED" || job.status === "COMPLETED_WITH_WARNINGS") && href ? (
             <Link href={href} className="inline-flex rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
               Open review
             </Link>
           ) : null}
-          <Link href="/owner/uploads/new" className="inline-flex rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
-            Upload another
+          <Link href={job.importType.endsWith("PRODUCT_INVENTORY") ? "/owner/product-inventory/refresh" : "/owner/imports"} className="inline-flex rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
+            Start New Import
           </Link>
         </div>
       </div>
@@ -142,7 +161,7 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
           <span>{job.processedRows} / {job.totalRows} rows</span>
         </div>
         <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-berry transition-all" style={{ width: `${progress}%` }} />
+          <div className={`h-full rounded-full transition-all ${job.status === "FAILED" ? "bg-rose-600" : job.status === "COMPLETED_WITH_WARNINGS" ? "bg-amber-500" : job.status === "COMPLETED" ? "bg-teal-600" : "bg-berry"}`} style={{ width: `${progress}%` }} />
         </div>
       </div>
 
@@ -162,17 +181,13 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
       ) : null}
 
       <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
-        <h3 className="font-semibold text-slate-950">{job.status === "FAILED" ? "Job failed" : job.status === "COMPLETED" ? "Job completed" : "Next actions"}</h3>
+        <h3 className="font-semibold text-slate-950">{job.status === "FAILED" ? "Job failed" : job.status === "COMPLETED_WITH_WARNINGS" ? "Completed with warnings" : job.status === "COMPLETED" ? "Completed" : "Next actions"}</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href="/owner/imports" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Back to imports
           </Link>
-          <Link href="/picker" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-            Open picker
-          </Link>
-          <Link href="/packing" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-            Open packer
-          </Link>
+          {job.importType.endsWith("PRODUCT_INVENTORY") ? <Link href="/owner/product-inventory" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">View Product Inventory</Link> : null}
+          {job.importType.includes("ORDER") ? <Link href="/picker" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Open Customer Orders</Link> : null}
           <Link href={exportHref(job.id, "csv")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Summary CSV
           </Link>
@@ -182,16 +197,18 @@ export function ImportJobProgress({ initialJob }: ImportJobProgressProps) {
           <Link href={exportHref(job.id, "txt")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Summary TXT
           </Link>
-          {issueCount > 0 && job.batchId ? (
+          {job.warningRows > 0 && job.batchId ? (
             <>
-              <Link href={`/owner/imports/${job.id}/issues`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
-                View issues
+              <Link href={`/owner/imports/${job.id}/issues?kind=warning`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                View Warnings ({job.warningRows})
               </Link>
               <Link href={exportHref(job.id, "csv", "issues")} className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900">
                 Issues CSV
               </Link>
             </>
-          ) : job.status === "COMPLETED" ? (
+          ) : null}
+          {job.errorRows > 0 && job.batchId ? <Link href={`/owner/imports/${job.id}/issues?kind=error`} className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800">View Blocking Errors ({job.errorRows})</Link> : null}
+          {issueCount === 0 && job.status === "COMPLETED" ? (
             <span className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-800">No issues recorded</span>
           ) : null}
         </div>

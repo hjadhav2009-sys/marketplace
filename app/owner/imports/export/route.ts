@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/format";
 import { safeImportIssueContext } from "@/lib/import/issues";
 import { prisma } from "@/lib/prisma";
 import { importJobProgressPercent } from "@/src/lib/import-jobs/progress";
+import { sanitizePublicImportJobError } from "@/src/lib/import-jobs/public-job";
 
 const formats = new Set(["csv", "xlsx", "txt"]);
 const exportTypes = new Set(["summary", "issues"]);
@@ -104,13 +105,14 @@ export async function GET(request: Request) {
         issueType: true,
         message: true,
         rawData: true,
+        safeDataJson: true,
         createdAt: true
       },
       orderBy: [{ issueType: "asc" }, { rowNumber: "asc" }]
     });
     const headers = ["rowNumber", "issueType", "message", "sku", "shipmentKey", "orderItemKey", "createdAt"];
     const rows = issues.map((issue) => {
-      const safe = safeImportIssueContext(issue.rawData);
+      const safe = safeImportIssueContext(issue.safeDataJson ?? issue.rawData);
       return [issue.rowNumber, issue.issueType, issue.message, safe.sku, safe.shipmentKey, safe.orderItemKey, issue.createdAt] satisfies CsvValue[];
     });
     return responseFor(format, headers, rows, filenameBase);
@@ -162,7 +164,7 @@ export async function GET(request: Request) {
     formatDateTime(job.startedAt),
     formatDateTime(job.finishedAt),
     formatDateTime(job.updatedAt),
-    job.lastError
+    sanitizePublicImportJobError(job.lastError)
   ] satisfies CsvValue[]];
 
   return responseFor(format, headers, rows, filenameBase);

@@ -2,18 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
-import { recordAuditLog } from "@/lib/audit";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getRequestMeta } from "@/lib/request-context";
 import { problemOrderSchema } from "@/lib/validators";
 import { packCustomerOrderShipmentSafely } from "@/src/lib/workflow/order-pack-scope";
 import { hasWorkPermission } from "@/lib/work-permissions";
+import { reportOrderWorkflowProblem } from "@/src/lib/workflow/order-problems";
 
 export async function confirmPackedAction(formData: FormData) {
   const user = await requireUser();
   const account = await requireAccount(user);
-  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
+  if (!hasWorkPermission(user, "canPack")) redirect(capabilityHomePath(user));
   const orderId = String(formData.get("orderId") ?? "");
 
   const order = await prisma.order.findFirst({
@@ -51,8 +50,7 @@ export async function confirmPackedAction(formData: FormData) {
 export async function reportProblemFromScanAction(formData: FormData) {
   const user = await requireUser();
   const account = await requireAccount(user);
-  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
-  const request = await getRequestMeta();
+  if (!hasWorkPermission(user, "canPack")) redirect(capabilityHomePath(user));
   const parsed = problemOrderSchema.safeParse({
     orderId: formData.get("orderId"),
     reason: formData.get("reason"),
@@ -78,53 +76,20 @@ export async function reportProblemFromScanAction(formData: FormData) {
     redirect(`/packing/${encodeURIComponent(order.awb)}?packed=already`);
   }
 
-  const existingProblem = await prisma.problemOrder.findFirst({
-    where: {
+  try {
+    await reportOrderWorkflowProblem({
+      actorUserId: user.id,
       accountId: account.id,
       orderId: order.id,
-      status: "OPEN"
-    }
-  });
-
-  if (existingProblem) {
-    redirect(`/packing/${encodeURIComponent(order.awb)}?problem=existing`);
+      stage: "PACK",
+      reason: parsed.data.reason,
+      note: parsed.data.details,
+      clientRequestId: String(formData.get("clientRequestId") ?? "")
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "Problem could not be saved.";
+    redirect(`/packing/${encodeURIComponent(order.awb)}?problemError=${encodeURIComponent(message)}`);
   }
-
-  await prisma.$transaction([
-    prisma.problemOrder.create({
-      data: {
-        accountId: account.id,
-        orderId: order.id,
-        reason: parsed.data.reason,
-        details: parsed.data.details,
-        reportedById: user.id
-      }
-    }),
-    prisma.order.update({
-      where: { id: order.id },
-      data: { status: "PROBLEM", packStatus: "PROBLEM", pickStatus: "PROBLEM" }
-    }),
-    prisma.scanLog.create({
-      data: {
-        accountId: account.id,
-        orderId: order.id,
-        awb: order.awb,
-        outcome: "PROBLEM",
-        scannedById: user.id,
-        note: parsed.data.reason
-      }
-    })
-  ]);
-
-  await recordAuditLog({
-    userId: user.id,
-    accountId: account.id,
-    action: "PROBLEM_ORDER_CREATED",
-    entityType: "Order",
-    entityId: order.id,
-    metadata: { awb: order.awb, reason: parsed.data.reason },
-    request
-  });
 
   revalidatePath("/problems");
   revalidatePath("/picker");

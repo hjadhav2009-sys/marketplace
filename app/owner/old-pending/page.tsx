@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
@@ -7,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { getAvailableAccounts, requireAccount, requireUser } from "@/lib/auth";
 import { compactNumber, formatDateTime } from "@/lib/format";
 import { maskOperationalKey } from "@/lib/import/issues";
-import { startOfWorkDay } from "@/lib/operations/work-queue";
+import { noActiveOrderWorkflowProblem, startOfWorkDay } from "@/lib/operations/work-queue";
 import { prisma } from "@/lib/prisma";
 import { reviewOldPendingOrderAction } from "./actions";
 
@@ -82,6 +83,7 @@ export default async function OldPendingReviewPage({ searchParams }: OldPendingP
   const where: Prisma.OrderWhereInput = {
     accountId: { in: selectedAccountIds },
     packStatus: "READY",
+    ...noActiveOrderWorkflowProblem,
     importedAt: importDay ?? { lt: startOfWorkDay() },
     marketplace: params?.marketplace || undefined,
     sku: sku ? { contains: sku } : undefined,
@@ -145,6 +147,7 @@ export default async function OldPendingReviewPage({ searchParams }: OldPendingP
       where: {
         accountId: { in: selectedAccountIds },
         packStatus: "READY",
+        ...noActiveOrderWorkflowProblem,
         importedAt: { lt: startOfWorkDay() }
       },
       _count: { _all: true },
@@ -281,6 +284,7 @@ export default async function OldPendingReviewPage({ searchParams }: OldPendingP
                     <td className="px-3 py-3">
                       <form action={reviewOldPendingOrderAction} className="grid min-w-[18rem] gap-2">
                         <input type="hidden" name="orderId" value={order.id} />
+                        <input type="hidden" name="clientRequestId" value={`old-pending:${randomUUID()}`} />
                         <input name="note" defaultValue={order.oldPendingReviewNote ?? ""} placeholder="Optional review note" className="min-h-10 rounded-md border border-slate-300 px-3 py-2 text-xs" />
                         <div className="flex flex-wrap gap-2">
                           <button name="action" value="keep" className="rounded-md border border-slate-200 px-2 py-1 text-xs font-bold text-slate-800">Keep pending</button>

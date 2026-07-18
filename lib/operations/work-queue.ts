@@ -13,6 +13,10 @@ export type WorkQueueOrderInput = {
   importedAt: Date;
 };
 
+export const noActiveOrderWorkflowProblem = {
+  workTasks: { none: { status: "PROBLEM" as const } }
+} satisfies Prisma.OrderWhereInput;
+
 export function startOfWorkDay(now = new Date()) {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);

@@ -1,14 +1,13 @@
 import { revalidatePath } from "next/cache";
 import { normalizeAwb } from "@/lib/awb";
-import { recordAuditLog } from "@/lib/audit";
 import {
   getMobilePermissionAccountContext,
-  getMobileRequestMeta,
   mobileError,
   mobileJson,
   readMobileJsonBody
 } from "@/lib/mobile-api";
 import { prisma } from "@/lib/prisma";
+import { reportOrderWorkflowProblem } from "@/src/lib/workflow/order-problems";
 
 export async function POST(request: Request) {
   const body = await readMobileJsonBody(request);
@@ -57,63 +56,22 @@ export async function POST(request: Request) {
     return mobileError("already_packed", "Already packed items cannot be marked as problem from mobile.", 409);
   }
 
-  const existingProblem = await prisma.problemOrder.findFirst({
-    where: {
+  let result;
+  try {
+    result = await reportOrderWorkflowProblem({
+      actorUserId: context.user.id,
       accountId: context.account.id,
       orderId: order.id,
-      status: "OPEN"
-    }
-  });
-
-  if (existingProblem) {
-    return mobileJson({ ok: true, existing: true, problemId: existingProblem.id });
+      stage: "PACK",
+      reason,
+      note: details,
+      clientRequestId: String(body.data.clientRequestId ?? "")
+    });
+  } catch (cause) {
+    return mobileError("problem_rejected", cause instanceof Error ? cause.message : "Problem could not be saved.", 409);
   }
-
-  const problem = await prisma.$transaction(async (tx) => {
-    const created = await tx.problemOrder.create({
-      data: {
-        accountId: context.account.id,
-        orderId: order.id,
-        reason,
-        details,
-        reportedById: context.user.id
-      }
-    });
-
-    await tx.order.update({
-      where: { id: order.id },
-      data: {
-        status: "PROBLEM",
-        pickStatus: "PROBLEM",
-        packStatus: "PROBLEM"
-      }
-    });
-
-    await tx.scanLog.create({
-      data: {
-        accountId: context.account.id,
-        orderId: order.id,
-        awb: order.trackingId ?? order.awb,
-        outcome: "PROBLEM",
-        scannedById: context.user.id,
-        note: reason
-      }
-    });
-
-    return created;
-  });
-
-  await recordAuditLog({
-    userId: context.user.id,
-    accountId: context.account.id,
-    action: "MOBILE_PROBLEM_ORDER_CREATED",
-    entityType: "Order",
-    entityId: order.id,
-    metadata: { awb: order.awb, trackingId: order.trackingId, reason },
-    request: getMobileRequestMeta(request)
-  });
 
   revalidatePath("/packing");
   revalidatePath("/problems");
-  return mobileJson({ ok: true, existing: false, problemId: problem.id });
+  return mobileJson({ ok: true, existing: result.idempotent, problemId: result.problemId });
 }

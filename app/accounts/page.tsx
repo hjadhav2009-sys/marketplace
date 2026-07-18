@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AccountSwitcherForm } from "@/components/AccountSwitcherForm";
 import { getAvailableAccounts, getSelectedAccount, requireUser } from "@/lib/auth";
 import { selectAccountAction } from "./actions";
@@ -52,6 +53,17 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
             selectedAccountId={selectedAccount?.id}
             action={selectAccountAction}
           />
+        ) : user.role === "OWNER" ? (
+          <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950">
+            <p className="text-sm font-semibold">No seller accounts have been created yet.</p>
+            <Link
+              href="/owner/accounts"
+              prefetch
+              className="mt-4 inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              Create First Seller Account
+            </Link>
+          </div>
         ) : (
           <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
             No active seller account is assigned to this user. Ask the owner to assign an account.

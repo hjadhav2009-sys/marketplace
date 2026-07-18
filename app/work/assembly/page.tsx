@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
-import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { prisma } from "@/lib/prisma";
 import { getOrderAssemblyQueue } from "@/src/lib/workflow/order-assembly";
@@ -10,7 +10,7 @@ import { OrderAssemblyCard } from "./OrderAssemblyCard";
 
 export default async function OrderAssemblyPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; page?: string; assemblySuccess?: string; assemblyError?: string }> }) {
   const user = await requireUser(); const account = await requireAccount(user);
-  if (!(hasWorkPermission(user, "canAssemble") || user.canViewAllWork)) redirect(roleHomePath(user.role));
+  if (!(hasWorkPermission(user, "canAssemble") || user.canViewAllWork)) redirect(capabilityHomePath(user));
   const query = await searchParams; const status = query.status === "problem" || query.status === "completed" || query.status === "mine" ? query.status : "active"; const page = Math.max(1, Number(query.page) || 1);
   const [result, workers] = await Promise.all([
     getOrderAssemblyQueue({ actorUserId: user.id, accountId: account.id, page, search: query.q, status }),

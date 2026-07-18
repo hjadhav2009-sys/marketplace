@@ -1,19 +1,10 @@
 import Link from "next/link";
+import type { WorkStage } from "@prisma/client";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
-import { requireAccount, requireUser } from "@/lib/auth";
+import { capabilityHomePath,requireAccount,requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
-import { getWorkHubCounts } from "@/src/lib/workflow/queues";
-import { getOrderAssemblyCounts } from "@/src/lib/workflow/order-assembly";
-
-export default async function WorkHubPage(){const user=await requireUser();const account=await requireAccount(user);const [counts,assemblyCounts]=await Promise.all([getWorkHubCounts(user,account.id),(hasWorkPermission(user,"canAssemble")||user.canViewAllWork)?getOrderAssemblyCounts(user.id,account.id):null]);const cards=[
- {show:hasWorkPermission(user,"canPick")||hasWorkPermission(user,"canMark")||hasWorkPermission(user,"canAssemble")||hasWorkPermission(user,"canPack")||user.canViewAllWork,href:"/work/scan",title:"Universal Work Scanner",stage:null,stats:null},
- {show:hasWorkPermission(user,"canPick"),href:"/picker",title:"Order Picking",stage:null},
- {show:hasWorkPermission(user,"canPack"),href:"/packing",title:"Order Packing",stage:null},
- {show:Boolean(assemblyCounts),href:"/work/assembly",title:"Order Assembly",stage:null,stats:assemblyCounts},
- {show:hasWorkPermission(user,"canPick"),href:"/work/consignments/pick",title:"Consignment Picking",stage:"PICK"},
- {show:hasWorkPermission(user,"canMark"),href:"/work/marking",title:"Marking",stage:"MARK"},
- {show:hasWorkPermission(user,"canPack"),href:"/work/consignments/pack",title:"Consignment Packing",stage:"PACK"},
- {show:user.role==="OWNER"||user.canReportProblem||user.canManageConsignments||user.canViewAllWork,href:"/work/problems",title:"Problems",stage:null}
- ];return <AppShell><PageHeader eyebrow="Selected-account work" title="Work Hub" description="Fast worker queues for orders and activated consignments. Quantities are work progress, not inventory."/><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{cards.filter((card)=>card.show).map((card)=>{const stats=card.stats??(card.stage?counts[card.stage]:null);return <Link key={card.title} href={card.href} prefetch className="rounded-md border bg-white p-5 shadow-sm transition hover:border-berry"><p className="text-lg font-black">{card.title}</p>{stats?<div className="mt-3 grid grid-cols-2 gap-2 text-sm"><Stat label="Ready" value={stats.ready}/><Stat label="In progress" value={stats.inProgress}/><Stat label="Assigned to me" value={stats.mine}/><Stat label="Problems" value={stats.problems}/><Stat label="Completed today" value={stats.completedToday}/></div>:<p className="mt-2 text-sm text-slate-600">Open the existing customer-order workflow.</p>}</Link>})}</section></AppShell>;}
-function Stat({label,value}:{label:string;value:number}){return <div className="rounded-md bg-slate-50 p-2"><p className="text-xs text-slate-500">{label}</p><p className="text-xl font-black">{value}</p></div>;}
+import { getSmartStageSummary } from "@/src/lib/workflow/grouped-work";
+import { LiveWorkHubSummary } from "./LiveWorkHubSummary";
+export default async function WorkHubPage(){const user=await requireUser(),allowed=(["PICK","MARK","ASSEMBLE","PACK"] as WorkStage[]).filter(stage=>hasWorkPermission(user,stage==="PICK"?"canPick":stage==="MARK"?"canMark":stage==="ASSEMBLE"?"canAssemble":"canPack")||user.canViewAllWork);if(!allowed.length)redirect(capabilityHomePath(user));const account=await requireAccount(user),values=await Promise.all(allowed.map(stage=>getSmartStageSummary({actorUserId:user.id,accountId:account.id,stage}))),initial=Object.fromEntries(allowed.map((stage,index)=>[stage,values[index]]));return <AppShell><PageHeader eyebrow={`${account.marketplace} / ${account.accountDisplayName??account.name}`} title="Work Hub" description="Choose a stage. Daily Orders and Consignments remain visibly separated."/><LiveWorkHubSummary initial={initial}/><section className="mt-5 grid gap-3 sm:grid-cols-2"><Link href="/work/scan" className="rounded-md border bg-white p-5 shadow-sm"><p className="text-xs font-black text-berry">SELECTED ACCOUNT</p><p className="mt-2 text-xl font-black">Universal Scan</p><p className="text-sm text-slate-600">Every work state is visible. Scanning alone never mutates.</p></Link><Link href="/work/problems" className="rounded-md border bg-white p-5 shadow-sm"><p className="text-xs font-black text-rose-700">WORK EXCEPTIONS</p><p className="mt-2 text-xl font-black">Problems</p><p className="text-sm text-slate-600">Review assignment and interrupted-stage problems.</p></Link></section></AppShell>}

@@ -8,9 +8,7 @@ import { hashPassword, passwordHashNeedsUpgrade } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { getRequestMeta } from "@/lib/request-context";
 import { loginSchema } from "@/lib/validators";
-
-const MAX_FAILED_LOGINS = 5;
-const LOCK_MINUTES = 15;
+import { clearSecurityDimensions, consumeSecurityDimensions } from "@/lib/security-throttle";
 
 export async function loginAction(formData: FormData) {
   const request = await getRequestMeta();
@@ -23,6 +21,9 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=invalid");
   }
 
+  const throttle = await consumeSecurityDimensions({ scope: "web-login", username: parsed.data.username, ipAddress: request.ipAddress, usernameLimit: 50, ipLimit: 10, windowMs: 15 * 60_000, blockMs: 5 * 60_000 });
+  if (!throttle.allowed) redirect("/login?error=invalid");
+
   const user = await prisma.user.findUnique({
     where: { username: parsed.data.username }
   });
@@ -31,7 +32,7 @@ export async function loginAction(formData: FormData) {
     await recordAuditLog({
       action: "LOGIN_FAILURE",
       entityType: "User",
-      metadata: { reason: "bad_password", failedLoginCount: 0, username: parsed.data.username },
+      metadata: { reason: "bad_password", failedLoginCount: 0, throttleKeyHashes: throttle.keyHashes },
       request
     });
     redirect("/login?error=invalid");
@@ -46,7 +47,7 @@ export async function loginAction(formData: FormData) {
       action: "LOGIN_FAILURE",
       entityType: "User",
       entityId: user.id,
-      metadata: { reason: "inactive", username: parsed.data.username },
+      metadata: { reason: "inactive", throttleKeyHashes: throttle.keyHashes },
       request
     });
     redirect("/login?error=invalid");
@@ -67,13 +68,11 @@ export async function loginAction(formData: FormData) {
 
   if (loginCheck === "invalid_credentials") {
     const failedLoginCount = user.failedLoginCount + 1;
-    const lockedUntil = failedLoginCount >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCK_MINUTES * 60 * 1000) : null;
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        failedLoginCount,
-        lockedUntil
+        failedLoginCount
       }
     });
 
@@ -83,7 +82,7 @@ export async function loginAction(formData: FormData) {
       action: "LOGIN_FAILURE",
       entityType: "User",
       entityId: user.id,
-      metadata: { reason: lockedUntil ? "locked_after_failures" : "bad_password", failedLoginCount, username: parsed.data.username },
+      metadata: { reason: "bad_password", failedLoginCount, throttleKeyHashes: throttle.keyHashes },
       request
     });
     redirect("/login?error=invalid");
@@ -100,6 +99,7 @@ export async function loginAction(formData: FormData) {
       lastUserAgent: request.userAgent
     }
   });
+  await clearSecurityDimensions("web-login", parsed.data.username);
   let session;
 
   try {

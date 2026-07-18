@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { recordAuditLog } from "@/lib/audit";
-import { requireAccount, requireUser, roleHomePath } from "@/lib/auth";
+import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { normalizeAwb } from "@/lib/awb";
 import { searchOrdersByAwbFragment } from "@/lib/data";
 import { buildWorkQueueOrderWhere } from "@/lib/operations/work-queue";
@@ -25,7 +25,7 @@ function writeScanLogLater(input: {
 export async function searchAwbAction(formData: FormData) {
   const user = await requireUser();
   const account = await requireAccount(user);
-  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
+  if (!hasWorkPermission(user, "canPack")) redirect(capabilityHomePath(user));
   const query = normalizeAwb(formData.get("awb"));
 
   if (query.length < 5) {
@@ -122,7 +122,7 @@ export async function moveOldPendingToReviewAction() {
 export async function directPackFromSearchAction(formData: FormData) {
   const user = await requireUser();
   const account = await requireAccount(user);
-  if (!hasWorkPermission(user, "canPack")) redirect(roleHomePath(user.role));
+  if (!hasWorkPermission(user, "canPack")) redirect(capabilityHomePath(user));
   const orderId = String(formData.get("orderId") ?? "");
   const returnQuery = normalizeAwb(formData.get("returnQuery"));
 

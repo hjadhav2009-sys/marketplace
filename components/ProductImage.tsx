@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   getInitialDisplayImageState,
   isDisplayableImageSrc,
@@ -13,17 +13,19 @@ import { markProductImageBrokenAction, markProductImageMappedAction } from "./pr
 type ProductImageProps = {
   src?: string | null;
   alt: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "inventory" | "md" | "lg";
   showBadge?: boolean;
   mappingId?: string | null;
   showDebug?: boolean;
   imageHealth?: string | null;
   cacheStatus?: string | null;
   originalImageUrl?: string | null;
+  priority?: boolean;
 };
 
 const sizeClass = {
   sm: "h-16 w-16",
+  inventory: "h-[5.5rem] w-[5.5rem]",
   md: "h-28 w-28",
   lg: "aspect-square w-full"
 };
@@ -41,38 +43,45 @@ export function ProductImage({
   showDebug = false,
   imageHealth,
   cacheStatus,
-  originalImageUrl
+  originalImageUrl,
+  priority = false
 }: ProductImageProps) {
   const [state, setState] = useState<ProductImageState>(initialState(src, imageHealth, cacheStatus));
-  const [slowLoading, setSlowLoading] = useState(false);
   const [manualCheck, setManualCheck] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [eligibleToLoad,setEligibleToLoad]=useState(priority);
+  const containerRef=useRef<HTMLDivElement>(null);
   const validSrc = isDisplayableImageSrc(src) ? src : null;
   const isExternalSrc = isLoadableImageUrl(validSrc);
   const hasSource = Boolean(validSrc);
-  const stateText = productImageStateText(state, hasSource, slowLoading, cacheStatus);
+  const stateText = productImageStateText(state, hasSource, false, cacheStatus);
 
   useEffect(() => {
     setState(initialState(src, imageHealth, cacheStatus));
-    setSlowLoading(false);
     setManualCheck(false);
     if (src && !validSrc && mappingId) {
       void markProductImageBrokenAction(mappingId);
     }
   }, [cacheStatus, imageHealth, mappingId, src, validSrc]);
 
+  useEffect(()=>{if(priority||eligibleToLoad)return;const element=containerRef.current;if(!element)return;if(typeof IntersectionObserver==="undefined"){setEligibleToLoad(true);return;}const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setEligibleToLoad(true);observer.disconnect();}},{rootMargin:"200px"});observer.observe(element);return()=>observer.disconnect();},[eligibleToLoad,priority]);
+
   useEffect(() => {
-    if (!validSrc || state !== "loading" || !isExternalSrc) {
-      setSlowLoading(false);
+    if (!eligibleToLoad || !validSrc || (state !== "loading" && state !== "retrying") || !isExternalSrc) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      setSlowLoading(true);
-    }, 5000);
+      if (retryVersion === 0) {
+        setState("retrying");
+        setRetryVersion(1);
+      } else {
+        setState("unavailable");
+      }
+    }, retryVersion === 0 ? 2000 : 2500);
 
     return () => window.clearTimeout(timeout);
-  }, [isExternalSrc, retryVersion, state, validSrc]);
+  }, [eligibleToLoad, isExternalSrc, retryVersion, state, validSrc]);
 
   function stopParentNavigation(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -81,7 +90,6 @@ export function ProductImage({
 
   function retryImage(event: MouseEvent<HTMLButtonElement>) {
     stopParentNavigation(event);
-    setSlowLoading(false);
     setManualCheck(true);
     setState(validSrc ? "loading" : getInitialDisplayImageState(src));
     setRetryVersion((version) => version + 1);
@@ -98,17 +106,17 @@ export function ProductImage({
   const badge =
     state === "loaded"
       ? { label: "Image mapped", className: "bg-teal-50 text-teal-700 ring-teal-200" }
-      : state === "broken"
+      : state === "broken" || state === "unavailable"
         ? { label: showDebug ? stateText : "Image issue", className: "bg-rose-50 text-rose-700 ring-rose-200" }
         : { label: stateText, className: "bg-amber-50 text-amber-800 ring-amber-200" };
 
   return (
-    <div
+    <div ref={containerRef}
       className={`relative flex shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white ${sizeClass[size]}`}
       title={src ? `${stateText}: ${src}` : stateText}
     >
-      {state === "loading" ? <div className="absolute inset-0 animate-pulse bg-slate-100" /> : null}
-      {validSrc && state !== "broken" ? (
+      {(state === "loading" || state === "retrying") ? <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400"><span className="flex h-9 w-9 items-center justify-center rounded-md border bg-white text-[10px] font-black">IMG</span><span className="mt-1 text-[10px] font-bold uppercase">{state === "retrying" ? "Retrying" : "Loading"}</span></div> : null}
+      {eligibleToLoad && validSrc && state !== "broken" && state !== "unavailable" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={`${validSrc}-${retryVersion}`}
@@ -116,23 +124,16 @@ export function ProductImage({
           alt={alt}
           className={`h-full w-full object-contain p-2 transition-opacity ${state === "loaded" ? "opacity-100" : "opacity-0"}`}
           decoding="async"
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
           onLoad={() => {
             setState("loaded");
-            setSlowLoading(false);
             if (isExternalSrc && mappingId && (imageHealth === "BROKEN" || manualCheck)) {
               void markProductImageMappedAction(mappingId);
             }
             setManualCheck(false);
           }}
-          onError={() => {
-            setState("broken");
-            setSlowLoading(false);
-            setManualCheck(false);
-            if (isExternalSrc && mappingId) {
-              void markProductImageBrokenAction(mappingId);
-            }
-          }}
+          onError={() => { setManualCheck(false); if (isExternalSrc && retryVersion === 0) { setState("retrying"); setRetryVersion(1); } else { setState("unavailable"); } }}
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center bg-slate-50 px-3 text-center">
@@ -140,16 +141,16 @@ export function ProductImage({
             IMG
           </span>
           <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {state === "broken" ? "Image failed" : state === "missing" ? "No image" : stateText}
+            {state === "broken" || state === "unavailable" ? "Image unavailable" : state === "missing" ? "No image" : stateText}
           </span>
           <span className="mt-1 max-w-36 text-xs text-slate-500">{state === "missing" ? "Use Listing Master or cache today's images" : stateText}</span>
-          {showDebug && state === "broken" && validSrc && isExternalSrc ? (
+          {(state === "broken" || state === "unavailable") && validSrc && isExternalSrc ? (
             <button
               type="button"
               onClick={retryImage}
               className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
             >
-              Check this image
+              Retry image
             </button>
           ) : null}
           {showDebug && originalImageUrl ? (
@@ -159,11 +160,6 @@ export function ProductImage({
           ) : null}
         </div>
       )}
-      {state === "loading" && slowLoading && isExternalSrc ? (
-        <div className="absolute inset-x-2 bottom-2 rounded bg-white/90 px-2 py-1 text-center text-xs font-semibold text-slate-700">
-          Still loading
-        </div>
-      ) : null}
       {showBadge ? (
         <span className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[11px] font-semibold ring-1 ${badge.className}`}>
           {badge.label}

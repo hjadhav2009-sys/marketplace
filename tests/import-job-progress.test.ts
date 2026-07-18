@@ -42,7 +42,10 @@ const uploadReviewSource = readFileSync(join(process.cwd(), "app", "owner", "upl
 const runnerSource = readFileSync(join(process.cwd(), "src", "lib", "import-jobs", "runner.ts"), "utf8");
 
 assert.match(importSource, /updateImportJobProgress/g, "Flipkart imports update ImportJob progress");
-assert.match(importSource, /processedRows % 500 === 0/, "Flipkart order import updates progress during large daily files");
+const orderChunkStart = importSource.indexOf("for (const chunk of chunkFlipkartListingRows(preparedOrders, FLIPKART_ORDER_TRANSACTION_BATCH_SIZE))");
+const orderChunkEnd = importSource.indexOf("await writeIssues(batch.id, deferredMappingIssues)", orderChunkStart);
+assert.ok(orderChunkStart >= 0 && orderChunkEnd > orderChunkStart, "Flipkart Daily Orders use bounded transaction chunks");
+assert.match(importSource.slice(orderChunkStart, orderChunkEnd), /await updateImportJobProgress\(/, "Flipkart order import updates progress after every bounded chunk");
 assert.match(importSource, /chunkFlipkartListingRows\(listingDrafts\)/, "Flipkart listing import keeps 500-row chunks");
 assert.match(listingPageSource, /take: 50/, "Listing import review limits issue rows");
 assert.match(uploadReviewSource, /const REVIEW_PAGE_SIZE = 50/, "Order review page caps rendered rows");

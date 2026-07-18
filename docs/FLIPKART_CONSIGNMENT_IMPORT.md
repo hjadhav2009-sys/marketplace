@@ -23,9 +23,11 @@ Matches are selected-account only:
 
 SKU and FSN selecting different listings is an identifier conflict. Multiple exact results remain ambiguous. Titles are manual-search assistance only and are never auto-matched.
 
+An unmatched valid source row is retained as `NOT_FOUND` with its original positive `Quantity Sent`. Import never creates a catalog placeholder automatically. The batch stays `REVIEW_REQUIRED`, no worker task is created, and an owner must explicitly link or create the listing before activation.
+
 ## Routes
 
-An active Product Process Rule proposes the line route. Phase 2 activation permits Ready-made (PICK_PACK) and Marking (PICK_MARK_PACK). Marking requires an active linked MarkingAsset with an active MARKING_FILE version. Assembly routes remain stored by the foundation but are not activated for Flipkart consignments in this phase.
+An active Product Process Rule proposes the line route. Explicit activation supports Ready-made (`PICK_PACK`), Marking (`PICK_MARK_PACK`), Assembly (`PICK_ASSEMBLE_PACK`), and Marking then Assembly (`PICK_MARK_ASSEMBLE_PACK`). A Marking route uses an active linked `MarkingAsset`; an Assembly route snapshots its saved title and instructions. Activation creates only the initial Pick task. Completing Pick through the authoritative route action creates the selected downstream task plan and preserves the immutable instruction snapshots. Missing route instructions remain visible warnings and require explicit worker confirmation before manual-instruction work is created.
 
 ## Owner flow
 

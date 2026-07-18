@@ -19,14 +19,14 @@ const dualWorker = {
 };
 const picker = {
   role: "PICKER" as const,
-  canPick: false,
+  canPick: true,
   canPack: false,
   canReportProblem: true
 };
 const packer = {
   role: "PACKER" as const,
   canPick: false,
-  canPack: false,
+  canPack: true,
   canReportProblem: true
 };
 const owner = {

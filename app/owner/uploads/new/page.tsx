@@ -34,6 +34,7 @@ function errorText(error: string | undefined) {
   if (error === "flipkart-order-import-failed") {
     return "The Flipkart order file could not be imported. Check the headers and try again.";
   }
+  if (error === "amazon-daily-orders-disabled") return "Amazon Daily Orders are currently disabled. Product Catalog and Consignments remain available.";
 
   if (error === "too-large") {
     return "The PDF upload is larger than 100 MB. Split the marketplace download into smaller files and upload again.";
@@ -41,6 +42,10 @@ function errorText(error: string | undefined) {
 
   if (error === "parse-failed") {
     return "The PDF could not be parsed. Use text-based PDFs only; scanned image PDFs need OCR in a later phase.";
+  }
+
+  if (error === "legacy-pdf-review-only") {
+    return "Legacy PDF parsing is available only as a Meesho compatibility review and cannot create production work.";
   }
 
   return error ? "Choose a valid marketplace import file." : null;

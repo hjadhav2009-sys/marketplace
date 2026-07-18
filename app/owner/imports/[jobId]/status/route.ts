@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { startImportJob } from "@/src/lib/import-jobs/runner";
+import { toPublicImportJob } from "@/src/lib/import-jobs/public-job";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
 
 type ImportJobStatusRouteProps = {
@@ -27,9 +27,5 @@ export async function GET(_request: Request, { params }: ImportJobStatusRoutePro
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (job.status === "QUEUED" || job.status === "RUNNING") {
-    startImportJob(job.id);
-  }
-
-  return NextResponse.json({ job });
+  return NextResponse.json({ job: toPublicImportJob(job) });
 }

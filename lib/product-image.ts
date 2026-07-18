@@ -23,7 +23,7 @@ export function isDisplayableImageSrc(value: string | null | undefined) {
   return isLoadableImageUrl(value);
 }
 
-export type ProductImageState = "loading" | "loaded" | "missing" | "broken";
+export type ProductImageState = "loading" | "loaded" | "retrying" | "missing" | "broken" | "unavailable";
 export type SkuMappingImageFilter = "all" | "cached" | "not-cached" | "broken" | "recheck-needed";
 
 export type ListingImageGalleryInput = {
@@ -60,7 +60,7 @@ type ImageMappingLike = {
   cacheOriginalImageUrl?: string | null;
 };
 
-export function getInitialProductImageState(value: string | null | undefined): Exclude<ProductImageState, "loaded"> {
+export function getInitialProductImageState(value: string | null | undefined): "loading" | "missing" | "broken" {
   if (!value) {
     return "missing";
   }
@@ -68,7 +68,7 @@ export function getInitialProductImageState(value: string | null | undefined): E
   return isLoadableImageUrl(value) ? "loading" : "broken";
 }
 
-export function getInitialDisplayImageState(value: string | null | undefined): Exclude<ProductImageState, "loaded"> {
+export function getInitialDisplayImageState(value: string | null | undefined): "loading" | "missing" | "broken" {
   if (!value) {
     return "missing";
   }
@@ -101,6 +101,9 @@ export function productImageStateText(
   if (state === "broken") {
     return hasSource ? "Image URL failed" : "Broken URL";
   }
+
+  if (state === "unavailable") return "Image unavailable";
+  if (state === "retrying") return "Retrying image";
 
   return slowLoading ? (cacheStatus === "CACHED" ? "Cached image loading" : "Still loading") : "Loading image";
 }

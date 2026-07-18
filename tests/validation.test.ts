@@ -493,6 +493,7 @@ assert.equal(canRoleAccessPath("PACKER", "/owner/users"), false, "Packer cannot 
 assert.equal(canRoleAccessPath("PACKER", "/problems"), true, "Packer can access problems");
 assert.equal(canAccessAccount({ role: "PICKER", accountId: "a1" }, "a1"), true, "Assigned user can access account");
 assert.equal(canAccessAccount({ role: "PICKER", accountId: "a1" }, "a2"), false, "Assigned user cannot access other account");
+assert.equal(canAccessAccount({ role: "PICKER", accountId: null }, "a1"), false, "Worker with no assignment cannot access an account");
 assert.equal(canRoleAccessPath("PICKER", "/change-password"), true, "Workers can change password");
 
 assert.equal(canConfirmPacked({ packStatus: "READY" }), true, "Ready order can be packed");
@@ -732,7 +733,12 @@ assert.deepEqual(
   "Import issue context extracts only SKU and masked operational keys"
 );
 assert.equal(JSON.stringify(safeIssueContext).includes("PRIVATE"), false, "Import issue context excludes private customer raw data");
-assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs", "fake.xlsx")), true, "Import retry accepts retained files under storage/import-jobs");
+const retainedJobArtifact = join(repoRoot, "storage", "import-jobs", "job_11111111-1111-4111-8111-111111111111-fake.xlsx");
+assert.equal(isRetainedImportJobFilePath(retainedJobArtifact), true, "Import retry accepts a direct job-owned retained artifact");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs")), false, "Import cleanup rejects the storage root");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage")), false, "Import cleanup rejects a storage ancestor");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "import-jobs", "nested", "job_11111111-1111-4111-8111-111111111111-fake.xlsx")), false, "Import cleanup rejects nested non-job paths");
+assert.equal(isRetainedImportJobFilePath(join(repoRoot, "storage", "other-imports", "job_11111111-1111-4111-8111-111111111111-fake.xlsx")), false, "Import cleanup rejects sibling storage");
 assert.equal(isRetainedImportJobFilePath(join(repoRoot, "private-test-data", "fake.xlsx")), false, "Import retry rejects files outside private retained import-job storage");
 assert.equal(normalizeReportStatus("missing-image"), "missing-image", "Report status accepts current missing image filter");
 assert.equal(normalizeReportStatus("not-real"), "", "Report status falls back safely");
@@ -1072,8 +1078,6 @@ const uploadActions = readFileSync(join(repoRoot, "app", "owner", "uploads", "ac
 const uploadPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "new", "page.tsx"), "utf8");
 const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
 const productImageGalleryComponent = readFileSync(join(repoRoot, "components", "ProductImageGallery.tsx"), "utf8");
-const pickerProductCardComponent = readFileSync(join(repoRoot, "components", "PickerProductCard.tsx"), "utf8");
-const productDetailsDrawerComponent = readFileSync(join(repoRoot, "components", "ProductDetailsDrawer.tsx"), "utf8");
 const appNavComponent = readFileSync(join(repoRoot, "components", "AppNav.tsx"), "utf8");
 const accountSwitcherComponent = readFileSync(join(repoRoot, "components", "AccountSwitcherForm.tsx"), "utf8");
 const marketplaceImportWizardComponent = readFileSync(join(repoRoot, "components", "MarketplaceImportWizard.tsx"), "utf8");
@@ -1092,7 +1096,6 @@ const problemsPage = readFileSync(join(repoRoot, "app", "problems", "page.tsx"),
 const problemsActions = readFileSync(join(repoRoot, "app", "problems", "actions.ts"), "utf8");
 const pickerActions = readFileSync(join(repoRoot, "app", "picker", "[sku]", "actions.ts"), "utf8");
 const orderPickingService = readFileSync(join(repoRoot, "src", "lib", "workflow", "order-picking.ts"), "utf8");
-const pickerDetailsRoute = readFileSync(join(repoRoot, "app", "picker", "details", "route.ts"), "utf8");
 const dashboardPage = readFileSync(join(repoRoot, "app", "dashboard", "page.tsx"), "utf8");
 const ownerPage = readFileSync(join(repoRoot, "app", "owner", "page.tsx"), "utf8");
 const accountsPage = readFileSync(join(repoRoot, "app", "accounts", "page.tsx"), "utf8");
@@ -1169,7 +1172,6 @@ function sourceBetween(source: string, start: string, end: string) {
   return source.slice(startIndex, endIndex);
 }
 
-const pickerListDataSource = sourceBetween(dataHelpers, "export async function getSkuGroups", "export async function getSkuDetail");
 const packingSearchDataSource = sourceBetween(dataHelpers, "export async function searchOrdersByAwbFragment", "export async function getOrderWithImage");
 const heavyListingFieldsPattern = /productHighlights|allSpecifications|description:\s*true/;
 const mobileRouteBundle = [
@@ -1233,9 +1235,11 @@ assert.match(uploadActions, /isUploadTooLarge\(file, FLIPKART_IMPORT_MAX_BYTES\)
 assert.match(skuMappingImportActions, /isUploadTooLarge\(file, FLIPKART_IMPORT_MAX_BYTES\)/, "Flipkart Listing Master import checks file size before retaining");
 assert.match(uploadActions, /ownerUploadAccount/, "Upload actions use the chosen seller account instead of a stale account cookie");
 assert.match(uploadActions, /revalidatePath\("\/dashboard"\)/, "Upload actions refresh the dashboard route after imports");
-assert.match(uploadActions, /selectPreviewRowsForImport/, "Confirm import uses centralized label-over-manifest source selection");
+assert.doesNotMatch(uploadActions, /selectPreviewRowsForImport/, "Legacy PDF actions expose no hidden preview-to-production import path");
+assert.match(uploadActions, /confirmParsedBatchAction[\s\S]*legacy-review-only/, "Legacy confirmation compatibility action redirects to review-only guidance");
+assert.doesNotMatch(reviewPage, /confirmParsedBatchAction/, "Legacy review UI exposes no production confirmation form");
 assert.match(importPreview, /rows\.some\(\(row\) => row\.sourceType === "LABEL"\)[\s\S]*"MANIFEST_ORDER"/, "Preview import source prefers labels over manifest rows");
-assert.match(importPreview, /seenAwbs\.has/, "Confirm import skips duplicate AWB rows inside one preview batch");
+assert.match(importPreview, /seenAwbs\.has/, "Review-only preview analysis identifies duplicate AWB rows inside one batch");
 assert.match(importOrders, /heldRows/, "Order import stats include held-for-review rows");
 assert.match(reviewPage, /Held for review/, "Import result shows held-for-review count");
 assert.match(dashboardPage, /requireUser\(\["OWNER"\]\)/, "Dashboard route remains owner-only");
@@ -1253,7 +1257,7 @@ assert.match(marketplaceImportWizardComponent, /Daily workers upload this order 
 assert.match(marketplaceImportWizardComponent, /accounts\.filter\(\(account\) => account\.active && account\.marketplace === marketplace\)/, "Upload wizard filters accounts by selected marketplace");
 assert.match(marketplaceImportWizardComponent, /marketplace === "FLIPKART"[\s\S]*Flipkart Listing Master[\s\S]*Flipkart Daily Orders/, "Flipkart import types appear only under Flipkart");
 assert.match(marketplaceImportWizardComponent, /marketplace === "MEESHO"[\s\S]*Advanced \/ Legacy imports[\s\S]*Legacy PDF parser for old Meesho label\/manifest workflow/, "Meesho legacy PDF import appears only under Meesho legacy");
-assert.match(marketplaceImportWizardComponent, /Amazon coming soon/, "Amazon import option is disabled for now");
+assert.match(marketplaceImportWizardComponent, /Amazon Product Inventory Refresh/, "Amazon Product Inventory Refresh is enabled in the marketplace wizard");
 assert.match(ownerImportsPage, /IMPORT_JOB_PAGE_SIZES\.map/, "Import Progress page exposes configured page size choices");
 assert.match(ownerImportsPage, /Showing \{compactNumber\(window\.from\)\}-\{compactNumber\(window\.to\)\} of \{compactNumber\(totalRows\)\}/, "Import Progress page shows pagination range");
 assert.match(ownerImportsPage, /Previous[\s\S]*Next/, "Import Progress page includes previous and next pagination controls");
@@ -1269,7 +1273,10 @@ assert.doesNotMatch(sourceBetween(importJobExportRoute, "const headers = [\"rowN
 assert.match(importJobDetailPage, /retainedImportJobFileExists/, "Import job detail checks retained source file availability before retry");
 assert.match(importJobRetryActions, /retainedImportJobFileExists[\s\S]*createRetryImportJob[\s\S]*startImportJob/, "Retry action starts a safe new job only when the retained file exists");
 assert.match(importJobRunnerSource, /IMPORT_JOB_STORAGE_DIR[\s\S]*storage", "import-jobs"/, "Import jobs retain uploaded files in private import-job storage");
-assert.match(importJobRunnerSource, /isRetainedImportJobFilePath[\s\S]*resolvedStorage[\s\S]*startsWith/, "Retry only accepts source files inside retained import-job storage");
+assert.match(importJobRunnerSource, /export function retainedImportJobArtifactPath/, "Retry resolves retained artifacts through the canonical path validator");
+assert.match(importJobRunnerSource, /path\.dirname\(resolvedFile\) !== resolvedStorage/, "Retry requires retained artifacts to be direct children of private import-job storage");
+assert.match(importJobRunnerSource, /IMPORT_JOB_ARTIFACT_NAME\.test\(path\.basename\(resolvedFile\)\)/, "Retry requires an owned import-job artifact name and rejects the storage root or arbitrary siblings");
+assert.match(importJobRunnerSource, /retainedImportJobArtifactPath\(filePath\) !== null/, "Retry accepts only paths validated as exact retained import-job artifacts");
 assert.match(importIssuesPage, /Row issue drill-down/, "Import issues page exists");
 assert.match(importIssuesPage, /IMPORT_ISSUE_PAGE_SIZES[\s\S]*issueType[\s\S]*row[\s\S]*sku/, "Import issues page has page-size, issue type, row, and SKU filters");
 assert.match(importIssuesPage, /safeImportIssueContext/, "Import issues page uses safe issue context extraction");
@@ -1280,28 +1287,10 @@ assert.doesNotMatch(importIssuesExportRoute, /Address Line|Buyer name|Ship to na
 assert.match(importJobProgressComponent, /importJobEstimatedRemainingSeconds/, "Import job detail shows estimated remaining time");
 assert.match(importJobProgressComponent, /Live progress refreshes every 1\.5 seconds/, "Import job detail explains polling cadence");
 assert.match(importJobProgressComponent, /Summary CSV[\s\S]*Summary XLSX[\s\S]*Summary TXT/, "Import job detail exposes safe summary exports");
-assert.match(pickerPage, /Large images/, "Picker page keeps a large-image mobile toggle");
-assert.match(pickerPage, /Load more/, "Picker page supports load-more pagination");
-assert.match(pickerPage, /Compact/, "Picker page supports compact mode");
-assert.match(pickerPage, /data-mobile-picker-filter-pills/, "Picker filters become compact horizontal pills on mobile");
-assert.match(pickerPage, /data-mobile-picker-one-column/, "Picker cards explicitly use one mobile column");
-assert.match(pickerPage, /Upload today&apos;s orders[\s\S]*View old pending/, "Picker empty state has compact practical actions");
-assert.match(pickerPage, /PickerProductCard/, "Picker page renders worker cards through the client card component");
-assert.match(pickerListDataSource, /imageUrl1:\s*true[\s\S]*imageUrl10:\s*true[\s\S]*image1366Url1:\s*true/, "Picker card query includes listing image URLs for gallery");
-assert.doesNotMatch(pickerListDataSource, heavyListingFieldsPattern, "Picker list query keeps heavy listing description/spec/gallery fields out of card payloads");
-assert.match(pickerProductCardComponent, /ProductImageGallery/, "Picker card image area opens the image gallery");
-assert.match(pickerProductCardComponent, /showInlineThumbnails={false}/, "Picker card keeps the top image area square without inline thumbnail rows");
-assert.match(pickerProductCardComponent, /data-card-actions="3"/, "Picker card keeps worker actions under the four-button maximum");
-assert.match(pickerProductCardComponent, /data-mobile-worker-actions/, "Picker card uses thumb-friendly mobile worker actions");
-assert.match(pickerProductCardComponent, /Details[\s\S]*ProductDetailsDrawer/, "Picker card separates Details from the image gallery");
-assert.doesNotMatch(pickerProductCardComponent, /href=.*picker\/\$\{/, "Picker card image/details controls do not navigate to the SKU page");
-assert.match(productDetailsDrawerComponent, /fetch\(detailsUrl/, "Product details drawer fetches heavy detail data only after opening");
-assert.match(pickerDetailsRoute, /getSkuDetail/, "Picker details drawer route reuses the full SKU detail query");
-assert.match(pickerActions, /markSkuGroupPickedInlineAction[\s\S]*return \{ ok: true, updatedRows: result\.updatedCount \}/, "Direct picker card action returns picked result without redirecting");
-assert.match(pickerActions, /markSkuGroupProblemInlineAction[\s\S]*return \{ ok: true, affectedOrders: orders\.length/, "Direct picker problem action returns problem result without redirecting");
-assert.match(pickerDetailPage, /fixed inset-x-0 bottom-0/, "Picker detail has mobile sticky bottom actions");
-assert.match(pickerDetailPage, /mapping\?\.cachedImageUrl/, "Picker detail uses cached image URL first");
-assert.match(pickerDetailPage, /ProductImageGallery/, "Picker detail opens the product image gallery");
+assert.match(pickerPage, /redirect\("\/work\/pick\?source=ORDER"\)/, "Legacy Picker list redirects to source-aware Work Hub");
+assert.match(pickerDetailPage, /redirect\("\/work\/pick\?source=ORDER"\)/, "Legacy SKU Details redirects to source-aware Work Hub");
+assert.match(pickerActions, /Legacy SKU-group mutations were retired/, "Legacy SKU mutation actions are explicitly retired");
+assert.doesNotMatch(pickerActions, /completePickWithNextRoute|order\.update|workTask\.update/, "Legacy Picker actions contain no hidden mutation implementation");
 assert.match(packingPage, /<AwbBarcodeScanner[\s\S]*Packed today/, "Packing page places the scanner before lower-priority dashboard details");
 assert.doesNotMatch(packingPage, /recentScans/, "Packing page does not wait on recent scan logs before showing scanner");
 assert.match(packingResultPage, /Quantity to pack/, "Packing result makes quantity prominent on mobile");
@@ -1362,11 +1351,10 @@ assert.match(problemsPage, /Resolved \(\{countByStatus\.get\("RESOLVED"\)/, "Pro
 assert.match(problemsPage, /name="accountId"[\s\S]*name="marketplace"[\s\S]*name="sku"[\s\S]*name="reason"[\s\S]*name="reporter"/, "Problems page supports account, marketplace, SKU, reason, and reporter filters");
 assert.match(problemsPage, /status: tab === "resolved" \? "RESOLVED" : "OPEN"/, "Resolved problems disappear from the open problem query");
 assert.match(problemsPage, /name="resolutionNote"/, "Problem resolution accepts a note");
-assert.match(problemsPage, /name="returnToReady"[\s\S]*Mark order back to ready/, "Problem return-to-ready is explicit");
+assert.match(problemsPage, /Restores only the interrupted stage to its exact previous state/, "Problem resolution explains stage-aware restoration");
 assert.match(problemsActions, /requireUser\(\["OWNER"\]\)/, "Problem resolution actions are owner-only");
-assert.match(problemsActions, /resolutionNote: resolutionNote \|\| null/, "Problem resolution stores resolution note");
-assert.match(problemsActions, /recordAuditLog[\s\S]*PROBLEM_ORDER_RESOLVED/, "Resolving a problem creates an audit log");
-assert.match(problemsActions, /returnToReady[\s\S]*status: "READY"[\s\S]*pickStatus: "READY"[\s\S]*packStatus: "READY"/, "Problem resolution returns to ready only when explicit");
+assert.match(problemsActions, /resolveOrderWorkflowProblem/, "Problem resolution delegates to the authoritative stage-aware service");
+assert.doesNotMatch(problemsActions, /pickStatus:\s*"READY"[\s\S]*packStatus:\s*"READY"/, "Problem UI action cannot globally rewind workflow stages");
 assert.match(problemsActions, /PROBLEM_ORDER_KEPT_OPEN/, "Keeping a problem open is audited");
 assert.match(dataHelpers, /awb: query[\s\S]*endsWith: query[\s\S]*contains: query/, "AWB search queries exact, suffix, then contains");
 assert.match(dataHelpers, /packStatus: "READY"[\s\S]*OR: \[\{ awb: query \}, \{ trackingId: query \}\]/, "Packing AWB search defaults to active READY orders and checks Tracking ID");
@@ -1377,9 +1365,6 @@ assert.match(dataHelpers, /withDevTiming\("picker orders"[\s\S]*800[\s\S]*\);/, 
 assert.match(dataHelpers, /buildWorkQueueOrderWhere/, "Picker queries are scoped through the daily active work queue");
 assert.match(workQueueSource, /importedAt: \{ gte: startOfToday \}/, "Today work queue filters by today's imported orders");
 assert.match(workQueueSource, /importedAt: \{ lt: startOfToday \}/, "Old pending work queue separates older READY orders");
-assert.match(pickerPage, /Current batch/, "Picker exposes a current-batch work queue chip");
-assert.match(pickerPage, /All pending/, "Picker exposes all-pending work queue chip");
-assert.match(pickerPage, /Old pending review/, "Picker links owners to the old pending review queue");
 assert.match(packingPage, /Today ready[\s\S]*Old pending[\s\S]*Problems/, "Packing dashboard separates today, old pending, and problem counts");
 assert.match(packingPage, /Move old pending to review/, "Owner can move old pending work into a review-only flow");
 assert.match(packingPage, /directPackFromSearchAction/, "Packing page wires direct Pack action into search suggestions");
@@ -1393,8 +1378,9 @@ assert.match(oldPendingPage, /Old pending orders remain in history and reports/,
 assert.match(oldPendingPage, /Keep pending[\s\S]*Carry forward[\s\S]*Archive from today[\s\S]*Move to problem/, "Old pending page exposes owner review actions");
 assert.doesNotMatch(oldPendingPage, /Buyer name|Address Line|phone/i, "Old pending page avoids private customer fields");
 assert.match(oldPendingActions, /oldPendingReviewStatus: reviewStatus/, "Old pending action updates review state");
-assert.match(oldPendingActions, /status: "PROBLEM"[\s\S]*pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"/, "Old pending move-to-problem updates order state");
-assert.match(oldPendingActions, /problemOrder\.create/, "Old pending move-to-problem creates an open problem when needed");
+assert.match(oldPendingActions, /reportOrderWorkflowProblem\s*\(/, "Old pending move-to-problem delegates to the authoritative stage-aware problem service");
+assert.doesNotMatch(oldPendingActions, /pickStatus:\s*"PROBLEM"|packStatus:\s*"PROBLEM"|problemOrder\.create/, "Old pending actions do not directly desynchronize workflow status or problem records");
+assert.match(oldPendingActions, /order\.updateMany[\s\S]*noActiveOrderWorkflowProblem/, "Old pending non-problem review writes close the active-stage-problem race");
 assert.match(productImageRoute, /getCurrentUser/, "Cached image route checks session without login redirect");
 assert.match(productImageRoute, /verifySignedCachedImageUrl/, "Cached image route verifies signed image URLs");
 assert.equal(productImageRoute.indexOf("verifySignedCachedImageUrl") < productImageRoute.indexOf("const user = await getCurrentUser"), true, "Signed cached image route avoids database auth before serving normal image requests");
@@ -1404,7 +1390,7 @@ assert.match(skuExportRoute, /cache_status/, "Full SKU export includes cache sta
 assert.match(skuExportRoute, /product_name[\s\S]*color[\s\S]*size/, "Full SKU export includes auto-filled metadata");
 assert.match(skuExportRoute, /safeSpreadsheetValue/, "SKU mapping XLSX exports neutralize formula-like values");
 assert.match(appShell, /\{ href: "\/dashboard", label: "Dashboard" \}/, "Owner navigation uses /dashboard as the dashboard link");
-assert.match(appShell, /hasWorkPermission\(user, "canPick"\)[\s\S]*href: "\/picker"/, "Picker navigation derives from permission with legacy role fallback");
+assert.match(appShell, /hasWorkPermission\(user, "canPick"\)[\s\S]*href: "\/work\/pick\?source=ORDER"/, "Picker navigation opens the source-aware projection queue");
 assert.match(appShell, /hasWorkPermission\(user, "canPack"\)[\s\S]*href: "\/packing"/, "Packing navigation derives from permission with legacy role fallback");
 assert.match(appShell, /function linksForUser[\s\S]*if \(user\.role === "OWNER"\)[\s\S]*return ownerLinks[\s\S]*hasWorkPermission/, "Owner management links remain separate while workers may combine operational permissions");
 assert.match(appNavComponent, /usePathname/, "Top navigation can style the active route");
@@ -1416,6 +1402,8 @@ assert.match(appShell, /MobileBottomNav/, "App shell renders mobile bottom navig
 assert.match(appShell, /data-owner-mobile-menu/, "Owner mobile navigation is tucked behind a compact menu");
 assert.match(appShell, /account\.companyName[\s\S]*account\.marketplace/, "App shell shows selected company and marketplace context");
 assert.match(accountsPage, /AccountSwitcherForm/, "Account switch page uses the grouped marketplace switcher");
+assert.match(accountsPage, /user\.role === "OWNER"[\s\S]*No seller accounts have been created yet\.[\s\S]*Create First Seller Account/, "Owner with zero accounts sees the first-account setup action");
+assert.match(accountsPage, /No active seller account is assigned to this user\. Ask the owner to assign an account\./, "Worker with zero assignments keeps the owner-assignment guidance");
 assert.match(accountSwitcherComponent, /Search accounts/, "Switch account UX is searchable");
 assert.match(accountSwitcherComponent, /marketplaceLabels/, "Switch account UX groups accounts by marketplace");
 assert.match(accountActions, /active: true/, "Switch account action only selects active accounts");
@@ -1424,6 +1412,8 @@ assert.match(ownerAccountsPage, /Company \/ Organization/, "Owner accounts page 
 assert.match(ownerAccountsPage, /Marketplace accounts/, "Owner accounts page uses marketplace account language");
 assert.match(ownerAccountsPage, /Flipkart[\s\S]*Amazon[\s\S]*Meesho legacy[\s\S]*Other/, "Owner accounts page shows marketplace sections");
 assert.match(ownerAccountsPage, /Create seller account/, "Owner accounts page supports marketplace-aware account creation");
+assert.match(ownerAccountsPage, /<AppShell allowNoAccount>/, "Owner can open account management without a selected account");
+assert.doesNotMatch(ownerAccountsPage, /requireAccount/, "Owner account management does not require an existing account");
 assert.match(ownerAccountsPage, /name="marketplace"/, "Owner account form requires marketplace");
 assert.match(ownerAccountsPage, /accountDisplayName/, "Owner account form captures account display name");
 assert.match(ownerAccountsPage, /accountCode/, "Owner account form captures account code");
@@ -1431,6 +1421,7 @@ assert.match(ownerAccountsPage, /marketplaceListings/, "Owner accounts page show
 assert.match(ownerAccountsPage, /importJobs/, "Owner accounts page shows import counts");
 assert.match(ownerAccountsPage, /Deactivate|Reactivate/, "Owner accounts page supports activate/deactivate controls");
 assert.match(ownerAccountsActions, /OWNER_ACCOUNT_CREATED/, "Owner account creation is audited");
+assert.match(ownerAccountsActions, /isNewAccount && account\.active[\s\S]*accountId: account\.id[\s\S]*setSelectedAccount\(account\.id\)/, "A newly created active account is selected for the owner without a new login");
 assert.match(ownerAccountsActions, /marketplace: accountInput\.marketplace/, "Owner account action stores marketplace");
 assert.match(ownerAccountsActions, /accountDisplayName: accountName/, "Owner account action stores display name");
 assert.match(ownerAccountsActions, /OWNER_ACCOUNT_DEACTIVATED/, "Owner account deactivation is audited");
@@ -1467,16 +1458,17 @@ assert.match(mobileLoginRoute, /passwordHashNeedsUpgrade[\s\S]*hashPassword\(par
 assert.doesNotMatch(mobileLoginRoute, /inactive_user|Too many failed attempts|This user is inactive/, "Mobile login does not reveal inactive or locked account state");
 assert.match(mobileApiHelper, /getSafeClientIp[\s\S]*shouldTrustProxyHeaders/, "Mobile API rate limit metadata uses the safe client IP helper");
 assert.match(accountSelectionActions, /assignedUsers/, "Worker account switch checks assigned accounts");
+assert.match(accountSelectionActions, /user\.role === "OWNER"[\s\S]*users:[\s\S]*assignedUsers:/, "Account selection allows owners while requiring a worker assignment server-side");
 assert.match(authHelpers, /assignedUsers/, "Auth available-account helper includes assigned accounts");
 assert.match(windowsLauncher + windowsEnvUtils, /dotenv/, "Windows launcher loads .env with dotenv");
 assert.match(windowsLauncher, /SKIP_PRISMA_MIGRATE/, "Windows launcher defaults migration skip for local production");
 assert.match(windowsCheckEnv, /printEnvironmentSummary/, "check-env prints a masked environment summary");
 assert.match(productImageComponent, /decoding="async"/, "Product images decode asynchronously");
-assert.match(productImageComponent, /state !== "loading" \|\| !isExternalSrc/, "ProductImage does not show slow external warning for local cached images");
+assert.match(productImageComponent, /state !== "loading" && state !== "retrying"[\s\S]*!isExternalSrc/, "ProductImage bounds retries only for external loading states");
 assert.match(productImageComponent, /aspect-square w-full/, "Large product image areas stay square");
 assert.match(productImageComponent, /object-contain/, "Product images fit without cropping");
 assert.match(productImageComponent, /Use Listing Master or cache today's images/, "Product cards show a clean missing-image fallback");
-assert.match(productImageComponent, /Check this image/, "Owner image diagnostics include a manual client recheck button");
+assert.match(productImageComponent, /Retry image/, "Image fallback includes a manual client retry button");
 assert.match(productImageComponent, /imageHealth === "BROKEN" \|\| manualCheck/, "Successful image loads only update health when repairing or manually checking a mapping");
 assert.match(productImageGalleryComponent, /role="dialog"/, "Product image gallery opens as an accessible dialog");
 assert.match(productImageGalleryComponent, /data-mobile-product-gallery/, "Product gallery has mobile-specific modal structure");
@@ -1530,9 +1522,9 @@ assert.match(mobileLogoutRoute, /clearSession/, "Mobile logout clears server ses
 assert.match(mobilePickerGroupsRoute, /getMobilePermissionAccountContext\(request, "canPick"\)/, "Mobile picker groups require canPick permission");
 assert.doesNotMatch(mobilePickerGroupsRoute, /productDescription|allSpecifications|description/, "Mobile picker groups omit heavy/private listing fields");
 assert.match(mobilePickerGroupsRoute, /pendingCount[\s\S]*pickedCount[\s\S]*problemCount[\s\S]*mainImageUrl[\s\S]*cacheStatus/, "Mobile picker groups return compact worker fields");
-assert.match(mobilePickerPickedRoute, /markCustomerOrdersPickedSafely/, "Mobile mark-picked uses the shared picking service");
+assert.match(mobilePickerPickedRoute, /legacy_picker_retired[\s\S]*exact source-aware Pick task/, "Legacy mobile mark-picked cannot bypass route-aware Pick");
 assert.match(orderPickingService, /pickStatus === "READY"[\s\S]*packStatus === "READY"[\s\S]*pickStatus: "PICKED"/, "Shared picking service updates only ready picker rows");
-assert.match(mobilePickerProblemRoute, /pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"[\s\S]*MOBILE_PICK_PROBLEM_CREATED|MOBILE_PICK_PROBLEM_CREATED[\s\S]*pickStatus: "PROBLEM"[\s\S]*packStatus: "PROBLEM"/, "Mobile picker problem marks grouped items problem");
+assert.match(mobilePickerProblemRoute, /legacy_picker_retired[\s\S]*exact Pick task/, "Legacy mobile SKU-group problems are retired");
 assert.match(mobilePackingSearchRoute, /getMobilePermissionAccountContext\(request, "canPack"\)/, "Mobile packing search requires canPack permission");
 assert.equal(mobilePackingSearchRoute.indexOf("trackingId: code") < mobilePackingSearchRoute.indexOf("awb: code"), true, "Mobile packing search checks Tracking ID before AWB");
 assert.match(mobilePackingSearchRoute, /canPack: order\.packStatus === "READY"/, "Mobile packing search exposes pack eligibility");

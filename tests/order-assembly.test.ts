@@ -59,6 +59,10 @@ try {
 
   await db.marketplaceListingIdentifier.delete({ where: { id: "identifier-ambiguous" } });
   await db.order.createMany({ data: [order("auto", "ASSEMBLY-SKU"), order("ready", "READY-SKU"), order("manual", "NO-RULE-SKU", "PICKED"), order("problem", "NO-RULE-PROBLEM", "PICKED"), order("concurrent-claim", "NO-RULE-CLAIM", "PICKED"), order("concurrent-complete", "NO-RULE-COMPLETE", "PICKED"), order("concurrent-problem", "NO-RULE-PROBLEM-REPLAY", "PICKED"), order("ship-a", "ASSEMBLY-SKU", "PICKED", "TRACK-SHIP"), order("ship-b", "READY-SKU", "PICKED", "TRACK-SHIP")] });
+  await db.workTask.createMany({ data: ["ship-a", "ship-b"].flatMap(id => [
+    { id: `${id}-pick`, accountId: "account", sourceType: "ORDER", orderId: id, stage: "PICK", sequenceNumber: 10, requiredQuantity: 1, completedQuantity: 1, status: "COMPLETED", completedAt: new Date() },
+    { id: `${id}-pack`, accountId: "account", sourceType: "ORDER", orderId: id, stage: "PACK", sequenceNumber: 11, requiredQuantity: 1, status: "READY" }
+  ]) });
 
   const picked = await markCustomerOrdersPickedSafely({ actorUserId: "picker", accountId: "account", where: { id: { in: ["auto", "ready"] } }, source: "picker-card", expectedStatus: "READY" }, db);
   assert.equal(picked.updatedCount, 2);
@@ -71,8 +75,9 @@ try {
   assert.equal(parseOrderAssemblyMetadata((await db.workTask.findUniqueOrThrow({ where: { id: autoTask.id } })).metadataJson)?.assemblyInstructions, "Attach the fake part securely.", "Task metadata is immutable");
 
   const manual = await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Use the fake attachment.", clientRequestId: "manual-send" }, db);
-  const manualReplay = await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Different ignored text", clientRequestId: "manual-send-2" }, db);
+  const manualReplay = await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Use the fake attachment.", clientRequestId: "manual-send-2" }, db);
   assert.equal(manual.task.id, manualReplay.task.id);
+  await assert.rejects(()=>sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "manual", manualInstructions: "Changed collision", clientRequestId: "manual-send" }, db),/different workflow action|different payload/i);
   assert.equal(await db.workTask.count({ where: { orderId: "manual", stage: "ASSEMBLE" } }), 1);
   await claimOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, clientRequestId: "claim-a" }, db);
   await assert.rejects(() => claimOrderAssemblyTask({ actorUserId: "assembler-b", accountId: "account", taskId: manual.task.id, clientRequestId: "claim-b" }, db), /another worker/i);
@@ -80,6 +85,9 @@ try {
   await completeOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, expectedStatus: "IN_PROGRESS", clientRequestId: "complete-a" }, db);
   const completeReplay = await completeOrderAssemblyTask({ actorUserId: "assembler-a", accountId: "account", taskId: manual.task.id, expectedStatus: "IN_PROGRESS", clientRequestId: "complete-a" }, db);
   assert.equal(completeReplay.idempotent, true);
+  const completedBefore=await db.workTask.findUniqueOrThrow({where:{id:manual.task.id}}),packBefore=await db.workTask.findUniqueOrThrow({where:{orderId_stage:{orderId:"manual",stage:"PACK"}}});assert.equal(packBefore.status,"READY");
+  const lateRetry=await sendOrderToAssembly({actorUserId:"packer",accountId:"account",orderId:"manual",manualInstructions:"Use the fake attachment.",clientRequestId:"manual-send-after-complete"},db);assert.equal(lateRetry.task.status,"COMPLETED");
+  const completedAfter=await db.workTask.findUniqueOrThrow({where:{id:manual.task.id}}),packAfter=await db.workTask.findUniqueOrThrow({where:{id:packBefore.id}});assert.equal(packAfter.status,"READY","A late Send retry never re-locks Packing");assert.equal(completedAfter.metadataJson,completedBefore.metadataJson);assert.equal(completedAfter.routeSnapshotJson,completedBefore.routeSnapshotJson);
 
   const claimTask=(await sendOrderToAssembly({actorUserId:"packer",accountId:"account",orderId:"concurrent-claim",manualInstructions:"Fake concurrent claim."},db)).task;
   const claims=await Promise.all([claimOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:claimTask.id,clientRequestId:"claim-same"},db),claimOrderAssemblyTask({actorUserId:"assembler-a",accountId:"account",taskId:claimTask.id,clientRequestId:"claim-same"},db)]);
@@ -98,7 +106,7 @@ try {
   const problemTask = (await sendOrderToAssembly({ actorUserId: "packer", accountId: "account", orderId: "problem", manualInstructions: "Fake problem task." }, db)).task;
   await reportOrderAssemblyProblem({ actorUserId: "assembler-a", accountId: "account", taskId: problemTask.id, expectedStatus: "READY", reason: "PART_MISSING", note: "Fake part missing", clientRequestId: "problem-1" }, db);
   assert.equal((await getOrderAssemblyPackingGate({ accountId: "account", orders: [{ id: "problem", accountId: "account", sku: "NO-RULE-PROBLEM" }] }, db)).allowed, false);
-  await resolveOrderAssemblyProblem({ actorUserId: "owner", accountId: "account", taskId: problemTask.id, resolutionNote: "Fake part supplied." }, db);
+  await resolveOrderAssemblyProblem({ actorUserId: "owner", accountId: "account", taskId: problemTask.id, resolutionNote: "Fake part supplied.", clientRequestId: "resolve-problem-1" }, db);
   await skipOrderAssemblyTask({ actorUserId: "owner", accountId: "account", taskId: problemTask.id, reason: "Approved fake exception." }, db);
   assert.equal((await getOrderAssemblyPackingGate({ accountId: "account", orders: [{ id: "problem", accountId: "account", sku: "NO-RULE-PROBLEM" }] }, db)).allowed, true);
 

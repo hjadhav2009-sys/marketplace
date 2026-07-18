@@ -1,0 +1,2 @@
+import { inventoryDatabase, requireOwnerArgument, resolveRealDatabasePath, storageSummary } from "./core.mjs";
+try { const username=requireOwnerArgument(), result=inventoryDatabase(resolveRealDatabasePath(),username); console.log(JSON.stringify({...result,activeStorage:await storageSummary()},null,2)); } catch(error){ console.error(error instanceof Error?error.message:String(error)); process.exit(1); }

@@ -87,7 +87,7 @@ async function hydrateResults(accountId: string, orders: Array<{
 
 export async function GET(request: Request) {
   const done = startMobileTiming("/api/mobile/packing/search");
-  const limited = checkMobileRateLimit(request, "mobile-packing-search", 60, 60_000);
+  const limited = await checkMobileRateLimit(request, "mobile-packing-search", 60, 60_000);
 
   if (limited) {
     done({ status: 429 });

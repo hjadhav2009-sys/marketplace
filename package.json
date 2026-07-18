@@ -107,6 +107,7 @@
     "staging:smoke": "node scripts/staging/cli.mjs smoke",
     "staging:cleanup": "node scripts/staging/cli.mjs cleanup",
     "staging:test": "node tests/staging.test.mjs",
+    "stage4-ui:test": "node tests/stage4-grouped-work-card-ui.test.mjs",
     "staging:rollback-artifact": "node scripts/staging/previous-executable.mjs",
     "history:validate": "node scripts/validate-project-history.mjs",
     "lint": "eslint .",

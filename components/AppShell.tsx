@@ -26,6 +26,7 @@ const ownerLinks = [
   { href: "/problems", label: "Problems" },
   { href: "/reports", label: "Reports" },
   { href: "/owner/product-inventory", label: "Product Inventory" },
+  { href: "/owner/catalog/missing", label: "Missing Listings" },
   { href: "/owner/marking-library", label: "Marking Library" },
   { href: "/owner/process-rules", label: "Default Processing" },
   { href: "/owner/consignments", label: "Consignments" },

@@ -77,7 +77,7 @@ Every successful generation has a unique immutable directory and backup ID. Neve
 
 ### Windows path cautions
 
-Use explicit quoted paths and allow the tooling to resolve them. Do not hand-concatenate drive-relative paths such as `C:folder`, do not use junctions or symlinks inside source/destination trees, do not rely on case differences to distinguish source and target, and keep relative components within Windows per-segment limits. Long-path support must be verified on the production computer in Stage 2. The Stage 1 test covers backslash input, a long safe relative path and junction escape where the OS permits it.
+Use explicit quoted paths and allow the tooling to resolve them. Do not hand-concatenate drive-relative paths such as `C:folder`, do not use junctions or symlinks inside source/destination trees, do not rely on case differences to distinguish source and target, and keep relative components within Windows per-segment limits. Stage 2 verified the current production-relative paths on the production computer; future longer paths must still pass preflight. The Stage 1 test covers backslash input, a long safe relative path and junction escape where the OS permits it.
 
 ## Fail-closed behavior
 
@@ -90,4 +90,10 @@ Stop without retrying blindly on corruption, hash mismatch, foreign-key violatio
 - no production restore or rollback was run;
 - no encryption/key-custody transport format is implemented;
 - no remote/offsite retention policy is approved;
-- `storage/uploads/` remains a Stage 2 classification question.
+- `storage/uploads/` remains conservatively included as `MUST_BACK_UP_PENDING_CLEANUP` until owner-approved cleanup.
+
+## Stage 2 copied-data evidence
+
+Stage 2 finalized `storage/uploads/` as `MUST_BACK_UP_PENDING_CLEANUP` and proved the copied workflow. To prevent SQLite from changing production shared-memory coordination state, the approved copied-data method first hashes and copies the quiesced main file and present sidecars into ACL-restricted staging, proves the source is unchanged, then runs the online backup API only against that staged copy. Private storage remains quiesced through the same window.
+
+The copied database required nine migrations. Both the migrated-copy smoke and rollback recovery smoke passed against localhost-only storage-isolated environments. Rollback recovery for the current executable requires restoring the backup and reapplying the reviewed migrations; retaining and testing an older executable remains a Stage 3 requirement.

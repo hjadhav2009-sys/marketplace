@@ -31,12 +31,12 @@ SQLite WAL commits may exist only in `-wal`. The online backup API incorporates 
 | `.next/`, `node_modules/` | `TEMPORARY_EXCLUDE` | Build/dependency artifacts, recreated from source and lockfiles. |
 | `.codex-tmp/` | `TEMPORARY_EXCLUDE` | Disposable tests, benchmarks and rehearsals. Stage 1 outputs live here only because production mode is disabled. |
 | `backups/` | `HISTORICAL_BACKUP_DO_NOT_OVERWRITE` | Historical backup sets must never be recursively included in a new backup. They are managed as separate immutable generations. |
-| `storage/uploads/` | `UNKNOWN_REQUIRES_STAGE2_CONFIRMATION` | Present in historical cleanup scope, but no current authoritative owner was confirmed in Stage 1. Do not omit or delete it in a real rehearsal until separately classified. |
+| `storage/uploads/` | `MUST_BACK_UP_PENDING_CLEANUP` | Stage 2 found no files and no current source-code writer, but historical reset tooling still classifies the root as active. Include conservatively until an owner-approved cleanup removes the ambiguity. |
 | environment files, credentials, keystores | `SECRET_EXCLUDE` | Required for recovery but must use the approved secret manager, not the application backup archive or its manifest. |
 
-Only reviewed roots may be added. Unknown roots fail the future production preflight; they are never silently excluded. The classification vocabulary is `MUST_BACK_UP`, `REGENERABLE`, `TEMPORARY_EXCLUDE`, `SECRET_EXCLUDE`, `HISTORICAL_BACKUP_DO_NOT_OVERWRITE`, and `UNKNOWN_REQUIRES_STAGE2_CONFIRMATION`.
+Only reviewed roots may be added. Unknown roots fail the future production preflight; they are never silently excluded. The classification vocabulary is `MUST_BACK_UP`, `MUST_BACK_UP_PENDING_CLEANUP`, `REGENERABLE`, `TEMPORARY_EXCLUDE`, `SECRET_EXCLUDE`, `HISTORICAL_BACKUP_DO_NOT_OVERWRITE`, and `UNKNOWN_REQUIRES_STAGE2_CONFIRMATION`.
 
-`storage/marking-library/` and `storage/consignment-imports/` are defaults; their code supports `MARKING_LIBRARY_ROOT` and `CONSIGNMENT_IMPORT_ROOT`. Stage 2 must derive the effective configured roots without publishing their absolute values, verify they are distinct and private, and apply the same classification. Import-job and product-image code currently derives its default root from the application working directory. The default SQLite URL in the public example resolves `file:./dev.db` through the Prisma schema location; Stage 1 uses neither that default nor an environment file.
+`storage/marking-library/` and `storage/consignment-imports/` are defaults; their code supports `MARKING_LIBRARY_ROOT` and `CONSIGNMENT_IMPORT_ROOT`. Stage 2 added `IMPORT_JOB_STORAGE_ROOT` and `PRODUCT_IMAGE_STORAGE_ROOT` so a temporary copied application cannot fall back to production storage. Rehearsal tooling derives effective roots without publishing their absolute values and verifies that they are distinct and private. The default SQLite URL in the public example resolves `file:./dev.db` through the Prisma schema location; synthetic mode uses neither that default nor an environment file.
 
 ## Manifest contract
 

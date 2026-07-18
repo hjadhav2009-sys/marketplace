@@ -83,12 +83,8 @@ type SharpFactory = (input: Buffer) => {
   };
 };
 
-function repoRoot(root = process.cwd()) {
-  return root;
-}
-
-export function productImageCacheRoot(root = process.cwd()) {
-  return path.join(repoRoot(root), "storage", "product-images");
+export function productImageCacheRoot(root?: string) {
+  return path.resolve(root ? path.join(root, "storage", "product-images") : process.env.PRODUCT_IMAGE_STORAGE_ROOT ?? path.join(process.cwd(), "storage", "product-images"));
 }
 
 function hashSegment(value: string) {

@@ -18,7 +18,7 @@ import {
   renewImportJobLease
 } from "./store";
 
-export const IMPORT_JOB_STORAGE_DIR = path.join(process.cwd(), "storage", "import-jobs");
+export const IMPORT_JOB_STORAGE_DIR = path.resolve(process.env.IMPORT_JOB_STORAGE_ROOT ?? path.join(process.cwd(), "storage", "import-jobs"));
 const IMPORT_JOB_ARTIFACT_NAME = /^job_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:-[a-zA-Z0-9._-]+)?$/i;
 
 type RunningImportJobs = {

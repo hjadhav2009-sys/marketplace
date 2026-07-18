@@ -95,6 +95,8 @@
     "release-backup:restore-test": "node scripts/release-backup/cli.mjs restore-test",
     "release-backup:test": "node tests/release-backup.test.mjs",
     "release-backup:synthetic-rehearsal": "node scripts/release-backup/synthetic-rehearsal.mjs",
+    "release-backup:copied-rehearsal-test": "node tests/release-backup-copied.test.mjs",
+    "release-backup:copied-rehearsal": "node scripts/release-backup/stage2-rehearsal.mjs",
     "history:validate": "node scripts/validate-project-history.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

@@ -246,6 +246,7 @@ const reviewedOperationalScriptPaths = [
   "scripts/grouped-work-performance.ts",
   "scripts/operational-retention.ts",
   "scripts/phase7-scale-data.ts",
+  "scripts/staging/seed.ts",
   "scripts/workflow-activation-benchmark.ts",
   "scripts/repair-legacy-order-workflow.ts"
 ] as const;
@@ -263,6 +264,11 @@ assert.ok(
 assert.equal(reviewedMutationPaths.has("src/lib/catalog/manual-listing.ts"), true);
 assert.equal(reviewedMutationPaths.has("src/lib/catalog/missing-listing-resolution.ts"), true);
 assert.equal(reviewedMutationPaths.has("app/owner/product-inventory/manual-actions.ts"), false);
+assert.equal(reviewedMutationPaths.has("scripts/staging/seed.ts"), true);
+const stagingSeed = readFileSync("scripts/staging/seed.ts", "utf8");
+assert.match(stagingSeed, /STAGE3_SYNTHETIC_STAGING/);
+assert.match(stagingSeed, /STAGING_CREDENTIAL_PATH/);
+assert.doesNotMatch(stagingSeed, /resolveRealDatabasePath|real-db|fresh-db:reset|prisma\/dev\.db/);
 
 const tracked = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { encoding: "utf8" })
   .split("\0")

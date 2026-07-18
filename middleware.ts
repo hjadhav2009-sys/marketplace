@@ -3,6 +3,7 @@ import { getSafeClientIp, isAllowedLocalNetworkIp, shouldTrustProxyHeaders } fro
 
 const PUBLIC_PATHS = ["/auth/session-ended", "/forgot-password", "/login", "/network-blocked", "/setup"];
 const STATIC_FILE = /\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest)$/;
+const SESSION_COOKIE = process.env.SESSION_COOKIE_NAME?.trim() || "mpp_session";
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
@@ -42,7 +43,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!isPublicPath(pathname) && !request.cookies.get("mpp_session")) {
+  if (!isPublicPath(pathname) && !request.cookies.get(SESSION_COOKIE)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("expired", "1");

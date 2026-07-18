@@ -6,8 +6,8 @@ import { authRedirectForSessionStatus, shouldUseSecureSessionCookie, type AuthSe
 import type { RequestMeta } from "./network";
 import { prisma } from "./prisma";
 
-const SESSION_COOKIE = "mpp_session";
-const ACCOUNT_COOKIE = "mpp_account";
+const SESSION_COOKIE = process.env.SESSION_COOKIE_NAME?.trim() || "mpp_session";
+const ACCOUNT_COOKIE = process.env.ACCOUNT_COOKIE_NAME?.trim() || "mpp_account";
 const SESSION_MAX_AGE = 60 * 60 * 12;
 
 type SessionPayload = {

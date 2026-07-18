@@ -1,5 +1,7 @@
 # Workflow Roadmap
 
+Current Phase 7.3.6 sequence: implementation review -> browser QA -> two-worker QA -> copied-database rehearsal -> backend contract freeze -> fully native Expo with no WebView. Older sequence text below is historical and does not approve rollout.
+
 Current sequence: Phase 7.3.4 audit → GitHub review → browser QA → two-worker QA → copied-database rehearsal → contract freeze → fully native Expo (no WebView).
 
 Marketplace Pick & Pack is a worker workflow system, not an ERP or inventory product.
@@ -48,6 +50,8 @@ Implemented bounded Amazon CSV/TSV/XLSX/XLSM/ZIP classification, account-scoped 
 Added bounded Amazon stored-reparse policy, real-resolver scale presets and benchmarks, query-plan checks, controlled concurrency and replay hardening, a documented permission matrix, security source checks, and browser/warehouse release gates. Full-size generation is local and ignored; measured results are documented honestly per machine.
 
 ## Next Phases
+
+Phase 7.3.6 adds valid empty projections, immediate affected-group refresh after Order creation/reimport and Consignment activation, idempotent rolling Daily Orders, conflict-aware in-file dedupe, privacy-minimized issue data, retained missing-listing work, owner link/create resolution, and dynamic Flipkart/Amazon catalog form profiles. It does not approve production or native Expo work.
 
 - Phase 8: fully native React Native/Expo app, without WebView.
 - Final: Android release APK after Expo testing.

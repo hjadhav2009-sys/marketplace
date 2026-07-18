@@ -1,6 +1,6 @@
 # Marketplace Pick & Pack: project master guide
 
-Phase 7.3.4 freezes new features while authoritative workflow, projection, import recovery, permissions and security paths are audited. See `docs/audits/PHASE_7_3_4_PRODUCTION_AUDIT.md`.
+Phase 7.3.6 hardens projection creation, rolling Daily Order idempotency, retained missing-listing resolution, safe issue storage, and dynamic marketplace catalog forms. See `docs/audits/PHASE_7_3_6_IMPORT_AND_CATALOG.md`. Production and native Expo remain gated.
 
 ## 1–5. Purpose, non-goals, structure, deployment, and SQLite
 
@@ -17,6 +17,8 @@ Seller accounts scope listings, identifiers, orders, consignments, tasks, action
 ## 9–12. Catalog, identifiers, defaults, and marking
 
 MarketplaceListing is the canonical per-account catalog row. MarketplaceListingIdentifier stores exact lookup values such as SKU, FSN, listing ID, ASIN, FNSKU, EAN/UPC/GTIN, model, barcode, and external ID. Imports merge through marketplace-specific classifiers and services; account scoping prevents ambiguous cross-account mutation.
+
+MarketplaceListingAttribute stores nonblank dynamic template/category values without adding hundreds of fixed columns. Missing Daily Order listings are retained as blocking, privacy-minimized issues and do not create actionable Pick work until an owner links or creates a listing. Manual values are provenance-tracked and locked by default.
 
 ProductProcessRule is optional. Missing rules default to Pick to Pack. MarkingAsset, files, and listing links provide reusable warehouse marking material; database and marking-library files must be backed up together.
 

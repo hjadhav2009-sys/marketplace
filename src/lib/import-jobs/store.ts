@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { PrismaClient } from "@prisma/client";
 import { sanitizeImportJobError } from "./safe-error";
 
-export type ImportJobStatus = "QUEUED" | "RUNNING" | "NEEDS_MAPPING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
+export type ImportJobStatus = "QUEUED" | "RUNNING" | "NEEDS_MAPPING" | "AWAITING_FILE_ROLES" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED" | "CANCELLED";
 export type ImportJobType = "FLIPKART_LISTING_MASTER" | "FLIPKART_ORDER" | "FLIPKART_PRODUCT_INVENTORY" | "AMAZON_ALL_LISTINGS" | "AMAZON_CATEGORY_CATALOG" | "AMAZON_PRODUCT_INVENTORY" | "FLIPKART_CONSIGNMENT_QUANTITY" | "FLIPKART_CONSIGNMENT_ENRICHMENT" | "AMAZON_CONSIGNMENT_QUANTITY" | "AMAZON_CONSIGNMENT_ENRICHMENT";
 
 export type ImportJobRecord = {

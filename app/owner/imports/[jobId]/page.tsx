@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { ImportJobProgress } from "@/components/ImportJobProgress";
 import { PageHeader } from "@/components/PageHeader";
@@ -8,8 +9,8 @@ import { prisma } from "@/lib/prisma";
 import { retainedImportJobFileExists } from "@/src/lib/import-jobs/runner";
 import { toPublicImportJob } from "@/src/lib/import-jobs/public-job";
 import { findImportJobById } from "@/src/lib/import-jobs/store";
-import { retainedProductInventoryJobDirectoryExists } from "@/src/lib/product-inventory/jobs";
-import { cancelProductInventoryJobAction, retryImportJobAction, retryProductInventoryJobAction } from "./actions";
+import { retainedProductInventoryJobDirectoryExists, type CatalogJobManifest } from "@/src/lib/product-inventory/jobs";
+import { cancelProductInventoryJobAction, confirmAmazonFileRolesAction, retryImportJobAction, retryProductInventoryJobAction } from "./actions";
 
 type ImportJobPageProps = {
   params: Promise<{
@@ -17,6 +18,8 @@ type ImportJobPageProps = {
   }>;
   searchParams?: Promise<{
     retry?: string;
+    roles?: string;
+    rolesError?: string;
   }>;
 };
 
@@ -37,6 +40,8 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
   const canRetry = !productInventoryJob && (job.status === "FAILED" || job.status === "CANCELLED") && (await retainedImportJobFileExists(job.filePath));
   const canRetryProductInventory = productInventoryJob && (job.status === "FAILED" || staleProductInventoryRun) && (await retainedProductInventoryJobDirectoryExists(job.filePath));
   const issueCount = job.errorRows + job.warningRows + job.missingListingRows + job.missingImageRows;
+  let roleManifest:CatalogJobManifest|null=null;
+  if(job.status==="AWAITING_FILE_ROLES")try{const parsed=JSON.parse(job.manifestJson??"") as CatalogJobManifest;if(parsed.marketplace==="AMAZON"&&Array.isArray(parsed.entries))roleManifest=parsed;}catch{}
 
   return (
     <AppShell>
@@ -47,6 +52,12 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
       >
         <StatusBadge value={job.status} />
       </PageHeader>
+
+      <nav className="mb-5 flex flex-wrap gap-2" aria-label="Import navigation"><Link href="/owner/imports" className="min-h-11 rounded-xl border bg-white px-4 py-2 font-bold">Back to Imports</Link><Link href="/owner/product-inventory/refresh" className="min-h-11 rounded-xl bg-slate-950 px-4 py-2 font-bold text-white">New Import</Link><Link href="/owner/imports" className="min-h-11 rounded-xl border bg-white px-4 py-2 font-bold">Import History</Link></nav>
+
+      {query?.rolesError?<div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-3 font-bold text-rose-800">{query.rolesError}</div>:query?.roles==="saved"?<div className="mb-5 rounded-xl border border-teal-200 bg-teal-50 p-3 font-bold text-teal-800">File roles saved. Processing started.</div>:null}
+
+      {roleManifest?<form action={confirmAmazonFileRolesAction} className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm"><input type="hidden" name="jobId" value={job.id}/><h2 className="text-xl font-black">Review Amazon file roles</h2><p className="mt-1 text-sm text-amber-950">Auto-detection is a suggestion. Confirm or correct each file before any catalog rows are processed.</p><div className="mt-4 grid gap-3">{roleManifest.entries.map(entry=><article key={entry.id} className="grid gap-3 rounded-xl border bg-white p-3 md:grid-cols-[minmax(0,1fr)_16rem] md:items-center"><div className="min-w-0"><p className="break-words font-black">{entry.displayName}</p><p className="mt-1 text-xs text-slate-600">Detected: {(entry.detectedRole??"AUTO_DETECT").replaceAll("_"," ")} · {entry.detectedProfile??"Unknown profile"} · {entry.detectedSheet??"Unknown sheet"} · {entry.detectedRows??0} source row(s)</p></div><label className="text-sm font-bold">File role<select name={`role_${entry.id}`} defaultValue={entry.detectedRole??"AUTO_DETECT"} required className="mt-1 min-h-11 w-full rounded-xl border bg-white px-3"><option value="AUTO_DETECT">Auto Detect</option><option value="ALL_LISTINGS_IDENTITY">All Listings / Identity</option><option value="CATEGORY_TEMPLATE">Category Template</option><option value="PRODUCT_CATALOG">Product Catalog</option><option value="SUPPORTING_ENRICHMENT">Supporting Enrichment</option><option value="REFERENCE_IGNORE">Reference / Ignore</option></select></label></article>)}</div><button className="mt-4 min-h-12 rounded-xl bg-berry px-5 font-black text-white">Confirm Roles and Start</button></form>:null}
 
       {query?.retry === "file-missing" ? (
         <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
@@ -91,6 +102,7 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
           {job.importType.endsWith("PRODUCT_INVENTORY") && ["QUEUED","RUNNING"].includes(job.status) && !staleProductInventoryRun ? <form action={cancelProductInventoryJobAction}><input type="hidden" name="jobId" value={job.id}/><button className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-700">Cancel import safely</button></form>:null}
         </div>
       </section>
+      <div className="mt-5"><Link href="/owner/imports" className="inline-flex min-h-11 items-center rounded-xl border bg-white px-4 font-bold">Back to Imports</Link></div>
     </AppShell>
   );
 }

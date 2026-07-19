@@ -35,6 +35,7 @@ const statuses = [
   { value: "", label: "All statuses" },
   { value: "QUEUED", label: "Queued" },
   { value: "RUNNING", label: "Running" },
+  { value: "AWAITING_FILE_ROLES", label: "Awaiting file roles" },
   { value: "COMPLETED", label: "Completed" },
   { value: "COMPLETED_WITH_WARNINGS", label: "Completed with warnings" },
   { value: "FAILED", label: "Failed" },

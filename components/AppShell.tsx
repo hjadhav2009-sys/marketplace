@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import type { User } from "@prisma/client";
-import { AppNav, MobileBottomNav } from "@/components/AppNav";
+import { AppNav, MobileBottomNav, MobileDrawer, type AppNavLink } from "@/components/AppNav";
 import { capabilityHomePath, clearSession, getSelectedAccount, requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { getRequestMeta } from "@/lib/request-context";
@@ -14,27 +14,28 @@ type AppShellProps = {
   allowNoAccount?: boolean;
 };
 
-const ownerLinks = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/work", label: "Work" },
-  { href: "/work/scan", label: "Scan" },
-  { href: "/work/assembly", label: "Assembly" },
-  { href: "/owner/uploads/new", label: "Import" },
-  { href: "/owner/imports", label: "Imports" },
-  { href: "/work/pick?source=ORDER", label: "Pick" },
-  { href: "/packing", label: "Pack" },
-  { href: "/problems", label: "Problems" },
-  { href: "/reports", label: "Reports" },
-  { href: "/owner/product-inventory", label: "Product Inventory" },
-  { href: "/owner/catalog/missing", label: "Missing Listings" },
-  { href: "/owner/marking-library", label: "Marking Library" },
-  { href: "/owner/process-rules", label: "Default Processing" },
-  { href: "/owner/consignments", label: "Consignments" },
-  { href: "/owner/accounts", label: "Accounts" },
-  { href: "/owner/users", label: "Users" },
-  { href: "/owner/system", label: "System" },
-  { href: "/owner/manual-review", label: "Manual Review" },
-  { href: "/change-password", label: "Password" }
+const ownerLinks:AppNavLink[] = [
+  { href: "/dashboard", label: "Dashboard", section:"OVERVIEW" },
+  { href: "/work", label: "Work Hub", section:"OVERVIEW" },
+  { href: "/owner/product-inventory", label: "Product Inventory", section:"CATALOG" },
+  { href: "/owner/catalog/missing", label: "Missing Listings", section:"CATALOG" },
+  { href: "/owner/process-rules", label: "Default Processing", section:"CATALOG" },
+  { href: "/owner/marking-library", label: "Marking Library", section:"CATALOG" },
+  { href: "/owner/product-inventory/refresh", label: "New Import", section:"IMPORTS" },
+  { href: "/owner/imports", label: "Import History", section:"IMPORTS" },
+  { href: "/owner/consignments", label: "Consignments", section:"IMPORTS" },
+  { href: "/work/pick?source=ORDER", label: "Pick", section:"OPERATIONS" },
+  { href: "/work/mark", label: "Mark", section:"OPERATIONS" },
+  { href: "/work/assemble", label: "Assemble", section:"OPERATIONS" },
+  { href: "/work/pack", label: "Pack", section:"OPERATIONS" },
+  { href: "/work/scan", label: "Universal Scan", section:"OPERATIONS" },
+  { href: "/work/problems", label: "Problems", section:"OPERATIONS" },
+  { href: "/owner/work-route-summary", label: "Route Summary", section:"OPERATIONS" },
+  { href: "/owner/accounts", label: "Accounts", section:"PEOPLE" },
+  { href: "/owner/users", label: "Users", section:"PEOPLE" },
+  { href: "/reports", label: "Reports", section:"INSIGHTS" },
+  { href: "/owner/system", label: "System", section:"INSIGHTS" },
+  { href: "/change-password", label: "Password", section:"PROFILE" }
 ];
 
 async function logoutAction() {
@@ -93,12 +94,14 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
   const accountName = account ? account.accountDisplayName ?? account.name : "No seller account selected";
   const accountCode = account ? account.accountCode ?? account.code : "Create or choose an account";
   const mobileLinks = mobileLinksForUser(user);
-  const managementMobileLinks = (user.role === "OWNER" ? ownerLinks : links).filter((link) => link.href !== "/change-password");
 
   return (
-    <div className="min-h-screen bg-stone-50 text-slate-950">
+    <div className="flex min-h-screen bg-stone-50 text-slate-950">
+      <AppNav links={links} accountName={accountName} marketplace={account?.marketplace ?? user.role}/>
+      <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 sm:py-3">
+        <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-6 sm:py-3">
+          <MobileDrawer links={links} accountName={accountName} marketplace={account?.marketplace ?? user.role}/>
           <Link href={account ? capabilityHomePath(user) : user.role === "OWNER" ? "/owner/accounts" : "/accounts"} prefetch className="min-w-0">
             <p className="hidden text-xs font-semibold uppercase tracking-wide text-berry sm:block">Marketplace Pick & Pack</p>
             <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account ? `${account.companyName} / ${accountName}` : accountName}</p>
@@ -120,26 +123,6 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
             >
               Switch account
             </Link>
-            {user.role === "OWNER" || user.canManageMarkingLibrary || user.canManageProcessRules || user.canViewConsignments || user.canImportConsignments || user.canManageConsignments ? (
-              <details className="relative sm:hidden" data-owner-mobile-menu>
-                <summary className="list-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 shadow-sm">
-                  Menu
-                </summary>
-                <div className="absolute right-0 mt-2 grid w-56 gap-1 rounded-md border border-slate-200 bg-white p-2 shadow-xl">
-                  {managementMobileLinks.map((link) => (
-                    <Link key={link.href} href={link.href} prefetch className="rounded-md px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
-                      {link.label}
-                    </Link>
-                  ))}
-                  <Link href="/accounts" prefetch className="rounded-md px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
-                    Switch account
-                  </Link>
-                  <Link href="/change-password" prefetch className="rounded-md px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50">
-                    Password
-                  </Link>
-                </div>
-              </details>
-            ) : null}
             <form action={logoutAction}>
               <button className="rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:text-sm">
                 Logout
@@ -147,13 +130,13 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
             </form>
           </div>
         </div>
-        <AppNav links={links} />
       </header>
-      <main className="mx-auto max-w-7xl px-3 pb-24 pt-4 sm:px-6 sm:py-6 lg:py-8">
+      <main className="mx-auto w-full max-w-[1600px] px-3 pb-24 pt-4 sm:px-6 sm:py-6 lg:pb-8 lg:py-8">
         {title ? <h1 className="mb-5 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{title}</h1> : null}
         {children}
       </main>
       {mobileLinks.length > 0 ? <MobileBottomNav links={mobileLinks} /> : null}
+      </div>
     </div>
   );
 }

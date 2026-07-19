@@ -4,6 +4,12 @@
 
 :root {
   color-scheme: light;
+  --page-max: 1600px;
+  --sidebar-expanded: 264px;
+  --sidebar-collapsed: 72px;
+  --card-radius: 1rem;
+  --control-height: 44px;
+  --page-gap: clamp(0.75rem, 2vw, 1.5rem);
 }
 
 * {
@@ -36,4 +42,9 @@ button {
 
 button:disabled {
   cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 3px solid #0f766e;
+  outline-offset: 2px;
 }

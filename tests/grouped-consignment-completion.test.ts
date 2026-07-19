@@ -16,8 +16,8 @@ try {
   }
   await rebuildWorkGroupProjection({ accountId: "a", sourceType: "CONSIGNMENT", stage: "PACK" }, db);
   const result = await getGroupedWork({ actorUserId: "w", accountId: "a", stage: "PACK", sourceType: "CONSIGNMENT" }, db);
-  const card = result.cards[0];
-  await completeGroupedStage({ actorUserId: "w", selectedAccountId: "a", sourceType: "CONSIGNMENT", stage: "PACK", groupKey: card.groupKey, expectedGroupVersion: card.groupVersion, clientRequestId: "complete" }, db);
+  assert.equal(result.cards.length, 2, "Consignment Pack remains one exact card per line");
+  for (const [index, card] of result.cards.entries()) await completeGroupedStage({ actorUserId: "w", selectedAccountId: "a", sourceType: "CONSIGNMENT", stage: "PACK", groupKey: card.groupKey, expectedGroupVersion: card.groupVersion, clientRequestId: `complete-${index}` }, db);
   const batch = await db.consignmentBatch.findUniqueOrThrow({ where: { id: "b" } });
   assert.equal(batch.status, "COMPLETED");
   assert.ok(batch.completedAt);

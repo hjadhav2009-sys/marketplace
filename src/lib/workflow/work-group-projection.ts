@@ -8,7 +8,7 @@ export type ProjectionSource = "ORDER" | "CONSIGNMENT";
 
 const INCLUDE = Prisma.validator<Prisma.WorkTaskInclude>()({
   assignedUser: { select: { name: true } },
-  order: { select: { batchId: true, marketplace: true, sku: true, color: true, size: true, trackingId: true, awb: true, orderNo: true, productDescription: true, imageUrl: true } },
+  order: { select: { id: true, batchId: true, marketplace: true, sku: true, color: true, size: true, trackingId: true, awb: true, orderNo: true, orderItemId: true, shipmentId: true, productDescription: true, imageUrl: true } },
   consignmentLine: { select: { consignmentBatchId: true, processRoute: true, sellerSkuSnapshot: true, sellerSkuSource: true, colorSource: true, sizeSource: true, fnskuSnapshot: true, fnskuSource: true, barcodeSnapshot: true, fsnSnapshot: true, listingIdSnapshot: true, productTitleSnapshot: true, productNameSource: true, productImageSnapshot: true, consignmentBatch: { select: { marketplace: true, externalConsignmentNumber: true } } } }
 });
 type ProjectionTask = Prisma.WorkTaskGetPayload<{ include: typeof INCLUDE }>;
@@ -59,12 +59,21 @@ function taskGroups(input: { accountId: string; sourceType: ProjectionSource; st
     const snapshot = safeWorkSnapshot(task.workCardSnapshotJson);
     const marketplace = order?.marketplace ?? line?.consignmentBatch.marketplace ?? input.marketplace;
     const sku = String(snapshot.sellerSku ?? order?.sku ?? line?.sellerSkuSnapshot ?? line?.sellerSkuSource ?? "");
-    const identity = input.stage === "PACK" && order ? `PACKAGE:${order.trackingId ?? order.awb}` : sku;
+    // Actionable queues are exact-member queues. SKU totals may be displayed as
+    // read-only summaries, but one mutation card must not represent unrelated
+    // Order Items or Consignment lines. Customer-order Pack is the deliberate
+    // exception because Packing is authorized and completed per package.
+    const identity = input.stage === "PACK" && order
+      ? `PACKAGE:${order.trackingId ?? order.awb ?? task.orderId}`
+      : order
+        ? `ORDER_ITEM:${task.orderId}`
+        : `CONSIGNMENT_LINE:${task.consignmentLineId}`;
     const batch = input.stage === "PACK" && order ? "shipment" : order?.batchId ?? line?.consignmentBatchId ?? "unbatched";
     const variant = sha([identity, snapshot.variantIdentity ?? null, order?.color ?? line?.colorSource ?? null, order?.size ?? line?.sizeSource ?? null]);
     const instruction = canonicalInstructionFingerprint(task.metadataJson, input.stage);
     const route = canonicalRouteFingerprint(task.routeSnapshotJson, task.metadataJson, task.workCardSnapshotJson, input.stage);
-    const assignment = task.assignedUserId ?? "UNASSIGNED";
+    // Temporary sibling assignment differences must not duplicate a package.
+    const assignment = input.stage === "PACK" && order ? "PACKAGE" : task.assignedUserId ?? "UNASSIGNED";
     const parts = [input.accountId, marketplace, input.sourceType, input.stage, batch, identity, variant, instruction, route, assignment];
     const raw = parts.join("\u0000"), group = grouped.get(raw) ?? { parts, sku, tasks: [] };
     group.tasks.push(task); grouped.set(raw, group);
@@ -112,7 +121,7 @@ function buildProjectionData(input:{accountId:string;sourceType:ProjectionSource
 async function replaceProjection(input: { accountId: string; sourceType: ProjectionSource; stage: WorkStage }, client: Client) {
   const account = await client.account.findUniqueOrThrow({ where: { id: input.accountId }, select: { marketplace: true } });
   const activeTasks=await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage:input.stage,status:{in:["READY","IN_PROGRESS","PROBLEM"]}},include:INCLUDE,orderBy:[{createdAt:"asc"},{id:"asc"}]});
-  const cohortOr:Prisma.WorkTaskWhereInput[]=[];for(const task of activeTasks){if(task.order){if(input.stage==="PACK")cohortOr.push(task.order.trackingId?{order:{trackingId:task.order.trackingId}}:{order:{awb:task.order.awb}});else cohortOr.push({order:{batchId:task.order.batchId,sku:task.order.sku}});}else if(task.consignmentLine){cohortOr.push(input.stage==="PACK"?{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId}}:{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId,OR:[{sellerSkuSnapshot:task.consignmentLine.sellerSkuSnapshot},{sellerSkuSource:task.consignmentLine.sellerSkuSource}]}});}}
+  const cohortOr:Prisma.WorkTaskWhereInput[]=[];for(const task of activeTasks){if(task.order){if(input.stage==="PACK")cohortOr.push(task.order.trackingId?{order:{trackingId:task.order.trackingId}}:task.order.awb?{order:{awb:task.order.awb}}:{orderId:task.orderId});else cohortOr.push({orderId:task.orderId});}else if(task.consignmentLine){cohortOr.push({consignmentLineId:task.consignmentLineId});}}
   const uniqueCohorts=[...new Map(cohortOr.map(where=>[JSON.stringify(where),where])).values()],completedTasks:typeof activeTasks=[];for(let index=0;index<uniqueCohorts.length;index+=50){completedTasks.push(...await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage:input.stage,status:"COMPLETED",OR:uniqueCohorts.slice(index,index+50)},include:INCLUDE,orderBy:[{createdAt:"asc"},{id:"asc"}]}));}
   const tasks=[...new Map([...activeTasks,...completedTasks].map(task=>[task.id,task])).values()].sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()||a.id.localeCompare(b.id));
   const {rows,members}=buildProjectionData({...input,marketplace:String(account.marketplace)},tasks);
@@ -135,7 +144,7 @@ export async function refreshAffectedWorkGroups(input:{accountId:string;sourceTy
     const affectedIds=new Set(affected.map(task=>task.id)),oldMemberships=affectedIds.size?await client.workGroupMember.findMany({where:{taskId:{in:[...affectedIds]},projection:{accountId:input.accountId,sourceType:input.sourceType,stage}},select:{groupKey:true}}):[];
     const oldGroupKeys=[...new Set(oldMemberships.map(item=>item.groupKey))],oldMembers=oldGroupKeys.length?await client.workGroupMember.findMany({where:{groupKey:{in:oldGroupKeys}},select:{taskId:true}}):[],oldMemberIds=oldMembers.map(item=>item.taskId);
     const cohortOr:Prisma.WorkTaskWhereInput[]=[];
-    for(const task of affected){if(task.order){if(stage==="PACK")cohortOr.push(task.order.trackingId?{order:{trackingId:task.order.trackingId}}:{order:{awb:task.order.awb}});else cohortOr.push({order:{batchId:task.order.batchId,sku:task.order.sku}});}else if(task.consignmentLine){cohortOr.push(stage==="PACK"?{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId}}:{consignmentLine:{consignmentBatchId:task.consignmentLine.consignmentBatchId,OR:[{sellerSkuSnapshot:task.consignmentLine.sellerSkuSnapshot},{sellerSkuSource:task.consignmentLine.sellerSkuSource}]}});}}
+    for(const task of affected){if(task.order){if(stage==="PACK")cohortOr.push(task.order.trackingId?{order:{trackingId:task.order.trackingId}}:task.order.awb?{order:{awb:task.order.awb}}:{orderId:task.orderId});else cohortOr.push({orderId:task.orderId});}else if(task.consignmentLine){cohortOr.push({consignmentLineId:task.consignmentLineId});}}
     const uniqueCohorts=[...new Map(cohortOr.map(where=>[JSON.stringify(where),where])).values()],candidateMap=new Map<string,ProjectionTask>();
     if(oldMemberIds.length){for(const task of await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage,status:{in:["READY","IN_PROGRESS","PROBLEM","COMPLETED"]},id:{in:oldMemberIds}},include:INCLUDE}))candidateMap.set(task.id,task);}
     for(let index=0;index<uniqueCohorts.length;index+=40){for(const task of await client.workTask.findMany({where:{accountId:input.accountId,sourceType:input.sourceType,stage,status:{in:["READY","IN_PROGRESS","PROBLEM","COMPLETED"]},OR:uniqueCohorts.slice(index,index+40)},include:INCLUDE}))candidateMap.set(task.id,task);}

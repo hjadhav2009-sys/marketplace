@@ -6,7 +6,7 @@ import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutate
 import { createWorkRouteSnapshot } from "./dynamic-route";
 import { refreshAffectedWorkGroups } from "./work-group-projection";
 import { createImmutableRouteProvenance } from "./route-provenance";
-import { deriveOrderWorkflowPrerequisites } from "./workflow-prerequisites";
+import { resolveConsignmentLineWorkflowPrerequisites } from "./workflow-prerequisites";
 import { beginWorkflowActionReceipt, completeWorkflowActionReceipt, withWorkflowActionRequestGate } from "./workflow-action-receipt";
 import { sanitizeImportJobError } from "@/src/lib/import-jobs/safe-error";
 
@@ -274,8 +274,7 @@ export async function completeConsignmentPackTasksInTransaction(tx: Transaction,
   if (tasks.length !== taskIds.length || tasks.some(task => !task.consignmentLine || task.consignmentLine.accountId !== input.accountId)) throw new Error("Packing work changed; refresh before completing the package.");
   for (const task of tasks) {
     if (!["READY", "IN_PROGRESS"].includes(task.status)) throw new Error("Packing work is no longer ready.");
-    const siblings = await tx.workTask.findMany({ where: { accountId: input.accountId, consignmentLineId: task.consignmentLineId }, select: { id: true, stage: true, status: true, routeSnapshotJson: true } });
-    const workflow = deriveOrderWorkflowPrerequisites({ id: task.consignmentLineId!, pickStatus: "READY", packStatus: "READY", status: "READY" }, siblings);
+    const workflow = await resolveConsignmentLineWorkflowPrerequisites({ accountId: input.accountId, consignmentLineId: task.consignmentLineId! }, tx);
     if (workflow.blocker) throw new Error(workflow.blocker);
   }
   const completedAt = new Date();

@@ -63,6 +63,7 @@
     "grouped-scale:test": "tsx tests/grouped-scale.test.ts",
     "grouped-pack-safety:test": "tsx tests/grouped-pack-safety.test.ts",
     "grouped-consignment-completion:test": "tsx tests/grouped-consignment-completion.test.ts",
+    "consignment-pack-prerequisites:test": "tsx tests/consignment-pack-prerequisites.test.ts",
     "stable-instruction-grouping:test": "tsx tests/stable-instruction-grouping.test.ts",
     "live-work-load:test": "tsx tests/live-work-load.test.ts",
     "adaptive-profile-integration:test": "tsx tests/adaptive-profile-integration.test.ts",

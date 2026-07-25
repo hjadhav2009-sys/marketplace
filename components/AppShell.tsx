@@ -35,6 +35,7 @@ const ownerLinks:AppNavLink[] = [
   { href: "/owner/users", label: "Users", section:"PEOPLE" },
   { href: "/reports", label: "Reports", section:"INSIGHTS" },
   { href: "/owner/system", label: "System", section:"INSIGHTS" },
+  { href: "/owner/data-management", label: "Data Management", section:"INSIGHTS" },
   { href: "/change-password", label: "Password", section:"PROFILE" }
 ];
 
@@ -119,12 +120,12 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
             <Link
               href="/accounts"
               prefetch
-              className="hidden rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:inline-flex"
+              className="hidden min-h-11 items-center rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:inline-flex"
             >
               Switch account
             </Link>
             <form action={logoutAction}>
-              <button className="rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:text-sm">
+              <button className="min-h-11 rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:text-sm">
                 Logout
               </button>
             </form>

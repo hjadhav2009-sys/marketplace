@@ -86,6 +86,7 @@ export function buildEnvironment(config) {
     MARKING_LIBRARY_ROOT: path.join(STORAGE_ROOT, "marking-library"),
     CONSIGNMENT_IMPORT_ROOT: path.join(STORAGE_ROOT, "consignment-imports"),
     PRODUCT_IMAGE_STORAGE_ROOT: path.join(STORAGE_ROOT, "images"),
+    DATA_QUARANTINE_ROOT: path.join(STORAGE_ROOT, "data-quarantine"),
     SKIP_PRISMA_MIGRATE: "true"
   };
   assertIsolatedEnvironment(env);
@@ -96,7 +97,7 @@ export function assertIsolatedEnvironment(env) {
   if (env.DATABASE_URL !== databaseUrl()) throw new Error("Staging DATABASE_URL is not the private synthetic database.");
   if (String(env.SESSION_SECRET ?? "").length < 48) throw new Error("Staging session secret is missing or too short.");
   if (env.PORT !== String(PORT) || env.HOSTNAME !== HOST) throw new Error("Staging network boundary is invalid.");
-  for (const key of ["IMPORT_JOB_STORAGE_ROOT", "MARKING_LIBRARY_ROOT", "CONSIGNMENT_IMPORT_ROOT", "PRODUCT_IMAGE_STORAGE_ROOT"]) {
+  for (const key of ["IMPORT_JOB_STORAGE_ROOT", "MARKING_LIBRARY_ROOT", "CONSIGNMENT_IMPORT_ROOT", "PRODUCT_IMAGE_STORAGE_ROOT", "DATA_QUARANTINE_ROOT"]) {
     assertStagingPath(String(env[key]));
   }
   const serialized = JSON.stringify(Object.fromEntries(Object.entries(env).filter(([key]) => !["PATH", "Path", "PATHEXT", "LOCALAPPDATA", "APPDATA", "USERPROFILE", "HOME", "TEMP", "TMP", "SystemRoot", "SYSTEMROOT", "ComSpec", "COMSPEC"].includes(key))));
@@ -147,7 +148,7 @@ export function run(command, args, options = {}) {
 }
 
 export async function createDirectories() {
-  for (const target of [path.dirname(DATABASE_PATH), STORAGE_ROOT, path.join(STORAGE_ROOT, "import-jobs"), path.join(STORAGE_ROOT, "marking-library"), path.join(STORAGE_ROOT, "consignment-imports"), path.join(STORAGE_ROOT, "images"), path.join(STORAGE_ROOT, "uploads"), path.join(STAGING_ROOT, "sessions"), LOG_ROOT, REPORT_ROOT, CREDENTIALS_ROOT, FIXTURES_ROOT, RUNTIME_ROOT]) {
+  for (const target of [path.dirname(DATABASE_PATH), STORAGE_ROOT, path.join(STORAGE_ROOT, "import-jobs"), path.join(STORAGE_ROOT, "marking-library"), path.join(STORAGE_ROOT, "consignment-imports"), path.join(STORAGE_ROOT, "images"), path.join(STORAGE_ROOT, "data-quarantine"), path.join(STORAGE_ROOT, "uploads"), path.join(STAGING_ROOT, "sessions"), LOG_ROOT, REPORT_ROOT, CREDENTIALS_ROOT, FIXTURES_ROOT, RUNTIME_ROOT]) {
     assertStagingPath(target);
     await mkdir(target, { recursive: true });
   }

@@ -272,6 +272,11 @@ export async function getSelectedAccount(user?: User | null) {
   );
 }
 
+export async function getCurrentSessionId() {
+  const cookieStore = await cookies();
+  return verifySignedCookie(cookieStore.get(SESSION_COOKIE)?.value)?.sessionId ?? null;
+}
+
 export async function requireAccount(user?: User | null) {
   const account = await getSelectedAccount(user);
 

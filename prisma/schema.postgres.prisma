@@ -277,6 +277,8 @@ model User {
   consignmentsCompleted        ConsignmentBatch[]           @relation("ConsignmentCompletedBy")
   consignmentLinesCompleted    ConsignmentLine[]            @relation("ConsignmentLineCompletedBy")
   consignmentIssuesResolved    ConsignmentImportIssue[]     @relation("ConsignmentIssueResolvedBy")
+  ownerActionGrants            OwnerActionGrant[]
+  dataDeletionJobs             DataDeletionJob[]            @relation("DataDeletionJobActor")
   createdAt                    DateTime                     @default(now())
   updatedAt                    DateTime                     @updatedAt
 }
@@ -366,6 +368,7 @@ model Account {
   workRouteDecisions          WorkRouteDecision[]
   workflowActionReceipts      WorkflowActionReceipt[]
   workRouteDecisionRejections WorkRouteDecisionRejection[]
+  dataDeletionJobs            DataDeletionJob[]
   createdAt                   DateTime                       @default(now())
   updatedAt                   DateTime                       @updatedAt
 
@@ -714,6 +717,51 @@ model SecurityThrottle {
 
   @@index([scope, lastAttemptAt])
   @@index([blockedUntil])
+}
+
+model OwnerActionGrant {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId        String
+  actionKind       String
+  scopeFingerprint String
+  tokenHash        String    @unique
+  expiresAt        DateTime
+  usedAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, sessionId, expiresAt])
+  @@index([expiresAt, usedAt])
+}
+
+model DataDeletionJob {
+  id                     String    @id @default(cuid())
+  accountId              String?
+  account                Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  actorUserId            String?
+  actorUser              User?     @relation("DataDeletionJobActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actionKind             String
+  state                  String    @default("PREVIEWED")
+  clientRequestId        String
+  requestFingerprint     String
+  scopeFingerprint       String
+  scopeJson              String
+  previewJson            String
+  manifestJson           String?
+  quarantineRelativePath String?
+  totalFiles             Int       @default(0)
+  totalBytes             Int       @default(0)
+  purgeAfter             DateTime?
+  completedAt            DateTime?
+  errorSummary           String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([actorUserId, actionKind, clientRequestId])
+  @@index([accountId, state, createdAt])
+  @@index([state, purgeAfter])
+  @@index([scopeFingerprint, createdAt])
 }
 
 model WorkChangeEvent {

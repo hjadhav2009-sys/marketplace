@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as ts from "typescript";
 import { sanitizePublicActionError } from "../src/lib/import-jobs/safe-error";
 
-const actionPaths = execFileSync("git", ["ls-files", "-z"], { encoding: "buffer" })
+const actionPaths = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { encoding: "buffer" })
   .toString("utf8")
   .split("\0")
   .filter((path) => /^app\/.+\/actions\.tsx?$/.test(path));
@@ -33,6 +33,7 @@ assert.deepEqual(caughtRedirects, [], `Next redirect() must execute after the su
 
 const privacyBoundaries = [
   "app/owner/consignments/actions.ts",
+  "app/owner/data-management/actions.ts",
   "app/owner/imports/[jobId]/actions.ts",
   "app/owner/marking-library/actions.ts",
   "app/owner/process-rules/actions.ts",

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [card,nav,shell,scanner,scannerDialog,workDialog,details,productDetails,importPage,importActions,jobs,legacyTask] = await Promise.all([
-  read("app/work/GroupedWorkCard.tsx"),read("components/AppNav.tsx"),read("components/AppShell.tsx"),read("components/UniversalScannerPanel.tsx"),read("components/ScannerPickRouteDialog.tsx"),read("components/WorkRouteDialog.tsx"),read("app/work/groups/[stage]/[groupKey]/page.tsx"),read("app/owner/product-inventory/[listingId]/page.tsx"),read("app/owner/imports/[jobId]/page.tsx"),read("app/owner/imports/[jobId]/actions.ts"),read("src/lib/product-inventory/jobs.ts"),read("app/work/WorkTaskCard.tsx")
+const [card,nav,shell,scanner,scannerDialog,workDialog,details,productDetails,importPage,importActions,jobs,legacyTask,dataPage,dataActions,dataService,dataApi] = await Promise.all([
+  read("app/work/GroupedWorkCard.tsx"),read("components/AppNav.tsx"),read("components/AppShell.tsx"),read("components/UniversalScannerPanel.tsx"),read("components/ScannerPickRouteDialog.tsx"),read("components/WorkRouteDialog.tsx"),read("app/work/groups/[stage]/[groupKey]/page.tsx"),read("app/owner/product-inventory/[listingId]/page.tsx"),read("app/owner/imports/[jobId]/page.tsx"),read("app/owner/imports/[jobId]/actions.ts"),read("src/lib/product-inventory/jobs.ts"),read("app/work/WorkTaskCard.tsx"),read("app/owner/data-management/page.tsx"),read("app/owner/data-management/actions.ts"),read("src/lib/data-management/service.ts"),read("app/api/owner/data-management/preview/route.ts")
 ]);
 
 assert.match(nav,/data-mobile-drawer/);assert.match(nav,/sticky top-0/);assert.match(shell,/AppNav/);
@@ -16,5 +16,10 @@ for(const section of ["Overview","Marketplace Listing","Pricing","Fulfilment and
 for(const label of ["Back to Imports","New Import","Import History","Review Amazon file roles","Confirm Roles and Start"])assert.match(importPage,new RegExp(label));
 assert.match(importActions,/confirmProductInventoryFileRoles/);assert.match(jobs,/AWAITING_FILE_ROLES/);assert.match(jobs,/REFERENCE_IGNORE/);
 assert.doesNotMatch(legacyTask,/RouteChoiceWithInstructionConfirmation/);assert.match(legacyTask,/stage!=="PACK"\?<form action=\{setTaskProgressAction\}/,"Generic exact progress is explicitly excluded for Pack.");
+for(const label of ["Uploaded Source Files","Import Jobs","Operational Test Data","Product Inventory Data","Trash / Quarantine","Deletion History","Full Reset Guidance"])assert.match(dataPage,new RegExp(label));
+assert.match(dataPage,/ownerPassword/);assert.match(dataPage,/confirmationPhrase/);assert.match(dataActions,/requireUser\(\["OWNER"\]\)/);assert.doesNotMatch(dataActions,/@\/lib\/prisma|\.\s*(?:create|update|delete|upsert)\s*\(/);
+for(const control of ["createOwnerActionGrant","consumeOwnerActionGrant","previewDataAction","executeDataAction","QUARANTINING_FILES","FILES_QUARANTINED","DELETING_DATABASE_ROWS","VERIFYING","FAILED_RESTORED"])assert.match(dataService,new RegExp(control));
+assert.match(dataApi,/user\.role\s*!==\s*"OWNER"/);assert.match(dataApi,/status:\s*403/);assert.match(dataApi,/previewDataAction/);
+assert.doesNotMatch(dataPage,/actionKind="[^"]*RESET/,"Full database reset remains guidance-only, never a browser mutation.");
 
 console.log("Stage 4.1 responsive UI and import-role contracts passed.");

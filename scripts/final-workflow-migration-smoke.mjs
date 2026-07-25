@@ -9,7 +9,7 @@ const temporaryRoot = resolve(root, ".codex-tmp");
 const migrationsRoot = resolve(root, "prisma", "migrations");
 const postgresMigrationsRoot = resolve(root, "prisma", "migrations-postgres");
 const base = "20260717000400_final_workflow_correctness";
-const latest = "20260718000500_projection_import_manual_catalog";
+const latest = "20260725000100_owner_data_management";
 mkdirSync(temporaryRoot, { recursive: true });
 const entries = readdirSync(migrationsRoot, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
 assert.equal(entries.at(-1), latest, "Phase 7.3.6 catalog/import migration must remain the latest additive SQLite migration.");
@@ -64,7 +64,7 @@ assert.deepEqual(createdTables(postgresPhaseSql), createdTables(phaseSql), "Pair
 assert.deepEqual(createdIndexes(postgresPhaseSql), createdIndexes(phaseSql), "Paired migrations create the same named indexes and uniqueness constraints.");
 assert.deepEqual(foreignKeys(postgresPhaseSql), foreignKeys(phaseSql), "Paired migrations create the same named foreign keys.");
 
-for (const [table, key] of [["WorkProjectionState", "id"], ["SecurityThrottle", "keyHash"], ["MarketplaceListingAttribute", "id"]]) {
+for (const [table, key] of [["WorkProjectionState", "id"], ["SecurityThrottle", "keyHash"], ["MarketplaceListingAttribute", "id"], ["OwnerActionGrant", "id"], ["DataDeletionJob", "id"]]) {
   assert.match(createdTableBody(phaseSql, table), new RegExp(`"${key}"[^\\n,]*PRIMARY KEY`), `SQLite ${table} keeps its primary key.`);
   assert.match(createdTableBody(postgresPhaseSql, table), new RegExp(`CONSTRAINT "${table}_pkey" PRIMARY KEY \\(\\"${key}\\"\\)`), `PostgreSQL ${table} keeps its primary key.`);
 }
@@ -80,7 +80,11 @@ const essentialIndexNames = [
   "ImportRowIssue_sourceType_sourceId_resolved_idx",
   "MarketplaceListingAttribute_marketplaceListingId_technicalKey_key",
   "MarketplaceListingAttribute_accountId_marketplace_technicalKey_idx",
-  "MarketplaceListingAttribute_accountId_valueText_idx"
+  "MarketplaceListingAttribute_accountId_valueText_idx",
+  "OwnerActionGrant_tokenHash_key",
+  "OwnerActionGrant_userId_sessionId_expiresAt_idx",
+  "DataDeletionJob_actorUserId_actionKind_clientRequestId_key",
+  "DataDeletionJob_accountId_state_createdAt_idx"
 ];
 const sqlitePhaseIndexes = createdIndexes(phaseSql).join("\n");
 const postgresPhaseIndexes = createdIndexes(postgresPhaseSql).join("\n");
@@ -92,7 +96,10 @@ for (const indexName of essentialIndexNames) {
 for (const constraintName of [
   "WorkProjectionState_accountId_fkey",
   "MarketplaceListingAttribute_marketplaceListingId_fkey",
-  "MarketplaceListingAttribute_accountId_fkey"
+  "MarketplaceListingAttribute_accountId_fkey",
+  "OwnerActionGrant_userId_fkey",
+  "DataDeletionJob_accountId_fkey",
+  "DataDeletionJob_actorUserId_fkey"
 ]) {
   assert.ok(foreignKeys(phaseSql).includes(constraintName), `SQLite migration retains essential foreign key ${constraintName}.`);
   assert.ok(foreignKeys(postgresPhaseSql).includes(constraintName), `PostgreSQL migration retains essential foreign key ${constraintName}.`);

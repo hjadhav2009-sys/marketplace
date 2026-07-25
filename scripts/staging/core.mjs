@@ -306,7 +306,7 @@ export async function smoke() {
   const publicBody = await publicResponse.text();
   if (publicResponse.status !== 200 || !publicBody.includes("PRIVATE SYNTHETIC STAGING")) throw new Error("Login page or synthetic staging banner smoke failed.");
   const routeMap = {
-    OWNER: ["/dashboard", "/owner/users", "/owner/product-inventory", "/owner/imports", "/owner/catalog/missing", "/owner/consignments", "/work", "/work/problems"],
+    OWNER: ["/dashboard", "/owner/users", "/owner/product-inventory", "/owner/imports", "/owner/catalog/missing", "/owner/consignments", "/owner/data-management", "/work", "/work/problems"],
     PICKER: ["/work/pick", "/work/scan"], MARKER: ["/work/mark"], ASSEMBLER: ["/work/assemble"], PACKER: ["/work/pack"], VIEW_ALL: ["/work"], IMPORT_MANAGER: ["/owner/consignments"]
   };
   const routeResults = [];

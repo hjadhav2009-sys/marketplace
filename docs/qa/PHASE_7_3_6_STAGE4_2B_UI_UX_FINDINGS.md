@@ -10,7 +10,7 @@
 - HTTP/heading: 200 / Synthetic REVIEW_REQUIRED Consignment
 - Viewport evidence: VERIFIED
 - Full-page evidence: VERIFIED
-- Diagnostic: 
+- Diagnostic: Horizontal overflow detected.
 - Evidence: `.codex-tmp/stage4-2b/traces/CONSIGNMENT_REVIEW-360x800.zip`
 
 ### IMPORT_PROCESSING:1024x768
@@ -87,7 +87,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1024x768.zip`
 
 ### ROUTE_OWNER_CATALOG_MISSING_ISSUEID:1440x900
@@ -98,7 +98,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1440x900.zip`
 
 ### ROUTE_OWNER_CATALOG_MISSING_ISSUEID:360x800
@@ -109,7 +109,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-360x800.zip`
 
 ### ROUTE_OWNER_CATALOG_MISSING_ISSUEID:390x844
@@ -120,7 +120,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-390x844.zip`
 
 ### ROUTE_OWNER_CATALOG_MISSING_ISSUEID:430x932
@@ -131,7 +131,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-430x932.zip`
 
 ### ROUTE_OWNER_CATALOG_MISSING_ISSUEID:768x1024
@@ -142,7 +142,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-768x1024.zip`
 
 ### ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW:360x800
@@ -153,7 +153,7 @@
 - HTTP/heading: 200 / Synthetic REVIEW_REQUIRED Consignment
 - Viewport evidence: VERIFIED
 - Full-page evidence: VERIFIED
-- Diagnostic: 
+- Diagnostic: Horizontal overflow detected.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-360x800.zip`
 
 ### ROUTE_OWNER_IMPORTS_JOBID_MAPPING:1024x768
@@ -164,7 +164,7 @@
 - HTTP/heading: 200 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1024x768.zip`
 
 ### ROUTE_OWNER_IMPORTS_JOBID_MAPPING:1440x900
@@ -175,7 +175,7 @@
 - HTTP/heading: 200 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1440x900.zip`
 
 ### ROUTE_OWNER_IMPORTS_JOBID_MAPPING:360x800
@@ -186,7 +186,7 @@
 - HTTP/heading: 200 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-360x800.zip`
 
 ### ROUTE_OWNER_IMPORTS_JOBID_MAPPING:390x844
@@ -197,7 +197,7 @@
 - HTTP/heading: 200 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-390x844.zip`
 
 ### ROUTE_OWNER_IMPORTS_JOBID_MAPPING:430x932
@@ -208,7 +208,7 @@
 - HTTP/heading: 200 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-430x932.zip`
 
 ### ROUTE_OWNER_IMPORTS_JOBID_MAPPING:768x1024
@@ -219,7 +219,7 @@
 - HTTP/heading: 200 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-768x1024.zip`
 
 ### ROUTE_OWNER_MARKING_LIBRARY_ASSETID:1024x768
@@ -230,7 +230,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1024x768.zip`
 
 ### ROUTE_OWNER_MARKING_LIBRARY_ASSETID:1440x900
@@ -241,7 +241,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1440x900.zip`
 
 ### ROUTE_OWNER_MARKING_LIBRARY_ASSETID:360x800
@@ -252,7 +252,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-360x800.zip`
 
 ### ROUTE_OWNER_MARKING_LIBRARY_ASSETID:390x844
@@ -263,7 +263,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-390x844.zip`
 
 ### ROUTE_OWNER_MARKING_LIBRARY_ASSETID:430x932
@@ -274,7 +274,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-430x932.zip`
 
 ### ROUTE_OWNER_MARKING_LIBRARY_ASSETID:768x1024
@@ -285,7 +285,7 @@
 - HTTP/heading: 404 / 404
 - Viewport evidence: FAILED
 - Full-page evidence: FAILED
-- Diagnostic: 
+- Diagnostic: Canonical synthetic seed does not provide this reachable detail state.
 - Evidence: `.codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-768x1024.zip`
 
 

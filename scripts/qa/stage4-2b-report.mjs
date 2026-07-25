@@ -94,7 +94,7 @@ const findings=`# Phase 7.3.6 Stage 4.2B UI/UX Findings
 ${broken.length?broken.map(item=>{
   const missingState=item.status===404||item.inspection?.heading==="404";
   const severity=item.pageErrors?.length?"HIGH":missingState?"TEST_GAP":"MEDIUM";
-  const diagnostic=item.error??item.pageErrors?.join(" | ")??(item.inspection?.overflow?"Horizontal overflow detected.":missingState?"Canonical synthetic seed does not provide this reachable detail state.":"Runtime verification failed.");
+  const diagnostic=item.error||item.pageErrors?.join(" | ")||(item.inspection?.overflow?"Horizontal overflow detected.":missingState?"Canonical synthetic seed does not provide this reachable detail state.":"Runtime verification failed.");
   return `### ${item.id}\n\n- Severity: ${severity}\n- Route: \`${item.route}\`\n- Viewport: ${item.viewport.id}\n- HTTP/heading: ${item.status} / ${item.inspection?.heading??"-"}\n- Viewport evidence: ${item.viewportCaptureStatus??"NOT_STARTED"}\n- Full-page evidence: ${item.fullPageCaptureStatus??"NOT_STARTED"}\n- Diagnostic: ${diagnostic}\n- Evidence: \`${item.tracePath??item.screenshotPath}\`\n`;
 }).join("\n"):"No browser-rendering failures were recorded in this generated batch."}
 

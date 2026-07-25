@@ -8,7 +8,8 @@ import { rebuildWorkGroupProjection } from "../../src/lib/workflow/work-group-pr
 const prisma = new PrismaClient();
 const credentialPath = process.env.STAGING_CREDENTIAL_PATH;
 const fixtureRoot = process.env.STAGING_FIXTURES_ROOT;
-if (!credentialPath || !fixtureRoot || !process.env.STAGE3_SYNTHETIC_STAGING) throw new Error("Synthetic seed may run only inside the Stage 3 environment.");
+const importStorageRoot = process.env.IMPORT_JOB_STORAGE_ROOT;
+if (!credentialPath || !fixtureRoot || !importStorageRoot || !process.env.STAGE3_SYNTHETIC_STAGING) throw new Error("Synthetic seed may run only inside the Stage 3 environment.");
 
 const accounts = [
   { id: "stage3-account-fk-01", name: "Synthetic Flipkart Primary", code: "STAGE-FK-01", marketplace: "FLIPKART", active: true },
@@ -40,7 +41,9 @@ const listings = [
   ["fk-broken-image", "STAGE-FK-SKU-007", "Synthetic Broken Image Product", "PICK_PACK"],
   ["fk-gallery", "STAGE-FK-SKU-008", "Synthetic Gallery Product", "PICK_PACK"],
   ["fk-inactive", "STAGE-FK-SKU-009", "Synthetic Inactive Listing", "PICK_PACK"],
-  ["fk-locked", "STAGE-FK-SKU-010", "Synthetic Manually Locked Product", "PICK_PACK"]
+  ["fk-locked", "STAGE-FK-SKU-010", "Synthetic Manually Locked Product", "PICK_PACK"],
+  ["fk-archived", "STAGE-FK-SKU-011", "Synthetic Archived Listing", "PICK_PACK"],
+  ["fk-error", "STAGE-FK-SKU-012", "Synthetic Processing Error Listing", "PICK_PACK"]
 ] as const;
 
 function snapshot(sku: string, title: string, route: string | null) {
@@ -76,7 +79,7 @@ async function seed() {
   let listingIndex = 0;
   for (const [suffix, sku, title, route] of listings) {
     const id = `stage3-listing-${suffix}`;
-    await prisma.marketplaceListing.create({ data: { id, accountId: accounts[0].id, marketplace: "FLIPKART", sellerSkuId: sku, sku, productTitle: title, listingStatus: suffix === "fk-inactive" ? "INACTIVE" : "ACTIVE", fsn: `STAGE-FSN-${String(++listingIndex).padStart(3, "0")}`, listingId: `STAGE-LISTING-${String(listingIndex).padStart(3, "0")}`, mainImageUrl: suffix === "fk-missing-image" ? null : suffix === "fk-broken-image" ? "https://invalid.example.invalid/stage3-image.jpg" : `https://example.invalid/synthetic/${sku}.jpg`, imageUrl2: suffix === "fk-gallery" ? "https://example.invalid/synthetic/gallery-2.jpg" : null, imageUrl3: suffix === "fk-gallery" ? "https://example.invalid/synthetic/gallery-3.jpg" : null, manualLocksJson: suffix === "fk-locked" ? JSON.stringify({ productTitle: true }) : null, fieldProvenanceJson: JSON.stringify({ productTitle: { source: suffix === "fk-locked" ? "MANUAL_OWNER" : "SYNTHETIC_FIXTURE", manualLocked: suffix === "fk-locked" } }) } });
+    await prisma.marketplaceListing.create({ data: { id, accountId: accounts[0].id, marketplace: "FLIPKART", sellerSkuId: sku, sku, productTitle: title, listingStatus: suffix === "fk-inactive" ? "INACTIVE" : suffix === "fk-archived" ? "ARCHIVED" : "ACTIVE", fsn: `STAGE-FSN-${String(++listingIndex).padStart(3, "0")}`, listingId: `STAGE-LISTING-${String(listingIndex).padStart(3, "0")}`, mainImageUrl: suffix === "fk-missing-image" ? null : suffix === "fk-broken-image" ? "https://invalid.example.invalid/stage3-image.jpg" : `https://example.invalid/synthetic/${sku}.jpg`, imageUrl2: suffix === "fk-gallery" ? "https://example.invalid/synthetic/gallery-2.jpg" : null, imageUrl3: suffix === "fk-gallery" ? "https://example.invalid/synthetic/gallery-3.jpg" : null, scrapeStatus: suffix === "fk-error" ? "FAILED" : "COMPLETED", scrapeError: suffix === "fk-error" ? "Synthetic image and catalog refresh failure." : null, manualLocksJson: suffix === "fk-locked" ? JSON.stringify({ productTitle: true }) : null, fieldProvenanceJson: JSON.stringify({ productTitle: { source: suffix === "fk-locked" ? "MANUAL_OWNER" : "SYNTHETIC_FIXTURE", manualLocked: suffix === "fk-locked" } }) } });
     await prisma.marketplaceListingIdentifier.createMany({ data: [
       { id: `${id}-sku`, accountId: accounts[0].id, marketplaceListingId: id, marketplace: "FLIPKART", identifierType: "SELLER_SKU", rawValue: sku, normalizedValue: sku, source: "SYNTHETIC_STAGE3" },
       { id: `${id}-fsn`, accountId: accounts[0].id, marketplaceListingId: id, marketplace: "FLIPKART", identifierType: "FSN", rawValue: `STAGE-FSN-${String(listingIndex).padStart(3, "0")}`, normalizedValue: `STAGE-FSN-${String(listingIndex).padStart(3, "0")}`, source: "SYNTHETIC_STAGE3" }
@@ -107,6 +110,15 @@ async function seed() {
     await prisma.order.create({ data: { id: orderId, accountId: accounts[0].id, marketplace: "FLIPKART", shipmentId: `STAGE-SHIP-${++orderNumber}`, orderItemId: `STAGE-ITEM-${orderNumber}`, trackingId: `STAGE-TRACK-${orderNumber}`, awb: `STAGE-AWB-${orderNumber}`, sku, qty, orderNo: `STAGE-ORDER-${orderNumber}`, productDescription: `Synthetic ${name} order`, pickStatus: stage === "PICK" ? "READY" : "PICKED", packStatus: status === "COMPLETED" ? "PACKED" : "READY", status: status === "COMPLETED" ? "PACKED" : "READY" } });
     await createTask({ id: `${orderId}-${stage.toLowerCase()}`, orderId, stage, sequence: stage === "PICK" ? 1 : stage === "MARK" ? 2 : stage === "ASSEMBLE" ? 2 : 4, status: status as WorkTaskStatus, quantity: qty, completed: status === "IN_PROGRESS" ? 1 : undefined, assigned, sku, title: `Synthetic ${name} order`, route, problem: status === "PROBLEM" ? "Synthetic staged problem" : undefined });
   }
+  await prisma.problemOrder.createMany({ data: [
+    { id: "stage4-problem-open", accountId: accounts[0].id, orderId: "stage3-order-pick-problem", reason: "Synthetic damaged item", details: "Synthetic open problem for UI audit.", interruptedStage: "PICK", workTaskId: "stage3-order-pick-problem-pick", taskStatusBefore: "READY", orderStatusBefore: "READY", pickStatusBefore: "READY", packStatusBefore: "READY", clientRequestId: "stage4-open-problem", status: "OPEN", reportedById: users[2].id },
+    { id: "stage4-problem-resolved", accountId: accounts[0].id, orderId: "stage3-order-assembly-problem", reason: "Synthetic assembly mismatch", details: "Synthetic resolved problem for UI audit.", interruptedStage: "ASSEMBLE", workTaskId: "stage3-order-assembly-problem-assemble", taskStatusBefore: "READY", orderStatusBefore: "READY", pickStatusBefore: "PICKED", packStatusBefore: "READY", clientRequestId: "stage4-resolved-problem", status: "RESOLVED", reportedById: users[5].id, resolvedAt: new Date(), resolutionNote: "Synthetic resolution completed." }
+  ] });
+  await prisma.scanLog.createMany({ data: [
+    { id: "stage4-scan-found", accountId: accounts[0].id, orderId: "stage3-order-pick-ready", awb: "STAGE-AWB-1", outcome: "FOUND", scannedById: users[2].id, note: "Synthetic exact active match." },
+    { id: "stage4-scan-packed", accountId: accounts[0].id, orderId: "stage3-order-pack-complete", awb: "STAGE-AWB-10", outcome: "PACKED", scannedById: users[6].id, note: "Synthetic completed match." },
+    { id: "stage4-scan-missing", accountId: accounts[0].id, awb: "STAGE-NO-MATCH", outcome: "NOT_FOUND", scannedById: users[2].id, note: "Synthetic no-match result." }
+  ] });
 
   const batchStates = ["DRAFT", "REVIEW_REQUIRED", "READY_TO_ACTIVATE", "ACTIVE", "COMPLETED"] as const;
   let batchIndex = 0;
@@ -119,11 +131,52 @@ async function seed() {
   }
   await prisma.consignmentLine.create({ data: { id: "stage3-line-held-missing", consignmentBatchId: "stage3-batch-review_required", accountId: accounts[0].id, rowNumber: 1, sellerSkuSource: "STAGE-MISSING-SKU-001", requiredQuantity: 5, matchStatus: "NOT_FOUND", activated: false } });
   await prisma.consignmentImportIssue.create({ data: { id: "stage3-consignment-missing-issue", consignmentBatchId: "stage3-batch-review_required", consignmentLineId: "stage3-line-held-missing", severity: "ERROR", issueType: "MISSING_LISTING", message: "Synthetic missing listing requires owner resolution.", rowNumber: 2, safeDataJson: JSON.stringify({ sourceFileName: "synthetic-missing.csv", sourceTableName: "Synthetic", sellerSku: "STAGE-MISSING-SKU-001" }) } });
+  await prisma.consignmentImportIssue.createMany({ data: [
+    { id: "stage4-consignment-zero-info", consignmentBatchId: "stage3-batch-review_required", severity: "INFO", issueType: "ZERO_QUANTITY_SKIPPED", message: "Synthetic zero quantity row created no work.", rowNumber: 3, safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-002" }) },
+    { id: "stage4-consignment-invalid-error", consignmentBatchId: "stage3-batch-review_required", severity: "ERROR", issueType: "INVALID_QUANTITY", message: "Synthetic invalid quantity blocks activation.", rowNumber: 4, safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-003" }) }
+  ] });
+
+  await mkdir(importStorageRoot!, { recursive: true });
+  const syntheticImportFile = path.join(importStorageRoot!, "stage4-synthetic-import.csv");
+  await writeFile(syntheticImportFile, "synthetic,only\n1,true\n", { flag: "wx" });
+  const importStates = [
+    ["queued", "QUEUED", "QUEUED", 0, 0, 0, null],
+    ["mapping", "NEEDS_MAPPING", "MAPPING", 20, 0, 0, null],
+    ["running", "RUNNING", "MERGING", 100, 45, 2, null],
+    ["completed", "COMPLETED", "COMPLETED", 100, 100, 0, null],
+    ["warnings", "COMPLETED", "COMPLETED_WITH_WARNINGS", 100, 100, 5, null],
+    ["failed", "FAILED", "FAILED", 40, 12, 3, "Synthetic parser failure."],
+    ["cancelled", "CANCELLED", "CANCELLED", 20, 5, 0, null]
+  ] as const;
+  for (const [suffix, status, stage, totalRows, processedRows, warningRows, lastError] of importStates) {
+    await prisma.importJob.create({ data: {
+      id: `stage4-import-${suffix}`, accountId: accounts[0].id, createdByUserId: users[1].id, marketplace: "FLIPKART", importType: "PRODUCT_INVENTORY",
+      fileName: `synthetic-${suffix}.csv`, filePath: syntheticImportFile, batchId: `stage4-batch-${suffix}`, status, stage, totalRows, processedRows,
+      createdRows: suffix === "completed" ? 25 : 0, unchangedRows: suffix === "completed" ? 75 : 0, warningRows, errorRows: suffix === "failed" ? 3 : 0,
+      totalFiles: 1, processedFiles: ["completed", "warnings", "failed", "cancelled"].includes(suffix) ? 1 : 0, lastError,
+      startedAt: ["running", "completed", "warnings", "failed", "cancelled"].includes(suffix) ? new Date() : undefined,
+      finishedAt: ["completed", "warnings", "failed", "cancelled"].includes(suffix) ? new Date() : undefined,
+      reportJson: JSON.stringify({ synthetic: true, state: suffix })
+    } });
+  }
+  await prisma.uploadBatch.create({ data: { id: "stage4-upload-needs-mapping", accountId: accounts[0].id, createdByUserId: users[1].id, fileName: "synthetic-needs-mapping.csv", importType: "ORDER_LABEL", status: "NEEDS_MAPPING", totalRows: 3, errorRows: 1, warningRows: 1, blockingErrorRows: 1 } });
+  await prisma.importRowIssue.createMany({ data: [
+    { id: "stage4-import-warning", batchId: "stage4-upload-needs-mapping", rowNumber: 2, issueType: "UNKNOWN_HEADER", message: "Synthetic header requires mapping.", safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-001" }), severity: "WARNING" },
+    { id: "stage4-import-blocking", batchId: "stage4-upload-needs-mapping", rowNumber: 3, issueType: "IDENTITY_CONFLICT", message: "Synthetic conflicting identity blocks import.", safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-002" }), severity: "ERROR" }
+  ] });
+  await prisma.dataDeletionJob.createMany({ data: [
+    { id: "stage4-delete-preview", accountId: accounts[0].id, actorUserId: users[0].id, actionKind: "PURGE_QA_OPERATIONAL_DATA", state: "PREVIEWED", clientRequestId: "stage4-preview", requestFingerprint: "a".repeat(64), scopeFingerprint: "b".repeat(64), scopeJson: JSON.stringify({ synthetic: true, label: "STAGE4" }), previewJson: JSON.stringify({ synthetic: true, affectedRecords: 12 }) },
+    { id: "stage4-delete-quarantined", accountId: accounts[0].id, actorUserId: users[0].id, actionKind: "QUARANTINE_IMPORT_FILES", state: "QUARANTINED", clientRequestId: "stage4-quarantine", requestFingerprint: "c".repeat(64), scopeFingerprint: "d".repeat(64), scopeJson: JSON.stringify({ synthetic: true }), previewJson: JSON.stringify({ synthetic: true, affectedFiles: 1 }), manifestJson: JSON.stringify({ synthetic: true, fileCount: 1 }), quarantineRelativePath: "stage4/synthetic-only", totalFiles: 1, totalBytes: 22, purgeAfter: new Date(Date.now() + 86_400_000) },
+    { id: "stage4-delete-completed", accountId: accounts[0].id, actorUserId: users[0].id, actionKind: "RESTORE_QUARANTINED_FILES", state: "COMPLETED", clientRequestId: "stage4-restored", requestFingerprint: "e".repeat(64), scopeFingerprint: "f".repeat(64), scopeJson: JSON.stringify({ synthetic: true }), previewJson: JSON.stringify({ synthetic: true }), completedAt: new Date() }
+  ] });
 
   for (const account of accounts.filter((item) => item.active)) for (const sourceType of ["ORDER", "CONSIGNMENT"] as const) for (const stage of ["PICK", "MARK", "ASSEMBLE", "PACK"] as const) {
     await rebuildWorkGroupProjection({ accountId: account.id, sourceType, stage }, prisma);
   }
-  await prisma.auditLog.create({ data: { id: "stage3-seed-audit", userId: users[0].id, accountId: accounts[0].id, action: "STAGE3_SYNTHETIC_SEED", entityType: "SyntheticStaging", entityId: "phase-7.3.6-stage3-v1", metadata: JSON.stringify({ synthetic: true }) } });
+  await prisma.auditLog.createMany({ data: [
+    { id: "stage3-seed-audit", userId: users[0].id, accountId: accounts[0].id, action: "STAGE4_2_SYNTHETIC_SEED", entityType: "SyntheticStaging", entityId: "phase-7.3.6-stage4.2-synthetic-ui-v2", metadata: JSON.stringify({ synthetic: true }) },
+    { id: "stage4-delete-audit", userId: users[0].id, accountId: accounts[0].id, action: "DATA_MANAGEMENT_PREVIEW", entityType: "DataDeletionJob", entityId: "stage4-delete-preview", metadata: JSON.stringify({ synthetic: true, result: "PREVIEWED" }) }
+  ] });
 
   const fixtureFiles: Record<string, string> = {
     "flipkart/product-inventory-75-column-like.csv": "Product Title,Seller SKU Id,Sub-category,Flipkart Serial Number,Listing ID,Listing Status,MRP,Your Selling Price,Live Title,Live Brand,Live Category,Live Price,Live MRP,Product Highlights,Description,All Specifications,Generated Direct Product URL,Canonical Product URL,Image URL 1,Image 1 1366 URL,System Stock count,Your Stock Count,Recommended Stock,Minimum Order Quantity,Procurement SLA,Procurement Type\nSynthetic Product,STAGE-FK-SKU-001,Synthetic Category,STAGE-FSN-001,STAGE-LISTING-001,ACTIVE,100,90,Synthetic Live Product,Synthetic Brand,Synthetic Category,90,100,Synthetic highlight,Synthetic description,Synthetic specifications,https://example.invalid/direct,https://example.invalid/canonical,https://example.invalid/image.jpg,https://example.invalid/image-1366.jpg,0,0,0,1,1,MADE_TO_ORDER\n",

@@ -31,7 +31,7 @@ export const HOST = "127.0.0.1";
 export const PREPARE_PHRASE = "APPROVE PRIVATE SYNTHETIC STAGING PREPARATION";
 export const RESET_PHRASE = "RESET SYNTHETIC STAGING";
 export const CLEANUP_PHRASE = "CLEANUP SYNTHETIC STAGING";
-export const SEED_VERSION = "phase-7.3.6-stage3-v1";
+export const SEED_VERSION = "phase-7.3.6-stage4.2-synthetic-ui-v2";
 
 export function isInside(parent, candidate, allowEqual = false) {
   const root = path.resolve(parent);
@@ -174,7 +174,7 @@ export function inspectDatabase() {
   try {
     const migrationCount = Number(db.prepare('SELECT COUNT(*) AS count FROM "_prisma_migrations" WHERE "finished_at" IS NOT NULL').get().count);
     const counts = {};
-    for (const table of ["Account", "User", "MarketplaceListing", "Order", "ConsignmentBatch", "ConsignmentLine", "WorkTask", "WorkGroupProjection"]) {
+    for (const table of ["Account", "User", "MarketplaceListing", "Order", "ConsignmentBatch", "ConsignmentLine", "WorkTask", "WorkGroupProjection", "ImportJob", "UploadBatch", "ImportRowIssue", "ConsignmentImportIssue", "ProblemOrder", "ScanLog", "DataDeletionJob", "AuditLog"]) {
       counts[table] = Number(db.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).get().count);
     }
     return { exists: true, migrationCount, counts, integrity: db.prepare("PRAGMA integrity_check").get().integrity_check };

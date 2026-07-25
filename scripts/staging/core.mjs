@@ -79,6 +79,7 @@ export function buildEnvironment(config) {
     NEXT_PUBLIC_APP_URL: `http://${HOST}:${PORT}`,
     NEXT_PUBLIC_STAGING_BANNER: "PRIVATE SYNTHETIC STAGING",
     STAGE3_SYNTHETIC_STAGING: "true",
+    STAGING_UI_AUDIT: "true",
     STAGE3_RUNTIME_IDENTITY_TOKEN: config.runtimeIdentityToken,
     PORT: String(PORT),
     HOSTNAME: HOST,

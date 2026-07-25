@@ -38,4 +38,3 @@ The Figma connector currently returns `INVALID_ARGUMENT` for both metadata and
 write calls against the file, while authentication remains valid. No capture is
 marked complete until the file is writable and each synthetic frame is indexed.
 No real-data image or text has been uploaded.
-

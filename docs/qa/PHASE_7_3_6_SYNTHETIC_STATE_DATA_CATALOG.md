@@ -59,4 +59,3 @@ Seed version: `phase-7.3.6-stage4.2-synthetic-ui-v2`.
 - Amazon Consignment positive/zero/blank/negative/decimal/text quantities.
 
 All identifiers, filenames and content are conspicuously synthetic.
-

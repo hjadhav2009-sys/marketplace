@@ -19,4 +19,3 @@ certified by automation.
 Source review and previous synthetic artifacts are not substituted for a
 current browser pass. Screenshots, overflow measurements, touch-target checks,
 console/network findings and interaction outcomes remain pending.
-

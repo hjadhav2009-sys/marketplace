@@ -47,4 +47,3 @@ for (const viewport of ["360 × 800", "390 × 844", "430 × 932", "768 × 1024",
 assert.match(responsive, /BLOCKED_BROWSER_CONTROL_UNAVAILABLE/);
 
 console.log(`Stage 4.2 UI surface inventory tests passed (${routes.length} page routes).`);
-

@@ -89,4 +89,3 @@ Every reachable path must be exercised at:
 For every interaction record target, expected result, actual result, console
 errors, failed requests, overflow, focus return, touch size and screenshot ID.
 Current status: `BROWSER_PENDING`.
-

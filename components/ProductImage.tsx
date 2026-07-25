@@ -148,7 +148,7 @@ export function ProductImage({
             <button
               type="button"
               onClick={retryImage}
-              className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+              className="mt-2 min-h-11 rounded border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
             >
               Retry image
             </button>

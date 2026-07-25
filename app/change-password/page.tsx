@@ -80,7 +80,7 @@ export default async function ChangePasswordPage({ searchParams }: ChangePasswor
         </form>
 
         <form action={logoutFromPasswordChangeAction} className="mt-5">
-          <button className="text-sm font-semibold text-slate-600 hover:text-slate-950">Logout instead</button>
+          <button className="min-h-11 px-2 text-sm font-semibold text-slate-600 hover:text-slate-950">Logout instead</button>
         </form>
       </section>
     </main>

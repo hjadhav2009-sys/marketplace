@@ -49,6 +49,10 @@ const source = readFileSync(path.join(root, "scripts", "staging", "core.mjs"), "
 assert.match(source, /-H", HOST/); assertions += 1;
 assert.match(source, /refusing to kill/i); assertions += 1;
 assert.match(source, /cloudflare\|tailscale/); assertions += 1;
+assert.match(source, /current-build\.json/); assertions += 1;
+assert.match(source, /buildReceipt\.sourceSha !== sourceSha/); assertions += 1;
+assert.match(source, /buildReceipt\.buildId !== buildId/); assertions += 1;
+assert.match(source, /sourceSha,\s*buildId,\s*commandFingerprint/); assertions += 1;
 assert.doesNotMatch(source, /resolveRealDatabasePath|real-db\/|fresh-db:reset/); assertions += 1;
 const middleware = readFileSync(path.join(root, "middleware.ts"), "utf8");
 assert.match(middleware, /SESSION_COOKIE_NAME/); assertions += 1;

@@ -216,14 +216,22 @@ async function verifiedRecordedProcess(receipt) {
 export async function start() {
   if (!existsSync(ENV_PATH) || !existsSync(DATABASE_PATH) || !existsSync(CREDENTIAL_PATH)) throw new Error("Prepare synthetic staging before start.");
   if (!existsSync(path.join(ROOT, ".next", "BUILD_ID"))) throw new Error("A reviewed production build is required before staging start.");
+  const buildReceiptPath = path.join(REPORT_ROOT, "current-build.json");
+  if (!existsSync(buildReceiptPath)) throw new Error("A current staging build receipt is required before staging start.");
   if (await portOwner()) throw new Error("Port 3188 is already in use; refusing to stop or replace an unrelated process.");
   const config = await loadPrivateConfig();
+  const buildReceipt = JSON.parse(await readFile(buildReceiptPath, "utf8"));
+  const sourceSha = git(["rev-parse", "HEAD"]);
+  const buildId = String(await readFile(path.join(ROOT, ".next", "BUILD_ID"), "utf8")).trim();
+  if (buildReceipt.sourceSha !== sourceSha || buildReceipt.buildId !== buildId) {
+    throw new Error("The staging production build does not match the current source HEAD. Run staging:build again.");
+  }
   const env = buildEnvironment(config);
   const nextBin = require.resolve("next/dist/bin/next");
   const logHandle = await import("node:fs").then(({ openSync }) => openSync(path.join(LOG_ROOT, "server.log"), "a"));
   const child = spawn(process.execPath, [nextBin, "start", "-H", HOST, "-p", String(PORT)], { cwd: ROOT, env, detached: true, stdio: ["ignore", logHandle, logHandle], windowsHide: true });
   child.unref();
-  const receipt = { pid: child.pid, host: HOST, port: PORT, sourceSha: config.sourceSha, commandFingerprint: sha256([nextBin, "start", HOST, String(PORT)].join("\0")), startedAt: new Date().toISOString() };
+  const receipt = { pid: child.pid, host: HOST, port: PORT, sourceSha, buildId, commandFingerprint: sha256([nextBin, "start", HOST, String(PORT)].join("\0")), startedAt: new Date().toISOString() };
   await writeFile(PID_PATH, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx" });
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {

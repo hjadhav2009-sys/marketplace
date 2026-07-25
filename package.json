@@ -110,6 +110,7 @@
     "staging:cleanup": "node scripts/staging/cli.mjs cleanup",
     "staging:test": "node tests/staging.test.mjs",
     "stage4-ui:test": "node tests/stage4-grouped-work-card-ui.test.mjs && node tests/stage4-1-ui-contract.test.mjs",
+    "stage4.2-inventory:test": "node tests/stage4-2-ui-surface-inventory.test.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",
     "data-management:test": "tsx tests/data-management.test.ts",
     "staging:rollback-artifact": "node scripts/staging/previous-executable.mjs",

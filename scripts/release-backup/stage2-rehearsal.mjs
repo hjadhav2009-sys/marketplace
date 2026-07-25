@@ -60,9 +60,35 @@ async function portOpen(port) {
 
 function otherNodeProcesses() {
   if (process.platform !== "win32") return [];
-  const result = spawnSync("powershell.exe", ["-NoProfile", "-Command", "Get-Process node -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"], { encoding: "utf8", windowsHide: true, timeout: 15_000 });
-  if (result.error || (result.status !== 0 && result.status !== 1)) return ["PROCESS_CHECK_FAILED"];
-  return String(result.stdout ?? "").split(/\s+/).filter(Boolean).map(Number).filter((pid) => pid && pid !== process.pid);
+  const command = "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress";
+  const result = spawnSync("powershell.exe", ["-NoProfile", "-Command", command], { encoding: "utf8", windowsHide: true, timeout: 15_000 });
+  if (result.error || result.status !== 0) return ["PROCESS_CHECK_FAILED"];
+  const raw = String(result.stdout ?? "").trim();
+  if (!raw) return [];
+  let processes;
+  try {
+    const parsed = JSON.parse(raw);
+    processes = Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return ["PROCESS_CHECK_FAILED"];
+  }
+  const repositoryPath = ROOT.toLowerCase();
+  return processes
+    .filter((entry) => Number(entry.ProcessId) !== process.pid)
+    .filter((entry) => String(entry.CommandLine ?? "").toLowerCase().includes(repositoryPath))
+    .map((entry) => Number(entry.ProcessId))
+    .filter(Boolean);
+}
+
+function currentApplicationCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8", windowsHide: true, timeout: 15_000 });
+  const commit = String(result.stdout ?? "").trim();
+  if (result.status !== 0 || !/^[0-9a-f]{40}$/.test(commit)) {
+    const error = new Error("Current application commit could not be resolved.");
+    error.code = "APPLICATION_COMMIT_UNAVAILABLE";
+    throw error;
+  }
+  return commit;
 }
 
 function restrictAndInspectAcl(directory) {
@@ -237,7 +263,7 @@ try {
   const databaseInfo = await lstat(databasePath);
   if (!databaseInfo.isFile() || databaseInfo.isSymbolicLink() || pathIsInside(path.resolve(ROOT, ".codex-tmp"), databasePath, true)) { const error = new Error("Configured production SQLite path failed safety validation."); error.code = "SCOPE_DATABASE_INVALID"; throw error; }
   const nodes = otherNodeProcesses();
-  const ports = await Promise.all([portOpen(3000), portOpen(3001)]);
+  const ports = await Promise.all([portOpen(3000), portOpen(3001), portOpen(3188)]);
   if (nodes.length || ports.some(Boolean)) { const error = new Error("A possible repository application writer is active."); error.code = "ACTIVE_WRITER"; throw error; }
 
   const preflightCopyDirectory = path.join(runRoot, "preflight-database-copy");
@@ -267,7 +293,8 @@ try {
   await writeFile(path.join(runRoot, "source-before.json"), `${JSON.stringify(sourceBefore, null, 2)}\n`, { flag: "wx" });
   const expectedSourceSha256 = await sha256File(databasePath);
   const backupDirectory = path.join(runRoot, "verified-backup");
-  const backup = await timed("backupAndStorageCopyMs", () => createCopiedBackup({ confirmCopiedRehearsal: true, confirmationPhrase: COPIED_CONFIRMATION_PHRASE, database: databasePath, output: backupDirectory, expectedSourceSha256, scopeFile, quiescenceReceipt: receiptFile, applicationCommit: "1f7877cfd8ae5633e30406d5c5500425df6686b4" }));
+  const applicationCommit = currentApplicationCommit();
+  const backup = await timed("backupAndStorageCopyMs", () => createCopiedBackup({ confirmCopiedRehearsal: true, confirmationPhrase: COPIED_CONFIRMATION_PHRASE, database: databasePath, output: backupDirectory, expectedSourceSha256, scopeFile, quiescenceReceipt: receiptFile, applicationCommit }));
   const verified = await timed("backupVerificationMs", () => verifyCopiedBackup(backupDirectory));
   const sourceAfter = await privateFingerprint({ databasePath, scopeFile });
   await writeFile(path.join(runRoot, "source-after.json"), `${JSON.stringify(sourceAfter, null, 2)}\n`, { flag: "wx" });
@@ -308,7 +335,7 @@ try {
   if (!protectionAcceptableForRetention) await rm(backupDirectory, { recursive: true, force: true });
   timings.totalMs = elapsed(startedAt);
   finalReport = {
-    decision: "STAGE2_COPIED_BACKUP_RESTORE_MIGRATION_PASSED", runId,
+    decision: "STAGE2_COPIED_BACKUP_RESTORE_MIGRATION_PASSED", runId, applicationCommit,
     source: { databaseResolvedSafely: true, writerProcesses: 0, activeImportLeases: 0, legacyRunningImportRowsWithoutLease: importWriterState.legacyRunningCount, portsClosed: true, unchanged: true },
     scope: { rootCount: scope.roots.length, uploadsClassification: "MUST_BACK_UP_PENDING_CLEANUP", databaseBytes: capacity.databaseBytes, storageBytes: capacity.storageBytes, fileCount: capacity.fileCount, largestIncludedFile: capacity.largestIncludedFile, longestRelativePath: capacity.longestRelativePath },
     capacity: { requiredBytes: capacity.requiredBytes, freeBytes: capacity.freeBytes, sufficient: true }, acl, encryption,

@@ -134,5 +134,11 @@ fixture.pinnedReader.close();
 
 assert.ok(path.resolve(runRoot).startsWith(path.resolve(STAGE2_ROOT)));
 assert.equal(existsSync(path.join(runRoot, ".git")), false);
+const rehearsalSource = await readFile(new URL("../scripts/release-backup/stage2-rehearsal.mjs", import.meta.url), "utf8");
+assert.match(rehearsalSource, /currentApplicationCommit\(\)/, "Copied rehearsal records the current application HEAD");
+assert.doesNotMatch(rehearsalSource, /applicationCommit:\s*"[0-9a-f]{40}"/, "Copied rehearsal does not stamp a historical hard-coded SHA");
+assert.match(rehearsalSource, /Get-CimInstance Win32_Process/, "Windows writer inspection reads process command lines");
+assert.match(rehearsalSource, /CommandLine[\s\S]*includes\(repositoryPath\)/, "Only repository-scoped Node processes are classified as possible writers");
+assert.match(rehearsalSource, /portOpen\(3188\)/, "The private staging port is included in writer checks");
 assert.ok(observed.length >= 25);
 process.stdout.write(`${JSON.stringify({ status: "PASSED", negativeCases: observed.length, requiredScenarios: 25, copiedConfirmations: "PASSED", multipleRoots: "PASSED", uploadsClassification: "MUST_BACK_UP_PENDING_CLEANUP", sourceMutationDetection: "PASSED", restores: 2, sourceUnchanged: true, productionPathsRefusedBySyntheticMode: true, privateIgnoredOutput: true, aclAndEncryptionAreRuntimePreflights: true, alternatePortPolicy: true }, null, 2)}\n`);

@@ -8,7 +8,7 @@ The authoritative 64-page source inventory remains in
 - Browser entries produced: 840
 - Unique routes captured: 87
 - Unique states captured: 140
-- Visible controls recorded: 23495
-- Broken entries: 26
-- Verified full-page masters: 822
-- Missing full-page masters: 18
+- Visible controls recorded: 24020
+- Broken entries: 0
+- Verified full-page masters: 840
+- Missing full-page masters: 0

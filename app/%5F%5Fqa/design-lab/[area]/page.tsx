@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductImage } from "@/components/ProductImage";
 import { StatusBadge } from "@/components/StatusBadge";
+import { WorkCardLiveEditor } from "./WorkCardLiveEditor";
 
 const allowed = new Set(["design-system","navigation","dashboard","product-inventory","product-details","imports","work-cards","route-dialogs","scanner","problems","data-management","empty-loading-error"]);
 
@@ -16,6 +17,7 @@ export default async function DesignLabArea({params}:{params:Promise<{area:strin
       <Variant title="Redesign Draft A" status="DRAFT A"><Gallery area={area} draft="a"/></Variant>
       <Variant title="Redesign Draft B" status="DRAFT B"><Gallery area={area} draft="b"/></Variant>
     </div>
+    {area==="work-cards"?<WorkCardLiveEditor/>:null}
   </main>;
 }
 

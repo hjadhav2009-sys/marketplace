@@ -14,7 +14,7 @@ export type AuditResult = {
   fullPageCaptureStatus?: string;
 };
 type Tool = "select"|"text"|"rectangle"|"ellipse"|"arrow"|"line"|"freehand"|"highlight"|"blur";
-type Mark = { id:string; tool:Tool; x:number; y:number; width:number; height:number; text?:string; points?:string; hidden?:boolean; color:string };
+type Mark = { id:string; tool:Tool; x:number; y:number; width:number; height:number; text?:string; points?:string; hidden?:boolean; locked?:boolean; groupId?:string; color:string };
 type SavedNotes = Record<string, { ownerNotes:string; completed:boolean; marks:Mark[]; redesignMarks:Mark[] }>;
 
 const TAGS = ["KEEP","MOVE","REMOVE UI","RESIZE","MOBILE","DESKTOP","INTERACTION","DATA","BUG","REDESIGN"];
@@ -34,6 +34,9 @@ export function AuditStudio({ initialResults }: { initialResults: AuditResult[] 
   const [history,setHistory]=useState<SavedNotes[]>([]);
   const [future,setFuture]=useState<SavedNotes[]>([]);
   const [draft,setDraft]=useState<{x:number;y:number}|null>(null);
+  const [selectedMarkIds,setSelectedMarkIds]=useState<string[]>([]);
+  const [drag,setDrag]=useState<{mode:"move"|"resize";start:{x:number;y:number};original:Mark[]} | null>(null);
+  const [approval,setApproval]=useState("");
   const frameRef=useRef<HTMLDivElement>(null);
 
   useEffect(()=>{void fetch("/api/qa/ui-audit/notes").then(r=>r.ok?r.json():{}).then(setSaved).catch(()=>{});},[]);
@@ -51,9 +54,27 @@ export function AuditStudio({ initialResults }: { initialResults: AuditResult[] 
 
   function mutate(next:SavedNotes){setHistory(items=>[...items.slice(-49),saved]);setFuture([]);setSaved(next);}
   function updateNote(patch:Partial<typeof EMPTY>){if(!selected)return;mutate({...saved,[selected.id]:{...note,...patch}});}
+  function replaceMarks(next:Mark[], record=true){if(!selected)return;const patch=tab==="redesign"?{redesignMarks:next}:{marks:next};if(record)updateNote(patch);else setSaved(current=>({...current,[selected.id]:{...(current[selected.id]??EMPTY),...patch}}));}
   async function persist(){await fetch("/api/qa/ui-audit/notes",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(saved)});}
   function coordinates(event:React.PointerEvent){const rect=frameRef.current!.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};}
   function pointerDown(event:React.PointerEvent){if(tool==="select"||tab==="notes"||tab==="compare"||!selected)return;event.currentTarget.setPointerCapture(event.pointerId);setDraft(coordinates(event));}
+  function markPointerDown(event:React.PointerEvent,mark:Mark,mode:"move"|"resize"){
+    event.stopPropagation();
+    if(mark.locked)return;
+    const ids=event.shiftKey?[...new Set([...selectedMarkIds,mark.id])]:(mark.groupId?marks.filter(item=>item.groupId===mark.groupId).map(item=>item.id):[mark.id]);
+    setSelectedMarkIds(ids);
+    setHistory(items=>[...items.slice(-49),saved]);setFuture([]);
+    setDrag({mode,start:coordinates(event),original:marks.filter(item=>ids.includes(item.id))});
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function pointerMove(event:React.PointerEvent){
+    if(!drag)return;
+    const current=coordinates(event),dx=current.x-drag.start.x,dy=current.y-drag.start.y;
+    replaceMarks(marks.map(mark=>{const original=drag.original.find(item=>item.id===mark.id);if(!original)return mark;
+      if(drag.mode==="move")return{...mark,x:Math.max(0,Math.min(1-original.width,original.x+dx)),y:Math.max(0,Math.min(1-original.height,original.y+dy))};
+      return{...mark,width:Math.max(.01,Math.min(1-original.x,original.width+dx)),height:Math.max(.01,Math.min(1-original.y,original.height+dy))};
+    }),false);
+  }
   function pointerUp(event:React.PointerEvent){if(!draft||!selected)return;const end=coordinates(event);const x=Math.min(draft.x,end.x),y=Math.min(draft.y,end.y),width=Math.max(.01,Math.abs(end.x-draft.x)),height=Math.max(.01,Math.abs(end.y-draft.y));const text=tool==="text"?prompt("Annotation text")??"":undefined;const mark:Mark={id:crypto.randomUUID(),tool,x,y,width,height,text,color:tool==="highlight"?"#facc15":tool==="blur"?"#64748b":"#e11d48"};const next=[...marks,mark];updateNote(tab==="redesign"?{redesignMarks:next}:{marks:next});setDraft(null);}
   function removeMark(id:string){const next=marks.filter(mark=>mark.id!==id);updateNote(tab==="redesign"?{redesignMarks:next}:{marks:next});}
   function undo(){const previous=history.at(-1);if(!previous)return;setFuture(items=>[saved,...items]);setSaved(previous);setHistory(items=>items.slice(0,-1));}
@@ -62,6 +83,28 @@ export function AuditStudio({ initialResults }: { initialResults: AuditResult[] 
   async function exportPng(){if(!imageUrl||!selected)return;const image=new Image();image.src=imageUrl;await image.decode();const canvas=document.createElement("canvas");canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext("2d");if(!context)return;context.drawImage(image,0,0);for(const mark of marks.filter(item=>!item.hidden)){context.strokeStyle=mark.color;context.fillStyle=mark.color;context.lineWidth=Math.max(3,canvas.width/300);const x=mark.x*canvas.width,y=mark.y*canvas.height,w=mark.width*canvas.width,h=mark.height*canvas.height;if(mark.tool==="text"){context.font=`bold ${Math.max(18,canvas.width/50)}px sans-serif`;context.fillText(mark.text??"",x,y);}else if(mark.tool==="ellipse"){context.beginPath();context.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2);context.stroke();}else if(mark.tool==="highlight"||mark.tool==="blur"){context.globalAlpha=.45;context.fillRect(x,y,w,h);context.globalAlpha=1;}else if(["line","arrow","freehand"].includes(mark.tool)){context.beginPath();context.moveTo(x,y);context.lineTo(x+w,y+h);context.stroke();}else context.strokeRect(x,y,w,h);}canvas.toBlob(blob=>{if(!blob)return;const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${selected.scenarioId}-${selected.viewport.id}-annotated.png`;a.click();URL.revokeObjectURL(a.href);},"image/png");}
   async function importJson(file:File){const parsed=JSON.parse(await file.text()) as SavedNotes;mutate(parsed);}
   function duplicateToRedesign(){updateNote({redesignMarks:structuredClone(note.marks)});setTab("redesign");}
+  function duplicateSelected(){const chosen=marks.filter(mark=>selectedMarkIds.includes(mark.id));const copies=chosen.map(mark=>({...mark,id:crypto.randomUUID(),x:Math.min(1-mark.width,mark.x+.025),y:Math.min(1-mark.height,mark.y+.025),groupId:undefined}));replaceMarks([...marks,...copies]);setSelectedMarkIds(copies.map(mark=>mark.id));}
+  function groupSelected(){if(selectedMarkIds.length<2)return;const groupId=crypto.randomUUID();replaceMarks(marks.map(mark=>selectedMarkIds.includes(mark.id)?{...mark,groupId}:mark));}
+  function ungroupSelected(){replaceMarks(marks.map(mark=>selectedMarkIds.includes(mark.id)?{...mark,groupId:undefined}:mark));}
+  function toggleLock(){replaceMarks(marks.map(mark=>selectedMarkIds.includes(mark.id)?{...mark,locked:!mark.locked}:mark));}
+  function alignSelected(edge:"left"|"top"){
+    const chosen=marks.filter(mark=>selectedMarkIds.includes(mark.id));if(chosen.length<2)return;
+    const value=edge==="left"?Math.min(...chosen.map(mark=>mark.x)):Math.min(...chosen.map(mark=>mark.y));
+    replaceMarks(marks.map(mark=>selectedMarkIds.includes(mark.id)?{...mark,[edge==="left"?"x":"y"]:value}:mark));
+  }
+  const designArea=selected?.scenarioId.includes("PICK")||selected?.scenarioId.includes("WORK")?"work-cards":selected?.scenarioId.includes("IMPORT")?"imports":selected?.scenarioId.includes("SCAN")?"scanner":selected?.scenarioId.includes("PROBLEM")?"problems":"design-system";
+  async function approveDesign(){
+    if(!selected)return;
+    const response=await fetch("/api/qa/ui-audit/approved-designs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+      targetComponent:designArea==="work-cards"?"GroupedWorkCard / Pick card":designArea,
+      viewport:selected.viewport.id,sourceRoute:selected.route,sourceScenario:selected.scenarioId,
+      layout:{overlayLayerCount:note.redesignMarks.length},tokens:{source:"Audit Studio overlays"},
+      sectionOrder:[],visibilityRules:{},desktopMobileRules:{viewport:selected.viewport.id},
+      interactionNotes:"Redesign overlays are a local specification and do not mutate production code.",
+      dataRequirements:"Preserve existing authoritative server data.",ownerNotes:note.ownerNotes,overlayLayers:note.redesignMarks
+    })});
+    const result=await response.json() as{privatePath?:string};setApproval(response.ok?`Approved locally: ${result.privatePath}`:"Approval failed.");
+  }
 
   const unique=(key:keyof AuditResult)=>[...new Set(initialResults.map(item=>String(item[key])))].sort();
   return <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -89,14 +132,21 @@ export function AuditStudio({ initialResults }: { initialResults: AuditResult[] 
           {(["viewport","full-page","compare","redesign","notes"] as const).map(value=><button key={value} onClick={()=>setTab(value)} className={`min-h-11 rounded-lg px-4 font-bold ${tab===value?"bg-pink-700":"bg-slate-800"}`}>{value.replace("-"," ").replace(/\b\w/g,letter=>letter.toUpperCase())}</button>)}
           <button onClick={duplicateToRedesign} className="min-h-11 rounded-lg border px-3">Duplicate to redesign</button>
           <button onClick={()=>updateNote({redesignMarks:[]})} className="min-h-11 rounded-lg border px-3">Reset redesign</button>
+          <button onClick={duplicateSelected} disabled={!selectedMarkIds.length} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Duplicate layer</button>
+          <button onClick={groupSelected} disabled={selectedMarkIds.length<2} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Group</button>
+          <button onClick={ungroupSelected} disabled={!selectedMarkIds.length} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Ungroup</button>
+          <button onClick={toggleLock} disabled={!selectedMarkIds.length} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Lock / unlock</button>
+          <button onClick={()=>alignSelected("left")} disabled={selectedMarkIds.length<2} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Align left</button>
+          <button onClick={()=>alignSelected("top")} disabled={selectedMarkIds.length<2} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Align top</button>
           <button onClick={undo} disabled={!history.length} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Undo</button>
           <button onClick={redo} disabled={!future.length} className="min-h-11 rounded-lg border px-3 disabled:opacity-40">Redo</button>
           {[25,50,100,200].map(value=><button key={value} onClick={()=>setZoom(value)} className="min-h-11 rounded-lg border px-3">{value}%</button>)}<button onClick={()=>setZoom(100)} className="min-h-11 rounded-lg border px-3">Fit width</button><button onClick={()=>setZoom(50)} className="min-h-11 rounded-lg border px-3">Fit page</button><span className="self-center text-sm">{zoom}%</span>
         </div>
         {tab==="compare"?<div className="grid gap-3 overflow-auto rounded-xl bg-slate-900 p-3 xl:grid-cols-2">{[viewportPath,selected?.fullPageMasterPath].map((item,index)=>item?<div key={item}><p className="mb-2 font-bold">{index?"Full Page":"Viewport"}</p><img src={`/api/qa/ui-audit/evidence?path=${encodeURIComponent(item)}`} alt={index?"Full page master":"Viewport capture"} className="max-w-full"/></div>:<div key={index} className="grid h-96 place-items-center border border-dashed">Missing evidence</div>)}</div>:tab!=="notes"?<div className="overflow-auto rounded-xl bg-slate-900 p-3">
-          <div ref={frameRef} onPointerDown={pointerDown} onPointerUp={pointerUp} style={{width:`${zoom}%`}} className="relative mx-auto w-fit max-w-none touch-none">
+          <div ref={frameRef} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={event=>{if(drag){setDrag(null);return;}pointerUp(event);}} style={{width:`${zoom}%`}} className="relative mx-auto w-fit max-w-none touch-none">
             {imageUrl?<img src={imageUrl} alt={selected?.scenarioId??"Audit capture"} className="max-h-[calc(100vh-190px)] max-w-full select-none object-contain"/>:<div className="grid h-96 w-[600px] max-w-full place-items-center border border-dashed text-slate-500">Run browser capture to populate evidence.</div>}
             <svg className="pointer-events-none absolute inset-0 h-full w-full">{marks.filter(mark=>!mark.hidden).map(mark=><MarkShape key={mark.id} mark={mark}/>)}</svg>
+            {tool==="select"?marks.filter(mark=>!mark.hidden).map(mark=><div key={mark.id} onPointerDown={event=>markPointerDown(event,mark,"move")} className={`absolute border ${selectedMarkIds.includes(mark.id)?"border-cyan-300 ring-2 ring-cyan-300/40":"border-transparent hover:border-white/60"} ${mark.locked?"cursor-not-allowed":"cursor-move"}`} style={{left:`${mark.x*100}%`,top:`${mark.y*100}%`,width:`${mark.width*100}%`,height:`${mark.height*100}%`}}>{selectedMarkIds.includes(mark.id)&&!mark.locked?<button aria-label="Resize selected layer" onPointerDown={event=>markPointerDown(event,mark,"resize")} className="absolute -bottom-2 -right-2 h-5 w-5 cursor-se-resize rounded-full bg-cyan-300"/>:null}</div>):null}
           </div>
         </div>:<textarea value={note.ownerNotes} onChange={e=>updateNote({ownerNotes:e.target.value})} placeholder="Owner review notes" className="min-h-[60vh] w-full rounded-xl bg-slate-900 p-4"/>}
       </section>
@@ -110,6 +160,9 @@ export function AuditStudio({ initialResults }: { initialResults: AuditResult[] 
         <dl className="mt-3 text-xs text-slate-300"><dt>Full-page status</dt><dd>{selected?.fullPageCaptureStatus??"NOT_STARTED"}</dd><dt>Dimensions</dt><dd>{selected?.fullPageMasterWidth??"-"} × {selected?.fullPageMasterHeight??"-"}</dd><dt>File size</dt><dd>{selected?.fullPageFileBytes?.toString()??"-"} bytes</dd><dt>SHA-256</dt><dd className="break-all">{selected?.fullPageSha256??"-"}</dd></dl>
         {selected?.fullPageMasterPath?<a href={`/api/qa/ui-audit/evidence?path=${encodeURIComponent(selected.fullPageMasterPath)}`} target="_blank" className="mt-3 inline-flex min-h-11 items-center rounded-lg border px-3 font-bold">Open original master</a>:null}
         {selected?<a href={selected.route} target="_blank" className="mt-4 inline-flex min-h-11 items-center rounded-lg border px-3 font-bold">Open actual route</a>:null}
+        {selected?<a href={`/__qa/design-lab/${designArea}`} className="mt-2 inline-flex min-h-11 items-center rounded-lg border px-3 font-bold">Open linked Live Component</a>:null}
+        <button onClick={()=>void approveDesign()} disabled={!selected} className="mt-2 min-h-11 w-full rounded-lg bg-violet-700 px-3 font-black disabled:opacity-40">Approve Design</button>
+        {approval?<p role="status" className="mt-2 break-words text-xs font-bold text-teal-300">{approval}</p>:null}
       </aside>
     </div>
   </main>;

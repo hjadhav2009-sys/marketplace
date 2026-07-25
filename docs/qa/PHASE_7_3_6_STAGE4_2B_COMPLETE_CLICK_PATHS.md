@@ -3246,7 +3246,7 @@ classified as interaction-complete merely because it rendered.
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | PPassword | A/- | true | `/change-password` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | Switch account | A/- | true | `/accounts` |
-| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | Logout | BUTTON/- | true | `javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')` |
+| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | Logout | BUTTON/- | true | `` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | New Import | A/- | true | `/owner/product-inventory/refresh` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1024x768 | Import History | A/- | true | `/owner/imports` |
@@ -3287,7 +3287,7 @@ classified as interaction-complete merely because it rendered.
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | PPassword | A/- | true | `/change-password` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | Switch account | A/- | true | `/accounts` |
-| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | Logout | BUTTON/- | true | `javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')` |
+| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | Logout | BUTTON/- | true | `` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | New Import | A/- | true | `/owner/product-inventory/refresh` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | Import History | A/- | true | `/owner/imports` |
@@ -3304,7 +3304,7 @@ classified as interaction-complete merely because it rendered.
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 1440x900 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | Open navigation | BUTTON/button | true | `-` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
-| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | Logout | BUTTON/- | true | `javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')` |
+| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | Logout | BUTTON/- | true | `` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | New Import | A/- | true | `/owner/product-inventory/refresh` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | Import History | A/- | true | `/owner/imports` |
@@ -3321,7 +3321,7 @@ classified as interaction-complete merely because it rendered.
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 360x800 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | Open navigation | BUTTON/button | true | `-` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
-| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | Logout | BUTTON/- | true | `javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')` |
+| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | Logout | BUTTON/- | true | `` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | New Import | A/- | true | `/owner/product-inventory/refresh` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | Import History | A/- | true | `/owner/imports` |
@@ -3338,7 +3338,7 @@ classified as interaction-complete merely because it rendered.
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 390x844 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 430x932 | Open navigation | BUTTON/button | true | `-` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 430x932 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
-| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 430x932 | Logout | BUTTON/- | true | `javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')` |
+| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 430x932 | Logout | BUTTON/- | true | `` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 430x932 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 430x932 | New Import | A/- | true | `/owner/product-inventory/refresh` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 430x932 | Import History | A/- | true | `/owner/imports` |
@@ -3356,7 +3356,7 @@ classified as interaction-complete merely because it rendered.
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | Open navigation | BUTTON/button | true | `-` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | Switch account | A/- | true | `/accounts` |
-| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | Logout | BUTTON/- | true | `javascript:throw new Error('A React form was unexpectedly submitted. If you called form.submit() manually, consider using form.requestSubmit() instead. If you\'re trying to use event.stopPropagation() in a submit event handler, consider also calling event.preventDefault().')` |
+| IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | Logout | BUTTON/- | true | `` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | Back to Imports | A/- | true | `/owner/imports` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | New Import | A/- | true | `/owner/product-inventory/refresh` |
 | IMPORT_PROCESSING | `/owner/imports/stage4-import-running` | 768x1024 | Import History | A/- | true | `/owner/imports` |
@@ -13972,6 +13972,163 @@ classified as interaction-complete merely because it rendered.
 | ROUTE_OWNER_ACCOUNTS | `/owner/accounts` | 768x1024 | FlipkartMeesho legacyAmazonMyntraShopifyWooCommerceOther | SELECT/- | true | `` |
 | ROUTE_OWNER_ACCOUNTS | `/owner/accounts` | 768x1024 | notes | INPUT/- | true | `` |
 | ROUTE_OWNER_ACCOUNTS | `/owner/accounts` | 768x1024 | Save account | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | MarketplacePick & Pack | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Collapse sidebar | BUTTON/button | true | `-` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | DDashboard | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | WWork Hub | A/- | true | `/work` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | PProduct Inventory | A/- | true | `/owner/product-inventory` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | MMissing Listings | A/- | true | `/owner/catalog/missing` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | DDefault Processing | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | MMarking Library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | NNew Import | A/- | true | `/owner/product-inventory/refresh` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | IImport History | A/- | true | `/owner/imports` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | CConsignments | A/- | true | `/owner/consignments` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | PPick | A/- | true | `/work/pick?source=ORDER` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | MMark | A/- | true | `/work/mark` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | AAssemble | A/- | true | `/work/assemble` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | PPack | A/- | true | `/work/pack` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | UUniversal Scan | A/- | true | `/work/scan` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | PProblems | A/- | true | `/work/problems` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | RRoute Summary | A/- | true | `/owner/work-route-summary` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | AAccounts | A/- | true | `/owner/accounts` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | UUsers | A/- | true | `/owner/users` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | RReports | A/- | true | `/reports` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | SSystem | A/- | true | `/owner/system` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | DData Management | A/- | true | `/owner/data-management` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | PPassword | A/- | true | `/change-password` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Choose an exact account listing | SELECT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Link Existing | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | productTitle | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | brand | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | category | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | subCategory | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | images | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | mrp | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | sellingPrice | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | productHighlights | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | description | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | specifications | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | manualLocked | INPUT/checkbox | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Save and Resolve This Work | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1024x768 | Create Minimal Listing | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | MarketplacePick & Pack | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Collapse sidebar | BUTTON/button | true | `-` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | DDashboard | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | WWork Hub | A/- | true | `/work` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | PProduct Inventory | A/- | true | `/owner/product-inventory` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | MMissing Listings | A/- | true | `/owner/catalog/missing` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | DDefault Processing | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | MMarking Library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | NNew Import | A/- | true | `/owner/product-inventory/refresh` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | IImport History | A/- | true | `/owner/imports` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | CConsignments | A/- | true | `/owner/consignments` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | PPick | A/- | true | `/work/pick?source=ORDER` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | MMark | A/- | true | `/work/mark` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | AAssemble | A/- | true | `/work/assemble` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | PPack | A/- | true | `/work/pack` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | UUniversal Scan | A/- | true | `/work/scan` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | PProblems | A/- | true | `/work/problems` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | RRoute Summary | A/- | true | `/owner/work-route-summary` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | AAccounts | A/- | true | `/owner/accounts` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | UUsers | A/- | true | `/owner/users` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | RReports | A/- | true | `/reports` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | SSystem | A/- | true | `/owner/system` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | DData Management | A/- | true | `/owner/data-management` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | PPassword | A/- | true | `/change-password` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Choose an exact account listing | SELECT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Link Existing | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | productTitle | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | brand | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | category | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | subCategory | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | images | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | mrp | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | sellingPrice | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | productHighlights | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | description | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | specifications | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | manualLocked | INPUT/checkbox | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Save and Resolve This Work | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 1440x900 | Create Minimal Listing | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | Choose an exact account listing | SELECT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | Link Existing | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | productTitle | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | brand | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | category | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | subCategory | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | images | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | mrp | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | sellingPrice | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | productHighlights | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | description | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | specifications | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | manualLocked | INPUT/checkbox | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | Save and Resolve This Work | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 360x800 | Create Minimal Listing | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | Choose an exact account listing | SELECT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | Link Existing | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | productTitle | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | brand | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | category | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | subCategory | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | images | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | mrp | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | sellingPrice | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | productHighlights | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | description | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | specifications | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | manualLocked | INPUT/checkbox | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | Save and Resolve This Work | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 390x844 | Create Minimal Listing | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | Choose an exact account listing | SELECT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | Link Existing | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | productTitle | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | brand | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | category | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | subCategory | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | images | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | mrp | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | sellingPrice | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | productHighlights | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | description | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | specifications | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | manualLocked | INPUT/checkbox | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | Save and Resolve This Work | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 430x932 | Create Minimal Listing | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Choose an exact account listing | SELECT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Link Existing | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | productTitle | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | brand | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | category | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | subCategory | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | images | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | mrp | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | sellingPrice | INPUT/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | productHighlights | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | description | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | specifications | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | manualLocked | INPUT/checkbox | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Save and Resolve This Work | BUTTON/submit | true | `` |
+| ROUTE_OWNER_CATALOG_MISSING_ISSUEID | `/owner/catalog/missing/stage4-missing-listing-issue` | 768x1024 | Create Minimal Listing | BUTTON/- | true | `` |
 | ROUTE_OWNER_CATALOG_MISSING | `/owner/catalog/missing` | 1024x768 | MarketplacePick & Pack | A/- | true | `/dashboard` |
 | ROUTE_OWNER_CATALOG_MISSING | `/owner/catalog/missing` | 1024x768 | Collapse sidebar | BUTTON/button | true | `-` |
 | ROUTE_OWNER_CATALOG_MISSING | `/owner/catalog/missing` | 1024x768 | DDashboard | A/- | true | `/dashboard` |
@@ -15170,6 +15327,115 @@ classified as interaction-complete merely because it rendered.
 | ROUTE_OWNER_IMPORTS_JOBID_ISSUES | `/owner/imports/stage4-import-warnings/issues` | 768x1024 | Apply | BUTTON/- | true | `-` |
 | ROUTE_OWNER_IMPORTS_JOBID_ISSUES | `/owner/imports/stage4-import-warnings/issues` | 768x1024 | Previous | A/- | true | `/owner/imports/stage4-import-warnings/issues?pageSize=50&page=1` |
 | ROUTE_OWNER_IMPORTS_JOBID_ISSUES | `/owner/imports/stage4-import-warnings/issues` | 768x1024 | Next | A/- | true | `/owner/imports/stage4-import-warnings/issues?pageSize=50&page=1` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | MarketplacePick & Pack | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Collapse sidebar | BUTTON/button | true | `-` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | DDashboard | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | WWork Hub | A/- | true | `/work` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | PProduct Inventory | A/- | true | `/owner/product-inventory` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | MMissing Listings | A/- | true | `/owner/catalog/missing` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | DDefault Processing | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | MMarking Library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | NNew Import | A/- | true | `/owner/product-inventory/refresh` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | IImport History | A/- | true | `/owner/imports` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | CConsignments | A/- | true | `/owner/consignments` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | PPick | A/- | true | `/work/pick?source=ORDER` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | MMark | A/- | true | `/work/mark` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | AAssemble | A/- | true | `/work/assemble` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | PPack | A/- | true | `/work/pack` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | UUniversal Scan | A/- | true | `/work/scan` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | PProblems | A/- | true | `/work/problems` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | RRoute Summary | A/- | true | `/owner/work-route-summary` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | AAccounts | A/- | true | `/owner/accounts` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | UUsers | A/- | true | `/owner/users` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | RReports | A/- | true | `/reports` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | SSystem | A/- | true | `/owner/system` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | DData Management | A/- | true | `/owner/data-management` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | PPassword | A/- | true | `/change-password` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | profileName | INPUT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Choose detected headerOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1024x768 | Save Profile and Retry | BUTTON/submit | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | MarketplacePick & Pack | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Collapse sidebar | BUTTON/button | true | `-` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | DDashboard | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | WWork Hub | A/- | true | `/work` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | PProduct Inventory | A/- | true | `/owner/product-inventory` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | MMissing Listings | A/- | true | `/owner/catalog/missing` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | DDefault Processing | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | MMarking Library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | NNew Import | A/- | true | `/owner/product-inventory/refresh` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | IImport History | A/- | true | `/owner/imports` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | CConsignments | A/- | true | `/owner/consignments` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | PPick | A/- | true | `/work/pick?source=ORDER` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | MMark | A/- | true | `/work/mark` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | AAssemble | A/- | true | `/work/assemble` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | PPack | A/- | true | `/work/pack` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | UUniversal Scan | A/- | true | `/work/scan` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | PProblems | A/- | true | `/work/problems` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | RRoute Summary | A/- | true | `/owner/work-route-summary` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | AAccounts | A/- | true | `/owner/accounts` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | UUsers | A/- | true | `/owner/users` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | RReports | A/- | true | `/reports` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | SSystem | A/- | true | `/owner/system` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | DData Management | A/- | true | `/owner/data-management` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | PPassword | A/- | true | `/change-password` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | profileName | INPUT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Choose detected headerOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 1440x900 | Save Profile and Retry | BUTTON/submit | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | profileName | INPUT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Choose detected headerOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 360x800 | Save Profile and Retry | BUTTON/submit | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | profileName | INPUT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Choose detected headerOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 390x844 | Save Profile and Retry | BUTTON/submit | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | profileName | INPUT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Choose detected headerOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 430x932 | Save Profile and Retry | BUTTON/submit | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | profileName | INPUT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Choose detected headerOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Not mappedOrder Item IDShipment IDTracking IDSeller SKUQuantity | SELECT/- | true | `` |
+| ROUTE_OWNER_IMPORTS_JOBID_MAPPING | `/owner/imports/stage4-import-mapping/mapping` | 768x1024 | Save Profile and Retry | BUTTON/submit | true | `` |
 | ROUTE_OWNER_IMPORTS_JOBID | `/owner/imports/stage4-import-completed` | 1024x768 | MarketplacePick & Pack | A/- | true | `/dashboard` |
 | ROUTE_OWNER_IMPORTS_JOBID | `/owner/imports/stage4-import-completed` | 1024x768 | Collapse sidebar | BUTTON/button | true | `-` |
 | ROUTE_OWNER_IMPORTS_JOBID | `/owner/imports/stage4-import-completed` | 1024x768 | DDashboard | A/- | true | `/dashboard` |
@@ -15812,6 +16078,265 @@ classified as interaction-complete merely because it rendered.
 | ROUTE_OWNER_MANUAL_REVIEW | `/owner/manual-review` | 768x1024 | Problems | A/- | true | `/problems` |
 | ROUTE_OWNER_MANUAL_REVIEW | `/owner/manual-review` | 768x1024 | Reports | A/- | true | `/reports` |
 | ROUTE_OWNER_MANUAL_REVIEW | `/owner/manual-review` | 768x1024 | System | A/- | true | `/owner/system` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | MarketplacePick & Pack | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Collapse sidebar | BUTTON/button | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | DDashboard | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | WWork Hub | A/- | true | `/work` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | PProduct Inventory | A/- | true | `/owner/product-inventory` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | MMissing Listings | A/- | true | `/owner/catalog/missing` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | DDefault Processing | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | MMarking Library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | NNew Import | A/- | true | `/owner/product-inventory/refresh` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | IImport History | A/- | true | `/owner/imports` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | CConsignments | A/- | true | `/owner/consignments` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | PPick | A/- | true | `/work/pick?source=ORDER` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | MMark | A/- | true | `/work/mark` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | AAssemble | A/- | true | `/work/assemble` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | PPack | A/- | true | `/work/pack` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | UUniversal Scan | A/- | true | `/work/scan` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | PProblems | A/- | true | `/work/problems` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | RRoute Summary | A/- | true | `/owner/work-route-summary` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | AAccounts | A/- | true | `/owner/accounts` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | UUsers | A/- | true | `/owner/users` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | RReports | A/- | true | `/reports` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | SSystem | A/- | true | `/owner/system` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | DData Management | A/- | true | `/owner/data-management` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | PPassword | A/- | true | `/change-password` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Back to library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Process rules | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Archive asset | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | name | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | masterDesignId | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | status | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | material | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | machineType | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | softwareName | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | markingPosition | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | passes | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | markingWidthMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | markingHeightMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | powerSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | speedSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | frequencySetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Synthetic-only marking asset for private UI audit. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Use the synthetic alignment guide. No production settings. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | settingsJson | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Save metadata | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | SELLER_SKUINTERNAL_SKUFSNLISTING_IDLIDASINFNSKUEANUPCGTINMODEL_NUMBERBARCODEEXTERNAL_ID | SELECT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | identifierValue | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Exact match | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | title | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Manual search | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1024x768 | Unlink | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | MarketplacePick & Pack | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Collapse sidebar | BUTTON/button | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | DDashboard | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | WWork Hub | A/- | true | `/work` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | PProduct Inventory | A/- | true | `/owner/product-inventory` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | MMissing Listings | A/- | true | `/owner/catalog/missing` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | DDefault Processing | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | MMarking Library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | NNew Import | A/- | true | `/owner/product-inventory/refresh` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | IImport History | A/- | true | `/owner/imports` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | CConsignments | A/- | true | `/owner/consignments` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | PPick | A/- | true | `/work/pick?source=ORDER` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | MMark | A/- | true | `/work/mark` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | AAssemble | A/- | true | `/work/assemble` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | PPack | A/- | true | `/work/pack` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | UUniversal Scan | A/- | true | `/work/scan` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | PProblems | A/- | true | `/work/problems` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | RRoute Summary | A/- | true | `/owner/work-route-summary` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | AAccounts | A/- | true | `/owner/accounts` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | UUsers | A/- | true | `/owner/users` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | RReports | A/- | true | `/reports` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | SSystem | A/- | true | `/owner/system` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | DData Management | A/- | true | `/owner/data-management` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | PPassword | A/- | true | `/change-password` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Back to library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Process rules | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Archive asset | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | name | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | masterDesignId | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | status | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | material | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | machineType | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | softwareName | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | markingPosition | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | passes | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | markingWidthMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | markingHeightMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | powerSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | speedSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | frequencySetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Synthetic-only marking asset for private UI audit. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Use the synthetic alignment guide. No production settings. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | settingsJson | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Save metadata | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | SELLER_SKUINTERNAL_SKUFSNLISTING_IDLIDASINFNSKUEANUPCGTINMODEL_NUMBERBARCODEEXTERNAL_ID | SELECT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | identifierValue | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Exact match | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | title | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Manual search | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 1440x900 | Unlink | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Back to library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Process rules | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Archive asset | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | name | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | masterDesignId | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | status | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | material | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | machineType | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | softwareName | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | markingPosition | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | passes | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | markingWidthMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | markingHeightMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | powerSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | speedSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | frequencySetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Synthetic-only marking asset for private UI audit. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Use the synthetic alignment guide. No production settings. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | settingsJson | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Save metadata | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | SELLER_SKUINTERNAL_SKUFSNLISTING_IDLIDASINFNSKUEANUPCGTINMODEL_NUMBERBARCODEEXTERNAL_ID | SELECT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | identifierValue | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Exact match | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | title | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Manual search | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 360x800 | Unlink | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Back to library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Process rules | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Archive asset | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | name | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | masterDesignId | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | status | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | material | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | machineType | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | softwareName | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | markingPosition | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | passes | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | markingWidthMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | markingHeightMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | powerSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | speedSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | frequencySetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Synthetic-only marking asset for private UI audit. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Use the synthetic alignment guide. No production settings. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | settingsJson | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Save metadata | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | SELLER_SKUINTERNAL_SKUFSNLISTING_IDLIDASINFNSKUEANUPCGTINMODEL_NUMBERBARCODEEXTERNAL_ID | SELECT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | identifierValue | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Exact match | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | title | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Manual search | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 390x844 | Unlink | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Back to library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Process rules | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Archive asset | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | name | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | masterDesignId | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | status | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | material | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | machineType | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | softwareName | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | markingPosition | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | passes | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | markingWidthMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | markingHeightMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | powerSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | speedSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | frequencySetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Synthetic-only marking asset for private UI audit. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Use the synthetic alignment guide. No production settings. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | settingsJson | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Save metadata | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | SELLER_SKUINTERNAL_SKUFSNLISTING_IDLIDASINFNSKUEANUPCGTINMODEL_NUMBERBARCODEEXTERNAL_ID | SELECT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | identifierValue | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Exact match | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | title | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Manual search | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 430x932 | Unlink | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Open navigation | BUTTON/button | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Marketplace Pick & PackSynthetic Warehouse / Synthetic Flipkart PrimaryFLIPKARTFLIPKART / STAGE-FK-01 | A/- | true | `/dashboard` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Switch account | A/- | true | `/accounts` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Logout | BUTTON/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Back to library | A/- | true | `/owner/marking-library` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Process rules | A/- | true | `/owner/process-rules` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Archive asset | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | name | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | masterDesignId | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | status | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | material | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | machineType | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | softwareName | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | markingPosition | INPUT/text | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | passes | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | markingWidthMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | markingHeightMm | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | powerSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | speedSetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | frequencySetting | INPUT/number | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Synthetic-only marking asset for private UI audit. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Use the synthetic alignment guide. No production settings. | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | settingsJson | TEXTAREA/- | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Save metadata | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | file | INPUT/file | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Upload new version | BUTTON/submit | true | `` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | SELLER_SKUINTERNAL_SKUFSNLISTING_IDLIDASINFNSKUEANUPCGTINMODEL_NUMBERBARCODEEXTERNAL_ID | SELECT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | identifierValue | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Exact match | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | title | INPUT/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Manual search | BUTTON/- | true | `-` |
+| ROUTE_OWNER_MARKING_LIBRARY_ASSETID | `/owner/marking-library/stage4-synthetic-marking-asset` | 768x1024 | Unlink | BUTTON/submit | true | `` |
 | ROUTE_OWNER_MARKING_LIBRARY_NEW | `/owner/marking-library/new` | 1024x768 | MarketplacePick & Pack | A/- | true | `/dashboard` |
 | ROUTE_OWNER_MARKING_LIBRARY_NEW | `/owner/marking-library/new` | 1024x768 | Collapse sidebar | BUTTON/button | true | `-` |
 | ROUTE_OWNER_MARKING_LIBRARY_NEW | `/owner/marking-library/new` | 1024x768 | DDashboard | A/- | true | `/dashboard` |

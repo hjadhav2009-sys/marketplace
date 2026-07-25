@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-07-25T22:33:57.526Z",
+  "generatedAt": "2026-07-25T23:12:53.901Z",
   "summary": {
-    "generatedAt": "2026-07-25T22:33:57.526Z",
+    "generatedAt": "2026-07-25T23:12:53.901Z",
     "browserEngine": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "requestedJobs": 840,
-    "jobsInThisRun": 6,
-    "verified": 814,
-    "broken": 26,
-    "controlCount": 23495,
+    "jobsInThisRun": 2,
+    "verified": 840,
+    "broken": 0,
+    "controlCount": 24020,
     "screenshots": 840,
-    "fullPageMasters": 822,
-    "fullPageBytes": 471431593,
-    "freeDiskBytesAtStart": 39069995008,
+    "fullPageMasters": 840,
+    "fullPageBytes": 470440526,
+    "freeDiskBytesAtStart": 39017488384,
     "totalDiskBytes": 67316477952,
-    "failureTraces": 26,
+    "failureTraces": 0,
     "viewports": [
       {
         "id": "360x800",
@@ -6141,37 +6141,37 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/CONSIGNMENT_REVIEW-360x800__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/CONSIGNMENT_REVIEW-360x800.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 26,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:51:44.802Z",
-      "finishedAt": "2026-07-25T21:51:45.897Z",
-      "fingerprint": "dcf6e112dca9f5a1d21657fdb1d74b4a7c975f4f6c506fb688c6dbd097460163",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:11:57.968Z",
+      "finishedAt": "2026-07-25T23:12:02.076Z",
+      "fingerprint": "2e1aea8ee0a0f85232f62859e0f3c32886582c21af78a8aef281f58f471ba742",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/CONSIGNMENT_REVIEW-360x800__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/CONSIGNMENT_REVIEW__owner-consignments-stage3-batch-review_required-review__360x800__full-page@highres.png",
-      "fullPageMasterWidth": 1472,
-      "fullPageMasterHeight": 11668,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 642361,
-      "fullPageSha256": "9dee98aed446361230c62ca4c9df1a2d74385a8093a1f10eb58375ba44de021d",
+      "fullPageMasterWidth": 720,
+      "fullPageMasterHeight": 5760,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 281502,
+      "fullPageSha256": "f2142e65be9fd030b884c9a02b24a8aa6a16fdfae44cbe3a9e3adeb649f83488",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/CONSIGNMENT_REVIEW-360x800__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/CONSIGNMENT_REVIEW-360x800.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/consignments/stage3-batch-review_required/review",
           "title": "Marketplace Pick & Pack",
           "heading": "Synthetic REVIEW_REQUIRED Consignment",
-          "overflow": true,
-          "scrollWidth": 368,
+          "overflow": false,
+          "scrollWidth": 360,
           "clientWidth": 360,
-          "documentHeight": 2917,
+          "documentHeight": 2880,
           "stagingBanner": true,
           "undersizedCount": 11
         },
@@ -6182,6 +6182,10 @@
           },
           {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=eI1BHH3bFckPWvyl",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/listing/stage3-line-held-missing?_rsc=6qE-M6K4JOMZHSf7",
             "error": "net::ERR_ABORTED"
           }
         ],
@@ -6224,19 +6228,19 @@
       "controlCount": 26,
       "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:51:46.401Z",
-      "finishedAt": "2026-07-25T21:51:47.439Z",
-      "fingerprint": "dcd182584ea0eeb831451964d8191282b1d09785d697538db3b38ff2bbf13ef9",
+      "startedAt": "2026-07-25T23:12:21.166Z",
+      "finishedAt": "2026-07-25T23:12:24.455Z",
+      "fingerprint": "a61b39ef9eb6900e4e4e2869af42bac021649bfcf012b79b11e1cfa2c12a0fcb",
       "auditStatus": "VERIFIED",
       "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/CONSIGNMENT_REVIEW-390x844__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/CONSIGNMENT_REVIEW__owner-consignments-stage3-batch-review_required-review__390x844__full-page@highres.png",
-      "fullPageMasterWidth": 1560,
-      "fullPageMasterHeight": 11668,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 658236,
-      "fullPageSha256": "067653b99d910735ef6b81c2a6ebd77c42e58181cff2a7c7a6ae9c71e4fbfce4",
+      "fullPageMasterWidth": 780,
+      "fullPageMasterHeight": 5820,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 289117,
+      "fullPageSha256": "2a5d349743d4dd01f3f98acd739890979ea0b8ac5ae0a836f764a0bcc051a3ac",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/CONSIGNMENT_REVIEW-390x844__viewport.png",
       "browserTracePath": null,
@@ -6248,7 +6252,7 @@
           "overflow": false,
           "scrollWidth": 390,
           "clientWidth": 390,
-          "documentHeight": 2917,
+          "documentHeight": 2910,
           "stagingBanner": true,
           "undersizedCount": 11
         },
@@ -6259,6 +6263,10 @@
           },
           {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=eI1BHH3bFckPWvyl",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/listing/stage3-line-held-missing?_rsc=6qE-M6K4JOMZHSf7",
             "error": "net::ERR_ABORTED"
           }
         ],
@@ -6301,19 +6309,19 @@
       "controlCount": 26,
       "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:51:47.928Z",
-      "finishedAt": "2026-07-25T21:51:48.952Z",
+      "startedAt": "2026-07-25T23:12:42.584Z",
+      "finishedAt": "2026-07-25T23:12:46.827Z",
       "fingerprint": "e6ff7ec664a667d4322347d94ec66b19ad21e3e6d39163775b4c614318b8be3a",
       "auditStatus": "VERIFIED",
       "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/CONSIGNMENT_REVIEW-430x932__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/CONSIGNMENT_REVIEW__owner-consignments-stage3-batch-review_required-review__430x932__full-page@highres.png",
-      "fullPageMasterWidth": 1720,
-      "fullPageMasterHeight": 11736,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 651202,
-      "fullPageSha256": "0e2c976e617f6bcc33f7696671f94c6b65fa5e29e886717e2cb1ab8a2feeddc6",
+      "fullPageMasterWidth": 860,
+      "fullPageMasterHeight": 5868,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 286223,
+      "fullPageSha256": "a61be897780c0df0ad86ce8e8cf66c09a6b33dd0cf16cfc1f9cd7f2ebfba1fb8",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/CONSIGNMENT_REVIEW-430x932__viewport.png",
       "browserTracePath": null,
@@ -6336,6 +6344,10 @@
           },
           {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=eI1BHH3bFckPWvyl",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/listing/stage3-line-held-missing?_rsc=6qE-M6K4JOMZHSf7",
             "error": "net::ERR_ABORTED"
           }
         ],
@@ -16460,28 +16472,28 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-1024x768__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-1024x768.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 41,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:50:03.475Z",
-      "finishedAt": "2026-07-25T21:50:06.504Z",
-      "fingerprint": "a104bd4292c35029c993d96ff892d70535c6005a147b7f2beebd19899b2eaa99",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:11:35.329Z",
+      "finishedAt": "2026-07-25T23:11:39.705Z",
+      "fingerprint": "570bb7d10eadb7c23c6701e036df8f44ac3695cd737e43211b508d3ce5245bee",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-1024x768__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/IMPORT_PROCESSING__owner-imports-stage4-import-running__1024x768__full-page@highres.png",
-      "fullPageMasterWidth": 4096,
-      "fullPageMasterHeight": 5688,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 779938,
-      "fullPageSha256": "c31ba46e58b16e26d850f222af0f0e19b26bf72436f55dc045d809f16552f3c9",
+      "fullPageMasterWidth": 2048,
+      "fullPageMasterHeight": 2844,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 330893,
+      "fullPageSha256": "0535d905af46aff40be6c9efddf7cb6f41c399e681836c7c9ddb0151247ae39e",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-1024x768__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-1024x768.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-running",
@@ -16504,6 +16516,10 @@
             "error": "net::ERR_ABORTED"
           },
           {
+            "url": "http://127.0.0.1:3188/work?_rsc=RK2tINt9zuqNYyQW",
+            "error": "net::ERR_ABORTED"
+          },
+          {
             "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
@@ -16512,7 +16528,7 @@
             "error": "net::ERR_ABORTED"
           },
           {
-            "url": "http://127.0.0.1:3188/work?_rsc=RK2tINt9zuqNYyQW",
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
           {
@@ -16521,10 +16537,6 @@
           },
           {
             "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=RK2tINt9zuqNYyQW",
-            "error": "net::ERR_ABORTED"
-          },
-          {
-            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
           {
@@ -16540,6 +16552,10 @@
             "error": "net::ERR_ABORTED"
           },
           {
+            "url": "http://127.0.0.1:3188/owner/imports/stage4-import-running/issues?kind=warning&_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
+          },
+          {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
@@ -16550,9 +16566,7 @@
         ],
         "errorResponses": [],
         "consoleErrors": [],
-        "pageErrors": [
-          "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
-        ]
+        "pageErrors": []
       }
     },
     {
@@ -16583,28 +16597,28 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-1440x900__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-1440x900.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 41,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:50:08.833Z",
-      "finishedAt": "2026-07-25T21:50:12.962Z",
-      "fingerprint": "77cd08855a0414323f239f0c9688ed3bd7754137cedfd061d467a31a718c3574",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:11:40.957Z",
+      "finishedAt": "2026-07-25T23:11:46.457Z",
+      "fingerprint": "90aa27ddc70c89894f3e31e23f2af0b2843513d715bf7112d963362042f140bb",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-1440x900__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/IMPORT_PROCESSING__owner-imports-stage4-import-running__1440x900__full-page@highres.png",
-      "fullPageMasterWidth": 4320,
-      "fullPageMasterHeight": 3984,
-      "fullPageDeviceScaleFactor": 3,
-      "fullPageFileBytes": 556783,
-      "fullPageSha256": "c4a542e14c7dd12020afee52ab74fa370c4b99bfc4affd76556daf151f8b8fc1",
+      "fullPageMasterWidth": 2880,
+      "fullPageMasterHeight": 2656,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 340316,
+      "fullPageSha256": "7be6b29002b9e85b18c3a0ed82c4be925435e5c7a6df517980f5297eb07b1ac5",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-1440x900__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-1440x900.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-running",
@@ -16627,15 +16641,15 @@
             "error": "net::ERR_ABORTED"
           },
           {
+            "url": "http://127.0.0.1:3188/work?_rsc=RK2tINt9zuqNYyQW",
+            "error": "net::ERR_ABORTED"
+          },
+          {
             "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
           {
             "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=RK2tINt9zuqNYyQW",
-            "error": "net::ERR_ABORTED"
-          },
-          {
-            "url": "http://127.0.0.1:3188/work?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
           {
@@ -16651,19 +16665,11 @@
             "error": "net::ERR_ABORTED"
           },
           {
-            "url": "http://127.0.0.1:3188/work/mark?_rsc=RK2tINt9zuqNYyQW",
-            "error": "net::ERR_ABORTED"
-          },
-          {
             "url": "http://127.0.0.1:3188/owner/imports?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
           {
-            "url": "http://127.0.0.1:3188/work/assemble?_rsc=RK2tINt9zuqNYyQW",
-            "error": "net::ERR_ABORTED"
-          },
-          {
-            "url": "http://127.0.0.1:3188/work/pick?source=ORDER&_rsc=RK2tINt9zuqNYyQW",
+            "url": "http://127.0.0.1:3188/work/mark?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
           {
@@ -16672,6 +16678,14 @@
           },
           {
             "url": "http://127.0.0.1:3188/accounts?_rsc=RK2tINt9zuqNYyQW",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/assemble?_rsc=RK2tINt9zuqNYyQW",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pick?source=ORDER&_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
           },
           {
@@ -16689,9 +16703,7 @@
         ],
         "errorResponses": [],
         "consoleErrors": [],
-        "pageErrors": [
-          "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
-        ]
+        "pageErrors": []
       }
     },
     {
@@ -16722,28 +16734,28 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-360x800__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-360x800.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 17,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:49:43.993Z",
-      "finishedAt": "2026-07-25T21:49:46.963Z",
-      "fingerprint": "ae747ad42428c1d7d1b2c1f2263dc316725b374fad024e29b04e126a9d61695d",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:11:14.359Z",
+      "finishedAt": "2026-07-25T23:11:19.542Z",
+      "fingerprint": "0abe8585324fe235f9b1d0ae5115ecdc39fc24387ccbc2b610ea34aecab18f47",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-360x800__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/IMPORT_PROCESSING__owner-imports-stage4-import-running__360x800__full-page@highres.png",
-      "fullPageMasterWidth": 1440,
-      "fullPageMasterHeight": 9936,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 569948,
-      "fullPageSha256": "b8e56b2535eb1ecc5cdb6a45898802511a22474535b9100e281dc407d459a294",
+      "fullPageMasterWidth": 720,
+      "fullPageMasterHeight": 4928,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 244821,
+      "fullPageSha256": "d90d88e4140fb9cfcfdb3007356fd0eabb7d5dc39be7ab6178aef1c59616ce89",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-360x800__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-360x800.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-running",
@@ -16752,7 +16764,7 @@
           "overflow": false,
           "scrollWidth": 360,
           "clientWidth": 360,
-          "documentHeight": 2484,
+          "documentHeight": 2464,
           "stagingBanner": true,
           "undersizedCount": 10
         },
@@ -16768,13 +16780,19 @@
           {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports/stage4-import-running/issues?kind=warning&_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
           }
         ],
         "errorResponses": [],
         "consoleErrors": [],
-        "pageErrors": [
-          "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
-        ]
+        "pageErrors": []
       }
     },
     {
@@ -16805,28 +16823,28 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-390x844__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-390x844.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 17,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:49:49.129Z",
-      "finishedAt": "2026-07-25T21:49:51.997Z",
-      "fingerprint": "5c4efa5c5e9860514417c3b36b2f4ae523697331b56a36396f294f4cf4364b5f",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:11:20.940Z",
+      "finishedAt": "2026-07-25T23:11:24.372Z",
+      "fingerprint": "a07b60e9c220aa99365a750389209b21fd96efa5b4e24838a710428a94a8183b",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-390x844__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/IMPORT_PROCESSING__owner-imports-stage4-import-running__390x844__full-page@highres.png",
-      "fullPageMasterWidth": 1560,
-      "fullPageMasterHeight": 9856,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 575442,
-      "fullPageSha256": "2553a655339a5099bff7d04c2a24bf7c228c94bc93a93f1831bf0c0d72ef7dbf",
+      "fullPageMasterWidth": 780,
+      "fullPageMasterHeight": 4928,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 246958,
+      "fullPageSha256": "336e656189952e8de52ec5846d87a4f9fa7fe31c6090ec4a6566366da1061a33",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-390x844__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-390x844.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-running",
@@ -16841,23 +16859,21 @@
         },
         "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/imports?_rsc=QRHqlg0YBwCtZnQp",
-            "error": "net::ERR_ABORTED"
-          },
-          {
-            "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=QRHqlg0YBwCtZnQp",
-            "error": "net::ERR_ABORTED"
-          },
-          {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=RK2tINt9zuqNYyQW",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports/stage4-import-running/issues?kind=warning&_rsc=QRHqlg0YBwCtZnQp",
             "error": "net::ERR_ABORTED"
           }
         ],
         "errorResponses": [],
         "consoleErrors": [],
-        "pageErrors": [
-          "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
-        ]
+        "pageErrors": []
       }
     },
     {
@@ -16888,28 +16904,28 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-430x932__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-430x932.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 17,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:49:53.781Z",
-      "finishedAt": "2026-07-25T21:49:56.562Z",
-      "fingerprint": "a1704ee73f93058667e079d5feb98a48c55209d3a120b516812af02f4b558703",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:11:25.333Z",
+      "finishedAt": "2026-07-25T23:11:28.839Z",
+      "fingerprint": "6c287e4c9ffd7964484f0e8e15d46facd751f2e4c58aedca273e3f63a7324e9b",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-430x932__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/IMPORT_PROCESSING__owner-imports-stage4-import-running__430x932__full-page@highres.png",
-      "fullPageMasterWidth": 1720,
-      "fullPageMasterHeight": 9680,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 577889,
-      "fullPageSha256": "0b1cfe7d88ac0fde7f7a6f5ec39566855bb3a1e51e325e26f299e2b4143fb6e6",
+      "fullPageMasterWidth": 860,
+      "fullPageMasterHeight": 4840,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 246587,
+      "fullPageSha256": "957716d98fad201616713cc7a8c6900d8718846fa8786b422f88f9714cedf37f",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-430x932__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-430x932.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-running",
@@ -16934,13 +16950,19 @@
           {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports/stage4-import-running/issues?kind=warning&_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
           }
         ],
         "errorResponses": [],
         "consoleErrors": [],
-        "pageErrors": [
-          "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
-        ]
+        "pageErrors": []
       }
     },
     {
@@ -16971,28 +16993,28 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-768x1024__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-768x1024.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 18,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T21:49:58.246Z",
-      "finishedAt": "2026-07-25T21:50:01.208Z",
-      "fingerprint": "5e05f5680a6b092b92ac656e4bfb9e1f0e9818086dc83be87d000ba3440cbeca",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:11:29.842Z",
+      "finishedAt": "2026-07-25T23:11:34.360Z",
+      "fingerprint": "cb93c1959374e52001d630ce5d7264d3f20d153470a1d8a312831e0eb21f38b6",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-768x1024__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/IMPORT_PROCESSING__owner-imports-stage4-import-running__768x1024__full-page@highres.png",
-      "fullPageMasterWidth": 3072,
-      "fullPageMasterHeight": 6792,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 657231,
-      "fullPageSha256": "3ece6c1f4695295201de24fb484dec08573585c5c2fa0656b96b37fccac5ebc2",
+      "fullPageMasterWidth": 1536,
+      "fullPageMasterHeight": 3396,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 277562,
+      "fullPageSha256": "8af913f0183e972062de3449ff2c260e1a7d26b12ae68013cc350deb4bf6938d",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/IMPORT_PROCESSING-768x1024__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/IMPORT_PROCESSING-768x1024.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-running",
@@ -17021,13 +17043,19 @@
           {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=RK2tINt9zuqNYyQW",
             "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports/stage4-import-running/issues?kind=warning&_rsc=QRHqlg0YBwCtZnQp",
+            "error": "net::ERR_ABORTED"
           }
         ],
         "errorResponses": [],
         "consoleErrors": [],
-        "pageErrors": [
-          "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
-        ]
+        "pageErrors": []
       }
     },
     {
@@ -41981,8 +42009,8 @@
     {
       "id": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID:1024x768",
       "area": "ROUTE",
-      "route": "/owner/catalog/missing/stage4-import-blocking",
-      "dynamicRouteExample": "/owner/catalog/missing/stage4-import-blocking",
+      "route": "/owner/catalog/missing/stage4-missing-listing-issue",
+      "dynamicRouteExample": "/owner/catalog/missing/stage4-missing-listing-issue",
       "role": "OWNER",
       "selectedAccount": "STAGE-FK-01",
       "scenarioId": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID",
@@ -42006,58 +42034,104 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1024x768__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1024x768.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 42,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:32:44.998Z",
-      "finishedAt": "2026-07-25T22:32:48.170Z",
-      "fingerprint": "a3b37e4201c8492b6f9baff2b6a8856e477d787d2aae6e56f78c2b82d1229504",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:08:52.886Z",
+      "finishedAt": "2026-07-25T23:08:58.124Z",
+      "fingerprint": "aa2740d76b84b150ff36cbad0e9d8171a296f56cfe781ce0e9ba313d4fa4d2ad",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1024x768__viewport.png",
-      "viewportCaptureStatus": "FAILED",
-      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-import-blocking__1024x768__full-page@highres.png",
-      "fullPageMasterWidth": 4096,
-      "fullPageMasterHeight": 3232,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 80645,
-      "fullPageSha256": "6182a8c907f2aa36b811095a38bdb841706653990ee1bad5267e2028ccb1246c",
-      "fullPageCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
+      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-missing-listing-issue__1024x768__full-page@highres.png",
+      "fullPageMasterWidth": 2048,
+      "fullPageMasterHeight": 4244,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 283148,
+      "fullPageSha256": "98f60d6ede1ad9aac86bfdc1322cddc54fcc9d021b162a81ea24bf476561f691",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1024x768__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1024x768.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
-          "url": "/owner/catalog/missing/stage4-import-blocking",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "url": "/owner/catalog/missing/stage4-missing-listing-issue",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Create or link Product Inventory",
           "overflow": false,
           "scrollWidth": 1024,
           "clientWidth": 1024,
-          "documentHeight": 808,
+          "documentHeight": 2122,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/catalog/missing/stage4-import-blocking",
-            "status": 404
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=d0ILYA7VkajdxTfC",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/catalog/missing?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/accounts?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pick?source=ORDER&_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
     {
       "id": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID:1440x900",
       "area": "ROUTE",
-      "route": "/owner/catalog/missing/stage4-import-blocking",
-      "dynamicRouteExample": "/owner/catalog/missing/stage4-import-blocking",
+      "route": "/owner/catalog/missing/stage4-missing-listing-issue",
+      "dynamicRouteExample": "/owner/catalog/missing/stage4-missing-listing-issue",
       "role": "OWNER",
       "selectedAccount": "STAGE-FK-01",
       "scenarioId": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID",
@@ -42081,58 +42155,116 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1440x900__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1440x900.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 42,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:32:48.718Z",
-      "finishedAt": "2026-07-25T22:32:51.707Z",
-      "fingerprint": "a8fab3f74c0123a850964dc208fcbc238c9b7228de6c2875d856a4df8dcfe45e",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:00.071Z",
+      "finishedAt": "2026-07-25T23:09:05.413Z",
+      "fingerprint": "bad527b3c687bac40c96251d1a1c8117627ef9875c421de1eadd1016c190fe3e",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1440x900__viewport.png",
-      "viewportCaptureStatus": "FAILED",
-      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-import-blocking__1440x900__full-page@highres.png",
-      "fullPageMasterWidth": 4320,
-      "fullPageMasterHeight": 2820,
-      "fullPageDeviceScaleFactor": 3,
-      "fullPageFileBytes": 66157,
-      "fullPageSha256": "e0f611099067871f48ade8d7160f2b411ae603e78118266acf4e50f957ddb893",
-      "fullPageCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
+      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-missing-listing-issue__1440x900__full-page@highres.png",
+      "fullPageMasterWidth": 2880,
+      "fullPageMasterHeight": 4244,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 304836,
+      "fullPageSha256": "2a6cf3eb92ce1cb64ab86a52ca30d30901dfc82493516c692f723f7b0e550dba",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1440x900__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-1440x900.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
-          "url": "/owner/catalog/missing/stage4-import-blocking",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "url": "/owner/catalog/missing/stage4-missing-listing-issue",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Create or link Product Inventory",
           "overflow": false,
           "scrollWidth": 1440,
           "clientWidth": 1440,
-          "documentHeight": 940,
+          "documentHeight": 2122,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/catalog/missing/stage4-import-blocking",
-            "status": 404
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=d0ILYA7VkajdxTfC",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/catalog/missing?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/mark?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/assemble?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pick?source=ORDER&_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/accounts?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pack?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
     {
       "id": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID:360x800",
       "area": "ROUTE",
-      "route": "/owner/catalog/missing/stage4-import-blocking",
-      "dynamicRouteExample": "/owner/catalog/missing/stage4-import-blocking",
+      "route": "/owner/catalog/missing/stage4-missing-listing-issue",
+      "dynamicRouteExample": "/owner/catalog/missing/stage4-missing-listing-issue",
       "role": "OWNER",
       "selectedAccount": "STAGE-FK-01",
       "scenarioId": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID",
@@ -42156,58 +42288,56 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-360x800__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-360x800.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 18,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:32:32.999Z",
-      "finishedAt": "2026-07-25T22:32:35.102Z",
-      "fingerprint": "c284c79386a392dd451c4b7a92c4b478ba9bf7ed27124008954b1f4d62934510",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:08:30.972Z",
+      "finishedAt": "2026-07-25T23:08:34.985Z",
+      "fingerprint": "d38ea09685b3ad2686b58e3a17b05eda47a3166b87ac9cb1c56782e3e3feb0d3",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-360x800__viewport.png",
-      "viewportCaptureStatus": "FAILED",
-      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-import-blocking__360x800__full-page@highres.png",
-      "fullPageMasterWidth": 1440,
-      "fullPageMasterHeight": 3456,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 57714,
-      "fullPageSha256": "d113a9a1f3e6d47d7101ea830bcd4632dfe31e61a8c10555ec9595f7061f892d",
-      "fullPageCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
+      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-missing-listing-issue__360x800__full-page@highres.png",
+      "fullPageMasterWidth": 720,
+      "fullPageMasterHeight": 5188,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 167404,
+      "fullPageSha256": "38a798211aac4e418a4a6c50f5dfc0d02934095db146ecd8af98199c5ba08aa3",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-360x800__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-360x800.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
-          "url": "/owner/catalog/missing/stage4-import-blocking",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "url": "/owner/catalog/missing/stage4-missing-listing-issue",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Create or link Product Inventory",
           "overflow": false,
           "scrollWidth": 360,
           "clientWidth": 360,
-          "documentHeight": 864,
+          "documentHeight": 2594,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/catalog/missing/stage4-import-blocking",
-            "status": 404
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
     {
       "id": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID:390x844",
       "area": "ROUTE",
-      "route": "/owner/catalog/missing/stage4-import-blocking",
-      "dynamicRouteExample": "/owner/catalog/missing/stage4-import-blocking",
+      "route": "/owner/catalog/missing/stage4-missing-listing-issue",
+      "dynamicRouteExample": "/owner/catalog/missing/stage4-missing-listing-issue",
       "role": "OWNER",
       "selectedAccount": "STAGE-FK-01",
       "scenarioId": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID",
@@ -42231,58 +42361,56 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-390x844__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-390x844.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 18,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:32:35.614Z",
-      "finishedAt": "2026-07-25T22:32:37.826Z",
-      "fingerprint": "c7069e5a42e7a87ac5ef3e54a50bd615c86926302140ccf2b65fde33d2a129ba",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:08:36.586Z",
+      "finishedAt": "2026-07-25T23:08:40.316Z",
+      "fingerprint": "3bce4c27f94da2e3b52233fff31a1a92d872945ed903c4d0c9b14bc2b2fd2247",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-390x844__viewport.png",
-      "viewportCaptureStatus": "FAILED",
-      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-import-blocking__390x844__full-page@highres.png",
-      "fullPageMasterWidth": 1560,
-      "fullPageMasterHeight": 3632,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 59550,
-      "fullPageSha256": "91bed91858bdd020a5ba9b6158ea28ed7e1f01068c19ff340b0f6e71c688b3e7",
-      "fullPageCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
+      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-missing-listing-issue__390x844__full-page@highres.png",
+      "fullPageMasterWidth": 780,
+      "fullPageMasterHeight": 5084,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 165805,
+      "fullPageSha256": "58ace6a8b402f1b3addda7b9035f713d9b4c7cb0bdd408cf49f6f727019ddf74",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-390x844__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-390x844.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
-          "url": "/owner/catalog/missing/stage4-import-blocking",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "url": "/owner/catalog/missing/stage4-missing-listing-issue",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Create or link Product Inventory",
           "overflow": false,
           "scrollWidth": 390,
           "clientWidth": 390,
-          "documentHeight": 908,
+          "documentHeight": 2542,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/catalog/missing/stage4-import-blocking",
-            "status": 404
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
     {
       "id": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID:430x932",
       "area": "ROUTE",
-      "route": "/owner/catalog/missing/stage4-import-blocking",
-      "dynamicRouteExample": "/owner/catalog/missing/stage4-import-blocking",
+      "route": "/owner/catalog/missing/stage4-missing-listing-issue",
+      "dynamicRouteExample": "/owner/catalog/missing/stage4-missing-listing-issue",
       "role": "OWNER",
       "selectedAccount": "STAGE-FK-01",
       "scenarioId": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID",
@@ -42306,58 +42434,56 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-430x932__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-430x932.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 18,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:32:38.325Z",
-      "finishedAt": "2026-07-25T22:32:40.618Z",
-      "fingerprint": "734fd073c432fb8815846040bdf918b938262443aed624a4418de2ab116829fb",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:08:41.456Z",
+      "finishedAt": "2026-07-25T23:08:45.196Z",
+      "fingerprint": "d51229864bf74321edf5208f3bf3bd8165b78ec80a7fdaedca16faedf6dad433",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-430x932__viewport.png",
-      "viewportCaptureStatus": "FAILED",
-      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-import-blocking__430x932__full-page@highres.png",
-      "fullPageMasterWidth": 1720,
-      "fullPageMasterHeight": 3984,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 60793,
-      "fullPageSha256": "0a23da47c37dc486c183f5a885bc59d271ae9e49b8f32788d55b6cc6a547639f",
-      "fullPageCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
+      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-missing-listing-issue__430x932__full-page@highres.png",
+      "fullPageMasterWidth": 860,
+      "fullPageMasterHeight": 5084,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 165385,
+      "fullPageSha256": "77703279b038721ec15e0bb11085c122710d06530180cef1ace21cb49cb78f71",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-430x932__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-430x932.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
-          "url": "/owner/catalog/missing/stage4-import-blocking",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "url": "/owner/catalog/missing/stage4-missing-listing-issue",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Create or link Product Inventory",
           "overflow": false,
           "scrollWidth": 430,
           "clientWidth": 430,
-          "documentHeight": 996,
+          "documentHeight": 2542,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/catalog/missing/stage4-import-blocking",
-            "status": 404
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
     {
       "id": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID:768x1024",
       "area": "ROUTE",
-      "route": "/owner/catalog/missing/stage4-import-blocking",
-      "dynamicRouteExample": "/owner/catalog/missing/stage4-import-blocking",
+      "route": "/owner/catalog/missing/stage4-missing-listing-issue",
+      "dynamicRouteExample": "/owner/catalog/missing/stage4-missing-listing-issue",
       "role": "OWNER",
       "selectedAccount": "STAGE-FK-01",
       "scenarioId": "ROUTE_OWNER_CATALOG_MISSING_ISSUEID",
@@ -42381,50 +42507,52 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-768x1024__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-768x1024.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 19,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:32:41.180Z",
-      "finishedAt": "2026-07-25T22:32:44.377Z",
-      "fingerprint": "a1e68e82e6a63ef907d5268182deeb347a5e618a5a9f85bdb8cd9f62a10519c1",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:08:46.439Z",
+      "finishedAt": "2026-07-25T23:08:51.490Z",
+      "fingerprint": "008be7ce63b9132ed4558e2e272390f17f0c20c3fc820ed382d3175646a46d3c",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-768x1024__viewport.png",
-      "viewportCaptureStatus": "FAILED",
-      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-import-blocking__768x1024__full-page@highres.png",
-      "fullPageMasterWidth": 3072,
-      "fullPageMasterHeight": 4256,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 81587,
-      "fullPageSha256": "98a6b7f45fd657d28df7e4cd6b886d7042047ca640c95c92c07038d5e0f9aaa3",
-      "fullPageCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
+      "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CATALOG_MISSING_ISSUEID__owner-catalog-missing-stage4-missing-listing-issue__768x1024__full-page@highres.png",
+      "fullPageMasterWidth": 1536,
+      "fullPageMasterHeight": 4244,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 214857,
+      "fullPageSha256": "ca2cbd4d21dc357ce13ea6b64727c022d2798dbe7826a2bf3cbe666b86b24fa7",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-768x1024__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CATALOG_MISSING_ISSUEID-768x1024.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
-          "url": "/owner/catalog/missing/stage4-import-blocking",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "url": "/owner/catalog/missing/stage4-missing-listing-issue",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Create or link Product Inventory",
           "overflow": false,
           "scrollWidth": 768,
           "clientWidth": 768,
-          "documentHeight": 1064,
+          "documentHeight": 2122,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/catalog/missing/stage4-import-blocking",
-            "status": 404
+            "url": "http://127.0.0.1:3188/accounts?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=iIj5LyCIp7N-lofz",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
@@ -44937,43 +45065,51 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-360x800__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-360x800.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
       "controlCount": 26,
-      "status": "BROKEN",
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:05:09.526Z",
-      "finishedAt": "2026-07-25T22:05:10.751Z",
-      "fingerprint": "28dbf992b85bf7f9c9f29e00a8f1f9ff40dae11e2050350607e030671593a282",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:12:03.554Z",
+      "finishedAt": "2026-07-25T23:12:07.828Z",
+      "fingerprint": "9d7d88b9814666b5589e4bdef190974c24204c727d59fdfc78d6a6501f07e15b",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-360x800__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW__owner-consignments-stage3-batch-review_required-review__360x800__full-page@highres.png",
-      "fullPageMasterWidth": 1472,
-      "fullPageMasterHeight": 11668,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 642361,
-      "fullPageSha256": "9dee98aed446361230c62ca4c9df1a2d74385a8093a1f10eb58375ba44de021d",
+      "fullPageMasterWidth": 720,
+      "fullPageMasterHeight": 5760,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 281502,
+      "fullPageSha256": "f2142e65be9fd030b884c9a02b24a8aa6a16fdfae44cbe3a9e3adeb649f83488",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-360x800__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-360x800.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/consignments/stage3-batch-review_required/review",
           "title": "Marketplace Pick & Pack",
           "heading": "Synthetic REVIEW_REQUIRED Consignment",
-          "overflow": true,
-          "scrollWidth": 368,
+          "overflow": false,
+          "scrollWidth": 360,
           "clientWidth": 360,
-          "documentHeight": 2917,
+          "documentHeight": 2880,
           "stagingBanner": true,
           "undersizedCount": 11
         },
         "failedRequests": [
           {
+            "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/issues?_rsc=6qE-M6K4JOMZHSf7",
+            "error": "net::ERR_ABORTED"
+          },
+          {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=eI1BHH3bFckPWvyl",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/listing/stage3-line-held-missing?_rsc=6qE-M6K4JOMZHSf7",
             "error": "net::ERR_ABORTED"
           }
         ],
@@ -45016,19 +45152,19 @@
       "controlCount": 26,
       "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:05:11.326Z",
-      "finishedAt": "2026-07-25T22:05:12.409Z",
-      "fingerprint": "316038a648fb6f38c16f51bfca47c6b0caedf931b6905c8ba152352a3a560adf",
+      "startedAt": "2026-07-25T23:12:25.872Z",
+      "finishedAt": "2026-07-25T23:12:30.160Z",
+      "fingerprint": "a60a89b4bffaa00bded9e83ce2d704f0656847f74249e87b13563c4c2a1e8a3f",
       "auditStatus": "VERIFIED",
       "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-390x844__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW__owner-consignments-stage3-batch-review_required-review__390x844__full-page@highres.png",
-      "fullPageMasterWidth": 1560,
-      "fullPageMasterHeight": 11668,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 658236,
-      "fullPageSha256": "067653b99d910735ef6b81c2a6ebd77c42e58181cff2a7c7a6ae9c71e4fbfce4",
+      "fullPageMasterWidth": 780,
+      "fullPageMasterHeight": 5820,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 289117,
+      "fullPageSha256": "2a5d349743d4dd01f3f98acd739890979ea0b8ac5ae0a836f764a0bcc051a3ac",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-390x844__viewport.png",
       "browserTracePath": null,
@@ -45040,17 +45176,21 @@
           "overflow": false,
           "scrollWidth": 390,
           "clientWidth": 390,
-          "documentHeight": 2917,
+          "documentHeight": 2910,
           "stagingBanner": true,
           "undersizedCount": 11
         },
         "failedRequests": [
           {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=eI1BHH3bFckPWvyl",
+            "error": "net::ERR_ABORTED"
+          },
+          {
             "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/issues?_rsc=6qE-M6K4JOMZHSf7",
             "error": "net::ERR_ABORTED"
           },
           {
-            "url": "http://127.0.0.1:3188/dashboard?_rsc=eI1BHH3bFckPWvyl",
+            "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/listing/stage3-line-held-missing?_rsc=6qE-M6K4JOMZHSf7",
             "error": "net::ERR_ABORTED"
           }
         ],
@@ -45093,19 +45233,19 @@
       "controlCount": 26,
       "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:05:12.916Z",
-      "finishedAt": "2026-07-25T22:05:14.318Z",
+      "startedAt": "2026-07-25T23:12:48.375Z",
+      "finishedAt": "2026-07-25T23:12:52.790Z",
       "fingerprint": "cbca8a6e249f69c3cf52fcbffbbb8916127ad6bc5b0a3014126f34853ceb3ca1",
       "auditStatus": "VERIFIED",
       "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-430x932__viewport.png",
       "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW__owner-consignments-stage3-batch-review_required-review__430x932__full-page@highres.png",
-      "fullPageMasterWidth": 1720,
-      "fullPageMasterHeight": 11736,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 651202,
-      "fullPageSha256": "0e2c976e617f6bcc33f7696671f94c6b65fa5e29e886717e2cb1ab8a2feeddc6",
+      "fullPageMasterWidth": 860,
+      "fullPageMasterHeight": 5868,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 286223,
+      "fullPageSha256": "a61be897780c0df0ad86ce8e8cf66c09a6b33dd0cf16cfc1f9cd7f2ebfba1fb8",
       "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_CONSIGNMENTS_BATCHID_REVIEW-430x932__viewport.png",
       "browserTracePath": null,
@@ -45122,6 +45262,10 @@
           "undersizedCount": 11
         },
         "failedRequests": [
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments/stage3-batch-review_required/issues?_rsc=6qE-M6K4JOMZHSf7",
+            "error": "net::ERR_ABORTED"
+          },
           {
             "url": "http://127.0.0.1:3188/dashboard?_rsc=eI1BHH3bFckPWvyl",
             "error": "net::ERR_ABORTED"
@@ -48098,33 +48242,33 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1024x768__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1024x768.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 34,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:17.947Z",
-      "finishedAt": "2026-07-25T22:33:21.378Z",
-      "fingerprint": "81694fc3bd290a620693f15808765a9fbce44ff75a7371f9405b2737c283855a",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:31.148Z",
+      "finishedAt": "2026-07-25T23:09:35.853Z",
+      "fingerprint": "6474484c3a100371708802132767c66998455875adad6415c034e0d41c0a84fc",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1024x768__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_IMPORTS_JOBID_MAPPING__owner-imports-stage4-import-mapping-mapping__1024x768__full-page@highres.png",
-      "fullPageMasterWidth": 4096,
-      "fullPageMasterHeight": 3232,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 80645,
-      "fullPageSha256": "6182a8c907f2aa36b811095a38bdb841706653990ee1bad5267e2028ccb1246c",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 2048,
+      "fullPageMasterHeight": 1616,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 201961,
+      "fullPageSha256": "090559148e0bd71658bf790dcbeac132e72e964cf95bdb1a073d76f80ca4b5d2",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1024x768__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1024x768.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-mapping/mapping",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Map File Headers",
           "overflow": false,
           "scrollWidth": 1024,
           "clientWidth": 1024,
@@ -48132,7 +48276,44 @@
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
+        "failedRequests": [
+          {
+            "url": "http://127.0.0.1:3188/owner/catalog/missing?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/accounts?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          }
+        ],
         "errorResponses": [],
         "consoleErrors": [],
         "pageErrors": []
@@ -48166,33 +48347,33 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1440x900__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1440x900.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 34,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:21.944Z",
-      "finishedAt": "2026-07-25T22:33:25.295Z",
-      "fingerprint": "a4c099deefbd85dde722727b7b3973b66cf64c8b51fac1abce74aa4b7767c51f",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:37.362Z",
+      "finishedAt": "2026-07-25T23:09:42.168Z",
+      "fingerprint": "8513f6f836c01af87153ef09303c296cc906badf68019679bb105002b3dc3838",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1440x900__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_IMPORTS_JOBID_MAPPING__owner-imports-stage4-import-mapping-mapping__1440x900__full-page@highres.png",
-      "fullPageMasterWidth": 4320,
-      "fullPageMasterHeight": 2820,
-      "fullPageDeviceScaleFactor": 3,
-      "fullPageFileBytes": 66157,
-      "fullPageSha256": "e0f611099067871f48ade8d7160f2b411ae603e78118266acf4e50f957ddb893",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 2880,
+      "fullPageMasterHeight": 1880,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 219808,
+      "fullPageSha256": "8d6bf6e8d6ed60cc615462a10f88d1fa56fc8fa329d09a591b13ccdde5531463",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1440x900__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-1440x900.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-mapping/mapping",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Map File Headers",
           "overflow": false,
           "scrollWidth": 1440,
           "clientWidth": 1440,
@@ -48200,7 +48381,72 @@
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
+        "failedRequests": [
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=gTQ_qLwzFNmvwH4E",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/catalog/missing?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/mark?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/assemble?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pick?source=ORDER&_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/accounts?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pack?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          }
+        ],
         "errorResponses": [],
         "consoleErrors": [],
         "pageErrors": []
@@ -48234,41 +48480,46 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-360x800__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-360x800.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 10,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:04.629Z",
-      "finishedAt": "2026-07-25T22:33:06.919Z",
-      "fingerprint": "721e30c8bafa817093ec1948fd8112141e5aaf5aa6ab6ac582da0f7b179c8ae7",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:16.369Z",
+      "finishedAt": "2026-07-25T23:09:19.186Z",
+      "fingerprint": "2589ef31230bb9d69086571e0eaf32ad6d4d7b9ca7ba92976567f559e0a4826d",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-360x800__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_IMPORTS_JOBID_MAPPING__owner-imports-stage4-import-mapping-mapping__360x800__full-page@highres.png",
-      "fullPageMasterWidth": 1440,
-      "fullPageMasterHeight": 3456,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 57714,
-      "fullPageSha256": "d113a9a1f3e6d47d7101ea830bcd4632dfe31e61a8c10555ec9595f7061f892d",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 720,
+      "fullPageMasterHeight": 1952,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 97501,
+      "fullPageSha256": "5a06d2879ab6a41fd183a8b75d77139df35d3b000cc4196e0a1749baca2673d5",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-360x800__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-360x800.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-mapping/mapping",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Map File Headers",
           "overflow": false,
           "scrollWidth": 360,
           "clientWidth": 360,
-          "documentHeight": 864,
+          "documentHeight": 976,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
+        "failedRequests": [
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          }
+        ],
         "errorResponses": [],
         "consoleErrors": [],
         "pageErrors": []
@@ -48302,41 +48553,46 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-390x844__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-390x844.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 10,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:07.489Z",
-      "finishedAt": "2026-07-25T22:33:09.888Z",
-      "fingerprint": "35df77b8d981793b0ed2a787c6c91a1fe2dc873bdf2d13b5915967e50a581a3c",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:20.120Z",
+      "finishedAt": "2026-07-25T23:09:22.725Z",
+      "fingerprint": "d7c0e1c3cfc9c9eaab10d071c00754155a796e1ec67059ae93124ceb7bec51e2",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-390x844__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_IMPORTS_JOBID_MAPPING__owner-imports-stage4-import-mapping-mapping__390x844__full-page@highres.png",
-      "fullPageMasterWidth": 1560,
-      "fullPageMasterHeight": 3632,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 59550,
-      "fullPageSha256": "91bed91858bdd020a5ba9b6158ea28ed7e1f01068c19ff340b0f6e71c688b3e7",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 780,
+      "fullPageMasterHeight": 1952,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 98958,
+      "fullPageSha256": "a85312b715ad7f7ecfb35b2ff4a794c6d8679ce6d11edf27fc53187e39fe1073",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-390x844__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-390x844.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-mapping/mapping",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Map File Headers",
           "overflow": false,
           "scrollWidth": 390,
           "clientWidth": 390,
-          "documentHeight": 908,
+          "documentHeight": 976,
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
+        "failedRequests": [
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          }
+        ],
         "errorResponses": [],
         "consoleErrors": [],
         "pageErrors": []
@@ -48370,33 +48626,33 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-430x932__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-430x932.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 10,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:10.523Z",
-      "finishedAt": "2026-07-25T22:33:13.183Z",
-      "fingerprint": "a690043a350578071d0879e2c2f09ce6ba5c29f519253f1ce7b2093f01cfbabf",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:23.489Z",
+      "finishedAt": "2026-07-25T23:09:26.062Z",
+      "fingerprint": "ed9d4bbd815aceec0cb88c1add9aaf8eae7704da6f8f19e45cb52ae9e096d805",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-430x932__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_IMPORTS_JOBID_MAPPING__owner-imports-stage4-import-mapping-mapping__430x932__full-page@highres.png",
-      "fullPageMasterWidth": 1720,
-      "fullPageMasterHeight": 3984,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 60793,
-      "fullPageSha256": "0a23da47c37dc486c183f5a885bc59d271ae9e49b8f32788d55b6cc6a547639f",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 860,
+      "fullPageMasterHeight": 1992,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 97969,
+      "fullPageSha256": "4cb5b2f9114268271c610f705e9fa9d42eaf397c7e8bb3f53bb934fb734db1d1",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-430x932__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-430x932.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-mapping/mapping",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Map File Headers",
           "overflow": false,
           "scrollWidth": 430,
           "clientWidth": 430,
@@ -48404,7 +48660,12 @@
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
+        "failedRequests": [
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          }
+        ],
         "errorResponses": [],
         "consoleErrors": [],
         "pageErrors": []
@@ -48438,33 +48699,33 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-768x1024__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-768x1024.zip",
+      "tracePath": null,
       "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 11,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:13.950Z",
-      "finishedAt": "2026-07-25T22:33:17.390Z",
-      "fingerprint": "628fa70b6f5c81197feffb67515f245ab41cedcd5c818decbb513cfdce14dd67",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:27.054Z",
+      "finishedAt": "2026-07-25T23:09:30.306Z",
+      "fingerprint": "b4a4fc54017a6ea534d13dea33ae9be35ee4ea8b1fd792508dab4d6101226499",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-768x1024__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_IMPORTS_JOBID_MAPPING__owner-imports-stage4-import-mapping-mapping__768x1024__full-page@highres.png",
-      "fullPageMasterWidth": 3072,
-      "fullPageMasterHeight": 4256,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 81587,
-      "fullPageSha256": "98a6b7f45fd657d28df7e4cd6b886d7042047ca640c95c92c07038d5e0f9aaa3",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 1536,
+      "fullPageMasterHeight": 2128,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 144227,
+      "fullPageSha256": "4c938f8678ec4ad933271d434a36d7be94e5726848bca7f07e2ba6f3ae59109f",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-768x1024__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_IMPORTS_JOBID_MAPPING-768x1024.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/imports/stage4-import-mapping/mapping",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Map File Headers",
           "overflow": false,
           "scrollWidth": 768,
           "clientWidth": 768,
@@ -48472,7 +48733,16 @@
           "stagingBanner": true,
           "undersizedCount": 0
         },
-        "failedRequests": [],
+        "failedRequests": [
+          {
+            "url": "http://127.0.0.1:3188/accounts?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=cRvqlTHlnQy-lHB5",
+            "error": "net::ERR_ABORTED"
+          }
+        ],
         "errorResponses": [],
         "consoleErrors": [],
         "pageErrors": []
@@ -50376,50 +50646,96 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1024x768__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1024x768.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 59,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:50.342Z",
-      "finishedAt": "2026-07-25T22:33:53.441Z",
-      "fingerprint": "2dfd33079845cc5186e382f6810c6450a24c97293a7566fdace545e3106f04aa",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:10:18.061Z",
+      "finishedAt": "2026-07-25T23:10:23.028Z",
+      "fingerprint": "e7c3f5c0c7fd3c97ff8cdc176d07b089e716425a0b0ed8562b8b51c266535160",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1024x768__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_MARKING_LIBRARY_ASSETID__owner-marking-library-stage4-synthetic-marking-asset__1024x768__full-page@highres.png",
-      "fullPageMasterWidth": 4096,
-      "fullPageMasterHeight": 3232,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 80645,
-      "fullPageSha256": "6182a8c907f2aa36b811095a38bdb841706653990ee1bad5267e2028ccb1246c",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 2048,
+      "fullPageMasterHeight": 4402,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 416031,
+      "fullPageSha256": "d24ee885a5410565bea7b7874be1de07a78810b244db20fdacce6bdc5e7a3338",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1024x768__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1024x768.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/marking-library/stage4-synthetic-marking-asset",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Synthetic Marking Guide",
           "overflow": false,
           "scrollWidth": 1024,
           "clientWidth": 1024,
-          "documentHeight": 808,
+          "documentHeight": 2201,
           "stagingBanner": true,
-          "undersizedCount": 0
+          "undersizedCount": 2
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/marking-library/stage4-synthetic-marking-asset",
-            "status": 404
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/catalog/missing?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/accounts?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pick?source=ORDER&_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
@@ -50451,50 +50767,108 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1440x900__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1440x900.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 59,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:53.977Z",
-      "finishedAt": "2026-07-25T22:33:56.928Z",
-      "fingerprint": "881f23d3056e7e987be258be5d653dac9bf5e69f4bd37b7593e38e15d40cec55",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:10:24.254Z",
+      "finishedAt": "2026-07-25T23:10:29.655Z",
+      "fingerprint": "3601128e9717247756f62ceb1a4de105080f1325e113fd61baa88aeab7b1d82c",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1440x900__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_MARKING_LIBRARY_ASSETID__owner-marking-library-stage4-synthetic-marking-asset__1440x900__full-page@highres.png",
-      "fullPageMasterWidth": 4320,
-      "fullPageMasterHeight": 2820,
-      "fullPageDeviceScaleFactor": 3,
-      "fullPageFileBytes": 66157,
-      "fullPageSha256": "e0f611099067871f48ade8d7160f2b411ae603e78118266acf4e50f957ddb893",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 2880,
+      "fullPageMasterHeight": 4362,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 439343,
+      "fullPageSha256": "049c7c269b9d6f8890d1be32b74679f3a8a56d990c4ed02672e027cfd0848486",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1440x900__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-1440x900.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/marking-library/stage4-synthetic-marking-asset",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Synthetic Marking Guide",
           "overflow": false,
           "scrollWidth": 1440,
           "clientWidth": 1440,
-          "documentHeight": 940,
+          "documentHeight": 2181,
           "stagingBanner": true,
-          "undersizedCount": 0
+          "undersizedCount": 2
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/marking-library/stage4-synthetic-marking-asset",
-            "status": 404
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/catalog/missing?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory/refresh?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/product-inventory?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/consignments?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/mark?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pick?source=ORDER&_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/assemble?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/imports?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/accounts?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/work/pack?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
@@ -50526,50 +50900,52 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-360x800__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-360x800.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 35,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:38.199Z",
-      "finishedAt": "2026-07-25T22:33:40.280Z",
-      "fingerprint": "fd6d321bf10967b5211754122ae5d6ba9d3816426eb43729b93f0cb60db3ac36",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:09:54.911Z",
+      "finishedAt": "2026-07-25T23:09:59.663Z",
+      "fingerprint": "18dcf501a4c27fd5ba1e2f002d36e9238b6a2c20ad96ab95af18e2dc4132f9a6",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-360x800__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_MARKING_LIBRARY_ASSETID__owner-marking-library-stage4-synthetic-marking-asset__360x800__full-page@highres.png",
-      "fullPageMasterWidth": 1440,
-      "fullPageMasterHeight": 3456,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 57714,
-      "fullPageSha256": "d113a9a1f3e6d47d7101ea830bcd4632dfe31e61a8c10555ec9595f7061f892d",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 720,
+      "fullPageMasterHeight": 7646,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 352534,
+      "fullPageSha256": "5abe0270dab53275fdc94de230dbae1a292c7dea92e6a3cfc07c66a882399c05",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-360x800__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-360x800.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/marking-library/stage4-synthetic-marking-asset",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Synthetic Marking Guide",
           "overflow": false,
           "scrollWidth": 360,
           "clientWidth": 360,
-          "documentHeight": 864,
+          "documentHeight": 3823,
           "stagingBanner": true,
-          "undersizedCount": 0
+          "undersizedCount": 2
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/marking-library/stage4-synthetic-marking-asset",
-            "status": 404
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
@@ -50601,50 +50977,56 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-390x844__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-390x844.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 35,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:40.769Z",
-      "finishedAt": "2026-07-25T22:33:43.119Z",
-      "fingerprint": "1834ef05e501fca3b28d3bcaabd433a7912672182acc1187deeb4b2b9aaaa1ea",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:10:01.052Z",
+      "finishedAt": "2026-07-25T23:10:05.311Z",
+      "fingerprint": "e65d9e6e752bd0a64ff5a9ba603de6b57640eab422dbdb94c049a18dffbfa57c",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-390x844__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_MARKING_LIBRARY_ASSETID__owner-marking-library-stage4-synthetic-marking-asset__390x844__full-page@highres.png",
-      "fullPageMasterWidth": 1560,
-      "fullPageMasterHeight": 3632,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 59550,
-      "fullPageSha256": "91bed91858bdd020a5ba9b6158ea28ed7e1f01068c19ff340b0f6e71c688b3e7",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 780,
+      "fullPageMasterHeight": 7706,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 354791,
+      "fullPageSha256": "771c58b95408670af8ba366ac50c9fa600009b19823aa456eb01ce426af779d1",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-390x844__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-390x844.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/marking-library/stage4-synthetic-marking-asset",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Synthetic Marking Guide",
           "overflow": false,
           "scrollWidth": 390,
           "clientWidth": 390,
-          "documentHeight": 908,
+          "documentHeight": 3853,
           "stagingBanner": true,
-          "undersizedCount": 0
+          "undersizedCount": 2
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/marking-library/stage4-synthetic-marking-asset",
-            "status": 404
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
@@ -50676,50 +51058,56 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-430x932__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-430x932.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 35,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:43.675Z",
-      "finishedAt": "2026-07-25T22:33:45.980Z",
-      "fingerprint": "d246c4d2c167e6ab8a428840a50eadf8f833deeeaffaecf6cecd257436c4daba",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:10:06.607Z",
+      "finishedAt": "2026-07-25T23:10:10.926Z",
+      "fingerprint": "c5fb9c03baf5c30ca26ef9a0a6b7abf16320c880f79b0d78240a7174baec9f5a",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-430x932__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_MARKING_LIBRARY_ASSETID__owner-marking-library-stage4-synthetic-marking-asset__430x932__full-page@highres.png",
-      "fullPageMasterWidth": 1720,
-      "fullPageMasterHeight": 3984,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 60793,
-      "fullPageSha256": "0a23da47c37dc486c183f5a885bc59d271ae9e49b8f32788d55b6cc6a547639f",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 860,
+      "fullPageMasterHeight": 7662,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 352465,
+      "fullPageSha256": "fdda554ed498bac1a5e835dcad37034c5864d1ac0e6dfa91bc8e301cb13c90e7",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-430x932__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-430x932.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/marking-library/stage4-synthetic-marking-asset",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Synthetic Marking Guide",
           "overflow": false,
           "scrollWidth": 430,
           "clientWidth": 430,
-          "documentHeight": 996,
+          "documentHeight": 3831,
           "stagingBanner": true,
-          "undersizedCount": 0
+          "undersizedCount": 2
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/marking-library/stage4-synthetic-marking-asset",
-            "status": 404
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },
@@ -50751,50 +51139,56 @@
       "mutatesSyntheticData": false,
       "resetStrategy": "canonical synthetic reset",
       "screenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-768x1024__viewport.png",
-      "tracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-768x1024.zip",
-      "consoleStatus": "ERROR",
+      "tracePath": null,
+      "consoleStatus": "CLEAN",
       "networkStatus": "CLEAN",
-      "controlCount": 0,
-      "status": "BROKEN",
+      "controlCount": 36,
+      "status": "COMPLETE",
       "error": null,
-      "startedAt": "2026-07-25T22:33:46.516Z",
-      "finishedAt": "2026-07-25T22:33:49.682Z",
-      "fingerprint": "6044f29ee9873bb5790a989b97f70224da8e2594d7a07bc2a2140c78af3c6abb",
-      "auditStatus": "BROKEN",
-      "notes": "Inspect private trace and browser evidence.",
+      "startedAt": "2026-07-25T23:10:12.312Z",
+      "finishedAt": "2026-07-25T23:10:16.788Z",
+      "fingerprint": "42047996e30bdee0061991e3d97ce6ed909be73ad8f6f0ca645f2f45a6030b70",
+      "auditStatus": "VERIFIED",
+      "notes": "",
       "viewportScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-768x1024__viewport.png",
-      "viewportCaptureStatus": "FAILED",
+      "viewportCaptureStatus": "VERIFIED",
       "fullPageMasterPath": ".codex-tmp/stage4-2b/full-page-hires/ROUTE_OWNER_MARKING_LIBRARY_ASSETID__owner-marking-library-stage4-synthetic-marking-asset__768x1024__full-page@highres.png",
-      "fullPageMasterWidth": 3072,
-      "fullPageMasterHeight": 4256,
-      "fullPageDeviceScaleFactor": 4,
-      "fullPageFileBytes": 81587,
-      "fullPageSha256": "98a6b7f45fd657d28df7e4cd6b886d7042047ca640c95c92c07038d5e0f9aaa3",
-      "fullPageCaptureStatus": "FAILED",
+      "fullPageMasterWidth": 1536,
+      "fullPageMasterHeight": 6694,
+      "fullPageDeviceScaleFactor": 2,
+      "fullPageFileBytes": 371256,
+      "fullPageSha256": "d7286809a7c00868547ca22ebbcc64a2cb09abdd88924124308e32fd1e5cf58f",
+      "fullPageCaptureStatus": "VERIFIED",
       "browserScreenshotPath": ".codex-tmp/stage4-2b/screenshots/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-768x1024__viewport.png",
-      "browserTracePath": ".codex-tmp/stage4-2b/traces/ROUTE_OWNER_MARKING_LIBRARY_ASSETID-768x1024.zip",
+      "browserTracePath": null,
       "browserDetails": {
         "inspection": {
           "url": "/owner/marking-library/stage4-synthetic-marking-asset",
-          "title": "404: This page could not be found.",
-          "heading": "404",
+          "title": "Marketplace Pick & Pack",
+          "heading": "Synthetic Marking Guide",
           "overflow": false,
           "scrollWidth": 768,
           "clientWidth": 768,
-          "documentHeight": 1064,
+          "documentHeight": 3347,
           "stagingBanner": true,
-          "undersizedCount": 0
+          "undersizedCount": 2
         },
-        "failedRequests": [],
-        "errorResponses": [
+        "failedRequests": [
           {
-            "url": "http://127.0.0.1:3188/owner/marking-library/stage4-synthetic-marking-asset",
-            "status": 404
+            "url": "http://127.0.0.1:3188/owner/marking-library?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/owner/process-rules?_rsc=r8uThMb7W_pvfR5g",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "http://127.0.0.1:3188/dashboard?_rsc=feLCzwP4Uu4HEoXg",
+            "error": "net::ERR_ABORTED"
           }
         ],
-        "consoleErrors": [
-          "Failed to load resource: the server responded with a status of 404 (Not Found)"
-        ],
+        "errorResponses": [],
+        "consoleErrors": [],
         "pageErrors": []
       }
     },

@@ -66,7 +66,7 @@ const DYNAMIC_EXAMPLES = {
   "/%5F%5Fqa/design-lab": "/__qa/design-lab",
   "/%5F%5Fqa/design-lab/[area]": "/__qa/design-lab/work-cards",
   "/%5F%5Fqa/ui-audit": "/__qa/ui-audit",
-  "/owner/catalog/missing/[issueId]": "/owner/catalog/missing/stage4-import-blocking",
+  "/owner/catalog/missing/[issueId]": "/owner/catalog/missing/stage4-missing-listing-issue",
   "/owner/consignments/[batchId]/issues": "/owner/consignments/stage3-batch-review_required/issues",
   "/owner/consignments/[batchId]/listing/[lineId]": "/owner/consignments/stage3-batch-review_required/listing/stage3-line-held-missing",
   "/owner/consignments/[batchId]/review": "/owner/consignments/stage3-batch-review_required/review",
@@ -169,8 +169,11 @@ async function inspectStable(page) {
   }
 }
 
-function deviceScaleFactor(viewport) {
-  return viewport.width >= 1440 ? 3 : 4;
+function deviceScaleFactor() {
+  // Stage 4.2C owner decision: retain lossless full-page PNG evidence at a
+  // practical high-density 2x scale. Existing verified 3x/4x masters remain
+  // untouched; only missing or explicitly recaptured states use this setting.
+  return 2;
 }
 
 async function settleFullPage(page) {
@@ -273,7 +276,7 @@ try {
       results.push(prior.completed[key]);
       continue;
     }
-    const scale = cli.hires || cli.mastersOnly ? deviceScaleFactor(job.viewport) : 1;
+    const scale = cli.hires || cli.mastersOnly ? deviceScaleFactor() : 1;
     const context = await browser.newContext({ viewport: { width: job.viewport.width, height: job.viewport.height }, deviceScaleFactor: scale, storageState: authStates.get(job.role) });
     await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
     const page = await context.newPage();

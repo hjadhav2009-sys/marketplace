@@ -64,9 +64,13 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
   }));
   const calculatedProgress = importJobProgressPercent(job);
   const [progress, setProgress] = useState(calculatedProgress);
-  const elapsedSeconds = importJobElapsedSeconds(job);
-  const rowsPerSecond = importJobRowsPerSecond(job);
-  const remainingSeconds = importJobEstimatedRemainingSeconds(job);
+  // Use a timestamp present in the server payload for the hydration render.
+  // The browser advances this clock only after hydration has completed.
+  const [clockMs, setClockMs] = useState(() => initialJob.updatedAt.getTime());
+  const calculationTime = new Date(clockMs);
+  const elapsedSeconds = importJobElapsedSeconds(job, calculationTime);
+  const rowsPerSecond = importJobRowsPerSecond(job, calculationTime);
+  const remainingSeconds = importJobEstimatedRemainingSeconds(job, calculationTime);
   const href = reviewHref(job);
   const isDone = isTerminalImportJobStatus(job.status);
   const issueCount = job.errorRows + job.warningRows;
@@ -103,6 +107,7 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
     const controller = new AbortController();
     const timer = window.setInterval(async () => {
       try {
+        setClockMs(Date.now());
         setRefreshState("refreshing");
         const response = await fetch(`/owner/imports/${job.id}/status`, {
           signal: controller.signal,

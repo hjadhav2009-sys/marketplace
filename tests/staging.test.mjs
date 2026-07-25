@@ -33,7 +33,7 @@ assert.ok(prepared.database.counts.MarketplaceListing >= 12); assertions += 1;
 assert.ok(prepared.database.counts.WorkTask >= 14); assertions += 1;
 assert.equal(prepared.database.counts.ImportJob, 7); assertions += 1;
 assert.equal(prepared.database.counts.UploadBatch, 1); assertions += 1;
-assert.equal(prepared.database.counts.ImportRowIssue, 2); assertions += 1;
+assert.equal(prepared.database.counts.ImportRowIssue, 3); assertions += 1;
 assert.equal(prepared.database.counts.ConsignmentImportIssue, 3); assertions += 1;
 assert.equal(prepared.database.counts.ProblemOrder, 2); assertions += 1;
 assert.equal(prepared.database.counts.ScanLog, 3); assertions += 1;

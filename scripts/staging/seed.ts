@@ -97,6 +97,37 @@ async function seed() {
     { id: "stage3-attr-fk", marketplaceListingId: "stage3-listing-fk-mark", accountId: accounts[0].id, marketplace: "FLIPKART", technicalKey: "synthetic_material", displayLabel: "Synthetic Material", valueJson: JSON.stringify("Synthetic alloy"), valueText: "Synthetic alloy", sourceAuthority: "MANUAL_OWNER", manualLocked: true, createdByUserId: users[0].id },
     { id: "stage3-attr-amz", marketplaceListingId: "stage3-listing-amazon", accountId: accounts[1].id, marketplace: "AMAZON", technicalKey: "item_type_keyword", displayLabel: "Item Type Keyword", valueJson: JSON.stringify("synthetic-item"), valueText: "synthetic-item", sourceAuthority: "MANUAL_OWNER", manualLocked: true, createdByUserId: users[0].id }
   ] });
+  await prisma.markingAsset.create({
+    data: {
+      id: "stage4-synthetic-marking-asset",
+      name: "Synthetic Marking Guide",
+      masterDesignId: "STAGE-MARKING-MASTER-001",
+      description: "Synthetic-only marking asset for private UI audit.",
+      machineType: "Synthetic laser",
+      material: "Synthetic alloy",
+      markingPosition: "Centered",
+      markingWidthMm: 24,
+      markingHeightMm: 12,
+      instructions: "Use the synthetic alignment guide. No production settings.",
+      status: "APPROVED",
+      active: true,
+      createdByUserId: users[0].id,
+      updatedByUserId: users[0].id,
+      listingLinks: {
+        create: {
+          id: "stage4-synthetic-marking-link",
+          marketplaceListingId: "stage3-listing-fk-mark",
+          accountId: accounts[0].id,
+          marketplace: "FLIPKART",
+          matchMethod: "SYNTHETIC_STAGE4",
+          confidence: 1,
+          identifierSnapshotJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-002", synthetic: true }),
+          active: true,
+          createdByUserId: users[0].id
+        }
+      }
+    }
+  });
 
   const orderStates = [
     ["pick-ready", "PICK", "READY", "STAGE-FK-SKU-001", "PICK_PACK", users[2].id], ["pick-progress", "PICK", "IN_PROGRESS", "STAGE-FK-SKU-002", "PICK_MARK_PACK", users[2].id], ["pick-problem", "PICK", "PROBLEM", "STAGE-FK-SKU-003", "PICK_ASSEMBLE_PACK", users[3].id],
@@ -110,6 +141,24 @@ async function seed() {
     await prisma.order.create({ data: { id: orderId, accountId: accounts[0].id, marketplace: "FLIPKART", shipmentId: `STAGE-SHIP-${++orderNumber}`, orderItemId: `STAGE-ITEM-${orderNumber}`, trackingId: `STAGE-TRACK-${orderNumber}`, awb: `STAGE-AWB-${orderNumber}`, sku, qty, orderNo: `STAGE-ORDER-${orderNumber}`, productDescription: `Synthetic ${name} order`, pickStatus: stage === "PICK" ? "READY" : "PICKED", packStatus: status === "COMPLETED" ? "PACKED" : "READY", status: status === "COMPLETED" ? "PACKED" : "READY" } });
     await createTask({ id: `${orderId}-${stage.toLowerCase()}`, orderId, stage, sequence: stage === "PICK" ? 1 : stage === "MARK" ? 2 : stage === "ASSEMBLE" ? 2 : 4, status: status as WorkTaskStatus, quantity: qty, completed: status === "IN_PROGRESS" ? 1 : undefined, assigned, sku, title: `Synthetic ${name} order`, route, problem: status === "PROBLEM" ? "Synthetic staged problem" : undefined });
   }
+  await prisma.order.create({
+    data: {
+      id: "stage4-order-held-missing-listing",
+      accountId: accounts[0].id,
+      marketplace: "FLIPKART",
+      shipmentId: "STAGE-HELD-SHIP-001",
+      orderItemId: "STAGE-HELD-ITEM-001",
+      trackingId: "STAGE-HELD-TRACK-001",
+      awb: "STAGE-HELD-AWB-001",
+      sku: "STAGE-MISSING-SKU-ORDER-001",
+      qty: 2,
+      orderNo: "STAGE-HELD-ORDER-001",
+      productDescription: "Synthetic held order awaiting listing resolution",
+      status: "READY",
+      pickStatus: "READY",
+      packStatus: "READY"
+    }
+  });
   await prisma.problemOrder.createMany({ data: [
     { id: "stage4-problem-open", accountId: accounts[0].id, orderId: "stage3-order-pick-problem", reason: "Synthetic damaged item", details: "Synthetic open problem for UI audit.", interruptedStage: "PICK", workTaskId: "stage3-order-pick-problem-pick", taskStatusBefore: "READY", orderStatusBefore: "READY", pickStatusBefore: "READY", packStatusBefore: "READY", clientRequestId: "stage4-open-problem", status: "OPEN", reportedById: users[2].id },
     { id: "stage4-problem-resolved", accountId: accounts[0].id, orderId: "stage3-order-assembly-problem", reason: "Synthetic assembly mismatch", details: "Synthetic resolved problem for UI audit.", interruptedStage: "ASSEMBLE", workTaskId: "stage3-order-assembly-problem-assemble", taskStatusBefore: "READY", orderStatusBefore: "READY", pickStatusBefore: "PICKED", packStatusBefore: "READY", clientRequestId: "stage4-resolved-problem", status: "RESOLVED", reportedById: users[5].id, resolvedAt: new Date(), resolutionNote: "Synthetic resolution completed." }
@@ -156,13 +205,20 @@ async function seed() {
       totalFiles: 1, processedFiles: ["completed", "warnings", "failed", "cancelled"].includes(suffix) ? 1 : 0, lastError,
       startedAt: ["running", "completed", "warnings", "failed", "cancelled"].includes(suffix) ? new Date() : undefined,
       finishedAt: ["completed", "warnings", "failed", "cancelled"].includes(suffix) ? new Date() : undefined,
-      reportJson: JSON.stringify({ synthetic: true, state: suffix })
+      reportJson: JSON.stringify({ synthetic: true, state: suffix }),
+      progressJson: suffix === "mapping" ? JSON.stringify({
+        headers: ["Order Item ID", "Shipment ID", "Tracking ID", "Seller SKU", "Quantity"],
+        fingerprint: "stage4-synthetic-mapping-profile",
+        requiredFields: ["orderItemId", "sellerSku", "quantity"],
+        optionalFields: ["shipmentId", "trackingId"]
+      }) : undefined
     } });
   }
   await prisma.uploadBatch.create({ data: { id: "stage4-upload-needs-mapping", accountId: accounts[0].id, createdByUserId: users[1].id, fileName: "synthetic-needs-mapping.csv", importType: "ORDER_LABEL", status: "NEEDS_MAPPING", totalRows: 3, errorRows: 1, warningRows: 1, blockingErrorRows: 1 } });
   await prisma.importRowIssue.createMany({ data: [
     { id: "stage4-import-warning", batchId: "stage4-upload-needs-mapping", rowNumber: 2, issueType: "UNKNOWN_HEADER", message: "Synthetic header requires mapping.", safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-001" }), severity: "WARNING" },
-    { id: "stage4-import-blocking", batchId: "stage4-upload-needs-mapping", rowNumber: 3, issueType: "IDENTITY_CONFLICT", message: "Synthetic conflicting identity blocks import.", safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-002" }), severity: "ERROR" }
+    { id: "stage4-import-blocking", batchId: "stage4-upload-needs-mapping", rowNumber: 3, issueType: "IDENTITY_CONFLICT", message: "Synthetic conflicting identity blocks import.", safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-002" }), severity: "ERROR" },
+    { id: "stage4-missing-listing-issue", batchId: "stage4-upload-needs-mapping", rowNumber: 4, issueType: "MISSING_FLIPKART_LISTING_MAPPING", message: "Synthetic Order listing must be linked or created before Pick work is released.", safeDataJson: JSON.stringify({ sellerSku: "STAGE-MISSING-SKU-ORDER-001", fsn: "STAGE-MISSING-FSN-ORDER-001" }), severity: "ERROR", sourceType: "ORDER", sourceId: "stage4-order-held-missing-listing" }
   ] });
   await prisma.dataDeletionJob.createMany({ data: [
     { id: "stage4-delete-preview", accountId: accounts[0].id, actorUserId: users[0].id, actionKind: "PURGE_QA_OPERATIONAL_DATA", state: "PREVIEWED", clientRequestId: "stage4-preview", requestFingerprint: "a".repeat(64), scopeFingerprint: "b".repeat(64), scopeJson: JSON.stringify({ synthetic: true, label: "STAGE4" }), previewJson: JSON.stringify({ synthetic: true, affectedRecords: 12 }) },

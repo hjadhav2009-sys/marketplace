@@ -113,6 +113,7 @@
     "stage4.2-inventory:test": "node tests/stage4-2-ui-surface-inventory.test.mjs",
     "stage4-2b:browser": "node scripts/qa/stage4-2b-browser-audit.mjs",
     "stage4-2b:audit-studio": "node tests/stage4-2b-audit-tools.test.mjs",
+    "stage4-2b:reports": "node scripts/qa/stage4-2b-report.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",
     "data-management:test": "tsx tests/data-management.test.ts",
     "staging:rollback-artifact": "node scripts/staging/previous-executable.mjs",

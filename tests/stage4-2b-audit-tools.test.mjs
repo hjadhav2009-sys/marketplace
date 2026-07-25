@@ -6,11 +6,11 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => readFileSync(path.join(root, relative), "utf8");
 
-const studio = read("app/__qa/ui-audit/page.tsx");
+const studio = read("app/%5F%5Fqa/ui-audit/page.tsx");
 const evidence = read("app/api/qa/ui-audit/evidence/route.ts");
 const notes = read("app/api/qa/ui-audit/notes/route.ts");
-const designIndex = read("app/__qa/design-lab/page.tsx");
-const designArea = read("app/__qa/design-lab/[area]/page.tsx");
+const designIndex = read("app/%5F%5Fqa/design-lab/page.tsx");
+const designArea = read("app/%5F%5Fqa/design-lab/[area]/page.tsx");
 const runner = read("scripts/qa/stage4-2b-browser-audit.mjs");
 const scenarios = read("scripts/qa/stage4-2b-scenarios.mjs");
 
@@ -28,9 +28,12 @@ assert.match(runner, /context\.tracing/);
 assert.match(runner, /requestfailed/);
 assert.match(runner, /pageerror/);
 assert.match(runner, /Math\.min\(4/);
+assert.match(runner, /full-page-hires/);
+assert.match(runner, /fullPageMasterSha256|fullPageSha256/);
+assert.match(runner, /deviceScaleFactor/);
+assert.match(runner, /freeDiskBytes < totalDiskBytes \* \.25/);
 assert.match(scenarios, /AUTH_DEFAULT/);
 assert.match(scenarios, /DATA_PURGED/);
 assert.match(scenarios, /PERMISSION_DENIED/);
 
 console.log("Stage 4.2B audit tooling boundary tests passed.");
-

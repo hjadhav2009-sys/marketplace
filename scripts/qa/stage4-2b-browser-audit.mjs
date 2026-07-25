@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
+import sharp from "sharp";
 import { REQUIRED_SCENARIOS, ROLE_TO_DISPLAY, VIEWPORTS } from "./stage4-2b-scenarios.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -13,19 +14,25 @@ const CREDENTIALS = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "c
 const PROGRESS_PATH = path.join(PRIVATE_ROOT, "progress.json");
 const RESULT_PATH = path.join(PRIVATE_ROOT, "browser-results.json");
 const SCREENSHOT_ROOT = path.join(PRIVATE_ROOT, "screenshots");
+const MASTER_ROOT = path.join(PRIVATE_ROOT, "full-page-hires");
 const TRACE_ROOT = path.join(PRIVATE_ROOT, "traces");
+const STOP_PATH = path.join(PRIVATE_ROOT, "stop-after-current");
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 
 function options(argv) {
-  const result = { headed: false, resume: false, captureOnly: false, verifyOnly: false, workers: 1 };
+  const result = { headed: false, resume: false, force: false, captureOnly: false, verifyOnly: false, fullPage: false, hires: false, mastersOnly: false, workers: 1 };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
     if (value === "--headed") result.headed = true;
     else if (value === "--headless") result.headed = false;
     else if (value === "--resume") result.resume = true;
+    else if (value === "--force") result.force = true;
     else if (value === "--capture-only") result.captureOnly = true;
     else if (value === "--verify-only") result.verifyOnly = true;
+    else if (value === "--full-page") result.fullPage = true;
+    else if (value === "--hires") result.hires = true;
+    else if (value === "--masters-only") result.mastersOnly = true;
     else if (["--route", "--state", "--viewport", "--workers"].includes(value)) {
       const key = value.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       result[key] = argv[++i];
@@ -39,8 +46,65 @@ function fingerprint(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+function slug(value) {
+  return value.replace(/^\/+/, "").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120) || "root";
+}
+
+async function walk(directory) {
+  const entries = await readdir(directory);
+  const output = [];
+  for (const name of entries) {
+    const absolute = path.join(directory, name);
+    if ((await stat(absolute)).isDirectory()) output.push(...await walk(absolute));
+    else output.push(absolute);
+  }
+  return output;
+}
+
+const DYNAMIC_EXAMPLES = {
+  "/__qa/design-lab/[area]": "/__qa/design-lab/work-cards",
+  "/%5F%5Fqa/design-lab": "/__qa/design-lab",
+  "/%5F%5Fqa/design-lab/[area]": "/__qa/design-lab/work-cards",
+  "/%5F%5Fqa/ui-audit": "/__qa/ui-audit",
+  "/owner/catalog/missing/[issueId]": "/owner/catalog/missing/stage4-import-blocking",
+  "/owner/consignments/[batchId]/issues": "/owner/consignments/stage3-batch-review_required/issues",
+  "/owner/consignments/[batchId]/listing/[lineId]": "/owner/consignments/stage3-batch-review_required/listing/stage3-line-held-missing",
+  "/owner/consignments/[batchId]/review": "/owner/consignments/stage3-batch-review_required/review",
+  "/owner/consignments/[batchId]": "/owner/consignments/stage3-batch-active",
+  "/owner/imports/[jobId]/issues": "/owner/imports/stage4-import-warnings/issues",
+  "/owner/imports/[jobId]/mapping": "/owner/imports/stage4-import-mapping/mapping",
+  "/owner/imports/[jobId]": "/owner/imports/stage4-import-completed",
+  "/owner/marking-library/[assetId]": "/owner/marking-library/stage4-synthetic-marking-asset",
+  "/owner/product-inventory/[listingId]/edit": "/owner/product-inventory/stage3-listing-fk-direct/edit",
+  "/owner/product-inventory/[listingId]": "/owner/product-inventory/stage3-listing-fk-direct",
+  "/owner/uploads/[batchId]/review": "/owner/uploads/stage4-upload-needs-mapping/review",
+  "/packing/[awb]": "/packing/STAGE-AWB-9",
+  "/picker/[sku]": "/picker/STAGE-FK-SKU-001",
+  "/work/consignments/items/[taskId]": "/work/consignments/items/stage3-line-pick_pack-pack",
+  "/work/groups/[stage]/[groupKey]": "/work/pick",
+  "/work/marking/[taskId]": "/work/marking/stage3-line-pick_mark_pack-mark",
+};
+
+async function sourceRouteScenarios() {
+  const appRoot = path.join(ROOT, "app");
+  const files = (await walk(appRoot)).filter((file) => path.basename(file) === "page.tsx");
+  return files.map((file) => {
+    const relative = path.relative(appRoot, file).replaceAll(path.sep, "/").replace(/\/?page\.tsx$/, "");
+    const pattern = relative ? `/${relative}` : "/";
+    const route = DYNAMIC_EXAMPLES[pattern] ?? pattern;
+    const publicRoute = ["/","/login","/forgot-password","/setup","/network-blocked"].includes(pattern);
+    return { id:`ROUTE_${pattern.replace(/[^a-zA-Z0-9]+/g,"_").replace(/^_+|_+$/g,"").toUpperCase()||"ROOT"}`,route,role:publicRoute?"PUBLIC":"OWNER",routePattern:pattern };
+  });
+}
+
 async function loadJson(file, fallback) {
   try { return JSON.parse(await readFile(file, "utf8")); } catch { return fallback; }
+}
+
+async function writeJsonCheckpoint(file, value) {
+  const temporary = `${file}.${process.pid}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`);
+  await rename(temporary, file);
 }
 
 async function login(page, credential) {
@@ -87,14 +151,80 @@ async function inspect(page) {
       overflow: Math.max(root.scrollWidth, body?.scrollWidth ?? 0) > root.clientWidth + 2,
       scrollWidth: Math.max(root.scrollWidth, body?.scrollWidth ?? 0),
       clientWidth: root.clientWidth,
+      documentHeight: Math.max(root.scrollHeight, body?.scrollHeight ?? 0),
       undersized: controls.filter((control) => ["BUTTON", "A", "SUMMARY"].includes(control.tag) && control.height < 40),
       stagingBanner: body?.innerText.includes("PRIVATE SYNTHETIC STAGING") ?? false,
     };
   });
 }
 
+async function inspectStable(page) {
+  try {
+    return await inspect(page);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("Execution context was destroyed")) throw error;
+    await page.waitForLoadState("domcontentloaded", { timeout: 10_000 });
+    await page.waitForTimeout(250);
+    return inspect(page);
+  }
+}
+
+function deviceScaleFactor(viewport) {
+  return viewport.width >= 1440 ? 3 : 4;
+}
+
+async function settleFullPage(page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const limit = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0);
+    for (let y = 0; y < limit; y += Math.max(300, Math.floor(innerHeight * .7))) {
+      scrollTo(0, y);
+      await new Promise((resolve) => setTimeout(resolve, 45));
+    }
+    scrollTo(0, limit);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    scrollTo(0, 0);
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    for (const animation of document.getAnimations()) animation.pause();
+  });
+}
+
+async function verifyPng(file, expectedWidth, expectedDocumentHeight, scale) {
+  const bytes = await readFile(file);
+  const image = sharp(bytes, { limitInputPixels: false });
+  const [metadata, statistics] = await Promise.all([image.metadata(), image.stats()]);
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+  const expectedHeight = Math.max(1, expectedDocumentHeight) * scale;
+  const entropy = statistics.entropy;
+  const valid = metadata.format === "png" && width >= expectedWidth && height >= Math.min(expectedHeight, scale * 500) && bytes.length > 10_000 && entropy > .05;
+  return { valid, width, height, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), entropy };
+}
+
+async function applyScenarioState(page, context, scenarioId) {
+  if (scenarioId === "AUTH_INVALID") {
+    await page.locator('input[name="username"]').fill("synthetic-invalid-user");
+    await page.locator('input[name="password"]').fill("synthetic-invalid-password");
+    await page.locator("form").first().evaluate((form) => form.requestSubmit());
+    await page.waitForTimeout(500);
+    return;
+  }
+  if (["PICK_ROUTE_DIALOG","PICK_ROUTE_OVERRIDE","PICK_MISSING_INSTRUCTIONS"].includes(scenarioId)) {
+    const trigger = page.getByRole("button", { name: /Picked All|choose route/i }).first();
+    if (await trigger.count()) {
+      await trigger.click();
+      await page.waitForTimeout(150);
+      if (scenarioId !== "PICK_ROUTE_DIALOG") {
+        const option = page.getByRole("button", { name: scenarioId === "PICK_ROUTE_OVERRIDE" ? /Assembly/i : /Marking/i }).first();
+        if (await option.count()) await option.click();
+      }
+    }
+  }
+}
+
 const cli = options(process.argv.slice(2));
 await mkdir(SCREENSHOT_ROOT, { recursive: true });
+await mkdir(MASTER_ROOT, { recursive: true });
 await mkdir(TRACE_ROOT, { recursive: true });
 if (!existsSync(CREDENTIALS)) throw new Error("Synthetic staging credentials are missing.");
 const credentialFile = JSON.parse(await readFile(CREDENTIALS, "utf8"));
@@ -102,34 +232,64 @@ const credentials = new Map(credentialFile.users.map((entry) => [entry.displayRo
 const executablePath = existsSync(CHROME) ? CHROME : existsSync(EDGE) ? EDGE : undefined;
 if (!executablePath) throw new Error("Installed Chrome or Edge is required; no bundled browser was downloaded.");
 
-let jobs = REQUIRED_SCENARIOS.flatMap((scenario) => VIEWPORTS
+const scenarioSet = [...REQUIRED_SCENARIOS, ...(!cli.state ? await sourceRouteScenarios() : [])];
+let jobs = scenarioSet.flatMap((scenario) => VIEWPORTS
   .filter((viewport) => !cli.viewport || viewport.id === cli.viewport)
   .map((viewport) => ({ ...scenario, viewport })))
   .filter((job) => !cli.route || job.route.includes(cli.route))
   .filter((job) => !cli.state || job.id === cli.state);
 
 const prior = cli.resume ? await loadJson(PROGRESS_PATH, { completed: {} }) : { completed: {} };
+const currentJobKeys = new Set(scenarioSet.flatMap((scenario) => VIEWPORTS.map((viewport) => `${scenario.id}:${viewport.id}`)));
+for (const key of Object.keys(prior.completed)) if (!currentJobKeys.has(key)) delete prior.completed[key];
+const disk = await statfs(PRIVATE_ROOT);
+const totalDiskBytes = Number(disk.blocks) * Number(disk.bsize);
+const freeDiskBytes = Number(disk.bavail) * Number(disk.bsize);
+if ((cli.hires || cli.mastersOnly) && freeDiskBytes < totalDiskBytes * .25) throw new Error("Full-page capture refused: less than 25% disk space remains.");
 const results = [];
 const browser = await chromium.launch({ executablePath, headless: !cli.headed, args: ["--disable-extensions", "--disable-sync"] });
 try {
+  const authStates = new Map();
+  for (const role of new Set(jobs.map((job) => job.role).filter((role) => role !== "PUBLIC"))) {
+    const credential = credentials.get(ROLE_TO_DISPLAY[role]);
+    if (!credential) throw new Error(`Synthetic credential is missing for role ${role}.`);
+    const authContext = await browser.newContext();
+    const authPage = await authContext.newPage();
+    await login(authPage, credential);
+    authStates.set(role, await authContext.storageState());
+    await authContext.close();
+  }
   for (const job of jobs) {
+    if (existsSync(STOP_PATH)) {
+      console.log(JSON.stringify({ stoppedSafely: true, reason: "stop-after-current flag", nextJob: `${job.id}:${job.viewport.id}` }));
+      break;
+    }
     const key = `${job.id}:${job.viewport.id}`;
-    if (cli.resume && prior.completed[key]?.auditStatus === "VERIFIED") {
+    const priorResult = prior.completed[key];
+    const alreadyComplete = cli.mastersOnly
+      ? priorResult?.fullPageCaptureStatus === "VERIFIED"
+      : priorResult?.viewportCaptureStatus === "VERIFIED";
+    if (cli.resume && !cli.force && alreadyComplete) {
       results.push(prior.completed[key]);
       continue;
     }
-    const context = await browser.newContext({ viewport: { width: job.viewport.width, height: job.viewport.height } });
+    const scale = cli.hires || cli.mastersOnly ? deviceScaleFactor(job.viewport) : 1;
+    const context = await browser.newContext({ viewport: { width: job.viewport.width, height: job.viewport.height }, deviceScaleFactor: scale, storageState: authStates.get(job.role) });
     await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
     const page = await context.newPage();
     const consoleErrors = [];
     const pageErrors = [];
     const failedRequests = [];
+    const errorResponses = [];
     page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
     page.on("pageerror", (error) => pageErrors.push(error.message));
     page.on("requestfailed", (request) => failedRequests.push({ url: request.url(), error: request.failure()?.errorText ?? "failed" }));
-    const credential = job.role === "PUBLIC" ? null : credentials.get(ROLE_TO_DISPLAY[job.role]);
-    const screenshotRelative = path.posix.join(".codex-tmp", "stage4-2b", "screenshots", `${job.id}-${job.viewport.id}.png`);
+    page.on("response", (response) => { if (response.status() >= 400) errorResponses.push({ url: response.url(), status: response.status() }); });
+    const screenshotRelative = path.posix.join(".codex-tmp", "stage4-2b", "screenshots", `${job.id}-${job.viewport.id}__viewport.png`);
     const screenshotPath = path.join(ROOT, ...screenshotRelative.split("/"));
+    const masterName = `${job.id}__${slug(job.route)}__${job.viewport.id}__full-page@highres.png`;
+    const masterRelative = path.posix.join(".codex-tmp", "stage4-2b", "full-page-hires", masterName);
+    const masterPath = path.join(ROOT, ...masterRelative.split("/"));
     const traceRelative = path.posix.join(".codex-tmp", "stage4-2b", "traces", `${job.id}-${job.viewport.id}.zip`);
     const tracePath = path.join(ROOT, ...traceRelative.split("/"));
     const startedAt = new Date().toISOString();
@@ -137,19 +297,44 @@ try {
     let inspection = null;
     let error = null;
     try {
-      if (credential) await login(page, credential);
-      const response = await page.goto(`${BASE}${job.route}`, { waitUntil: "networkidle", timeout: 25_000 });
+      if (job.id === "AUTH_EXPIRED") await context.clearCookies();
+      const response = await page.goto(`${BASE}${job.route}`, { waitUntil: "domcontentloaded", timeout: 25_000 });
+      await page.waitForTimeout(350);
+      await applyScenarioState(page, context, job.id);
       status = response?.status() ?? 0;
-      inspection = await inspect(page);
-      if (!cli.verifyOnly) await page.screenshot({ path: screenshotPath, fullPage: true });
+      inspection = await inspectStable(page);
+      if (!cli.verifyOnly && !cli.mastersOnly) await page.screenshot({ path: screenshotPath, type: "png", fullPage: false, animations: "disabled", caret: "hide", scale: "device" });
+      if (!cli.verifyOnly && (cli.fullPage || cli.mastersOnly)) {
+        await settleFullPage(page);
+        await page.screenshot({ path: masterPath, type: "png", fullPage: true, animations: "disabled", caret: "hide", scale: "device" });
+      }
     } catch (caught) {
       error = caught instanceof Error ? caught.message : String(caught);
     }
-    const unexpectedFailed = failedRequests.filter((item) => !/example\.invalid|invalid\.example\.invalid/.test(item.url));
-    const verified = !error && status > 0 && status < 500 && inspection?.stagingBanner && !inspection?.overflow && pageErrors.length === 0 && unexpectedFailed.length === 0;
+    const unexpectedFailed = failedRequests.filter((item) => !/example\.invalid|invalid\.example\.invalid/.test(item.url) && item.error !== "net::ERR_ABORTED");
+    const unexpectedResponses = errorResponses.filter((item) => !/\/favicon\.ico(?:\?|$)/.test(item.url));
+    const verified = !error && status > 0 && status < 400 && inspection?.stagingBanner && inspection?.heading !== "404" && !inspection?.overflow && pageErrors.length === 0 && unexpectedFailed.length === 0 && unexpectedResponses.length === 0;
     if (verified) await context.tracing.stop();
     else await context.tracing.stop({ path: tracePath });
+    let masterEvidence = null;
+    if (!error && !cli.verifyOnly && (cli.fullPage || cli.mastersOnly)) {
+      try { masterEvidence = await verifyPng(masterPath, job.viewport.width * scale, inspection?.documentHeight ?? job.viewport.height, scale); }
+      catch (caught) { error = caught instanceof Error ? caught.message : String(caught); }
+    }
+    let viewportEvidence = null;
+    if (!error && !cli.verifyOnly && !cli.mastersOnly) {
+      try { viewportEvidence = await verifyPng(screenshotPath, job.viewport.width, job.viewport.height, 1); }
+      catch (caught) { error = caught instanceof Error ? caught.message : String(caught); }
+    }
+    const visualStateValid = !error && status > 0 && status < 400 && Boolean(inspection?.stagingBanner) && inspection?.heading !== "404";
+    const viewportVerified = cli.mastersOnly
+      ? priorResult?.viewportCaptureStatus === "VERIFIED"
+      : Boolean(viewportEvidence?.valid) && visualStateValid;
+    const masterVerified = (cli.fullPage || cli.mastersOnly)
+      ? Boolean(masterEvidence?.valid) && visualStateValid
+      : priorResult?.fullPageCaptureStatus === "VERIFIED";
     const result = {
+      ...priorResult,
       id: key,
       area: job.id.split("_")[0],
       route: job.route,
@@ -165,7 +350,16 @@ try {
       expectedResult: "Synthetic state renders without overflow, unauthorized exposure, console errors or unexpected failed requests.",
       mutatesSyntheticData: false,
       resetStrategy: "canonical synthetic reset",
-      screenshotPath: cli.verifyOnly ? null : screenshotRelative,
+      screenshotPath: cli.mastersOnly ? priorResult?.screenshotPath ?? null : cli.verifyOnly ? priorResult?.screenshotPath ?? null : screenshotRelative,
+      viewportScreenshotPath: cli.mastersOnly ? priorResult?.viewportScreenshotPath ?? priorResult?.screenshotPath ?? null : cli.verifyOnly ? priorResult?.viewportScreenshotPath ?? null : screenshotRelative,
+      viewportCaptureStatus: viewportVerified ? "VERIFIED" : "FAILED",
+      fullPageMasterPath: (cli.fullPage || cli.mastersOnly) ? masterRelative : priorResult?.fullPageMasterPath ?? null,
+      fullPageMasterWidth: masterEvidence?.width ?? priorResult?.fullPageMasterWidth ?? null,
+      fullPageMasterHeight: masterEvidence?.height ?? priorResult?.fullPageMasterHeight ?? null,
+      fullPageDeviceScaleFactor: (cli.fullPage || cli.mastersOnly) ? scale : priorResult?.fullPageDeviceScaleFactor ?? null,
+      fullPageFileBytes: masterEvidence?.bytes ?? priorResult?.fullPageFileBytes ?? null,
+      fullPageSha256: masterEvidence?.sha256 ?? priorResult?.fullPageSha256 ?? null,
+      fullPageCaptureStatus: masterVerified ? "VERIFIED" : (cli.fullPage || cli.mastersOnly) ? "FAILED" : priorResult?.fullPageCaptureStatus ?? "NOT_STARTED",
       tracePath: verified ? null : traceRelative,
       consoleStatus: consoleErrors.length ? "ERROR" : "CLEAN",
       networkStatus: unexpectedFailed.length ? "ERROR" : "CLEAN",
@@ -176,33 +370,42 @@ try {
       consoleErrors,
       pageErrors,
       failedRequests,
+      errorResponses,
       error,
       startedAt,
       finishedAt: new Date().toISOString(),
       fingerprint: fingerprint({ job, inspection }),
-      auditStatus: verified ? "VERIFIED" : "BROKEN",
+      auditStatus: verified && viewportVerified && (!(cli.fullPage || cli.mastersOnly) || masterVerified) ? "VERIFIED" : "BROKEN",
       notes: verified ? "" : "Inspect private trace and browser evidence.",
     };
     results.push(result);
     prior.completed[key] = result;
-    await writeFile(PROGRESS_PATH, `${JSON.stringify(prior, null, 2)}\n`);
+    await writeJsonCheckpoint(PROGRESS_PATH, prior);
     await context.close();
   }
 } finally {
   await browser.close();
 }
 
+const finalResults = cli.resume
+  ? Object.values(prior.completed).sort((left, right) => left.id.localeCompare(right.id))
+  : results;
 const summary = {
   generatedAt: new Date().toISOString(),
   browserEngine: executablePath,
-  requestedJobs: jobs.length,
-  verified: results.filter((entry) => entry.auditStatus === "VERIFIED").length,
-  broken: results.filter((entry) => entry.auditStatus === "BROKEN").length,
-  controlCount: results.reduce((sum, entry) => sum + entry.controlCount, 0),
-  screenshots: results.filter((entry) => entry.screenshotPath).length,
-  failureTraces: results.filter((entry) => entry.tracePath).length,
+  requestedJobs: finalResults.length,
+  jobsInThisRun: jobs.length,
+  verified: finalResults.filter((entry) => entry.auditStatus === "VERIFIED").length,
+  broken: finalResults.filter((entry) => entry.auditStatus === "BROKEN").length,
+  controlCount: finalResults.reduce((sum, entry) => sum + entry.controlCount, 0),
+  screenshots: finalResults.filter((entry) => entry.screenshotPath).length,
+  fullPageMasters: finalResults.filter((entry) => entry.fullPageCaptureStatus === "VERIFIED").length,
+  fullPageBytes: finalResults.reduce((sum, entry) => sum + (entry.fullPageFileBytes ?? 0), 0),
+  freeDiskBytesAtStart: freeDiskBytes,
+  totalDiskBytes,
+  failureTraces: finalResults.filter((entry) => entry.tracePath).length,
   viewports: VIEWPORTS,
   syntheticOnly: true,
 };
-await writeFile(RESULT_PATH, `${JSON.stringify({ summary, results }, null, 2)}\n`);
+await writeJsonCheckpoint(RESULT_PATH, { summary, results: finalResults });
 console.log(JSON.stringify(summary, null, 2));

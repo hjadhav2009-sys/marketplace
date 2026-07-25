@@ -33,7 +33,7 @@ export const REQUIRED_SCENARIOS = [
   ["IMPORT_COMPLETED_WARNINGS", "/owner/imports/stage4-import-warnings", "OWNER"],
   ["IMPORT_FAILED", "/owner/imports/stage4-import-failed", "OWNER"],
   ["IMPORT_CANCELLED", "/owner/imports/stage4-import-cancelled", "OWNER"],
-  ["MISSING_LISTING_HELD", "/owner/catalog/missing/stage3-consignment-missing-issue", "OWNER"],
+  ["MISSING_LISTING_HELD", "/owner/catalog/missing", "OWNER"],
   ["MISSING_LISTING_RESOLVED", "/owner/catalog/missing", "OWNER"],
   ["CONSIGNMENT_DRAFT", "/owner/consignments/stage3-batch-draft", "OWNER"],
   ["CONSIGNMENT_REVIEW", "/owner/consignments/stage3-batch-review_required/review", "OWNER"],
@@ -91,4 +91,3 @@ export const ROLE_TO_DISPLAY = {
   PACKER: "Synthetic Packer A",
   VIEW_ALL: "Synthetic View-All Worker",
 };
-

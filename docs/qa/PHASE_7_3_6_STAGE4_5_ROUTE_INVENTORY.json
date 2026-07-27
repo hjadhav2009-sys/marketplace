@@ -1,0 +1,655 @@
+{
+  "version": "phase-7.3.6-stage4.5-v1",
+  "routes": [
+    {
+      "route": "/",
+      "parentRoute": null,
+      "dynamicParameters": [],
+      "authentication": "PUBLIC",
+      "sourceFile": "app/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/%5F%5Fqa/design-lab",
+      "parentRoute": "/%5F%5Fqa",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/%5F%5Fqa/design-lab/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/%5F%5Fqa/design-lab/[area]",
+      "parentRoute": "/%5F%5Fqa/design-lab",
+      "dynamicParameters": [
+        "area"
+      ],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/%5F%5Fqa/design-lab/[area]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/%5F%5Fqa/ui-audit",
+      "parentRoute": "/%5F%5Fqa",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/%5F%5Fqa/ui-audit/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/access-denied",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/access-denied/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/accounts",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/accounts/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/change-password",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/change-password/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/dashboard",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/dashboard/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/forgot-password",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "PUBLIC",
+      "sourceFile": "app/forgot-password/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/login",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "PUBLIC",
+      "sourceFile": "app/login/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/network-blocked",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "PUBLIC",
+      "sourceFile": "app/network-blocked/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/owner/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/accounts",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/accounts/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/catalog/missing",
+      "parentRoute": "/owner/catalog",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/catalog/missing/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/catalog/missing/[issueId]",
+      "parentRoute": "/owner/catalog/missing",
+      "dynamicParameters": [
+        "issueId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/catalog/missing/[issueId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/cleanup",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/cleanup/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/consignments",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/consignments/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/consignments/[batchId]",
+      "parentRoute": "/owner/consignments",
+      "dynamicParameters": [
+        "batchId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/consignments/[batchId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/consignments/[batchId]/issues",
+      "parentRoute": "/owner/consignments/[batchId]",
+      "dynamicParameters": [
+        "batchId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/consignments/[batchId]/issues/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/consignments/[batchId]/listing/[lineId]",
+      "parentRoute": "/owner/consignments/[batchId]/listing",
+      "dynamicParameters": [
+        "batchId",
+        "lineId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/consignments/[batchId]/listing/[lineId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/consignments/[batchId]/review",
+      "parentRoute": "/owner/consignments/[batchId]",
+      "dynamicParameters": [
+        "batchId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/consignments/[batchId]/review/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/consignments/new",
+      "parentRoute": "/owner/consignments",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/consignments/new/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/data-management",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/data-management/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/imports",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/imports/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/imports/[jobId]",
+      "parentRoute": "/owner/imports",
+      "dynamicParameters": [
+        "jobId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/imports/[jobId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/imports/[jobId]/issues",
+      "parentRoute": "/owner/imports/[jobId]",
+      "dynamicParameters": [
+        "jobId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/imports/[jobId]/issues/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/imports/[jobId]/mapping",
+      "parentRoute": "/owner/imports/[jobId]",
+      "dynamicParameters": [
+        "jobId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/imports/[jobId]/mapping/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/manual-review",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/manual-review/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/marking-library",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/marking-library/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/marking-library/[assetId]",
+      "parentRoute": "/owner/marking-library",
+      "dynamicParameters": [
+        "assetId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/marking-library/[assetId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/marking-library/new",
+      "parentRoute": "/owner/marking-library",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/marking-library/new/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/old-pending",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/old-pending/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/process-rules",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/process-rules/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/product-inventory",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/product-inventory/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/product-inventory/[listingId]",
+      "parentRoute": "/owner/product-inventory",
+      "dynamicParameters": [
+        "listingId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/product-inventory/[listingId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/product-inventory/[listingId]/edit",
+      "parentRoute": "/owner/product-inventory/[listingId]",
+      "dynamicParameters": [
+        "listingId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/product-inventory/[listingId]/edit/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/product-inventory/new",
+      "parentRoute": "/owner/product-inventory",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/product-inventory/new/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/product-inventory/refresh",
+      "parentRoute": "/owner/product-inventory",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/product-inventory/refresh/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/sku-mappings",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/sku-mappings/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/sku-mappings/import",
+      "parentRoute": "/owner/sku-mappings",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/sku-mappings/import/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/system",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/system/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/uploads/[batchId]/review",
+      "parentRoute": "/owner/uploads/[batchId]",
+      "dynamicParameters": [
+        "batchId"
+      ],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/uploads/[batchId]/review/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/uploads/new",
+      "parentRoute": "/owner/uploads",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/uploads/new/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/users",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/users/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/owner/work-route-summary",
+      "parentRoute": "/owner",
+      "dynamicParameters": [],
+      "authentication": "OWNER",
+      "sourceFile": "app/owner/work-route-summary/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/packing",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/packing/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/packing/[awb]",
+      "parentRoute": "/packing",
+      "dynamicParameters": [
+        "awb"
+      ],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/packing/[awb]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/picker",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/picker/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/picker/[sku]",
+      "parentRoute": "/picker",
+      "dynamicParameters": [
+        "sku"
+      ],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/picker/[sku]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/problems",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/problems/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/reports",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/reports/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/setup",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "PUBLIC",
+      "sourceFile": "app/setup/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work",
+      "parentRoute": "/",
+      "dynamicParameters": [],
+      "authentication": "AUTHENTICATED",
+      "sourceFile": "app/work/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/assemble",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/assemble/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/assembly",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/assembly/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/consignments/assemble",
+      "parentRoute": "/work/consignments",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/consignments/assemble/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/consignments/items/[taskId]",
+      "parentRoute": "/work/consignments/items",
+      "dynamicParameters": [
+        "taskId"
+      ],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/consignments/items/[taskId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/consignments/pack",
+      "parentRoute": "/work/consignments",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/consignments/pack/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/consignments/pick",
+      "parentRoute": "/work/consignments",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/consignments/pick/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/groups/[stage]/[groupKey]",
+      "parentRoute": "/work/groups/[stage]",
+      "dynamicParameters": [
+        "stage",
+        "groupKey"
+      ],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/groups/[stage]/[groupKey]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/mark",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/mark/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/marking",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/marking/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/marking/[taskId]",
+      "parentRoute": "/work/marking",
+      "dynamicParameters": [
+        "taskId"
+      ],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/marking/[taskId]/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/order-marking",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/order-marking/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/pack",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/pack/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/pick",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/pick/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/problems",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/problems/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    },
+    {
+      "route": "/work/scan",
+      "parentRoute": "/work",
+      "dynamicParameters": [],
+      "authentication": "WORKER",
+      "sourceFile": "app/work/scan/page.tsx",
+      "captureRequirement": "FULL_PAGE_AT_SIX_RESOLUTIONS",
+      "status": "INVENTORIED"
+    }
+  ]
+}

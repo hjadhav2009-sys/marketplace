@@ -116,6 +116,8 @@
     "stage4-2b:audit-studio": "node tests/stage4-2b-audit-tools.test.mjs",
     "stage4-2b:reports": "node scripts/qa/stage4-2b-report.mjs",
     "stage4-2c:test": "node tests/stage4-2c-coverage-editor.test.mjs",
+    "stage4-3a:test": "node tests/stage4-3a-ui-safety.test.mjs",
+    "stage4-3a:browser": "node scripts/qa/stage4-3a-browser-closure.mjs",
     "stage4-2c:editor-proof": "node scripts/qa/stage4-2c-editor-proof.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",
     "data-management:test": "tsx tests/data-management.test.ts",

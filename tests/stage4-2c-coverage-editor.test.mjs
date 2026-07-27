@@ -9,6 +9,10 @@ const review = read("app/owner/consignments/[batchId]/review/page.tsx");
 const studio = read("app/%5F%5Fqa/ui-audit/AuditStudio.tsx");
 const live = read("app/%5F%5Fqa/design-lab/[area]/WorkCardLiveEditor.tsx");
 const approval = read("app/api/qa/ui-audit/approved-designs/route.ts");
+const login = read("app/login/page.tsx");
+const shell = read("components/AppShell.tsx");
+const mobileAccountMenu = read("components/MobileAccountMenu.tsx");
+const workCard = read("app/work/GroupedWorkCard.tsx");
 
 assert.match(seed, /stage4-missing-listing-issue/);
 assert.match(seed, /sourceType:\s*"ORDER"/);
@@ -35,5 +39,18 @@ assert.match(approval, /STAGING_UI_AUDIT/);
 assert.match(approval, /\.codex-tmp", "stage4-2c", "approved-designs/);
 assert.match(approval, /ApprovedDesignSpecificationV1/);
 assert.match(approval, /flag:\s*"wx"/);
+
+assert.match(login, /max-w-md rounded-lg/);
+assert.match(login, /\[&_button\]:w-full/);
+assert.match(login, /\[&_button\]:rounded-full/);
+assert.match(mobileAccountMenu, /Open account menu/);
+assert.match(mobileAccountMenu, /Switch account/);
+assert.match(shell, /MobileAccountMenu/);
+assert.doesNotMatch(shell, /<MobileBottomNav/);
+assert.match(workCard, /md:grid-cols-\[150px_minmax\(0,1fr\)_220px\]/);
+assert.match(workCard, /xl:grid-cols-\[minmax\(200px,240px\)_minmax\(0,1fr\)_300px\]/);
+assert.match(workCard, /flex flex-nowrap gap-1/);
+assert.match(workCard, /md:max-w-\[220px\]/);
+assert.match(workCard, /xl:max-w-\[300px\]/);
 
 console.log("Stage 4.2C coverage and local visual-editor policy test passed.");

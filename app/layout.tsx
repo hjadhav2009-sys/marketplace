@@ -29,8 +29,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         {stagingBanner ? (
-          <div role="status" style={{ background: "#7f1d1d", color: "white", fontWeight: 800, padding: "8px 12px", textAlign: "center", letterSpacing: "0.04em", position: "relative", zIndex: 10000 }}>
-            {stagingBanner} — SYNTHETIC DATA ONLY
+          <div role="status" className="px-3 py-1.5 text-center text-xs font-extrabold leading-4 tracking-wide sm:py-2 sm:text-sm" style={{ background: "#7f1d1d", color: "white", position: "relative", zIndex: 10000 }}>
+            <span className="block sm:inline">{stagingBanner}</span>
+            <span className="block sm:inline"> — SYNTHETIC DATA ONLY</span>
           </div>
         ) : null}
         {children}

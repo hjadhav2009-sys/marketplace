@@ -224,7 +224,7 @@ export async function requireUser(roles?: Role[], options?: { allowPasswordChang
   }
 
   if (roles && !roles.includes(user.role)) {
-    redirect(capabilityHomePath(user));
+    redirect("/access-denied");
   }
 
   return user;

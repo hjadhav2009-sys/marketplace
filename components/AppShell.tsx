@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import type { User } from "@prisma/client";
-import { AppNav, MobileBottomNav, MobileDrawer, type AppNavLink } from "@/components/AppNav";
+import { AppNav, MobileDrawer, type AppNavLink } from "@/components/AppNav";
+import { MobileAccountMenu } from "@/components/MobileAccountMenu";
 import { capabilityHomePath, clearSession, getSelectedAccount, requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { getRequestMeta } from "@/lib/request-context";
@@ -78,23 +79,12 @@ function linksForUser(user: NavigationUser) {
   return links;
 }
 
-function mobileLinksForUser(user: NavigationUser) {
-  if (user.role === "OWNER") return [];
-  const links = [];
-  if (hasWorkPermission(user, "canPick") || hasWorkPermission(user, "canMark") || hasWorkPermission(user, "canAssemble") || hasWorkPermission(user, "canPack") || user.canViewAllWork) links.push({ href: "/work", label: "Work" }, { href: "/work/scan", label: "Scan" });
-  if (hasWorkPermission(user, "canPick")) links.push({ href: "/work/pick?source=ORDER", label: "Pick" });
-  if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) links.push({ href: "/work/problems", label: "Problems" });
-  links.push({ href: "/accounts", label: "Account" });
-  return links;
-}
-
 export async function AppShell({ children, title, allowNoAccount = false }: AppShellProps) {
   const user = await requireUser();
   const account = allowNoAccount ? await getSelectedAccount(user) : await requireAccount(user);
   const links = linksForUser(user);
   const accountName = account ? account.accountDisplayName ?? account.name : "No seller account selected";
   const accountCode = account ? account.accountCode ?? account.code : "Create or choose an account";
-  const mobileLinks = mobileLinksForUser(user);
 
   return (
     <div className="flex min-h-screen bg-stone-50 text-slate-950">
@@ -124,19 +114,19 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
             >
               Switch account
             </Link>
-            <form action={logoutAction}>
+            <form action={logoutAction} className="hidden sm:block">
               <button className="min-h-11 rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:text-sm">
                 Logout
               </button>
             </form>
+            <MobileAccountMenu role={user.role} name={user.name} logoutAction={logoutAction}/>
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[1600px] px-3 pb-24 pt-4 sm:px-6 sm:py-6 lg:pb-8 lg:py-8">
+      <main className="mx-auto w-full max-w-[1600px] px-3 pb-8 pt-4 sm:px-6 sm:py-6 lg:py-8">
         {title ? <h1 className="mb-5 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{title}</h1> : null}
         {children}
       </main>
-      {mobileLinks.length > 0 ? <MobileBottomNav links={mobileLinks} /> : null}
       </div>
     </div>
   );

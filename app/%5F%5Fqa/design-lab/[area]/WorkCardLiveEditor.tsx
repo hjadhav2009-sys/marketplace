@@ -68,8 +68,8 @@ export function WorkCardLiveEditor() {
     actions: <div className="flex gap-2" style={{ flexDirection: buttonDirection }}><button className="min-h-11 flex-1 rounded-lg bg-berry px-3 font-bold text-white">Picked All</button><button className="min-h-11 flex-1 rounded-lg border px-3 font-bold">Details</button></div>
   };
 
-  return <section className="mt-8 grid gap-5 xl:grid-cols-[22rem_1fr]">
-    <aside className="rounded-2xl border bg-white p-4 shadow-sm">
+  return <section className="mt-8 grid min-w-0 gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
+    <aside className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm">
       <p className="text-xs font-black uppercase text-violet-700">Live Component mode</p>
       <h2 className="text-xl font-black">Pick card controls</h2>
       <div className="mt-4 grid gap-3 text-sm">
@@ -91,7 +91,7 @@ export function WorkCardLiveEditor() {
       <button onClick={()=>void approve()} className="mt-5 min-h-12 w-full rounded-xl bg-violet-700 px-4 font-black text-white">Approve Design</button>
       {approval ? <p role="status" className="mt-2 break-words text-xs font-bold text-teal-700">{approval}</p> : null}
     </aside>
-    <div className="rounded-2xl border bg-slate-100 p-4">
+    <div className="min-w-0 overflow-hidden rounded-2xl border bg-slate-100 p-4">
       <p className="mb-3 text-sm font-bold">Immediate synthetic preview · {variant}</p>
       <div className={variant === "mobile" ? "mx-auto max-w-[390px]" : "max-w-5xl"}>
         <article className="flex border bg-white" style={{ flexDirection: variant === "mobile" ? "column" : direction, gap, padding, margin, borderRadius: radius, boxShadow: shadow ? "0 12px 30px rgba(15,23,42,.12)" : "none" }}>

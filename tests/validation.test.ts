@@ -1407,10 +1407,10 @@ assert.match(appShell, /hasWorkPermission\(user, "canPack"\)[\s\S]*href: "\/pack
 assert.match(appShell, /function linksForUser[\s\S]*if \(user\.role === "OWNER"\)[\s\S]*return ownerLinks[\s\S]*hasWorkPermission/, "Owner management links remain separate while workers may combine operational permissions");
 assert.match(appNavComponent, /usePathname/, "Top navigation can style the active route");
 assert.match(appNavComponent, /prefetch/, "Top navigation prefetches common route links");
-assert.match(appNavComponent, /data-mobile-bottom-nav/, "Mobile bottom navigation exists");
+assert.doesNotMatch(appNavComponent, /data-mobile-bottom-nav|function MobileBottomNav/, "Unapproved mobile bottom navigation is not rendered");
 assert.match(appNavComponent, /hidden[\s\S]*lg:flex[\s\S]*data-desktop-sidebar/, "Desktop sidebar is hidden below the large breakpoint");
 assert.match(appShell, /\/owner\/accounts/, "Owner navigation includes account management");
-assert.match(appShell, /MobileBottomNav/, "App shell renders mobile bottom navigation for workers");
+assert.doesNotMatch(appShell, /MobileBottomNav/, "App shell uses the complete permission-aware mobile drawer without an unapproved bottom navigation");
 assert.match(appShell, /MobileDrawer links=\{links\}/, "Owner mobile navigation uses the compact shared drawer");
 assert.match(appShell, /account\.companyName[\s\S]*account\.marketplace/, "App shell shows selected company and marketplace context");
 assert.match(accountsPage, /AccountSwitcherForm/, "Account switch page uses the grouped marketplace switcher");

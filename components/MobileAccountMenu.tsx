@@ -6,10 +6,22 @@ import { useEffect, useRef, useState } from "react";
 type MobileAccountMenuProps = {
   role: string;
   name: string;
+  companyName?: string;
+  accountName?: string;
+  marketplace?: string;
+  accountCode?: string;
   logoutAction: () => Promise<void>;
 };
 
-export function MobileAccountMenu({ role, name, logoutAction }: MobileAccountMenuProps) {
+export function MobileAccountMenu({
+  role,
+  name,
+  companyName,
+  accountName,
+  marketplace,
+  accountCode,
+  logoutAction
+}: MobileAccountMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -49,15 +61,27 @@ export function MobileAccountMenu({ role, name, logoutAction }: MobileAccountMen
         </svg>
       </button>
       {open ? (
-        <div role="menu" className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(16rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
-          <p title={`${role} / ${name}`} className="break-words rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-800">
-            {role} / {name}
-          </p>
-          <Link role="menuitem" href="/accounts" prefetch className="mt-2 flex min-h-11 items-center rounded-xl px-3 text-sm font-bold text-slate-800 hover:bg-slate-100">
+        <div role="menu" aria-label="Account menu" className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+          <div className="rounded-xl bg-slate-100 px-3 py-3 text-slate-800">
+            <p className="break-words text-sm font-semibold">{companyName ?? "Marketplace Pick & Pack"}</p>
+            {accountName ? <p className="mt-1 break-words text-sm">{accountName}</p> : null}
+            {marketplace || accountCode ? (
+              <p className="mt-1 break-words text-xs font-medium text-slate-600">
+                {[marketplace, accountCode].filter(Boolean).join(" / ")}
+              </p>
+            ) : null}
+            <p title={`${role} / ${name}`} className="mt-2 break-words border-t border-slate-200 pt-2 text-xs font-medium text-slate-600">
+              Signed in as {name} ({role})
+            </p>
+          </div>
+          <Link role="menuitem" href="/accounts" prefetch onClick={() => setOpen(false)} className="mt-2 flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100">
             Switch account
           </Link>
+          <Link role="menuitem" href="/change-password" prefetch onClick={() => setOpen(false)} className="flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+            Password
+          </Link>
           <form action={logoutAction}>
-            <button role="menuitem" className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-bold text-rose-700 hover:bg-rose-50">
+            <button role="menuitem" className="flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50">
               Logout
             </button>
           </form>

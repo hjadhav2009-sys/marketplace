@@ -93,7 +93,12 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-6 sm:py-3">
           <MobileDrawer links={links} accountName={accountName} marketplace={account?.marketplace ?? user.role}/>
-          <Link href={account ? capabilityHomePath(user) : user.role === "OWNER" ? "/owner/accounts" : "/accounts"} prefetch className="min-w-0">
+          <Link
+            href={account ? capabilityHomePath(user) : user.role === "OWNER" ? "/owner/accounts" : "/accounts"}
+            prefetch
+            title={account ? `${account.companyName} / ${accountName} / ${account.marketplace} / ${accountCode}` : accountName}
+            className="min-w-0"
+          >
             <p className="hidden text-xs font-semibold uppercase tracking-wide text-berry sm:block">Marketplace Pick & Pack</p>
             <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account ? `${account.companyName} / ${accountName}` : accountName}</p>
             <p className="truncate text-xs font-medium text-slate-500 sm:hidden">
@@ -119,7 +124,15 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
                 Logout
               </button>
             </form>
-            <MobileAccountMenu role={user.role} name={user.name} logoutAction={logoutAction}/>
+            <MobileAccountMenu
+              role={user.role}
+              name={user.name}
+              companyName={account?.companyName}
+              accountName={accountName}
+              marketplace={account?.marketplace}
+              accountCode={accountCode}
+              logoutAction={logoutAction}
+            />
           </div>
         </div>
       </header>

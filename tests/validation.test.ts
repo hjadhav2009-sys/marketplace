@@ -1412,6 +1412,7 @@ assert.match(appNavComponent, /hidden[\s\S]*lg:flex[\s\S]*data-desktop-sidebar/,
 assert.match(appShell, /\/owner\/accounts/, "Owner navigation includes account management");
 assert.doesNotMatch(appShell, /MobileBottomNav/, "App shell uses the complete permission-aware mobile drawer without an unapproved bottom navigation");
 assert.match(appShell, /MobileDrawer links=\{links\}/, "Owner mobile navigation uses the compact shared drawer");
+assert.match(appShell, /companyName=\{account\?\.companyName\}[\s\S]*accountName=\{accountName\}[\s\S]*accountCode=\{accountCode\}/, "Mobile account menu receives complete selected-account identity");
 assert.match(appShell, /account\.companyName[\s\S]*account\.marketplace/, "App shell shows selected company and marketplace context");
 assert.match(accountsPage, /AccountSwitcherForm/, "Account switch page uses the grouped marketplace switcher");
 assert.match(accountsPage, /user\.role === "OWNER"[\s\S]*No seller accounts have been created yet\.[\s\S]*Create First Seller Account/, "Owner with zero accounts sees the first-account setup action");

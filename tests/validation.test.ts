@@ -1090,6 +1090,12 @@ const uploadActions = readFileSync(join(repoRoot, "app", "owner", "uploads", "ac
 const uploadPage = readFileSync(join(repoRoot, "app", "owner", "uploads", "new", "page.tsx"), "utf8");
 const productImageComponent = readFileSync(join(repoRoot, "components", "ProductImage.tsx"), "utf8");
 const productImageGalleryComponent = readFileSync(join(repoRoot, "components", "ProductImageGallery.tsx"), "utf8");
+const workImageGalleryComponent = readFileSync(join(repoRoot, "components", "WorkImageGallery.tsx"), "utf8");
+const structuredDetailsComponent = readFileSync(join(repoRoot, "components", "StructuredDetails.tsx"), "utf8");
+const listingFormComponent = readFileSync(join(repoRoot, "app", "owner", "product-inventory", "ListingForm.tsx"), "utf8");
+const productInventoryPage = readFileSync(join(repoRoot, "app", "owner", "product-inventory", "page.tsx"), "utf8");
+const productDetailPage = readFileSync(join(repoRoot, "app", "owner", "product-inventory", "[listingId]", "page.tsx"), "utf8");
+const missingCatalogPage = readFileSync(join(repoRoot, "app", "owner", "catalog", "missing", "page.tsx"), "utf8");
 const appNavComponent = readFileSync(join(repoRoot, "components", "AppNav.tsx"), "utf8");
 const accountSwitcherComponent = readFileSync(join(repoRoot, "components", "AccountSwitcherForm.tsx"), "utf8");
 const marketplaceImportWizardComponent = readFileSync(join(repoRoot, "components", "MarketplaceImportWizard.tsx"), "utf8");
@@ -1260,6 +1266,15 @@ assert.match(dashboardPage, /getDashboardStats/, "Dashboard route exists and use
 assert.match(dashboardPage, /Selected company \/ seller account/, "Dashboard shows selected company and account context");
 assert.match(dashboardPage, /account\.marketplace/, "Dashboard shows selected marketplace context");
 assert.match(dashboardPage, /Import orders[\s\S]*Import listing master[\s\S]*href="\/work\/pick\?source=ORDER" label="Open Pick"[\s\S]*href="\/work\/pack" label="Open Pack"/, "Dashboard exposes fast account-scoped quick actions through the modern Work Hub routes");
+assert.match(productInventoryPage, /StatusBadge value=\{listing\.listingStatus[\s\S]*More identifiers[\s\S]*View details/, "Product Inventory exposes lifecycle state and keeps secondary identifiers compact on mobile");
+assert.match(productDetailPage, /StatusBadge[\s\S]*Seller SKU[\s\S]*Default processing[\s\S]*Protect manual values/, "Product detail establishes product identity before configuration controls");
+assert.match(productDetailPage, /ProcessRuleEditor[\s\S]*saveCatalogFieldLocksAction/, "Product detail preserves authoritative process-rule and manual-protection actions");
+assert.match(listingFormComponent, /beforeunload[\s\S]*Discard unsaved listing changes\?[\s\S]*Cancel/, "Manual listing forms warn before discarding dirty edits and provide a safe exit");
+assert.match(listingFormComponent, /readOnly=\{Boolean\(listing\)\}/, "Manual listing edit preserves immutable Seller SKU identity");
+assert.match(structuredDetailsComponent, /Include empty fields[\s\S]*border-l-2/, "Structured details use a compact optional-empty toggle and avoid nested field cards");
+assert.match(workImageGalleryComponent, /ArrowLeft[\s\S]*ArrowRight[\s\S]*aria-live="polite"[\s\S]*Image \{index \+ 1\} of \{available\.length\}/, "Work image gallery exposes keyboard and announced position state");
+assert.doesNotMatch(workImageGalleryComponent, /â|Ã|Â/, "Work image gallery contains no corrupted navigation glyphs");
+assert.match(missingCatalogPage, /unresolved listing issue[\s\S]*lg:grid-cols-2[\s\S]*Work held until listing is resolved/, "Missing Listings exposes scalable counts and operational hold language");
 assert.match(ownerPage, /redirect\("\/dashboard"\)/, "Legacy /owner route redirects to /dashboard");
 assert.match(uploadPage, /MarketplaceImportWizard/, "Upload page delegates marketplace/account filtering to the import wizard");
 assert.match(marketplaceImportWizardComponent, /Choose marketplace and seller account first\. Imports are saved under that account\./, "Upload wizard explains marketplace/account scoping");

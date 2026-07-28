@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { notFound } from "next/navigation";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import { StructuredDetails, type DetailSection } from "@/components/StructuredDetails";
 import { WorkImageGallery } from "@/components/WorkImageGallery";
 import { requireAccount, requireUser } from "@/lib/auth";
@@ -12,29 +13,323 @@ import { ProcessRuleEditor } from "../../process-rules/ProcessRuleEditor";
 import { saveCatalogFieldLocksAction } from "./actions";
 import { LOCKABLE_CATALOG_FIELDS } from "./fields";
 
-const text=(value:unknown)=>value===null||value===undefined?null:typeof value==="string"?value:JSON.stringify(value);
-export default async function ProductDetailPage({params}:{params:Promise<{listingId:string}>}){
- const user=await requireUser(["OWNER"]),account=await requireAccount(user),{listingId}=await params;
- const listing=await prisma.marketplaceListing.findFirst({where:{id:listingId,accountId:account.id},include:{identifiers:{where:{active:true},orderBy:{identifierType:"asc"}},attributes:{orderBy:{technicalKey:"asc"}},processRules:{where:{active:true},take:1},markingAssetLinks:{where:{active:true},include:{markingAsset:{include:{files:{where:{activeVersion:true},take:1}}}}}}});if(!listing)notFound();
- const assets=listing.markingAssetLinks.map(({markingAsset})=>({id:markingAsset.id,label:markingAsset.masterDesignId??markingAsset.name,hasFile:Boolean(markingAsset.files.length)}));const locks=(()=>{try{const parsed=JSON.parse(listing.manualLocksJson??"{}");return new Set<string>(Array.isArray(parsed)?parsed.filter((field):field is string=>typeof field==="string"):Object.entries(parsed&&typeof parsed==="object"?parsed:{}).flatMap(([field,locked])=>locked===true?[field]:[]));}catch{return new Set<string>();}})();
- const images=[listing.image1366Url1,listing.imageUrl1,listing.image1366Url2,listing.image1366Url3,listing.image1366Url4,listing.image1366Url5,listing.image1366Url6,listing.image1366Url7,listing.image1366Url8,listing.image1366Url9,listing.image1366Url10,listing.imageUrl2,listing.imageUrl3,listing.imageUrl4,listing.imageUrl5,listing.imageUrl6,listing.imageUrl7,listing.imageUrl8,listing.imageUrl9,listing.imageUrl10,listing.mainImageUrl];
- const dynamic=listing.attributes.map(attribute=>({label:attribute.displayLabel||attribute.technicalKey,value:text(attribute.valueText??attribute.valueJson)}));
- const sections:DetailSection[]=[
-  {title:"Package Measurements",fields:[{label:"Package Length",value:null},{label:"Package Breadth",value:null},{label:"Package Height",value:null},{label:"Package Weight",value:null}]},
-  {title:"Delivery Charges",fields:[{label:"Local Delivery Charge to Customer",value:null},{label:"Zonal Delivery Charge to Customer",value:null},{label:"National Delivery Charge to Customer",value:null}]},
-  {title:"Problems and History",fields:[{label:"Scrape Status",value:listing.scrapeStatus},{label:"Scrape Error",value:listing.scrapeError},{label:"Created",value:formatDateTime(listing.createdAt)},{label:"Updated",value:formatDateTime(listing.updatedAt)}]},
-  {title:"Overview",fields:[{label:"Product Title",value:listing.productTitle},{label:"Seller SKU Id",value:listing.sellerSkuId},{label:"Internal SKU",value:listing.sku},{label:"Marketplace",value:listing.marketplace},{label:"Listing Status",value:listing.listingStatus},{label:"Sub-category",value:listing.subCategory}]},
-  {title:"Marketplace Listing",fields:[{label:"Flipkart Serial Number",value:listing.fsn},{label:"Listing ID",value:listing.listingId},...listing.identifiers.map(identifier=>({label:identifier.identifierType,value:identifier.rawValue}))]},
-  {title:"Pricing and Settlement",fields:[{label:"MRP",value:listing.mrp},{label:"Your Selling Price",value:listing.sellingPrice},{label:"Live Price",value:listing.livePrice},{label:"Live MRP",value:listing.liveMrp},{label:"Bank Settlement",value:null},{label:"Minimum Order Quantity",value:null},{label:"Benchmark Price",value:null}]},
-  {title:"Fulfilment and Stock References",description:"Catalog/reference values only. They do not create physical inventory or ERP stock.",fields:[{label:"Fulfillment By",value:null},{label:"System Stock count",value:null},{label:"Your Stock Count",value:null},{label:"Recommended Stock",value:null},{label:"Procurement SLA",value:null},{label:"Procurement Type",value:null}]},
-  {title:"Package and Shipping",fields:[{label:"Package Length",value:null},{label:"Package Breadth",value:null},{label:"Package Height",value:null},{label:"Package Weight",value:null},{label:"Local Delivery Charge to Customer",value:null},{label:"Zonal Delivery Charge to Customer",value:null},{label:"National Delivery Charge to Customer",value:null}]},
-  {title:"Tax and Legal",fields:[{label:"HSN",value:null},{label:"Tax Code",value:null},{label:"Luxury Cess Tax Rate",value:null},{label:"Country of Origin ISO code",value:null},{label:"Manufacturer Details",value:null},{label:"Importer Details",value:null},{label:"Packer Details",value:null},{label:"Date of Manufacture",value:null},{label:"Shelf Life in Months",value:null}]},
-  {title:"Live Marketplace Data",fields:[{label:"Live Title",value:listing.liveTitle},{label:"Live Brand",value:listing.liveBrand},{label:"Live Category",value:listing.liveCategory},{label:"Live Price",value:listing.livePrice},{label:"Live MRP",value:listing.liveMrp},{label:"Live Seller",value:null},{label:"Rating",value:listing.rating},{label:"Review Count",value:listing.reviewCount}]},
-  {title:"Description and Specifications",fields:[{label:"Product Highlights",value:listing.productHighlights},{label:"Description",value:listing.description},{label:"All Specifications",value:listing.allSpecifications},...dynamic]},
-  {title:"Processing and Workflow",fields:[{label:"Saved route",value:listing.processRules[0]?.route},{label:"Manual locks",value:[...locks].join(", ")},{label:"Last catalog refresh",value:listing.lastImportedAt?formatDateTime(listing.lastImportedAt):null},{label:"Last changed",value:formatDateTime(listing.updatedAt)}]},
-  {title:"Attachments",fields:[{label:"Attachment status",value:listing.markingAssetLinks.length?`${listing.markingAssetLinks.length} marking attachment link(s)`:null}]},
-  {title:"Problems",fields:[{label:"Scrape Status",value:listing.scrapeStatus},{label:"Scrape Error",value:listing.scrapeError}]},
-  {title:"History",fields:[{label:"Created",value:formatDateTime(listing.createdAt)},{label:"Updated",value:formatDateTime(listing.updatedAt)},{label:"Generated Direct Product URL",value:listing.generatedDirectProductUrl,href:listing.generatedDirectProductUrl},{label:"Canonical Product URL",value:listing.canonicalProductUrl,href:listing.canonicalProductUrl}]}
- ];
- return <AppShell><PageHeader eyebrow={`${listing.marketplace} / ${account.accountDisplayName??account.name}`} title={listing.productTitle??listing.sellerSkuId} description="Complete account-scoped listing details. Empty supported fields are available through the toggle."><div className="flex flex-wrap gap-2"><Link href="/owner/product-inventory" className="inline-flex min-h-11 items-center rounded-xl border px-4 font-black">Back to Product Inventory</Link><Link href={`/owner/product-inventory/${listing.id}/edit`} className="inline-flex min-h-11 items-center rounded-xl bg-slate-950 px-4 font-black text-white">Edit Listing</Link></div></PageHeader><div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(260px,360px)_minmax(0,1fr)]"><div className="min-w-0 space-y-4"><WorkImageGallery images={images} alt={listing.productTitle??listing.sellerSkuId} priority/><section className="rounded-2xl border bg-white p-4"><h2 className="font-black">Default processing</h2><p className="mb-3 text-sm text-slate-600">No saved default means system fallback — Direct to Pack.</p><ProcessRuleEditor listingId={listing.id} rule={listing.processRules[0]} assets={assets}/></section><section className="rounded-2xl border bg-white p-4"><h2 className="font-black">Manual catalog locks</h2><form action={saveCatalogFieldLocksAction} className="mt-3"><input type="hidden" name="marketplaceListingId" value={listing.id}/><input type="hidden" name="expectedUpdatedAt" value={listing.updatedAt.toISOString()}/><input type="hidden" name="clientRequestId" value={randomUUID()}/><div className="grid gap-2">{LOCKABLE_CATALOG_FIELDS.map(field=><label key={field} className="flex min-h-11 items-center gap-2 rounded-xl border p-2 text-sm"><input type="checkbox" name="lockedField" value={field} defaultChecked={locks.has(field)}/>{field}</label>)}</div><button className="mt-3 min-h-11 rounded-xl bg-slate-900 px-4 font-black text-white">Save field locks</button></form></section></div><StructuredDetails sections={sections}/></div></AppShell>;
+const text = (value: unknown) =>
+  value === null || value === undefined
+    ? null
+    : typeof value === "string"
+      ? value
+      : JSON.stringify(value);
+
+const fieldLabel = (field: string) =>
+  field.toLowerCase() === "mrp"
+    ? "MRP"
+    : field.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());
+
+export default async function ProductDetailPage({
+  params
+}: {
+  params: Promise<{ listingId: string }>;
+}) {
+  const user = await requireUser(["OWNER"]);
+  const account = await requireAccount(user);
+  const { listingId } = await params;
+  const listing = await prisma.marketplaceListing.findFirst({
+    where: { id: listingId, accountId: account.id },
+    include: {
+      identifiers: { where: { active: true }, orderBy: { identifierType: "asc" } },
+      attributes: { orderBy: { technicalKey: "asc" } },
+      processRules: { where: { active: true }, take: 1 },
+      markingAssetLinks: {
+        where: { active: true },
+        include: {
+          markingAsset: {
+            include: { files: { where: { activeVersion: true }, take: 1 } }
+          }
+        }
+      }
+    }
+  });
+  if (!listing) notFound();
+
+  const assets = listing.markingAssetLinks.map(({ markingAsset }) => ({
+    id: markingAsset.id,
+    label: markingAsset.masterDesignId ?? markingAsset.name,
+    hasFile: Boolean(markingAsset.files.length)
+  }));
+  const locks = (() => {
+    try {
+      const parsed = JSON.parse(listing.manualLocksJson ?? "{}");
+      return new Set<string>(
+        Array.isArray(parsed)
+          ? parsed.filter((field): field is string => typeof field === "string")
+          : Object.entries(parsed && typeof parsed === "object" ? parsed : {}).flatMap(([field, locked]) =>
+              locked === true ? [field] : []
+            )
+      );
+    } catch {
+      return new Set<string>();
+    }
+  })();
+  const images = [
+    listing.image1366Url1,
+    listing.imageUrl1,
+    listing.image1366Url2,
+    listing.image1366Url3,
+    listing.image1366Url4,
+    listing.image1366Url5,
+    listing.image1366Url6,
+    listing.image1366Url7,
+    listing.image1366Url8,
+    listing.image1366Url9,
+    listing.image1366Url10,
+    listing.imageUrl2,
+    listing.imageUrl3,
+    listing.imageUrl4,
+    listing.imageUrl5,
+    listing.imageUrl6,
+    listing.imageUrl7,
+    listing.imageUrl8,
+    listing.imageUrl9,
+    listing.imageUrl10,
+    listing.mainImageUrl
+  ];
+  const dynamic = listing.attributes.map((attribute) => ({
+    label: attribute.displayLabel || attribute.technicalKey,
+    value: text(attribute.valueText ?? attribute.valueJson)
+  }));
+  const protectedFields = [...locks].map(fieldLabel).join(", ");
+  const sections: DetailSection[] = [
+    {
+      title: "Overview",
+      fields: [
+        { label: "Product Title", value: listing.productTitle },
+        { label: "Seller SKU Id", value: listing.sellerSkuId },
+        { label: "Internal SKU", value: listing.sku },
+        { label: "Marketplace", value: listing.marketplace },
+        { label: "Listing Status", value: listing.listingStatus },
+        { label: "Sub-category", value: listing.subCategory }
+      ]
+    },
+    {
+      title: "Marketplace Listing",
+      fields: [
+        { label: "Flipkart Serial Number", value: listing.fsn },
+        { label: "Listing ID", value: listing.listingId },
+        ...listing.identifiers.map((identifier) => ({
+          label: identifier.identifierType,
+          value: identifier.rawValue
+        }))
+      ]
+    },
+    {
+      title: "Pricing and Settlement",
+      fields: [
+        { label: "MRP", value: listing.mrp },
+        { label: "Your Selling Price", value: listing.sellingPrice },
+        { label: "Live Price", value: listing.livePrice },
+        { label: "Live MRP", value: listing.liveMrp },
+        { label: "Bank Settlement", value: null },
+        { label: "Minimum Order Quantity", value: null },
+        { label: "Benchmark Price", value: null }
+      ]
+    },
+    {
+      title: "Live Marketplace Data",
+      fields: [
+        { label: "Live Title", value: listing.liveTitle },
+        { label: "Live Brand", value: listing.liveBrand },
+        { label: "Live Category", value: listing.liveCategory },
+        { label: "Live Price", value: listing.livePrice },
+        { label: "Live MRP", value: listing.liveMrp },
+        { label: "Live Seller", value: null },
+        { label: "Rating", value: listing.rating },
+        { label: "Review Count", value: listing.reviewCount }
+      ]
+    },
+    {
+      title: "Description and Specifications",
+      fields: [
+        { label: "Product Highlights", value: listing.productHighlights },
+        { label: "Description", value: listing.description },
+        { label: "All Specifications", value: listing.allSpecifications },
+        ...dynamic
+      ]
+    },
+    {
+      title: "Processing and Workflow",
+      fields: [
+        { label: "Saved route", value: listing.processRules[0]?.route },
+        { label: "Protected manual fields", value: protectedFields },
+        {
+          label: "Last catalog refresh",
+          value: listing.lastImportedAt ? formatDateTime(listing.lastImportedAt) : null
+        },
+        { label: "Last changed", value: formatDateTime(listing.updatedAt) }
+      ]
+    },
+    {
+      title: "Fulfilment and Stock References",
+      description: "Catalog/reference values only. They do not create physical inventory or ERP stock.",
+      fields: [
+        { label: "Fulfillment By", value: null },
+        { label: "System Stock count", value: null },
+        { label: "Your Stock Count", value: null },
+        { label: "Recommended Stock", value: null },
+        { label: "Procurement SLA", value: null },
+        { label: "Procurement Type", value: null }
+      ]
+    },
+    {
+      title: "Package and Shipping",
+      fields: [
+        { label: "Package Length", value: null },
+        { label: "Package Breadth", value: null },
+        { label: "Package Height", value: null },
+        { label: "Package Weight", value: null },
+        { label: "Local Delivery Charge to Customer", value: null },
+        { label: "Zonal Delivery Charge to Customer", value: null },
+        { label: "National Delivery Charge to Customer", value: null }
+      ]
+    },
+    {
+      title: "Tax and Legal",
+      fields: [
+        { label: "HSN", value: null },
+        { label: "Tax Code", value: null },
+        { label: "Luxury Cess Tax Rate", value: null },
+        { label: "Country of Origin ISO code", value: null },
+        { label: "Manufacturer Details", value: null },
+        { label: "Importer Details", value: null },
+        { label: "Packer Details", value: null },
+        { label: "Date of Manufacture", value: null },
+        { label: "Shelf Life in Months", value: null }
+      ]
+    },
+    {
+      title: "Attachments",
+      fields: [
+        {
+          label: "Attachment status",
+          value: listing.markingAssetLinks.length
+            ? `${listing.markingAssetLinks.length} marking attachment link(s)`
+            : null
+        }
+      ]
+    },
+    {
+      title: "Problems and History",
+      fields: [
+        { label: "Scrape Status", value: listing.scrapeStatus },
+        { label: "Scrape Error", value: listing.scrapeError },
+        { label: "Created", value: formatDateTime(listing.createdAt) },
+        { label: "Updated", value: formatDateTime(listing.updatedAt) },
+        {
+          label: "Generated Direct Product URL",
+          value: listing.generatedDirectProductUrl,
+          href: listing.generatedDirectProductUrl
+        },
+        {
+          label: "Canonical Product URL",
+          value: listing.canonicalProductUrl,
+          href: listing.canonicalProductUrl
+        }
+      ]
+    }
+  ];
+
+  return (
+    <AppShell>
+      <PageHeader
+        eyebrow={`${listing.marketplace} / ${account.accountDisplayName ?? account.name}`}
+        title={listing.productTitle ?? listing.sellerSkuId}
+        description="Complete account-scoped listing details. Empty supported fields are available through the compact toggle."
+      >
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/owner/product-inventory"
+            className="inline-flex min-h-11 items-center rounded-md px-3 font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Back to Product Inventory
+          </Link>
+          <Link
+            href={`/owner/product-inventory/${listing.id}/edit`}
+            className="inline-flex min-h-11 items-center rounded-md bg-berry px-4 font-semibold text-white hover:bg-pink-800"
+          >
+            Edit Listing
+          </Link>
+        </div>
+      </PageHeader>
+
+      <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge value={listing.listingStatus ?? "UNKNOWN"} />
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+            {listing.marketplace}
+          </span>
+        </div>
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+          <SummaryField label="Seller SKU" value={listing.sellerSkuId} />
+          <SummaryField label="Internal SKU" value={listing.sku ?? "Not provided"} />
+          <SummaryField label="Last changed" value={formatDateTime(listing.updatedAt)} />
+        </dl>
+      </section>
+
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(260px,360px)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-4">
+          <WorkImageGallery
+            images={images}
+            alt={listing.productTitle ?? listing.sellerSkuId}
+            priority
+          />
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <h2 className="font-semibold">Default processing</h2>
+            <p className="mb-3 text-sm text-slate-600">
+              No saved default means system fallback — Direct to Pack.
+            </p>
+            <ProcessRuleEditor listingId={listing.id} rule={listing.processRules[0]} assets={assets} />
+          </section>
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <h2 className="font-semibold">Protect manual values</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Selected fields stay unchanged during automated marketplace refreshes.
+            </p>
+            <form action={saveCatalogFieldLocksAction} className="mt-3">
+              <input type="hidden" name="marketplaceListingId" value={listing.id} />
+              <input type="hidden" name="expectedUpdatedAt" value={listing.updatedAt.toISOString()} />
+              <input type="hidden" name="clientRequestId" value={randomUUID()} />
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                {LOCKABLE_CATALOG_FIELDS.map((field) => (
+                  <label
+                    key={field}
+                    className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      name="lockedField"
+                      value={field}
+                      defaultChecked={locks.has(field)}
+                    />
+                    {fieldLabel(field)}
+                  </label>
+                ))}
+              </div>
+              <button className="mt-3 min-h-11 rounded-md bg-berry px-4 font-semibold text-white hover:bg-pink-800">
+                Save protected fields
+              </button>
+            </form>
+          </section>
+        </div>
+        <StructuredDetails sections={sections} />
+      </div>
+    </AppShell>
+  );
+}
+
+function SummaryField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+      <dd className="mt-1 break-all font-semibold text-slate-900">{value}</dd>
+    </div>
+  );
 }

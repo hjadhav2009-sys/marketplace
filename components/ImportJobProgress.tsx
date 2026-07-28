@@ -73,18 +73,18 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
   const remainingSeconds = importJobEstimatedRemainingSeconds(job, calculationTime);
   const href = reviewHref(job);
   const isDone = isTerminalImportJobStatus(job.status);
-  const issueCount = job.errorRows + job.warningRows;
+  const issueCount = job.errorRows + job.warningRows + job.missingListingRows + job.missingImageRows;
   const [refreshState, setRefreshState] = useState<"idle" | "refreshing">("idle");
 
   const stats = useMemo(
     () => [
-      ["Rows read", job.processedRows],
+      ["Source rows read", job.processedRows],
       ["Rows accepted", Math.max(0, job.processedRows - job.errorRows)],
       ["Rows inserted", job.createdRows],
       ["Rows enriched", job.updatedRows],
       ["Rows unchanged", job.unchangedRows],
       ["Current stage", job.stage],
-      ["Processed files", `${job.processedFiles} / ${job.totalFiles}`],
+      ["Source files processed", `${job.processedFiles} / ${job.totalFiles}`],
       ["Current file", job.currentFile ?? "-"],
       ["Warnings", job.warningRows],
       ["Blocking errors", job.errorRows],
@@ -155,12 +155,12 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
             </Link>
           ) : null}
           <Link href={job.importType.endsWith("PRODUCT_INVENTORY") ? "/owner/product-inventory/refresh" : "/owner/imports"} className="inline-flex rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
-            Start New Import
+            Start another import
           </Link>
         </div>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5" aria-label={`Row processing progress: ${progress}%`}>
         <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
           <span>{progress}%</span>
           <span>{job.processedRows} / {job.totalRows} rows</span>
@@ -170,18 +170,19 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map(([label, value]) => (
           <div key={label} className="rounded-md bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 break-words text-lg font-bold text-slate-950">{value}</p>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+            <dd className="mt-1 break-words text-lg font-bold text-slate-950">{value}</dd>
           </div>
         ))}
-      </div>
+      </dl>
 
       {job.lastError ? (
-        <div className="mt-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-          {job.lastError}
+        <div role="alert" className="mt-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          <p>{job.lastError}</p>
+          <p className="mt-1 text-xs font-bold">Support reference: IMP-{job.id.slice(0, 8).toUpperCase()}</p>
         </div>
       ) : null}
 
@@ -192,7 +193,7 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
             Back to imports
           </Link>
           {job.importType.endsWith("PRODUCT_INVENTORY") ? <Link href="/owner/product-inventory" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">View Product Inventory</Link> : null}
-          {job.importType.includes("ORDER") ? <Link href="/picker" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Open Customer Orders</Link> : null}
+          {job.importType.includes("ORDER") ? <Link href="/work/pick" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Open Customer Orders</Link> : null}
           <Link href={exportHref(job.id, "csv")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Summary CSV
           </Link>

@@ -4,8 +4,13 @@ export function formatDateTime(value: Date | string | null | undefined) {
   }
 
   return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short"
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+    timeZoneName: "short"
   }).format(new Date(value));
 }
 

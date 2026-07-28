@@ -32,8 +32,20 @@ const statusTone: Record<string, string> = {
 };
 
 export function StatusBadge({ value }: { value: string }) {
+  const icon =
+    ["COMPLETED", "PACKED", "PICKED", "RESOLVED", "IMPORTED", "ACTIVE", "OK"].includes(value)
+      ? "✓"
+      : ["FAILED", "NOT_FOUND", "NEEDS_ACTION"].includes(value)
+        ? "×"
+        : ["WARNING", "PROBLEM", "MISSING_IMAGE", "COMPLETED_WITH_WARNINGS", "PASSWORD_REQUIRED"].includes(value)
+          ? "!"
+          : ["RUNNING"].includes(value)
+            ? "↻"
+            : "•";
+
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone[value] ?? statusTone.UPLOADED}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone[value] ?? statusTone.UPLOADED}`}>
+      <span aria-hidden="true" className="font-black">{icon}</span>
       {titleCase(value)}
     </span>
   );

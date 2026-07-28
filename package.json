@@ -127,6 +127,7 @@
     "stage4-5:atlas": "node scripts/qa/stage4-5-atlas.mjs atlas",
     "stage4-5:archive": "node scripts/qa/stage4-5-archive.mjs",
     "stage4-5:test": "node tests/stage4-5-atlas.test.mjs",
+    "stage4-6:test": "node tests/stage4-6-reconciled-operations-ui.test.mjs",
     "stage4-2c:editor-proof": "node scripts/qa/stage4-2c-editor-proof.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",
     "data-management:test": "tsx tests/data-management.test.ts",

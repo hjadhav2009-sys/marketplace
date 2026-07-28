@@ -169,7 +169,11 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
             <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black text-slate-950">{marketplace === "FLIPKART" ? "Flipkart" : "Amazon"}</h2><span className={`rounded-full px-2 py-1 text-xs font-bold ${selected ? "bg-teal-50 text-teal-800" : "bg-slate-100 text-slate-600"}`}>{selected ? "Selected account" : available ? "Account available" : "No account"}</span></div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <ImportPurposeLink title={`${marketplace === "FLIPKART" ? "Flipkart" : "Amazon"} Product Inventory`} description="Listings, catalog, identity and image enrichment." href={selected ? "/owner/product-inventory/refresh" : "/accounts"} />
-              <ImportPurposeLink title={`${marketplace === "FLIPKART" ? "Flipkart" : "Amazon"} Daily Orders`} description="Customer-order source files only." href={selected ? "/owner/uploads/new" : "/accounts"} />
+              <ImportPurposeLink
+                title={`${marketplace === "FLIPKART" ? "Flipkart" : "Amazon"} Daily Orders`}
+                description={marketplace === "AMAZON" ? "Not enabled in this release." : "Customer-order source files only."}
+                href={marketplace === "AMAZON" ? undefined : selected ? "/owner/uploads/new" : "/accounts"}
+              />
               <ImportPurposeLink title={`${marketplace === "FLIPKART" ? "Flipkart" : "Amazon"} New Consignment`} description="Shipment quantities and optional identity support." href={selected ? "/owner/consignments/new" : "/accounts"} />
             </div>
           </article>;
@@ -269,30 +273,29 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
                       <div className="h-full rounded-full bg-berry" style={{ width: `${progress}%` }} />
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
-                    <span>Rows {compactNumber(job.processedRows)} / {compactNumber(job.totalRows)}</span>
-                    <span>Issues {compactNumber(issueCount)}</span>
-                    <span>Created {compactNumber(job.createdRows)}</span>
-                    <span>Duplicates {compactNumber(job.duplicateRows)}</span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Link href={`/owner/imports/${job.id}`} prefetch className="min-h-10 rounded-md bg-slate-950 px-3 py-2 text-xs font-bold text-white">
-                      Open
-                    </Link>
-                    {(job.status === "COMPLETED" || job.status === "COMPLETED_WITH_WARNINGS") && review ? (
-                      <Link href={review} prefetch className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
-                        Review
-                      </Link>
-                    ) : null}
-                    {issueCount > 0 && job.batchId ? (
-                      <Link href={`/owner/imports/${job.id}/issues`} prefetch className="min-h-10 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
-                        Issues
-                      </Link>
-                    ) : null}
-                    <Link href={exportHref(job.id, "csv")} className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
-                      CSV
-                    </Link>
-                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700">
+                    <div><dt className="text-slate-500">Rows processed</dt><dd className="font-bold">{compactNumber(job.processedRows)} / {compactNumber(job.totalRows)}</dd></div>
+                    <div><dt className="text-slate-500">Warning/error rows</dt><dd className="font-bold">{compactNumber(issueCount)}</dd></div>
+                    <div><dt className="text-slate-500">Created</dt><dd className="font-bold">{formatDateTime(job.createdAt)}</dd></div>
+                    <div><dt className="text-slate-500">Finished</dt><dd className="font-bold">{formatDateTime(job.finishedAt)}</dd></div>
+                  </dl>
+                  <Link href={`/owner/imports/${job.id}`} prefetch className="mt-3 inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 py-2 text-sm font-bold text-white">
+                    {job.status === "FAILED" ? "Review failure" : job.status === "NEEDS_MAPPING" ? "Map headers" : "View progress"}
+                  </Link>
+                  <details className="mt-2 rounded-md border border-slate-200">
+                    <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-bold text-slate-700">More counts and downloads</summary>
+                    <dl className="grid grid-cols-2 gap-2 border-t p-3 text-xs text-slate-700">
+                      <div><dt className="text-slate-500">Rows inserted</dt><dd className="font-bold">{compactNumber(job.createdRows)}</dd></div>
+                      <div><dt className="text-slate-500">Duplicate rows</dt><dd className="font-bold">{compactNumber(job.duplicateRows)}</dd></div>
+                      <div><dt className="text-slate-500">Rows updated</dt><dd className="font-bold">{compactNumber(job.updatedRows)}</dd></div>
+                      <div><dt className="text-slate-500">Rows unchanged</dt><dd className="font-bold">{compactNumber(job.unchangedRows)}</dd></div>
+                    </dl>
+                    <div className="flex flex-wrap gap-2 border-t p-3">
+                      {(job.status === "COMPLETED" || job.status === "COMPLETED_WITH_WARNINGS") && review ? <Link href={review} prefetch className="inline-flex min-h-11 items-center rounded-md border px-3 text-xs font-bold">Open review</Link> : null}
+                      {issueCount > 0 && job.batchId ? <Link href={`/owner/imports/${job.id}/issues`} prefetch className="inline-flex min-h-11 items-center rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-900">View issues</Link> : null}
+                      <Link href={exportHref(job.id, "csv")} className="inline-flex min-h-11 items-center rounded-md border px-3 text-xs font-bold">Summary CSV</Link>
+                    </div>
+                  </details>
                 </article>
               );
             })}
@@ -428,7 +431,10 @@ export default async function OwnerImportsPage({ searchParams }: ImportsPageProp
   );
 }
 
-function ImportPurposeLink({ title, description, href }: { title: string; description: string; href: string }) {
+function ImportPurposeLink({ title, description, href }: { title: string; description: string; href?: string }) {
+  if (!href) {
+    return <div aria-disabled="true" className="flex min-h-32 flex-col rounded-md border border-slate-200 bg-slate-100 p-3 opacity-80"><span className="font-black text-slate-950">{title}</span><span className="mt-2 text-sm leading-5 text-slate-600">{description}</span><span className="mt-auto pt-3 text-sm font-bold text-slate-500">Unavailable</span></div>;
+  }
   return <Link href={href} prefetch className="flex min-h-32 flex-col rounded-md border border-slate-200 bg-slate-50 p-3 transition hover:border-berry hover:bg-white"><span className="font-black text-slate-950">{title}</span><span className="mt-2 text-sm leading-5 text-slate-600">{description}</span><span className="mt-auto pt-3 text-sm font-bold text-berry">Open →</span></Link>;
 }
 

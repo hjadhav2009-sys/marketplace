@@ -7,8 +7,8 @@ export const VIEWPORTS = [
   { id: "1440x900", width: 1440, height: 900 },
 ];
 
-export const SCENARIO_VERSION = "phase-7.3.6-stage4.5-v1";
-export const CAPTURE_RUNNER_VERSION = "stage4.5-full-page-v1";
+export const SCENARIO_VERSION = "phase-7.3.6-stage4.6-v1";
+export const CAPTURE_RUNNER_VERSION = "stage4.6-full-page-v1";
 
 export const REQUIRED_SCENARIOS = [
   ["AUTH_DEFAULT", "/login", "PUBLIC"],
@@ -51,23 +51,23 @@ export const REQUIRED_SCENARIOS = [
   ["PICK_MISSING_INSTRUCTIONS", "/work/pick", "PICKER"],
   ["MARK_READY", "/work/mark", "MARKER"],
   ["MARK_PARTIAL", "/work/mark", "MARKER"],
-  ["MARK_COMPLETED", "/work/mark", "MARKER"],
+  ["MARK_COMPLETED", "/work/consignments/items/stage4-line-mark-completed-mark", "MARKER"],
   ["ASSEMBLY_READY", "/work/assemble", "ASSEMBLER"],
   ["ASSEMBLY_PARTIAL", "/work/assemble", "ASSEMBLER"],
-  ["ASSEMBLY_COMPLETED", "/work/assemble", "ASSEMBLER"],
+  ["ASSEMBLY_COMPLETED", "/work/consignments/items/stage4-line-assembly-completed-assemble", "ASSEMBLER"],
   ["PACK_PICK_LOCKED", "/work/pack", "PACKER"],
   ["PACK_MARK_LOCKED", "/work/pack", "PACKER"],
-  ["PACK_ASSEMBLY_LOCKED", "/work/pack", "PACKER"],
+  ["PACK_ASSEMBLY_LOCKED", "/packing/STAGE-AWB-ASSEMBLY-LOCKED", "PACKER"],
   ["PACK_READY", "/work/pack", "PACKER"],
   ["PACK_COMPLETED", "/packing/STAGE-AWB-10", "PACKER"],
   ["SCANNER_EMPTY", "/work/scan", "PICKER"],
-  ["SCANNER_ONE_MATCH", "/work/scan?code=STAGE-AWB-1", "PICKER"],
-  ["SCANNER_MULTI_MATCH", "/work/scan?code=STAGE-FK-SKU-001", "PICKER"],
-  ["SCANNER_NO_MATCH", "/work/scan?code=STAGE-NO-MATCH", "PICKER"],
-  ["SCANNER_WRONG_ACCOUNT", "/work/scan?code=STAGEFNSKU001", "PICKER"],
-  ["SCANNER_COMPLETED", "/work/scan?code=STAGE-AWB-10", "PACKER"],
-  ["PROBLEM_OPEN", "/work/problems", "OWNER"],
-  ["PROBLEM_RESOLVED", "/problems", "OWNER"],
+  ["SCANNER_ONE_MATCH", "/work/scan?q=STAGE-AWB-1", "PICKER"],
+  ["SCANNER_MULTI_MATCH", "/work/scan?q=STAGE-FK-SKU-001", "PICKER"],
+  ["SCANNER_NO_MATCH", "/work/scan?q=STAGE-NO-MATCH", "PICKER"],
+  ["SCANNER_WRONG_ACCOUNT", "/work/scan?q=STAGEFNSKU001", "PICKER"],
+  ["SCANNER_COMPLETED", "/work/scan?q=STAGE-AWB-10", "PACKER"],
+  ["PROBLEM_OPEN", "/problems?tab=open", "OWNER"],
+  ["PROBLEM_RESOLVED", "/problems?tab=resolved", "OWNER"],
   ["DATA_DELETE_PREVIEW", "/owner/data-management?tab=operational", "OWNER"],
   ["DATA_WRONG_PASSWORD", "/owner/data-management?tab=operational", "OWNER"],
   ["DATA_CONFIRMATION_MISMATCH", "/owner/data-management?tab=operational", "OWNER"],

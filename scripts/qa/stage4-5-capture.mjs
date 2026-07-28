@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import sharp from "sharp";
 import { execFileSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { CAPTURE_RUNNER_VERSION, REQUIRED_SCENARIOS, ROLE_TO_DISPLAY, SCENARIO_VERSION, VIEWPORTS } from "./stage4-5-scenarios.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -17,6 +18,8 @@ if (!existsSync(BUILD_ID_PATH)) throw new Error("A production build is required 
 const BUILD_ID = (await readFile(BUILD_ID_PATH, "utf8")).trim();
 const PRIVATE_ROOT = path.join(ROOT, ".codex-tmp", "ui-state-atlas", "current", SOURCE_SHA);
 const CREDENTIALS = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "credentials", "synthetic-users.json");
+const STAGING_DATABASE = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "database", "staging.db");
+const STAGING_FIXTURES = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "fixtures");
 const PROGRESS_PATH = path.join(PRIVATE_ROOT, "progress.json");
 const RESULT_PATH = path.join(PRIVATE_ROOT, "browser-results.json");
 const MASTER_ROOT = path.join(PRIVATE_ROOT, "full-page");
@@ -224,6 +227,78 @@ async function applyScenarioState(page, context, scenarioId) {
       }
     }
   }
+  if (scenarioId === "IMPORT_ONE_FILE") {
+    await page.locator('input[name="files"]').setInputFiles(path.join(STAGING_FIXTURES, "catalog-one.csv"));
+  }
+  if (scenarioId === "IMPORT_MULTI_FILE") {
+    await page.locator('input[name="files"]').setInputFiles([
+      path.join(STAGING_FIXTURES, "catalog-one.csv"),
+      path.join(STAGING_FIXTURES, "catalog-two.csv"),
+    ]);
+  }
+  if (scenarioId === "IMPORT_AMAZON_THREE_ROLE") {
+    await page.locator('input[name="files"]').setInputFiles([
+      path.join(STAGING_FIXTURES, "amazon-all-listings.csv"),
+      path.join(STAGING_FIXTURES, "catalog-one.csv"),
+      path.join(STAGING_FIXTURES, "catalog-two.csv"),
+    ]);
+  }
+}
+
+async function assertScenarioTruth(page, scenarioId) {
+  const text = (await page.locator("body").innerText()).replace(/\s+/g, " ");
+  const requires = (...patterns) => {
+    for (const pattern of patterns) {
+      if (!pattern.test(text)) throw new Error(`${scenarioId} did not prove required state: ${pattern}`);
+    }
+  };
+  if (scenarioId === "OWNER_EMPTY_ACCOUNT") requires(/No seller accounts have been created yet/i, /Create First Seller Account/i);
+  if (scenarioId === "MARK_COMPLETED") requires(/MARK:\s*COMPLETED/i, /completed by Synthetic Marker/i);
+  if (scenarioId === "ASSEMBLY_COMPLETED") requires(/ASSEMBLE:\s*COMPLETED/i, /completed by Synthetic Assembler/i);
+  if (scenarioId === "PACK_ASSEMBLY_LOCKED") {
+    requires(/Assembly is required before packing/i);
+    if (await page.getByRole("button", { name: /^Confirm packed$/i }).count()) throw new Error("PACK_ASSEMBLY_LOCKED exposed Confirm packed.");
+  }
+  if (scenarioId === "SCANNER_COMPLETED") requires(/\bPACKED\b/i, /Packing is complete\. This result is read-only/i, /Scan Next/i);
+  if (scenarioId === "PROBLEM_OPEN") requires(/Synthetic damaged item/i, /Synthetic open problem for UI audit/i);
+  if (scenarioId === "PROBLEM_RESOLVED") requires(/Synthetic assembly mismatch/i, /Synthetic resolution completed/i);
+  if (scenarioId === "IMPORT_ONE_FILE") {
+    const count = await page.locator('input[name="files"]').evaluate((input) => input.files?.length ?? 0);
+    if (count !== 1) throw new Error("IMPORT_ONE_FILE did not retain exactly one selected synthetic file.");
+  }
+  if (scenarioId === "IMPORT_MULTI_FILE" || scenarioId === "IMPORT_AMAZON_THREE_ROLE") {
+    const expected = scenarioId === "IMPORT_MULTI_FILE" ? 2 : 3;
+    const count = await page.locator('input[name="files"]').evaluate((input) => input.files?.length ?? 0);
+    if (count !== expected) throw new Error(`${scenarioId} did not retain ${expected} selected synthetic files.`);
+  }
+  if (scenarioId === "PRODUCT_IMAGES_OK") {
+    await page.locator("[data-work-gallery] img").first().waitFor({ state: "visible", timeout: 5_000 });
+  }
+}
+
+function temporarilyDeactivateSyntheticAccounts() {
+  const database = new DatabaseSync(STAGING_DATABASE);
+  try {
+    const rows = database.prepare("SELECT id, active FROM Account").all();
+    database.exec("BEGIN IMMEDIATE");
+    database.prepare("UPDATE Account SET active = 0").run();
+    database.exec("COMMIT");
+    return rows;
+  } finally {
+    database.close();
+  }
+}
+
+function restoreSyntheticAccounts(rows) {
+  const database = new DatabaseSync(STAGING_DATABASE);
+  try {
+    database.exec("BEGIN IMMEDIATE");
+    const statement = database.prepare("UPDATE Account SET active = ? WHERE id = ?");
+    for (const row of rows) statement.run(row.active, row.id);
+    database.exec("COMMIT");
+  } finally {
+    database.close();
+  }
 }
 
 const cli = options(process.argv.slice(2));
@@ -280,6 +355,9 @@ try {
     }
     const scale = deviceScaleFactor();
     const context = await browser.newContext({ viewport: { width: job.viewport.width, height: job.viewport.height }, deviceScaleFactor: scale, storageState: authStates.get(job.role) });
+    if (job.id === "IMPORT_AMAZON_THREE_ROLE") {
+      await context.addCookies([{ name: "mpp_account", value: "stage3-account-amz-01", url: BASE }]);
+    }
     await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
     const page = await context.newPage();
     const consoleErrors = [];
@@ -299,11 +377,14 @@ try {
     let status = 0;
     let inspection = null;
     let error = null;
+    let accountRestore = null;
     try {
+      if (job.id === "OWNER_EMPTY_ACCOUNT") accountRestore = temporarilyDeactivateSyntheticAccounts();
       if (job.id === "AUTH_EXPIRED") await context.clearCookies();
       const response = await page.goto(`${BASE}${job.route}`, { waitUntil: "domcontentloaded", timeout: 25_000 });
       await page.waitForTimeout(350);
       await applyScenarioState(page, context, job.id);
+      await assertScenarioTruth(page, job.id);
       status = response?.status() ?? 0;
       inspection = await inspectStable(page);
       if (!cli.verifyOnly) {
@@ -312,6 +393,8 @@ try {
       }
     } catch (caught) {
       error = caught instanceof Error ? caught.message : String(caught);
+    } finally {
+      if (accountRestore) restoreSyntheticAccounts(accountRestore);
     }
     const unexpectedFailed = failedRequests.filter((item) => !/example\.invalid|invalid\.example\.invalid/.test(item.url) && item.error !== "net::ERR_ABORTED");
     const unexpectedResponses = errorResponses.filter((item) => !/\/favicon\.ico(?:\?|$)/.test(item.url));

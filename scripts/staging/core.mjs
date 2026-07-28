@@ -31,7 +31,7 @@ export const HOST = "127.0.0.1";
 export const PREPARE_PHRASE = "APPROVE PRIVATE SYNTHETIC STAGING PREPARATION";
 export const RESET_PHRASE = "RESET SYNTHETIC STAGING";
 export const CLEANUP_PHRASE = "CLEANUP SYNTHETIC STAGING";
-export const SEED_VERSION = "phase-7.3.6-stage4.2-synthetic-ui-v2";
+export const SEED_VERSION = "phase-7.3.6-stage4.6-reconciled-ui-v1";
 
 export function isInside(parent, candidate, allowEqual = false) {
   const root = path.resolve(parent);

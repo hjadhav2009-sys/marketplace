@@ -133,8 +133,12 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[0.7fr_1.3fr]">
-        <form action={saveOwnerAccountAction} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="grid gap-5">
+        <details open={accounts.length === 0} className="rounded-md border border-slate-200 bg-white shadow-sm">
+        <summary className="min-h-11 cursor-pointer list-none rounded-md bg-slate-50 px-5 py-3 font-bold text-slate-950">
+          Create seller account <span className="ml-2 text-sm font-medium text-slate-500">Open setup form</span>
+        </summary>
+        <form action={saveOwnerAccountAction} className="border-t border-slate-200 p-5">
           <h2 className="text-lg font-bold text-slate-950">Create seller account</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">
             Add one seller login per marketplace account. This keeps imports, listings, workers, and packing work separated.
@@ -160,6 +164,7 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
             <SubmitButton pendingText="Saving...">Create account</SubmitButton>
           </div>
         </form>
+        </details>
 
         <div className="space-y-5">
           {marketplaceSections.map((section) => {
@@ -183,6 +188,7 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
                   <div className="divide-y divide-slate-100">
                     {marketplaceAccounts.map((account) => {
                       const lastImportAt = latestDate(account);
+                      const marketplaceLocked = account._count.orders + account._count.marketplaceListings + account._count.uploadBatches + account._count.importJobs > 0;
 
                       return (
                         <article key={account.id} className="p-4">
@@ -222,19 +228,21 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
                           </div>
 
                           <div className="mt-4 grid grid-cols-2 gap-2 text-sm md:grid-cols-5">
-                            <SummaryCount label="Users" value={account._count.users} />
+                            <SummaryCount label="Users" value={account._count.users} href={`/owner/users?accountId=${encodeURIComponent(account.id)}`} />
                             <SummaryCount label="Orders" value={account._count.orders} />
                             <SummaryCount label="Listings" value={account._count.marketplaceListings} />
                             <SummaryCount label="Uploads" value={account._count.uploadBatches} />
-                            <SummaryCount label="Jobs" value={account._count.importJobs} />
+                            <SummaryCount label="Import jobs" value={account._count.importJobs} href={`/owner/imports?accountId=${encodeURIComponent(account.id)}`} />
                           </div>
 
-                          <form action={saveOwnerAccountAction} className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-[0.9fr_0.9fr_0.8fr_auto] xl:items-end">
+                          <details className="mt-4 rounded-md border border-slate-200">
+                          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-bold text-berry">Edit account details</summary>
+                          <form action={saveOwnerAccountAction} className="grid gap-3 border-t border-slate-200 p-4 lg:grid-cols-2 xl:grid-cols-[0.9fr_0.9fr_0.8fr_auto] xl:items-end">
                             <input type="hidden" name="accountId" value={account.id} />
                             <TextField name="companyName" label="Company" defaultValue={account.companyName} />
                             <TextField name="accountDisplayName" label="Account name" defaultValue={accountLabel(account)} />
                             <TextField name="accountCode" label="Account code" defaultValue={accountCode(account)} />
-                            <MarketplaceSelect defaultValue={account.marketplace} />
+                            {marketplaceLocked ? <label className="block"><span className="text-sm font-medium text-slate-700">Marketplace</span><input type="hidden" name="marketplace" value={account.marketplace}/><input value={account.marketplace} readOnly aria-describedby={`marketplace-lock-${account.id}`} className="mt-1 min-h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600"/><span id={`marketplace-lock-${account.id}`} className="mt-1 block text-xs text-slate-500">Locked because marketplace data exists.</span></label> : <MarketplaceSelect defaultValue={account.marketplace} />}
                             <label className="lg:col-span-2 xl:col-span-3 block">
                               <span className="text-sm font-medium text-slate-700">Notes</span>
                               <input
@@ -249,6 +257,7 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
                               </SubmitButton>
                             </div>
                           </form>
+                          </details>
                         </article>
                       );
                     })}
@@ -265,13 +274,14 @@ export default async function OwnerAccountsPage({ searchParams }: OwnerAccountsP
   );
 }
 
-function SummaryCount({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md bg-slate-50 p-3">
+function SummaryCount({ label, value, href }: { label: string; value: number; href?: string }) {
+  const content = <>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
-    </div>
-  );
+    </>;
+  return href
+    ? <Link href={href} className="rounded-md bg-slate-50 p-3 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-berry">{content}<span className="mt-1 block text-xs font-bold text-berry">Open scoped view →</span></Link>
+    : <div className="rounded-md bg-slate-50 p-3">{content}</div>;
 }
 
 function MarketplaceSelect({ defaultValue }: { defaultValue: Marketplace }) {

@@ -14,6 +14,9 @@ const importDetail = read("app/owner/imports/[jobId]/page.tsx");
 const importProgress = read("components/ImportJobProgress.tsx");
 const uploadField = read("components/FileUploadField.tsx");
 const format = read("lib/format.ts");
+const users = read("app/owner/users/page.tsx");
+const accounts = read("app/owner/accounts/page.tsx");
+const reports = read("app/reports/page.tsx");
 
 assert.match(consignments, /Review and activate/);
 assert.match(consignments, /View completion record/);
@@ -45,5 +48,14 @@ assert.match(uploadField, /No file selected/);
 assert.match(uploadField, /file\.size/);
 assert.match(format, /timeZone: "Asia\/Kolkata"/);
 assert.match(format, /timeZoneName: "short"/);
+assert.match(users, /Manage access, password and recent sessions/);
+assert.match(users, /Create a new user/);
+assert.match(accounts, /Edit account details/);
+assert.match(accounts, /Locked because marketplace data exists/);
+assert.match(accounts, /Open scoped view/);
+assert.match(reports, /Report scope · live as of/);
+assert.match(reports, /Open problems count the selected account scope regardless of date/);
+assert.match(reports, /Exports unavailable: no rows for current filters/);
+assert.match(reports, /aria-disabled="true"/);
 
 console.log("Stage 4.6 reconciled owner-operations UI contract tests passed.");

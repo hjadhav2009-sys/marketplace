@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getAvailableAccounts, requireAccount, requireUser } from "@/lib/auth";
 import { compactNumber, formatDateTime } from "@/lib/format";
@@ -36,6 +35,13 @@ const statusLabels: Record<string, string> = {
 function pageHref(params: URLSearchParams, page: number) {
   const next = new URLSearchParams(params);
   next.set("page", String(page));
+  return `/reports?${next.toString()}`;
+}
+
+function statusPageHref(params: URLSearchParams, status: string) {
+  const next = new URLSearchParams(params);
+  next.set("page", "1");
+  next.set("status", status);
   return `/reports?${next.toString()}`;
 }
 
@@ -91,6 +97,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     selectedAccount,
     filters: params ?? {}
   });
+  const asOf = new Date();
 
   return (
     <AppShell>
@@ -158,17 +165,19 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       </form>
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total orders" value={compactNumber(report.summary.totalOrders)} />
-        <StatCard label="Today ready" value={compactNumber(report.summary.todayReady)} tone="berry" />
-        <StatCard label="Today picked" value={compactNumber(report.summary.todayPicked)} />
-        <StatCard label="Today packed" value={compactNumber(report.summary.todayPacked)} tone="mint" />
-        <StatCard label="Problems open" value={compactNumber(report.summary.problemsOpen)} tone="clay" />
-        <StatCard label="Old pending" value={compactNumber(report.summary.oldPending)} tone="clay" />
-        <StatCard label="Missing listing current" value={compactNumber(report.summary.currentMissingListing)} />
-        <StatCard label="Missing image current" value={compactNumber(report.summary.currentMissingImage)} />
-        <StatCard label="Packed today" value={compactNumber(report.summary.packedToday)} tone="mint" />
-        <StatCard label="Pending today" value={compactNumber(report.summary.pendingToday)} tone="berry" />
+        <ReportMetric label="Orders matching filters" value={report.summary.totalOrders} href={pageHref(reportParams, 1)} />
+        <ReportMetric label="Ready orders imported today" value={report.summary.todayReady} href={statusPageHref(reportParams, "ready")} />
+        <ReportMetric label="Picked orders imported today" value={report.summary.todayPicked} href={statusPageHref(reportParams, "picked")} />
+        <ReportMetric label="Orders packed today" value={report.summary.todayPacked} href={statusPageHref(reportParams, "packed")} />
+        <ReportMetric label="Open workflow problems" value={report.summary.problemsOpen} href="/work/problems" />
+        <ReportMetric label="Ready before today" value={report.summary.oldPending} href="/owner/old-pending" />
+        <ReportMetric label="Orders missing listing now" value={report.summary.currentMissingListing} href={statusPageHref(reportParams, "missing-listing")} />
+        <ReportMetric label="Orders missing image now" value={report.summary.currentMissingImage} href={statusPageHref(reportParams, "missing-image")} />
       </section>
+      <aside className="mb-5 rounded-md border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+        <p className="font-bold">Report scope · live as of {formatDateTime(asOf)}</p>
+        <p>Order and mapping totals use the filters above. Open problems count the selected account scope regardless of date. Old pending counts ready orders imported before today and ignores the selected date range.</p>
+      </aside>
 
       <section className="mb-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -210,11 +219,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-sm">
           <h2 className="font-semibold text-slate-950">Order rows</h2>
           <div className="flex flex-wrap items-center gap-2">
-            <a href={exportHref(reportParams, "order-summary", "xlsx")} className="rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Summary XLSX</a>
-            <a href={exportHref(reportParams, "order-summary", "txt")} className="rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Summary TXT</a>
-            <Link href={pageHref(reportParams, Math.max(1, report.page - 1))} className="rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Previous</Link>
+            {report.orders.length ? <><a href={exportHref(reportParams, "order-summary", "xlsx")} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Summary XLSX</a><a href={exportHref(reportParams, "order-summary", "txt")} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Summary TXT</a></> : <span className="text-sm font-medium text-slate-500">Exports unavailable: no rows for current filters</span>}
+            {report.page > 1 ? <Link href={pageHref(reportParams, report.page - 1)} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Previous</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border bg-slate-50 px-3 py-2 font-bold text-slate-400">Previous</span>}
             <span className="font-semibold text-slate-600">Page {report.page} of {report.totalPages}</span>
-            <Link href={pageHref(reportParams, Math.min(report.totalPages, report.page + 1))} className="rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Next</Link>
+            {report.page < report.totalPages ? <Link href={pageHref(reportParams, report.page + 1)} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 px-3 py-2 font-bold text-slate-800">Next</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border bg-slate-50 px-3 py-2 font-bold text-slate-400">Next</span>}
           </div>
         </div>
         {report.orders.length === 0 ? (
@@ -321,5 +329,15 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </section>
       </section>
     </AppShell>
+  );
+}
+
+function ReportMetric({ label, value, href }: { label: string; value: number; href: string }) {
+  return (
+    <Link href={href} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-berry focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-berry">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-black text-slate-950">{compactNumber(value)}</p>
+      <p className="mt-2 text-xs font-bold text-berry">Open scoped rows →</p>
+    </Link>
   );
 }

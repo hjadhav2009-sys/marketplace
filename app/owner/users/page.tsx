@@ -122,6 +122,12 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
       ) : null}
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <details>
+        <summary className="min-h-11 cursor-pointer list-none rounded-md border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-slate-950 marker:hidden">
+          Create a new user
+          <span className="ml-2 text-sm font-medium text-slate-500">Open setup form</span>
+        </summary>
+        <div className="pt-4">
         <div className="mb-4 rounded-md bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
           Passwords are securely hashed and cannot be viewed. Owner can reset passwords and force a password change on next login.
         </div>
@@ -156,9 +162,13 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
             <SubmitButton pendingText="Creating...">Create user</SubmitButton>
           </div>
         </form>
+        </div>
+        </details>
       </section>
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <details open={passwordRequests.length > 0}>
+        <summary className="min-h-11 cursor-pointer list-none rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-berry">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-950">Password reset requests</h2>
@@ -166,6 +176,7 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
           </div>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-900">{passwordRequests.length} open</span>
         </div>
+        </summary>
         <div className="mt-4 grid gap-3">
           {passwordRequests.map((request) => (
             <div key={request.id} className="rounded-md border border-amber-200 bg-amber-50 p-3">
@@ -199,6 +210,7 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
           ))}
           {passwordRequests.length === 0 ? <div className="rounded-md bg-slate-50 p-4 text-center text-sm text-slate-500">No open password reset requests.</div> : null}
         </div>
+        </details>
       </section>
 
       <form className="mb-5 grid gap-3 rounded-md border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-5">
@@ -299,7 +311,9 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+              <details className="mt-4 rounded-md border border-slate-200">
+              <summary className="min-h-11 cursor-pointer px-4 py-3 font-bold text-berry">Manage access, password and recent sessions</summary>
+              <div className="grid gap-5 border-t border-slate-200 p-4 lg:grid-cols-[1.2fr_0.8fr]">
                 <form action={updateUserAction} className="rounded-md border border-slate-200 p-4">
                   <input type="hidden" name="userId" value={user.id} />
                   <h3 className="font-semibold text-slate-950">Edit access</h3>
@@ -412,6 +426,7 @@ export default async function OwnerUsersPage({ searchParams }: UsersPageProps) {
                   </tbody>
                 </table>
               </div>
+              </details>
             </article>
           );
         })}

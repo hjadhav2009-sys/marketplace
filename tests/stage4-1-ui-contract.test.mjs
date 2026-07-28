@@ -8,12 +8,16 @@ const [card,nav,shell,scanner,scannerDialog,workDialog,details,productDetails,im
 
 assert.match(nav,/data-mobile-drawer/);assert.match(nav,/sticky top-0/);assert.match(shell,/AppNav/);
 assert.match(card,/Order Item ID/);assert.match(card,/Package quantity/);assert.match(card,/Quantity to process/);assert.match(card,/data-work-actions/);assert.match(card,/WorkRouteDialog/);
-assert.doesNotMatch(`${card}${scanner}${scannerDialog}${workDialog}${legacyTask}`,/<select[^>]+name=["']routeReason/i,"Route reasons are plain text in on-demand dialogs, never a permanent dropdown.");
+assert.doesNotMatch(`${card}${scanner}${legacyTask}`,/<select[^>]+name=["']routeReason/i,"Route-reason controls remain inside on-demand dialogs.");
+assert.match(scannerDialog,/<select[^>]+name=["']routeReason/i,"Scanner overrides use the approved bounded reason selector.");
+assert.match(workDialog,/<select[^>]+name=["']routeReason/i,"Grouped-work overrides use the approved bounded reason selector.");
+assert.match(scannerDialog,/name="confirmMissingInstructions"[\s\S]*required/,"Scanner missing-instruction routing requires visible confirmation.");
+assert.match(workDialog,/name="confirmMissingInstructions"[\s\S]*required/,"Grouped missing-instruction routing requires visible confirmation.");
 assert.doesNotMatch(scanner,/function ScannerPickRoutes/,"The retired scanner route implementation cannot return.");
 assert.match(scanner,/lg:grid-cols-\[360px_minmax\(0,1fr\)\]/);assert.match(scannerDialog,/role="dialog"/);assert.match(workDialog,/role="dialog"/);assert.match(workDialog,/crypto\.randomUUID/);assert.match(scannerDialog,/crypto\.randomUUID/);
 for(const section of ["Overview","Quantity and Members","Instructions","Identifiers","Timeline","Problems and History"])assert.match(details,new RegExp(section));
-for(const section of ["Overview","Marketplace Listing","Pricing","Fulfilment and Stock References","Package Measurements","Tax and Legal","Processing","Problems and History"])assert.match(productDetails,new RegExp(section));
-for(const label of ["Back to Imports","New Import","Import History","Review Amazon file roles","Confirm Roles and Start"])assert.match(importPage,new RegExp(label));
+for(const section of ["Overview","Marketplace Listing","Pricing and Settlement","Live Marketplace Data","Description and Specifications","Processing and Workflow","Fulfilment and Stock References","Package and Shipping","Tax and Legal","Attachments","Problems and History"])assert.match(productDetails,new RegExp(section));
+for(const label of ["Back to imports","Start another import","Review Amazon file roles","Confirm roles and start"])assert.match(importPage,new RegExp(label));
 assert.match(importActions,/confirmProductInventoryFileRoles/);assert.match(jobs,/AWAITING_FILE_ROLES/);assert.match(jobs,/REFERENCE_IGNORE/);
 assert.doesNotMatch(legacyTask,/RouteChoiceWithInstructionConfirmation/);assert.match(legacyTask,/stage!=="PACK"\?<form action=\{setTaskProgressAction\}/,"Generic exact progress is explicitly excluded for Pack.");
 for(const label of ["Uploaded Source Files","Import Jobs","Operational Test Data","Product Inventory Data","Trash / Quarantine","Deletion History","Full Reset Guidance"])assert.match(dataPage,new RegExp(label));

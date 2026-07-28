@@ -17,6 +17,12 @@ const format = read("lib/format.ts");
 const users = read("app/owner/users/page.tsx");
 const accounts = read("app/owner/accounts/page.tsx");
 const reports = read("app/reports/page.tsx");
+const groupedCard = read("app/work/GroupedWorkCard.tsx");
+const workDialog = read("components/WorkRouteDialog.tsx");
+const scannerDialog = read("components/ScannerPickRouteDialog.tsx");
+const workHub = read("app/work/LiveWorkHubSummary.tsx");
+const stageSummary = read("app/work/LiveStageSummary.tsx");
+const workProblems = read("app/work/problems/page.tsx");
 
 assert.match(consignments, /Review and activate/);
 assert.match(consignments, /View completion record/);
@@ -57,5 +63,26 @@ assert.match(reports, /Report scope · live as of/);
 assert.match(reports, /Open problems count the selected account scope regardless of date/);
 assert.match(reports, /Exports unavailable: no rows for current filters/);
 assert.match(reports, /aria-disabled="true"/);
+assert.match(groupedCard, /Complete Pick/);
+assert.match(groupedCard, /Complete Pack/);
+assert.doesNotMatch(groupedCard, /Picked All|Pack Completed/);
+assert.match(groupedCard, /role="progressbar"/);
+assert.match(groupedCard, /aria-valuenow/);
+assert.match(groupedCard, /More identifiers/);
+for (const dialog of [workDialog, scannerDialog]) {
+  assert.match(dialog, /ROUTE_CHANGE_REASONS/);
+  assert.match(dialog, /name="routeReason"/);
+  assert.match(dialog, /name="confirmMissingInstructions"/);
+  assert.match(dialog, /I understand and want to continue/);
+  assert.match(dialog, /event\.key !== "Tab"/);
+  assert.match(dialog, /triggerRef\.current\?\.focus/);
+}
+assert.match(workHub, /Actions enabled/);
+assert.match(workHub, /Assigned to me/);
+assert.match(workHub, /Oldest waiting/);
+assert.match(stageSummary, /role="tablist"/);
+assert.match(stageSummary, /aria-selected/);
+assert.match(workProblems, /No problems to show/);
+assert.match(workProblems, /aria-disabled="true"/);
 
 console.log("Stage 4.6 reconciled owner-operations UI contract tests passed.");

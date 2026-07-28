@@ -13,9 +13,9 @@ const toneClass = {
 
 export function StatCard({ label, value, tone = "slate" }: StatCardProps) {
   return (
-    <div className={`rounded-md border p-4 shadow-sm ${toneClass[tone]}`}>
+    <div className={`min-w-0 rounded-xl border p-3 sm:p-4 ${toneClass[tone]}`}>
       <p className="text-sm font-medium text-slate-600">{label}</p>
-      <p className="mt-2 text-3xl font-bold tracking-tight">{value}</p>
+      <p className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
     </div>
   );
 }

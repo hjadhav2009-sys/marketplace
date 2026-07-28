@@ -1,7 +1,6 @@
-import { SubmitButton } from "@/components/SubmitButton";
 import { requireUser } from "@/lib/auth";
-import { getWeakPasswordWarning } from "@/lib/user-management";
 import { changeOwnPasswordAction, logoutFromPasswordChangeAction } from "./actions";
+import { ChangePasswordForm } from "./ChangePasswordForm";
 
 type ChangePasswordPageProps = {
   searchParams?: Promise<{
@@ -19,8 +18,6 @@ const errorMessage: Record<string, string> = {
 export default async function ChangePasswordPage({ searchParams }: ChangePasswordPageProps) {
   const user = await requireUser(undefined, { allowPasswordChangeRequired: true });
   const params = await searchParams;
-  const warning = getWeakPasswordWarning("temporary1");
-
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-8">
       <section className="mx-auto max-w-xl rounded-md border border-slate-200 bg-white p-6 shadow-soft">
@@ -42,42 +39,7 @@ export default async function ChangePasswordPage({ searchParams }: ChangePasswor
           </div>
         ) : null}
 
-        <form action={changeOwnPasswordAction} className="mt-6 space-y-4">
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Current password</span>
-            <input
-              name="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
-              required
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">New password</span>
-            <input
-              name="newPassword"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
-              required
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Confirm new password</span>
-            <input
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
-              required
-            />
-          </label>
-          {warning ? <p className="text-sm text-slate-500">{warning}</p> : null}
-          <SubmitButton pendingText="Changing...">Change password</SubmitButton>
-        </form>
+        <ChangePasswordForm action={changeOwnPasswordAction} />
 
         <form action={logoutFromPasswordChangeAction} className="mt-5">
           <button className="min-h-11 px-2 text-sm font-semibold text-slate-600 hover:text-slate-950">Logout instead</button>

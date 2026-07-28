@@ -42,6 +42,7 @@ export function AccountSwitcherForm({
   action: (formData: FormData) => void | Promise<void>;
 }) {
   const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState(selectedAccountId ?? accounts[0]?.id ?? "");
   const normalizedQuery = query.trim().toLowerCase();
   const filteredAccounts = useMemo(
     () =>
@@ -63,8 +64,6 @@ export function AccountSwitcherForm({
     [accounts, normalizedQuery]
   );
   const marketplaces = Array.from(new Set(filteredAccounts.map((account) => account.marketplace)));
-  const defaultAccountId = selectedAccountId ?? filteredAccounts[0]?.id;
-
   return (
     <form action={action} className="mt-6 space-y-4">
       <label className="block">
@@ -72,9 +71,13 @@ export function AccountSwitcherForm({
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search marketplace, account name, or code"
+          placeholder="Search accounts"
+          aria-describedby="account-search-help"
           className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
         />
+        <span id="account-search-help" className="mt-1 block text-xs leading-5 text-slate-500">
+          Search by marketplace, company, seller account, or account code.
+        </span>
       </label>
 
       <div className="space-y-4">
@@ -90,10 +93,21 @@ export function AccountSwitcherForm({
                 {marketplaceAccounts.map((account) => (
                   <label
                     key={account.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:border-berry"
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-4 transition ${
+                      selectedId === account.id
+                        ? "border-berry bg-pink-50/60 ring-1 ring-pink-100"
+                        : "border-slate-200 bg-white hover:border-pink-300 hover:bg-slate-50"
+                    }`}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-semibold text-slate-950">{accountName(account)}</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="block break-words font-semibold text-slate-950">{accountName(account)}</span>
+                        {account.id === selectedAccountId ? (
+                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                            Current
+                          </span>
+                        ) : null}
+                      </span>
                       <span className="text-sm text-slate-500">
                         {account.companyName} / {accountCode(account)} {!account.active ? "/ inactive" : ""}
                       </span>
@@ -102,7 +116,9 @@ export function AccountSwitcherForm({
                       type="radio"
                       name="accountId"
                       value={account.id}
-                      defaultChecked={account.id === defaultAccountId}
+                      checked={selectedId === account.id}
+                      onChange={() => setSelectedId(account.id)}
+                      required
                       className="h-5 w-5 shrink-0 accent-pink-700"
                     />
                   </label>
@@ -119,7 +135,9 @@ export function AccountSwitcherForm({
         </div>
       ) : null}
 
-      <SubmitButton>Select account</SubmitButton>
+      <div className="sticky bottom-3 z-10 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+        <SubmitButton className="w-full sm:w-auto">Select account</SubmitButton>
+      </div>
     </form>
   );
 }

@@ -1139,6 +1139,7 @@ const appShell = readFileSync(join(repoRoot, "components", "AppShell.tsx"), "utf
 const dataHelpers = readFileSync(join(repoRoot, "lib", "data.ts"), "utf8");
 const authHelpers = readFileSync(join(repoRoot, "lib", "auth.ts"), "utf8");
 const changePasswordAction = readFileSync(join(repoRoot, "app", "change-password", "actions.ts"), "utf8");
+const changePasswordForm = readFileSync(join(repoRoot, "app", "change-password", "ChangePasswordForm.tsx"), "utf8");
 const ownerSystemPage = readFileSync(join(repoRoot, "app", "owner", "system", "page.tsx"), "utf8");
 const systemHealth = readFileSync(join(repoRoot, "lib", "system-health.ts"), "utf8");
 const productionChecksSource = readFileSync(join(repoRoot, "lib", "production-checks.ts"), "utf8");
@@ -1258,7 +1259,7 @@ assert.match(dashboardPage, /requireUser\(\["OWNER"\]\)/, "Dashboard route remai
 assert.match(dashboardPage, /getDashboardStats/, "Dashboard route exists and uses lightweight dashboard data");
 assert.match(dashboardPage, /Selected company \/ seller account/, "Dashboard shows selected company and account context");
 assert.match(dashboardPage, /account\.marketplace/, "Dashboard shows selected marketplace context");
-assert.match(dashboardPage, /Import orders[\s\S]*Import listing master[\s\S]*Open picker[\s\S]*Open packer/, "Dashboard exposes fast account-scoped quick actions");
+assert.match(dashboardPage, /Import orders[\s\S]*Import listing master[\s\S]*href="\/work\/pick\?source=ORDER" label="Open Pick"[\s\S]*href="\/work\/pack" label="Open Pack"/, "Dashboard exposes fast account-scoped quick actions through the modern Work Hub routes");
 assert.match(ownerPage, /redirect\("\/dashboard"\)/, "Legacy /owner route redirects to /dashboard");
 assert.match(uploadPage, /MarketplaceImportWizard/, "Upload page delegates marketplace/account filtering to the import wizard");
 assert.match(marketplaceImportWizardComponent, /Choose marketplace and seller account first\. Imports are saved under that account\./, "Upload wizard explains marketplace/account scoping");
@@ -1492,6 +1493,11 @@ assert.match(productImageGalleryComponent, /Escape/, "Product image gallery clos
 assert.match(productImageGalleryComponent, /ArrowRight[\s\S]*ArrowLeft/, "Product image gallery supports keyboard image navigation");
 assert.match(productImageGalleryComponent, /galleryImages\.length === 0 \? 0/, "Product image gallery handles one or zero images cleanly");
 assert.match(changePasswordAction, /await clearSession\(\);\s*redirect\("\/login\?passwordChanged=1"\)/, "Password changes clear session and redirect to login");
+assert.match(changePasswordForm, /aria-label=\{`\$\{visible \? "Hide" : "Show"\} \$\{label\.toLowerCase\(\)\}`\}[\s\S]*\{visible \? "Hide" : "Show"\}/, "Password-change fields provide visible show and hide controls");
+assert.match(changePasswordForm, /At least 8 characters[\s\S]*Not a common demo password/, "Password-change checklist mirrors the authoritative minimum policy");
+assert.match(changePasswordForm, /Recommended: 12\+ characters with letters, numbers, and a symbol/, "Stronger password composition remains clearly advisory");
+assert.match(changePasswordForm, /Caps Lock is on\./, "Password-change form warns when Caps Lock is active");
+assert.match(changePasswordForm, /Passwords do not match\.[\s\S]*Passwords match\./, "Password-change form exposes a non-colour confirmation match state");
 assert.match(ownerSystemPage, /Cookie secure mode/, "Owner system page shows auth cookie diagnostics");
 assert.match(ownerSystemPage, /Database ping/, "Owner system page shows database latency");
 assert.match(ownerSystemPage, /Pending migrations/, "Owner system page shows pending migration status");

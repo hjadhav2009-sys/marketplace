@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export function PasswordField() {
+export function PasswordField({ invalid = false, describedBy }: { invalid?: boolean; describedBy?: string }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -13,7 +13,11 @@ export function PasswordField() {
           name="password"
           type={visible ? "text" : "password"}
           autoComplete="current-password"
-          className="min-h-12 w-full rounded-md border border-slate-300 px-4 py-3 pr-20 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
+          className={`min-h-12 w-full rounded-md border px-4 py-3 pr-20 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100 ${
+            invalid ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
+          }`}
           placeholder="Password"
           required
         />

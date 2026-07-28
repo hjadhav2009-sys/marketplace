@@ -65,27 +65,27 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Today ready" value={compactNumber(stats.readyOrders)} tone="berry" />
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard label="Orders ready" value={compactNumber(stats.readyOrders)} />
         <StatCard label="Packed today" value={compactNumber(stats.packedOrders)} tone="mint" />
-        <StatCard label="Problems today" value={compactNumber(stats.problemOrders)} tone="clay" />
-        <StatCard label="SKU images" value={compactNumber(stats.skuMappings)} />
-        <StatCard label="Batches" value={compactNumber(stats.batches)} />
+        <StatCard label="Open problems today" value={compactNumber(stats.problemOrders)} tone="clay" />
+        <StatCard label="SKU image mappings" value={compactNumber(stats.skuMappings)} />
+        <StatCard label="Import batches" value={compactNumber(stats.batches)} />
       </section>
 
-      <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <QuickAction href="/owner/uploads/new" label="Import orders" />
         <QuickAction href="/owner/uploads/new" label="Import listing master" />
-        <QuickAction href="/picker" label="Open picker" />
-        <QuickAction href="/packing" label="Open packer" />
+        <QuickAction href="/work/pick?source=ORDER" label="Open Pick" />
+        <QuickAction href="/work/pack" label="Open Pack" />
       </section>
 
-      <section className="mt-6 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="mt-6 grid items-start gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-md border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
             <h2 className="font-semibold text-slate-950">Recent work</h2>
-            <Link prefetch href="/picker" className="text-sm font-semibold text-berry hover:text-pink-800">
-              Open picker
+            <Link prefetch href="/work/pick?source=ORDER" className="inline-flex min-h-11 items-center text-sm font-semibold text-berry hover:text-pink-800">
+              View all
             </Link>
           </div>
           <div className="divide-y divide-slate-100">

@@ -30,9 +30,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const showDevHint = process.env.NODE_ENV !== "production" && process.env.SHOW_DEV_LOGIN_HINTS === "true";
 
   return (
-    <main className="flex min-h-screen items-start justify-center bg-stone-50 px-4 py-8 sm:items-center sm:px-6 sm:py-12">
-      <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-soft sm:p-8">
-        <div className="mb-7 text-center">
+    <main className="flex min-h-screen items-start justify-center bg-stone-50 px-4 py-4 sm:items-center sm:px-6 sm:py-10">
+      <section className="w-full max-w-[460px] rounded-xl border border-slate-200 bg-white p-5 shadow-soft sm:p-8">
+        <div className="mb-6 text-center">
           <p className="text-sm font-bold uppercase tracking-wide text-berry">Marketplace Pick & Pack</p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Sign in</h1>
           <p className="mt-2 text-sm leading-6 text-slate-700 sm:text-base">Fast login for daily picking and packing work.</p>
@@ -57,27 +57,31 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ) : null}
 
         {hasInvalidError || hasSessionError ? (
-          <div role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          <div id="login-error" role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
             {hasInvalidError ? "The username or password is incorrect." : null}
             {hasSessionError ? "Session creation failed. Try again." : null}
           </div>
         ) : null}
 
-        <form action={loginAction} className="space-y-5">
+        <form action={loginAction} aria-describedby={hasInvalidError || hasSessionError ? "login-error" : undefined} className="space-y-5">
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Username</span>
             <input
               name="username"
               autoComplete="username"
-              className="mt-2 min-h-12 w-full rounded-md border border-slate-300 px-4 py-3 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100"
+              aria-invalid={hasInvalidError || hasSessionError}
+              autoFocus={hasInvalidError || hasSessionError}
+              className={`mt-2 min-h-12 w-full rounded-md border px-4 py-3 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100 ${
+                hasInvalidError || hasSessionError ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
+              }`}
               placeholder="Enter username"
               required
             />
           </label>
 
-          <PasswordField />
+          <PasswordField invalid={hasInvalidError || hasSessionError} describedBy={hasInvalidError || hasSessionError ? "login-error" : undefined} />
 
-          <div className="[&_button]:min-h-12 [&_button]:w-full [&_button]:rounded-full [&_button]:text-base [&_button]:font-semibold">
+          <div className="[&_button]:min-h-12 [&_button]:w-full [&_button]:text-base [&_button]:font-semibold">
             <SubmitButton pendingText="Signing in...">Sign in</SubmitButton>
           </div>
         </form>

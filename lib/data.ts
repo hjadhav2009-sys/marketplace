@@ -138,7 +138,7 @@ export async function getRecentOrders(accountId: string) {
       packStatus: true
     },
     orderBy: { createdAt: "desc" },
-    take: 8
+    take: 5
   });
 }
 

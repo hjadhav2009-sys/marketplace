@@ -26,14 +26,8 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
           Accounts are grouped by marketplace. Workers only see accounts assigned to them; owners can switch any account.
         </p>
 
-        {selectedAccount ? (
-          <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
-            Current: {selectedAccount.companyName} / {selectedAccount.marketplace} / {selectedAccount.accountDisplayName ?? selectedAccount.name}
-          </div>
-        ) : null}
-
         {params?.error ? (
-          <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          <div role="alert" className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
             Select a valid account.
           </div>
         ) : null}

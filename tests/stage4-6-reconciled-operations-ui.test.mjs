@@ -23,6 +23,7 @@ const scannerDialog = read("components/ScannerPickRouteDialog.tsx");
 const workHub = read("app/work/LiveWorkHubSummary.tsx");
 const stageSummary = read("app/work/LiveStageSummary.tsx");
 const workProblems = read("app/work/problems/page.tsx");
+const dataManagement = read("app/owner/data-management/page.tsx");
 
 assert.match(consignments, /Review and activate/);
 assert.match(consignments, /View completion record/);
@@ -84,5 +85,14 @@ assert.match(stageSummary, /role="tablist"/);
 assert.match(stageSummary, /aria-selected/);
 assert.match(workProblems, /No problems to show/);
 assert.match(workProblems, /aria-disabled="true"/);
+assert.match(dataManagement, /Swipe to see all data sections/);
+assert.match(dataManagement, /aria-current=/);
+assert.match(dataManagement, /<details className=/);
+assert.match(dataManagement, /executeOwnerDataAction/);
+assert.match(dataManagement, /StatusBadge/);
+assert.match(dataManagement, /formatDateTime/);
+assert.match(dataManagement, /autoFocus/);
+assert.match(dataManagement, /Quarantined files will appear here with their retention deadline/);
+assert.doesNotMatch(dataManagement, /createdAt\.toLocaleString|purgeAfter\?\.toLocaleString/);
 
 console.log("Stage 4.6 reconciled owner-operations UI contract tests passed.");

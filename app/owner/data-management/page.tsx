@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import { getSelectedAccount, requireUser } from "@/lib/auth";
+import { formatDateTime } from "@/lib/format";
 import {
   dataManagementInventory,
   dataManagementOverview,
@@ -29,7 +31,9 @@ function DestructiveForm(props: {
   button: string;
   disabled?: boolean;
 }) {
-  return <form action={executeOwnerDataAction} className="mt-3 space-y-3 rounded-lg border border-rose-200 bg-rose-50 p-4">
+  return <details className="mt-3 rounded-lg border border-rose-200 bg-rose-50">
+    <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-bold text-rose-800">{props.button}</summary>
+    <form action={executeOwnerDataAction} className="space-y-3 border-t border-rose-200 p-4">
     <input type="hidden" name="actionKind" value={props.actionKind}/>
     <input type="hidden" name="returnTab" value={props.tab}/>
     <input type="hidden" name="clientRequestId" value={`dm-${randomUUID()}`}/>
@@ -42,7 +46,9 @@ function DestructiveForm(props: {
       <input name="confirmationPhrase" required disabled={props.disabled} className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3" aria-describedby={`phrase-${props.actionKind}`}/>
     </label>
     <button disabled={props.disabled} className="min-h-11 rounded-md bg-rose-700 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-400">{props.button}</button>
-  </form>;
+    {props.disabled ? <p className="text-xs font-semibold text-slate-600">Unavailable while the record is active, processing, not retained, or inside its required retention window.</p> : null}
+    </form>
+  </details>;
 }
 
 function Card({ children }: { children: React.ReactNode }) {
@@ -63,10 +69,11 @@ export default async function DataManagementPage({ searchParams }: {
 
   return <AppShell allowNoAccount>
     <PageHeader eyebrow="Owner-only safety controls" title="Data Management" description="Preview, quarantine, restore, and explicitly purge controlled data. Normal worker history is never removed from this page."/>
-    {query.error ? <p role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 font-semibold text-rose-800">{query.error}</p> : null}
-    {query.success ? <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-semibold text-emerald-800">The authorized action completed. Review Deletion History for its durable receipt.</p> : null}
+    {query.error ? <p role="alert" tabIndex={-1} autoFocus className="mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 font-semibold text-rose-800">{query.error}</p> : null}
+    {query.success ? <p role="status" tabIndex={-1} autoFocus className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-semibold text-emerald-800">The authorized action completed. Review Deletion History for its durable receipt.</p> : null}
+    <p className="mb-1 text-xs font-semibold text-slate-500 sm:hidden">Swipe to see all data sections →</p>
     <nav aria-label="Data management sections" className="mb-5 flex gap-2 overflow-x-auto pb-2">
-      {tabs.map(([key, label]) => <Link key={key} href={`/owner/data-management?tab=${key}`} className={`min-h-11 shrink-0 rounded-md border px-3 py-2 text-sm font-bold ${tab === key ? "border-slate-950 bg-slate-950 text-white" : "bg-white text-slate-700"}`}>{label}</Link>)}
+      {tabs.map(([key, label]) => <Link key={key} href={`/owner/data-management?tab=${key}`} aria-current={tab===key?"page":undefined} className={`min-h-11 shrink-0 rounded-md border px-3 py-2 text-sm font-bold ${tab === key ? "border-slate-950 bg-slate-950 text-white" : "bg-white text-slate-700"}`}>{label}</Link>)}
     </nav>
 
     {!account && !["overview", "history", "reset"].includes(tab) ? <Card><h2 className="text-lg font-bold">Choose a seller account</h2><p className="mt-2 text-slate-600">Account-scoped data is shown only after the owner selects an account.</p><Link href="/accounts" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 py-2 font-bold text-white">Choose seller account</Link></Card> : null}
@@ -78,14 +85,14 @@ export default async function DataManagementPage({ searchParams }: {
 
     {tab === "files" && account ? <div className="space-y-4">
       <Card><h2 className="text-xl font-bold">Retained import source files</h2><p className="mt-1 text-sm text-slate-600">File-only quarantine preserves the import-job record and its safe counters.</p></Card>
-      {inventory.imports.filter(job => job.filePath).map(job => <Card key={`source-${job.id}`}><h3 className="font-bold break-all">{job.fileName}</h3><p className="mt-1 text-sm text-slate-600">{job.importType} · {job.status}</p><DestructiveForm actionKind="QUARANTINE_IMPORT_SOURCE_FILE" tab="files" phrase={`QUARANTINE ${job.id}`} scope={{importJobId:job.id}} button="Quarantine source file only" disabled={["QUEUED","RUNNING","PARSING","MERGING","NEEDS_MAPPING","AWAITING_FILE_ROLES"].includes(job.status)}/></Card>)}
+      {inventory.imports.filter(job => job.filePath).map(job => <Card key={`source-${job.id}`}><h3 className="font-bold break-all">{job.fileName}</h3><div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600"><span>{job.importType}</span><StatusBadge value={job.status}/></div><DestructiveForm actionKind="QUARANTINE_IMPORT_SOURCE_FILE" tab="files" phrase={`QUARANTINE ${job.id}`} scope={{importJobId:job.id}} button="Quarantine source file only" disabled={["QUEUED","RUNNING","PARSING","MERGING","NEEDS_MAPPING","AWAITING_FILE_ROLES"].includes(job.status)}/></Card>)}
       <Card><h2 className="text-xl font-bold">Consignment source files</h2><p className="mt-1 text-sm text-slate-600">Current source files for actionable batches are blocked.</p></Card>
       {inventory.consignmentFiles.map(file => <Card key={file.id}><h3 className="font-bold break-all">{file.originalFileName}</h3><p className="mt-1 text-sm text-slate-600">{file.consignmentBatch.displayName} · {file.fileSizeBytes.toLocaleString()} bytes · {file.managedRelativePath ? "retained" : "absent"}</p><DestructiveForm actionKind="QUARANTINE_CONSIGNMENT_FILE" tab="files" phrase={`QUARANTINE ${file.id}`} scope={{consignmentFileId:file.id}} button="Quarantine source file" disabled={!file.managedRelativePath || (file.isCurrentSource && ["ACTIVE","READY_TO_ACTIVATE"].includes(file.consignmentBatch.status))}/></Card>)}
       {!inventory.consignmentFiles.length ? <Card><p>No managed Consignment source files exist for this account.</p></Card> : null}
     </div> : null}
 
     {tab === "imports" && account ? <div className="space-y-4">
-      {inventory.imports.map(job => <Card key={job.id}><h2 className="font-bold break-all">{job.fileName}</h2><p className="mt-1 text-sm text-slate-600">{job.importType} · {job.status} · {job.createdAt.toLocaleString()}</p><DestructiveForm actionKind="QUARANTINE_IMPORT_JOB_FILE" tab="imports" phrase={`QUARANTINE ${job.id}`} scope={{importJobId:job.id}} button="Archive job and quarantine retained artifact" disabled={!job.filePath || ["QUEUED","RUNNING","PARSING","MERGING","NEEDS_MAPPING","AWAITING_FILE_ROLES"].includes(job.status)}/><DestructiveForm actionKind="QUARANTINE_GENERATED_REPORTS" tab="imports" phrase={`QUARANTINE ${job.id}`} scope={{importJobId:job.id}} button="Quarantine generated reports" disabled={!job.filePath || ["QUEUED","RUNNING","PARSING","MERGING","NEEDS_MAPPING","AWAITING_FILE_ROLES"].includes(job.status)}/></Card>)}
+      {inventory.imports.map(job => <Card key={job.id}><h2 className="font-bold break-all">{job.fileName}</h2><div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600"><span>{job.importType}</span><StatusBadge value={job.status}/><span>Created {formatDateTime(job.createdAt)}</span></div><DestructiveForm actionKind="QUARANTINE_IMPORT_JOB_FILE" tab="imports" phrase={`QUARANTINE ${job.id}`} scope={{importJobId:job.id}} button="Archive job and quarantine retained artifact" disabled={!job.filePath || ["QUEUED","RUNNING","PARSING","MERGING","NEEDS_MAPPING","AWAITING_FILE_ROLES"].includes(job.status)}/><DestructiveForm actionKind="QUARANTINE_GENERATED_REPORTS" tab="imports" phrase={`QUARANTINE ${job.id}`} scope={{importJobId:job.id}} button="Quarantine generated reports" disabled={!job.filePath || ["QUEUED","RUNNING","PARSING","MERGING","NEEDS_MAPPING","AWAITING_FILE_ROLES"].includes(job.status)}/></Card>)}
       {!inventory.imports.length ? <Card><p>No import jobs exist for this account.</p></Card> : null}
     </div> : null}
 
@@ -100,9 +107,9 @@ export default async function DataManagementPage({ searchParams }: {
       {!inventory.listings.length ? <Card><p>No Product Inventory listings exist for this account.</p></Card> : null}
     </div> : null}
 
-    {tab === "trash" ? <div className="space-y-4">{overview.jobs.filter(job => ["COMPLETED","FAILED_RESTORED"].includes(job.state) && job.totalFiles > 0).map(job => <Card key={job.id}><h2 className="font-bold">{job.actionKind}</h2><p className="mt-1 text-sm text-slate-600">{job.totalFiles} file(s), {job.totalBytes.toLocaleString()} bytes · {job.state} · retained until {job.purgeAfter?.toLocaleString() ?? "review"}</p>{job.state === "COMPLETED" ? <DestructiveForm actionKind="RESTORE_QUARANTINED_FILES" tab="trash" phrase={`RESTORE ${job.id}`} scope={{deletionJobId:job.id}} button="Restore quarantined files"/> : null}<DestructiveForm actionKind="PURGE_QUARANTINED_FILES" tab="trash" phrase={`PERMANENTLY PURGE ${job.id}`} scope={{deletionJobId:job.id}} button="Permanently purge after retention" disabled={!job.purgeAfter || job.purgeAfter > new Date()}/></Card>)}{!overview.jobs.some(job => job.totalFiles > 0) ? <Card><p>Trash / Quarantine is empty.</p></Card> : null}</div> : null}
+    {tab === "trash" ? <div className="space-y-4">{overview.jobs.filter(job => ["COMPLETED","FAILED_RESTORED"].includes(job.state) && job.totalFiles > 0).map(job => <Card key={job.id}><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{job.actionKind.replaceAll("_"," ")}</h2><StatusBadge value={job.state}/></div><p className="mt-1 text-sm text-slate-600">{job.totalFiles} files · {job.totalBytes.toLocaleString()} bytes · retained until {job.purgeAfter ? formatDateTime(job.purgeAfter) : "manual review"}</p>{job.state === "COMPLETED" ? <DestructiveForm actionKind="RESTORE_QUARANTINED_FILES" tab="trash" phrase={`RESTORE ${job.id}`} scope={{deletionJobId:job.id}} button="Restore quarantined files"/> : null}<DestructiveForm actionKind="PURGE_QUARANTINED_FILES" tab="trash" phrase={`PERMANENTLY PURGE ${job.id}`} scope={{deletionJobId:job.id}} button="Permanently purge after retention" disabled={!job.purgeAfter || job.purgeAfter > new Date()}/></Card>)}{!overview.jobs.some(job => job.totalFiles > 0) ? <Card><p>Trash / Quarantine is empty. Quarantined files will appear here with their retention deadline.</p></Card> : null}</div> : null}
 
-    {tab === "history" ? <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-100"><tr><th className="p-3">Created</th><th className="p-3">Action</th><th className="p-3">State</th><th className="p-3">Files</th><th className="p-3">Retention</th></tr></thead><tbody>{overview.jobs.map(job => <tr key={job.id} className="border-t"><td className="p-3">{job.createdAt.toLocaleString()}</td><td className="p-3 font-semibold">{job.actionKind}</td><td className="p-3">{job.state}</td><td className="p-3">{job.totalFiles}</td><td className="p-3">{job.purgeAfter?.toLocaleString() ?? "—"}</td></tr>)}</tbody></table></div> : null}
+    {tab === "history" ? <div className="overflow-x-auto rounded-xl border bg-white"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-100"><tr><th className="p-3">Created</th><th className="p-3">Action</th><th className="p-3">State</th><th className="p-3">Files</th><th className="p-3">Retention</th></tr></thead><tbody>{overview.jobs.map(job => <tr key={job.id} className="border-t"><td className="p-3">{formatDateTime(job.createdAt)}</td><td className="p-3 font-semibold">{job.actionKind.replaceAll("_"," ")}</td><td className="p-3"><StatusBadge value={job.state}/></td><td className="p-3">{job.totalFiles} files</td><td className="p-3">{job.purgeAfter ? formatDateTime(job.purgeAfter) : "Not scheduled"}</td></tr>)}</tbody></table>{!overview.jobs.length?<p className="p-6 text-center text-sm text-slate-600">No deletion actions have been recorded.</p>:null}</div> : null}
 
     {tab === "reset" ? <div className="space-y-4"><Card><h2 className="text-xl font-bold">Full reset is CLI-only</h2><p className="mt-2 text-slate-600">This page never runs a full database reset. Follow the guarded fresh-start runbook from a stopped application, verified backup, and explicit owner authorization.</p><Link href="/owner/system" className="mt-4 inline-flex min-h-11 items-center rounded-md border px-4 py-2 font-bold">Open System guidance</Link></Card><Card><h2 className="text-xl font-bold">Seller account deletion</h2><p className="mt-2 text-slate-600">Account lifecycle checks remain in the existing account-management service; Data Management does not bypass them.</p><Link href="/owner/accounts" className="mt-4 inline-flex min-h-11 items-center rounded-md border px-4 py-2 font-bold">Manage seller accounts</Link></Card></div> : null}
   </AppShell>;

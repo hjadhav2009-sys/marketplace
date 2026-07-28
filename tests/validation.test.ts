@@ -18,6 +18,7 @@ import { escapeCsvFormulaText, formatCsvValue, rowsToCsv, safeSpreadsheetValue }
 import { buildSkuMetadataAutoFillUpdates, planOrderImport } from "../lib/import/orders";
 import { importIssuePageWindow, maskOperationalKey, safeImportIssueContext } from "../lib/import/issues";
 import {
+  absoluteCachedImagePath,
   cachedProductImageUrl,
   canUserAccessCachedImage,
   cardFileNameForContentType,
@@ -822,6 +823,17 @@ assert.match(imageCacheSource, /IMAGE_CACHE_MAX_REDIRECTS/, "Image cache caps re
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "card.webp"])?.relativePath, "meesho/a1/SKU1/card.webp", "Valid cache route path parses");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "meta.json"]), null, "Cache route rejects meta.json");
 assert.equal(parseProductImageCacheRoutePath(["meesho", "a1", "..", "card.webp"]), null, "Cache route rejects traversal segments");
+const originalProductImageStorageRoot = process.env.PRODUCT_IMAGE_STORAGE_ROOT;
+const isolatedProductImageStorageRoot = mkdtempSync(join(tmpdir(), "product-image-storage-"));
+process.env.PRODUCT_IMAGE_STORAGE_ROOT = isolatedProductImageStorageRoot;
+assert.equal(
+  absoluteCachedImagePath("meesho/a1/SKU1/card.webp"),
+  join(isolatedProductImageStorageRoot, "meesho", "a1", "SKU1", "card.webp"),
+  "Cached image reads honor the configured private product-image storage root"
+);
+if (originalProductImageStorageRoot === undefined) delete process.env.PRODUCT_IMAGE_STORAGE_ROOT;
+else process.env.PRODUCT_IMAGE_STORAGE_ROOT = originalProductImageStorageRoot;
+rmSync(isolatedProductImageStorageRoot, { recursive: true, force: true });
 const parsedCachedImagePath = parseProductImageCacheRoutePath(["meesho", "a1", "SKU1", "card.webp"]);
 assert.ok(parsedCachedImagePath, "Signed cache URL tests have a parsed route path");
 const signedCacheUrl = signedCachedProductImageUrl({

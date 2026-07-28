@@ -718,7 +718,7 @@ export async function cacheProductCardImage(input: {
   }
 }
 
-export function absoluteCachedImagePath(relativePath: string, root = process.cwd()) {
+export function absoluteCachedImagePath(relativePath: string, root?: string) {
   const cacheRoot = productImageCacheRoot(root);
   const resolved = path.resolve(cacheRoot, relativePath);
   const resolvedRoot = path.resolve(cacheRoot);

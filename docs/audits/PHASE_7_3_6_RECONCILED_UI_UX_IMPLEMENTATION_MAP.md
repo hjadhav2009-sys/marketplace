@@ -53,23 +53,25 @@ No production database, schema or workflow service is changed.
 
 ## Wave 2 — shared visual system
 
-Primary candidates:
+Implemented:
 
 - `app/globals.css`
 - `components/AppShell.tsx`
 - `components/MobileAccountMenu.tsx`
-- current button, field, status, alert, empty-state, image and dialog
-  components
+- shared navigation, page-header, status, statistic, empty-state,
+  structured-detail, image-gallery and dialog components
 
-Decision:
+Result:
 
-Audit existing primitives first. Add no duplicate primitive when an existing
-one can be extended. Preserve permission-filtered navigation and server-action
-Logout.
+- permission-filtered navigation and server-action Logout remain intact;
+- mobile and desktop navigation expose the same authorized destinations;
+- page/account context, focus, text wrapping, status semantics and touch
+  targets are more explicit;
+- no parallel navigation or authentication implementation was introduced.
 
 ## Wave 3 — owner and catalogue UI
 
-Primary candidates:
+Implemented:
 
 - authentication and account pages;
 - dashboard, Accounts and Users;
@@ -85,7 +87,7 @@ Safety:
 
 ## Wave 4 — imports and consignments
 
-Primary candidates:
+Implemented:
 
 - Product Inventory refresh;
 - import list/detail/mapping/issues;
@@ -101,7 +103,7 @@ Safety:
 
 ## Wave 5 — worker operations
 
-Primary candidates:
+Implemented:
 
 - Work Hub;
 - Pick, Mark, Assembly and Pack;
@@ -119,7 +121,7 @@ Safety:
 
 ## Wave 6 — data, reports and QA
 
-Primary candidates:
+Implemented:
 
 - Data Management;
 - reports/system;
@@ -131,9 +133,48 @@ Safety:
   restore, retention and audit receipts are preserved;
 - QA routes remain unavailable without the staging UI audit environment.
 
+## Local implementation checkpoints
+
+| Commit | Scope |
+|---|---|
+| `00ad86b` | Reconciled requirement matrix and deterministic fixture truth |
+| `eaf3568` | Isolated Product Inventory image storage |
+| `27bebd8` | Accessible shared navigation |
+| `a408834` | Shared account and page context |
+| `5a4d531` | Authentication, account chooser and dashboard |
+| `7e96c55` | Product Inventory and catalogue details |
+| `1ba319d` | Consignments and import operations |
+| `42bae4e` | Owner administration and report scope |
+| `f4b6de0` | Worker cards and route-decision dialogs |
+| `d0dfc67` | Owner Data Management lifecycle controls |
+
+These commits are local to the implementation branch. They do not modify
+`main`, the RC1 pull request, production data, or `mobile-app`.
+
+## Requirement reconciliation status
+
+The matrix contains 193 independently classified rows:
+
+- 14 already implemented;
+- 4 conflict with an approved product rule;
+- 6 conflict with the current authoritative backend architecture;
+- 24 lack sufficient source evidence;
+- 1 is stale;
+- 26 are valid accessibility findings;
+- 22 are valid fixture defects;
+- 27 are valid responsive findings;
+- 69 are valid UI findings.
+
+Conflicting requirements were not implemented. Missing-evidence rows were not
+converted into code changes without reproduction. The safe UI and fixture
+clusters above are implemented, but a matrix row is not considered
+browser-verified until it is exercised against the final committed build.
+
 ## Verification
 
-Each changed wave requires focused source tests, TypeScript, lint, six-width
-browser verification, keyboard/focus checks, overflow checks and new evidence
-from one exact committed source/build/seed combination.
-
+Focused source and service tests, TypeScript, lint and diff validation have
+passed for the committed waves. Six-width browser verification, keyboard/focus
+checks, overflow checks and replacement screenshots must still be generated
+from one final committed source/build/seed combination. Historical atlas
+images are preserved as historical evidence and are not relabelled as proof of
+this implementation branch.

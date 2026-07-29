@@ -24,6 +24,7 @@ const workHub = read("app/work/LiveWorkHubSummary.tsx");
 const stageSummary = read("app/work/LiveStageSummary.tsx");
 const workProblems = read("app/work/problems/page.tsx");
 const dataManagement = read("app/owner/data-management/page.tsx");
+const dataActionDetails = read("components/DataActionDetails.tsx");
 
 assert.match(consignments, /Review and activate/);
 assert.match(consignments, /View completion record/);
@@ -87,7 +88,8 @@ assert.match(workProblems, /No problems to show/);
 assert.match(workProblems, /aria-disabled="true"/);
 assert.match(dataManagement, /Swipe to see all data sections/);
 assert.match(dataManagement, /aria-current=/);
-assert.match(dataManagement, /<details className=/);
+assert.match(dataManagement, /<DataActionDetails/);
+assert.match(dataActionDetails, /<details/);
 assert.match(dataManagement, /executeOwnerDataAction/);
 assert.match(dataManagement, /StatusBadge/);
 assert.match(dataManagement, /formatDateTime/);

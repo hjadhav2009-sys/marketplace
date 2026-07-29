@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { User } from "@prisma/client";
 import { AppNav, MobileDrawer, type AppNavLink } from "@/components/AppNav";
 import { MobileAccountMenu } from "@/components/MobileAccountMenu";
+import { MobileOverlayCoordinator } from "@/components/MobileOverlayCoordinator";
 import { capabilityHomePath, clearSession, getSelectedAccount, requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { getRequestMeta } from "@/lib/request-context";
@@ -91,6 +92,7 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
       <AppNav links={links} accountName={accountName} marketplace={account?.marketplace ?? user.role}/>
       <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <MobileOverlayCoordinator>
         <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-6 sm:py-3">
           <MobileDrawer links={links} accountName={accountName} marketplace={account?.marketplace ?? user.role}/>
           <Link
@@ -135,6 +137,7 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
             />
           </div>
         </div>
+        </MobileOverlayCoordinator>
       </header>
       <main className="mx-auto w-full max-w-[1600px] px-3 pb-8 pt-4 sm:px-6 sm:py-6 lg:py-8">
         {title ? <h1 className="mb-5 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{title}</h1> : null}

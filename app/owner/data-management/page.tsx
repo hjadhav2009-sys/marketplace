@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { DataActionDetails, type DataActionTone } from "@/components/DataActionDetails";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getSelectedAccount, requireUser } from "@/lib/auth";
@@ -31,9 +32,10 @@ function DestructiveForm(props: {
   button: string;
   disabled?: boolean;
 }) {
-  return <details className="mt-3 rounded-lg border border-rose-200 bg-rose-50">
-    <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-bold text-rose-800">{props.button}</summary>
-    <form action={executeOwnerDataAction} className="space-y-3 border-t border-rose-200 p-4">
+  const tone = dataActionTone(props.actionKind);
+  const disabledReason = "Unavailable while the record is active, processing, not retained, or inside its required retention window.";
+  return <DataActionDetails label={props.button} tone={tone} disabled={props.disabled} disabledReason={disabledReason}>
+    <form action={executeOwnerDataAction} className="space-y-3">
     <input type="hidden" name="actionKind" value={props.actionKind}/>
     <input type="hidden" name="returnTab" value={props.tab}/>
     <input type="hidden" name="clientRequestId" value={`dm-${randomUUID()}`}/>
@@ -45,10 +47,23 @@ function DestructiveForm(props: {
     <label className="block text-sm font-bold text-slate-800">Confirmation phrase
       <input name="confirmationPhrase" required disabled={props.disabled} className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3" aria-describedby={`phrase-${props.actionKind}`}/>
     </label>
-    <button disabled={props.disabled} className="min-h-11 rounded-md bg-rose-700 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-400">{props.button}</button>
-    {props.disabled ? <p className="text-xs font-semibold text-slate-600">Unavailable while the record is active, processing, not retained, or inside its required retention window.</p> : null}
+    <button className={`min-h-11 w-full rounded-lg px-4 py-2 font-bold text-white sm:w-auto ${dataActionButtonClass(tone)}`}>{props.button}</button>
     </form>
-  </details>;
+  </DataActionDetails>;
+}
+
+function dataActionTone(actionKind: DataActionKind): DataActionTone {
+  if (actionKind === "RESTORE_QUARANTINED_FILES") return "restore";
+  if (actionKind === "ARCHIVE_LISTING") return "archive";
+  if (actionKind === "PURGE_QUARANTINED_FILES" || actionKind === "PURGE_QA_OPERATIONAL_DATA" || actionKind === "DELETE_UNREFERENCED_LISTING") return "permanent";
+  return "quarantine";
+}
+
+function dataActionButtonClass(tone: DataActionTone) {
+  if (tone === "restore") return "bg-emerald-700 hover:bg-emerald-800";
+  if (tone === "archive") return "bg-sky-700 hover:bg-sky-800";
+  if (tone === "permanent") return "bg-rose-700 hover:bg-rose-800";
+  return "bg-amber-700 hover:bg-amber-800";
 }
 
 function Card({ children }: { children: React.ReactNode }) {

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useMobileOverlayCoordinator } from "./MobileOverlayCoordinator";
 
 type MobileAccountMenuProps = {
   role: string;
@@ -22,18 +23,19 @@ export function MobileAccountMenu({
   accountCode,
   logoutAction
 }: MobileAccountMenuProps) {
-  const [open, setOpen] = useState(false);
+  const { activeOverlay, closeOverlay, toggleOverlay } = useMobileOverlayCoordinator();
+  const open = activeOverlay === "account";
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const closeOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as Node)) closeOverlay();
     };
     const closeEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeOverlay();
         triggerRef.current?.focus();
       }
     };
@@ -43,7 +45,7 @@ export function MobileAccountMenu({
       window.removeEventListener("pointerdown", closeOutside);
       window.removeEventListener("keydown", closeEscape);
     };
-  }, [open]);
+  }, [closeOverlay, open]);
 
   return (
     <div ref={rootRef} className="relative sm:hidden">
@@ -53,7 +55,7 @@ export function MobileAccountMenu({
         aria-label="Open account menu"
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => toggleOverlay("account")}
         className="flex min-h-11 min-w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-800 shadow-sm"
       >
         <svg aria-hidden viewBox="0 0 24 24" className="h-6 w-6 fill-current">
@@ -74,10 +76,10 @@ export function MobileAccountMenu({
               Signed in as {name} ({role})
             </p>
           </div>
-          <Link role="menuitem" href="/accounts" prefetch onClick={() => setOpen(false)} className="mt-2 flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+          <Link role="menuitem" href="/accounts" prefetch onClick={closeOverlay} className="mt-2 flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100">
             Switch account
           </Link>
-          <Link role="menuitem" href="/change-password" prefetch onClick={() => setOpen(false)} className="flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+          <Link role="menuitem" href="/change-password" prefetch onClick={closeOverlay} className="flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100">
             Password
           </Link>
           <form action={logoutAction}>

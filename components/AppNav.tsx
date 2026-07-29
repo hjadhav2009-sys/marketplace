@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useMobileOverlayCoordinator } from "./MobileOverlayCoordinator";
 
 export type AppNavLink = { href: string; label: string; section?: string };
 type AppNavProps = { links: AppNavLink[]; accountName?: string; marketplace?: string };
@@ -162,22 +163,16 @@ export function AppNav({ links, accountName, marketplace }: AppNavProps) {
 }
 
 export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
-  const [open, setOpen] = useState(false);
+  const { activeOverlay, closeOverlay, openOverlay } = useMobileOverlayCoordinator();
+  const open = activeOverlay === "navigation";
   const triggerRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeOverlay();
         triggerRef.current?.focus();
         return;
       }
@@ -198,11 +193,11 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [open]);
+  }, [closeOverlay, open]);
 
-  const closeDrawer = () => {
-    setOpen(false);
-    triggerRef.current?.focus();
+  const closeDrawer = (returnFocus = true) => {
+    closeOverlay();
+    if (returnFocus) triggerRef.current?.focus();
   };
 
   return (
@@ -213,7 +208,7 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
         aria-label="Open navigation"
         aria-controls="mobile-navigation-dialog"
         aria-expanded={open}
-        onClick={() => setOpen(true)}
+        onClick={() => openOverlay("navigation")}
         className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 lg:hidden"
         data-mobile-drawer-trigger
       >
@@ -226,7 +221,7 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
           <button
             type="button"
             aria-label="Close navigation"
-            onClick={closeDrawer}
+            onClick={() => closeDrawer(false)}
             className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]"
           />
           <aside
@@ -235,7 +230,7 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"
-            className="relative flex h-full w-[min(88vw,340px)] flex-col bg-white shadow-2xl"
+            className="relative flex h-dvh max-h-dvh w-[min(88vw,340px)] flex-col overflow-hidden bg-white shadow-2xl"
           >
             <div className="flex items-center justify-between border-b p-4">
               <div className="min-w-0">
@@ -246,7 +241,7 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
                 type="button"
                 autoFocus
                 aria-label="Close navigation"
-                onClick={closeDrawer}
+                onClick={() => closeDrawer()}
                 className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50"
               >
                 <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round">
@@ -254,8 +249,8 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
                 </svg>
               </button>
             </div>
-            <nav className="flex-1 overflow-y-auto p-4" aria-label="Mobile navigation">
-              <NavItems links={links} onNavigate={closeDrawer} />
+            <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" aria-label="Mobile navigation">
+              <NavItems links={links} onNavigate={() => closeDrawer(false)} />
             </nav>
           </aside>
         </div>

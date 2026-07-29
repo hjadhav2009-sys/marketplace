@@ -6,11 +6,13 @@ import { ProductImage } from "./ProductImage";
 export function WorkImageGallery({
   images,
   alt,
-  priority = false
+  priority = false,
+  compact = false
 }: {
   images: Array<string | null | undefined>;
   alt: string;
   priority?: boolean;
+  compact?: boolean;
 }) {
   const available = [...new Set(images.filter((value): value is string => Boolean(value)))];
   const [index, setIndex] = useState(0);
@@ -28,16 +30,17 @@ export function WorkImageGallery({
         if (event.key === "ArrowLeft") move(-1);
         if (event.key === "ArrowRight") move(1);
       }}
-      className={`relative mx-auto w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 ${
-        available.length ? "aspect-square" : "aspect-[4/3]"
-      }`}
+      className={compact
+        ? "relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 sm:h-28 sm:w-28"
+        : `relative mx-auto w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 ${available.length ? "aspect-square" : "aspect-[4/3]"}`
+      }
       data-work-gallery
       data-image-count={available.length}
     >
       <ProductImage
         src={current}
         alt={`${alt}${available.length > 1 ? ` image ${index + 1} of ${available.length}` : ""}`}
-        size="lg"
+        size={compact ? "work" : "lg"}
         showBadge={false}
         priority={priority}
       />

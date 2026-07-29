@@ -13,7 +13,7 @@ import { markProductImageBrokenAction, markProductImageMappedAction } from "./pr
 type ProductImageProps = {
   src?: string | null;
   alt: string;
-  size?: "sm" | "inventory" | "md" | "lg";
+  size?: "sm" | "inventory" | "md" | "scanner" | "work" | "lg";
   showBadge?: boolean;
   mappingId?: string | null;
   showDebug?: boolean;
@@ -27,6 +27,8 @@ const sizeClass = {
   sm: "h-16 w-16",
   inventory: "h-[5.5rem] w-[5.5rem]",
   md: "h-28 w-28",
+  scanner: "h-24 w-24",
+  work: "h-full w-full",
   lg: "aspect-square w-full"
 };
 
@@ -55,6 +57,7 @@ export function ProductImage({
   const isExternalSrc = isLoadableImageUrl(validSrc);
   const hasSource = Boolean(validSrc);
   const stateText = productImageStateText(state, hasSource, false, cacheStatus);
+  const compact = size === "work" || size === "scanner";
 
   useEffect(() => {
     setState(initialState(src, imageHealth, cacheStatus));
@@ -140,11 +143,11 @@ export function ProductImage({
           <span className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-black text-slate-400">
             IMG
           </span>
-          <span className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <span className={`${compact ? "mt-1 text-[10px]" : "mt-3 text-xs"} font-semibold uppercase tracking-wide text-slate-500`}>
             {state === "broken" || state === "unavailable" ? "Image unavailable" : state === "missing" ? "No image" : stateText}
           </span>
-          <span className="mt-1 max-w-36 text-xs text-slate-500">{state === "missing" ? "Use Listing Master or cache today's images" : stateText}</span>
-          {(state === "broken" || state === "unavailable") && validSrc && isExternalSrc ? (
+          {!compact ? <span className="mt-1 max-w-36 text-xs text-slate-500">{state === "missing" ? "Use Listing Master or cache today's images" : stateText}</span> : null}
+          {!compact && (state === "broken" || state === "unavailable") && validSrc && isExternalSrc ? (
             <button
               type="button"
               onClick={retryImage}

@@ -52,6 +52,76 @@ export function GroupedWorkCard({ card: initialCard, canAct }: { card: Card; can
       ? `Order Item ${card.orderItemId ?? card.reference}`
       : `Consignment line ${card.consignmentLineId?.slice(-8) ?? card.reference}`;
   const routeLabel = card.hasExplicitSavedRoute ? card.savedProcessRoute ?? "Saved route" : "System fallback — Direct to Pack";
+  return (
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" data-responsive-work-card data-source={card.sourceType} data-stage={card.stage} data-status={card.status}>
+      <div className="p-3 sm:p-4">
+        <div className="flex flex-wrap gap-1">
+          <Badge dark>{card.sourceType === "ORDER" ? "CUSTOMER ORDER" : "CONSIGNMENT"}</Badge>
+          <Badge>{card.marketplace}</Badge>
+          <Badge>{card.stage}</Badge>
+          <Badge>{card.status.replaceAll("_", " ")}</Badge>
+        </div>
+        <div className="mt-3 grid grid-cols-[6rem_minmax(0,1fr)] gap-3 sm:grid-cols-[7rem_minmax(0,1fr)] xl:grid-cols-[7rem_minmax(0,1fr)_15rem_15rem] xl:items-start">
+          <WorkImageGallery images={[card.productImageUrl]} alt={card.productTitle ?? card.sellerSku} compact/>
+          <div className="min-w-0">
+          <p className="mt-3 text-xs font-bold uppercase tracking-wide text-berry">{identity}</p>
+          <h2 className="mt-1 break-words text-lg font-black leading-tight sm:text-xl">{card.productTitle ?? "Untitled product"}</h2>
+          <p className="mt-1 break-all font-mono text-sm font-bold">Seller SKU {card.sellerSku}</p>
+          <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+            <Item label="Current stage" value={card.stage}/>
+            <Item label="Route" value={routeLabel}/>
+            <Item label="Assignment" value={card.assignedUserName ?? "Unassigned"}/>
+            {card.problemCount ? <Item label="Problem state" value={`${card.problemCount} ${card.problemCount === 1 ? "problem" : "problems"}`}/> : null}
+          </dl>
+          <details className="mt-1">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm font-bold text-berry">More identifiers</summary>
+            <Identifiers card={card}/>
+          </details>
+          </div>
+          <QuantityPanel card={card} isPackage={isPackage}/>
+          <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-2 xl:col-span-1" data-work-actions>
+            <CardActions card={card} canAct={canAct} details={details} token={token}/>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function QuantityPanel({ card, isPackage }: { card: Card; isPackage: boolean }) {
+  return <div className="col-span-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 xl:col-span-1" data-quantity-panel>
+    {isPackage ? <>
+      <p className="text-sm font-bold text-slate-500">Package quantity</p>
+      <p className="mt-1 text-2xl font-black">{card.requiredQuantity}</p>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+        <span><b>Order items</b><br/>{card.memberCount}</span>
+        <span><b>Total units</b><br/>{card.requiredQuantity}</span>
+      </div>
+    </> : <>
+      <div className="flex items-end justify-between gap-3">
+        <div><p className="text-sm font-bold text-slate-500">Quantity to process</p><p className="text-2xl font-black">{card.requiredQuantity}</p></div>
+        <div className="grid grid-cols-2 gap-3 text-right text-sm">
+          <span><b>Completed</b><br/>{card.completedQuantity}</span>
+          <span><b>Pending</b><br/>{card.pendingQuantity}</span>
+        </div>
+      </div>
+      <div
+        role="progressbar"
+        aria-label={`${card.stage} quantity completed`}
+        aria-valuemin={0}
+        aria-valuemax={card.requiredQuantity}
+        aria-valuenow={card.completedQuantity}
+        className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200"
+      >
+        <div className="h-full rounded-full bg-teal-600" style={{ width: `${Math.min(100, card.requiredQuantity ? card.completedQuantity / card.requiredQuantity * 100 : 0)}%` }}/>
+      </div>
+    </>}
+  </div>;
+}
+
+function CardActions({ card, canAct, details, token }: { card: Card; canAct: boolean; details: string; token: string }) {
+  const problem = card.status === "PROBLEM" || card.problemCount > 0;
+  const completed = card.status === "COMPLETED";
   const hidden = <>
     <input type="hidden" name="stage" value={card.stage}/>
     <input type="hidden" name="sourceType" value={card.sourceType}/>
@@ -60,89 +130,60 @@ export function GroupedWorkCard({ card: initialCard, canAct }: { card: Card; can
     <input type="hidden" name="clientRequestId" value={`${token}:complete`}/>
   </>;
 
-  return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" data-responsive-work-card data-source={card.sourceType} data-stage={card.stage}>
-      <div className="grid gap-4 p-4 md:grid-cols-[150px_minmax(0,1fr)_220px] md:items-center xl:grid-cols-[minmax(200px,240px)_minmax(0,1fr)_300px]">
-        <WorkImageGallery images={[card.productImageUrl]} alt={card.productTitle ?? card.sellerSku}/>
-        <div className="min-w-0">
-          <div className="flex flex-wrap gap-1">
-            <Badge dark>{card.sourceType === "ORDER" ? "CUSTOMER ORDER" : "CONSIGNMENT"}</Badge>
-            <Badge>{card.marketplace}</Badge>
-            <Badge>{card.stage}</Badge>
-            <Badge>{card.status.replaceAll("_", " ")}</Badge>
-          </div>
-          <p className="mt-3 text-xs font-bold uppercase tracking-wide text-berry">{identity}</p>
-          <h2 className="mt-1 break-words text-xl font-black leading-tight">{card.productTitle ?? "Untitled product"}</h2>
-          <p className="mt-1 break-all font-mono text-sm font-bold">Seller SKU {card.sellerSku}</p>
-          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            <Item label="Current stage" value={card.stage}/>
-            <Item label="Route" value={routeLabel}/>
-            <Item label="Assignment" value={card.assignedUserName ?? "Unassigned"}/>
-            {card.problemCount ? <Item label="Problem state" value={`${card.problemCount} ${card.problemCount === 1 ? "problem" : "problems"}`}/> : null}
-          </dl>
-          <details className="mt-2 sm:hidden">
-            <summary className="min-h-11 cursor-pointer py-3 text-sm font-bold text-berry">More identifiers</summary>
-            <Identifiers card={card}/>
-          </details>
-          <div className="mt-3 hidden sm:block"><Identifiers card={card}/></div>
-        </div>
-        <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 md:max-w-[220px] md:justify-self-end xl:max-w-[300px]" data-quantity-panel>
-          {isPackage ? <>
-            <p className="text-sm font-bold text-slate-500">Package quantity</p>
-            <p className="mt-1 text-3xl font-black">{card.requiredQuantity}</p>
-            <p className="mt-2 font-bold">Order items: {card.memberCount}</p>
-            <p className="font-bold">Total package quantity: {card.requiredQuantity}</p>
-          </> : <>
-            <p className="text-sm font-bold text-slate-500">Quantity to process</p>
-            <p className="mt-1 text-3xl font-black">{card.requiredQuantity}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <span><b>Completed</b><br/>{card.completedQuantity}</span>
-              <span><b>Pending</b><br/>{card.pendingQuantity}</span>
-            </div>
-            <div
-              role="progressbar"
-              aria-label={`${card.stage} quantity completed`}
-              aria-valuemin={0}
-              aria-valuemax={card.requiredQuantity}
-              aria-valuenow={card.completedQuantity}
-              className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200"
-            >
-              <div className="h-full rounded-full bg-teal-600" style={{ width: `${Math.min(100, card.requiredQuantity ? card.completedQuantity / card.requiredQuantity * 100 : 0)}%` }}/>
-            </div>
-          </>}
-        </div>
-      </div>
+  if (problem) {
+    return <div className="grid grid-cols-2 gap-2" data-action-mode="problem">
+      <p className="col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950">
+        Work paused — an open problem must be resolved before processing can continue.
+      </p>
+      <Link href={`${details}#problems`} className="flex min-h-11 items-center justify-center rounded-xl bg-amber-700 px-3 text-center font-bold text-white">Open Problem</Link>
+      <Details href={details}/>
+    </div>;
+  }
 
-      <div className="grid grid-cols-2 gap-2 border-t bg-slate-50 p-3" data-work-actions>
-        {canAct ? card.stage === "PACK" ? <>
-          <form action={completeGroupedStageAction}>{hidden}<SubmitButton pendingText="Packing...">Complete Pack</SubmitButton></form>
-          <Details href={details}/>
-          <Link href={`${details}#problems`} className="col-span-2 flex min-h-11 items-center justify-center rounded-xl border border-rose-300 bg-white font-bold text-rose-700">Report problem</Link>
-        </> : <>
-          <WorkRouteDialog
-            card={{
-              stage: card.stage,
-              sourceType: card.sourceType,
-              groupKey: card.groupKey,
-              groupVersion: card.groupVersion,
-              taskId: card.memberTaskIds[0],
-              completedQuantity: card.completedQuantity,
-              hasExplicitSavedRoute: card.hasExplicitSavedRoute,
-              savedProcessRoute: card.savedProcessRoute,
-              missingInstructionStages: card.missingInstructionStages
-            }}
-            triggerLabel={card.stage === "PICK" ? "Complete Pick" : card.stage === "MARK" ? "Complete Mark" : "Complete Assembly"}
-          />
-          <Link href={`${details}#quantity`} className="flex min-h-11 items-center justify-center rounded-xl border bg-white font-bold">Partial quantity</Link>
-          <Link href={`${details}#problems`} className="flex min-h-11 items-center justify-center rounded-xl border border-rose-300 bg-white font-bold text-rose-700">Report problem</Link>
-          <Details href={details}/>
-        </> : <>
-          <p className="col-span-2 rounded-xl bg-white p-3 text-sm font-bold text-slate-600">Read-only work view. Completion actions are hidden.</p>
-          <Details href={details}/>
-        </>}
-      </div>
-    </article>
-  );
+  if (completed) {
+    return <div className="grid grid-cols-2 gap-2" data-action-mode="completed">
+      <p className="col-span-2 rounded-xl bg-white p-3 text-sm font-bold text-slate-600">This work is completed and is available as a read-only receipt.</p>
+      <Details href={details}/>
+    </div>;
+  }
+
+  if (!canAct) {
+    return <div className="grid grid-cols-2 gap-2" data-action-mode="read-only">
+      <p className="col-span-2 rounded-xl bg-white p-3 text-sm font-bold text-slate-600">
+        Read-only: your current permissions do not allow {card.stage.toLowerCase()} actions.
+      </p>
+      <Details href={details}/>
+    </div>;
+  }
+
+  if (card.stage === "PACK") {
+    return <div className="grid grid-cols-2 gap-2" data-action-mode="ready">
+      <form action={completeGroupedStageAction}>{hidden}<SubmitButton pendingText="Packing...">Complete Pack</SubmitButton></form>
+      <Details href={details}/>
+      <Link href={`${details}#problems`} className="col-span-2 flex min-h-11 items-center justify-center rounded-xl border border-rose-300 bg-white font-bold text-rose-700">Problem</Link>
+    </div>;
+  }
+
+  const completionLabel = card.stage === "PICK" ? "Complete Pick" : card.stage === "MARK" ? "Marking Completed" : "Assembly Completed";
+  return <div className="grid grid-cols-2 gap-2" data-action-mode="ready">
+    <WorkRouteDialog
+      card={{
+        stage: card.stage,
+        sourceType: card.sourceType,
+        groupKey: card.groupKey,
+        groupVersion: card.groupVersion,
+        taskId: card.memberTaskIds[0],
+        completedQuantity: card.completedQuantity,
+        hasExplicitSavedRoute: card.hasExplicitSavedRoute,
+        savedProcessRoute: card.savedProcessRoute,
+        missingInstructionStages: card.missingInstructionStages
+      }}
+      triggerLabel={completionLabel}
+    />
+    <Link href={`${details}#quantity`} className="flex min-h-11 items-center justify-center rounded-xl border bg-white px-2 text-center font-bold">Partial Quantity</Link>
+    <Link href={`${details}#problems`} className="flex min-h-11 items-center justify-center rounded-xl border border-rose-300 bg-white font-bold text-rose-700">Problem</Link>
+    <Details href={details}/>
+  </div>;
 }
 
 function Identifiers({ card }: { card: Card }) {

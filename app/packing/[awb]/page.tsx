@@ -84,7 +84,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
           <StatusBadge value={order.packStatus} />
           <Link
             href="/packing"
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-berry hover:text-berry"
+            className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-berry hover:text-berry"
           >
             Scan next
           </Link>
@@ -356,7 +356,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
 
             {canReportProblem ? (
               <details id="problem" className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-                <summary className="cursor-pointer text-base font-semibold text-slate-950">Mark problem</summary>
+                <summary className="min-h-11 cursor-pointer py-2 text-base font-semibold text-slate-950">Mark problem</summary>
                 <form action={reportProblemFromScanAction} className="mt-4">
                   <input type="hidden" name="orderId" value={order.id} />
                   <label className="block">

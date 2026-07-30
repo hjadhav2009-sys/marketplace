@@ -926,7 +926,7 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
             <input type="checkbox" name="problems" value="1" defaultChecked={onlyProblems} className="h-4 w-4 rounded border-slate-300" />
             Problems only
           </label>
-          <button type="submit" className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+          <button type="submit" className="min-h-11 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
             Apply
           </button>
         </form>
@@ -1197,10 +1197,10 @@ export default async function ParseReviewPage({ params, searchParams }: ReviewPa
       ) : null}
 
       <div className="mt-5 flex flex-wrap gap-4">
-        <Link href="/owner/uploads/new" className="text-sm font-semibold text-berry hover:text-pink-800">
+        <Link href="/owner/uploads/new" className="inline-flex min-h-11 items-center text-sm font-semibold text-berry hover:text-pink-800">
           Upload another PDF
         </Link>
-        <Link href="/owner/sku-mappings" className="text-sm font-semibold text-berry hover:text-pink-800">
+        <Link href="/owner/sku-mappings" className="inline-flex min-h-11 items-center text-sm font-semibold text-berry hover:text-pink-800">
           Manage SKU image mappings
         </Link>
       </div>

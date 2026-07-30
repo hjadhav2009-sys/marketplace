@@ -88,8 +88,7 @@ async function captureFull(page, name) {
 function monitor(page) {
   const errors = { console: [], page: [], requests: [], responses: [] };
   page.on("console", (message) => {
-    const source = message.location().url;
-    if (message.type() === "error" && !/favicon\.ico/.test(source)) errors.console.push(message.text());
+    if (message.type() === "error") errors.console.push(message.text());
   });
   page.on("pageerror", (error) => errors.page.push(error.message));
   page.on("requestfailed", (request) => { if (request.failure()?.errorText !== "net::ERR_ABORTED") errors.requests.push(request.url()); });

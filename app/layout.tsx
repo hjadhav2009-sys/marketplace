@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   },
   description: "Multi-marketplace warehouse pick and pack workflow, starting with Flipkart.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }]
+  },
   appleWebApp: {
     capable: true,
     title: "Marketplace Pick & Pack",

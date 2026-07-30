@@ -110,7 +110,7 @@ export default async function DashboardPage() {
         <div className="rounded-md border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
             <h2 className="font-semibold text-slate-950">Recent imports</h2>
-            <Link prefetch href="/owner/imports" className="text-sm font-semibold text-berry hover:text-pink-800">
+            <Link prefetch href="/owner/imports" className="inline-flex min-h-11 items-center text-sm font-semibold text-berry hover:text-pink-800">
               View all
             </Link>
           </div>

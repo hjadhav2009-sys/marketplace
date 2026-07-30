@@ -78,8 +78,8 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {job.status === "NEEDS_MAPPING" ? <a href={`/owner/imports/${job.id}/mapping`} className="rounded-md bg-berry px-3 py-2 text-sm font-bold text-white">Map File Headers</a> : null}
-          {issueCount > 0 && job.batchId ? <a href={`/owner/imports/${job.id}/issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">View issues ({issueCount})</a> : <span className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-800">No issues</span>}
-          {issueCount > 0 && job.batchId ? <a href={`/owner/imports/export?jobId=${encodeURIComponent(job.id)}&format=csv&type=issues`} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">Download issues</a> : null}
+          {issueCount > 0 && job.batchId ? <a href={`/owner/imports/${job.id}/issues`} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">View issues ({issueCount})</a> : <span className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-800">No issues</span>}
+          {issueCount > 0 && job.batchId ? <a href={`/owner/imports/export?jobId=${encodeURIComponent(job.id)}&format=csv&type=issues`} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">Download issues</a> : null}
           {canRetry ? (
             <form action={retryImportJobAction}>
               <input type="hidden" name="jobId" value={job.id} />
@@ -88,7 +88,7 @@ export default async function ImportJobPage({ params, searchParams }: ImportJobP
           ) : canRetryProductInventory ? (
             <form action={retryProductInventoryJobAction}>
               <input type="hidden" name="jobId" value={job.id} />
-              <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Resume Product Inventory</button>
+              <button className="min-h-11 rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Resume Product Inventory</button>
             </form>
           ) : productInventoryJob && job.status === "CANCELLED" ? (
             <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">

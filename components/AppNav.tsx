@@ -119,7 +119,7 @@ export function AppNav({ links, accountName, marketplace }: AppNavProps) {
     >
       <div className="border-b border-slate-200 p-3">
         <div className="flex items-center justify-between gap-2">
-          <Link href="/dashboard" className="min-w-0">
+          <Link href="/dashboard" className="flex min-h-11 min-w-0 flex-col justify-center">
             {collapsed ? (
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-berry font-bold text-white">
                 MP

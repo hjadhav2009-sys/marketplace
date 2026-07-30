@@ -412,8 +412,12 @@ try {
       if (accountRestore) restoreSyntheticAccounts(accountRestore);
     }
     const unexpectedFailed = failedRequests.filter((item) => !/example\.invalid|invalid\.example\.invalid/.test(item.url) && item.error !== "net::ERR_ABORTED");
-    const unexpectedResponses = errorResponses.filter((item) => !/\/favicon\.ico(?:\?|$)/.test(item.url));
-    const smallControls = (inspection?.controls ?? []).filter((control) => ["BUTTON", "A", "SUMMARY"].includes(control.tag) && !control.disabled && control.height < 44);
+    const unexpectedResponses = errorResponses;
+    const smallControls = (inspection?.controls ?? []).filter((control) =>
+      ["BUTTON", "A", "SUMMARY"].includes(control.tag)
+      && !control.disabled
+      && (control.width < 44 || control.height < 44)
+    );
     const verified = !error && status > 0 && status < 400 && inspection?.stagingBanner && inspection?.heading !== "404" && !inspection?.overflow && pageErrors.length === 0 && consoleErrors.length === 0 && unexpectedFailed.length === 0 && unexpectedResponses.length === 0 && smallControls.length === 0 && semanticAssertion?.passed === true;
     if (verified) await context.tracing.stop();
     else await context.tracing.stop({ path: tracePath });

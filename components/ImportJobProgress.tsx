@@ -150,11 +150,11 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
         </div>
         <div className="flex flex-wrap gap-2">
           {(job.status === "COMPLETED" || job.status === "COMPLETED_WITH_WARNINGS") && href ? (
-            <Link href={href} className="inline-flex rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+            <Link href={href} className="inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
               Open review
             </Link>
           ) : null}
-          <Link href={job.importType.endsWith("PRODUCT_INVENTORY") ? "/owner/product-inventory/refresh" : "/owner/imports"} className="inline-flex rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
+          <Link href={job.importType.endsWith("PRODUCT_INVENTORY") ? "/owner/product-inventory/refresh" : "/owner/imports"} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
             Start another import
           </Link>
         </div>
@@ -189,31 +189,31 @@ export function ImportJobProgress({ initialJob, accountLabel }: ImportJobProgres
       <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
         <h3 className="font-semibold text-slate-950">{job.status === "FAILED" ? "Job failed" : job.status === "COMPLETED_WITH_WARNINGS" ? "Completed with warnings" : job.status === "COMPLETED" ? "Completed" : "Next actions"}</h3>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link href="/owner/imports" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+          <Link href="/owner/imports" className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Back to imports
           </Link>
-          {job.importType.endsWith("PRODUCT_INVENTORY") ? <Link href="/owner/product-inventory" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">View Product Inventory</Link> : null}
-          {job.importType.includes("ORDER") ? <Link href="/work/pick" className="rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Open Customer Orders</Link> : null}
-          <Link href={exportHref(job.id, "csv")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+          {job.importType.endsWith("PRODUCT_INVENTORY") ? <Link href="/owner/product-inventory" className="inline-flex min-h-11 items-center rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">View Product Inventory</Link> : null}
+          {job.importType.includes("ORDER") ? <Link href="/work/pick" className="inline-flex min-h-11 items-center rounded-md bg-slate-950 px-3 py-2 text-sm font-bold text-white">Open Customer Orders</Link> : null}
+          <Link href={exportHref(job.id, "csv")} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Summary CSV
           </Link>
-          <Link href={exportHref(job.id, "xlsx")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+          <Link href={exportHref(job.id, "xlsx")} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Summary XLSX
           </Link>
-          <Link href={exportHref(job.id, "txt")} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+          <Link href={exportHref(job.id, "txt")} className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             Summary TXT
           </Link>
           {job.warningRows > 0 && job.batchId ? (
             <>
-              <Link href={`/owner/imports/${job.id}/issues?kind=warning`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+              <Link href={`/owner/imports/${job.id}/issues?kind=warning`} className="inline-flex min-h-11 items-center rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
                 View Warnings ({job.warningRows})
               </Link>
-              <Link href={exportHref(job.id, "csv", "issues")} className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900">
+              <Link href={exportHref(job.id, "csv", "issues")} className="inline-flex min-h-11 items-center rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900">
                 Issues CSV
               </Link>
             </>
           ) : null}
-          {job.errorRows > 0 && job.batchId ? <Link href={`/owner/imports/${job.id}/issues?kind=error`} className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800">View Blocking Errors ({job.errorRows})</Link> : null}
+          {job.errorRows > 0 && job.batchId ? <Link href={`/owner/imports/${job.id}/issues?kind=error`} className="inline-flex min-h-11 items-center rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800">View Blocking Errors ({job.errorRows})</Link> : null}
           {issueCount === 0 && job.status === "COMPLETED" ? (
             <span className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-bold text-teal-800">No issues recorded</span>
           ) : null}

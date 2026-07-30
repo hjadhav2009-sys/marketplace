@@ -99,7 +99,7 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
             href={account ? capabilityHomePath(user) : user.role === "OWNER" ? "/owner/accounts" : "/accounts"}
             prefetch
             title={account ? `${account.companyName} / ${accountName} / ${account.marketplace} / ${accountCode}` : accountName}
-            className="min-w-0"
+            className="flex min-h-11 min-w-0 flex-col justify-center"
           >
             <p className="hidden text-xs font-semibold uppercase tracking-wide text-berry sm:block">Marketplace Pick & Pack</p>
             <p className="truncate text-base font-bold text-slate-950 sm:text-lg">{account ? `${account.companyName} / ${accountName}` : accountName}</p>

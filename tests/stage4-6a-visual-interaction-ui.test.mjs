@@ -21,6 +21,8 @@ assert.match(coordinator, /activeOverlay !== "navigation"/, "Body locking is lim
 assert.match(coordinator, /popstate/, "Browser history navigation closes mobile overlays.");
 assert.match(navigation, /h-dvh max-h-dvh/, "The mobile drawer is bounded to the dynamic viewport.");
 assert.match(navigation, /min-h-0 flex-1 overflow-y-auto overscroll-contain/, "Only the authorized navigation list scrolls.");
+assert.match(navigation, /createPortal\(/, "The fixed drawer escapes the filtered sticky-header containing block.");
+assert.match(navigation, /data-mobile-drawer-backdrop/, "The full-viewport backdrop has a stable interaction boundary.");
 assert.match(navigation, /triggerRef\.current\?\.focus/, "Closing the drawer restores trigger focus.");
 assert.match(accountMenu, /useMobileOverlayCoordinator/, "The account menu participates in shared overlay state.");
 assert.match(accountMenu, /triggerRef\.current\?\.focus/, "Escape from the account menu restores trigger focus.");

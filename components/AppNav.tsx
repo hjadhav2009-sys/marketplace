@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { useMobileOverlayCoordinator } from "./MobileOverlayCoordinator";
 
@@ -165,8 +166,13 @@ export function AppNav({ links, accountName, marketplace }: AppNavProps) {
 export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
   const { activeOverlay, closeOverlay, openOverlay } = useMobileOverlayCoordinator();
   const open = activeOverlay === "navigation";
+  const [portalReady, setPortalReady] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -200,6 +206,48 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
     if (returnFocus) triggerRef.current?.focus();
   };
 
+  const drawer = portalReady && open ? createPortal(
+    <div className="fixed inset-0 z-50 lg:hidden" data-mobile-drawer>
+      <button
+        type="button"
+        aria-label="Close navigation"
+        onClick={() => closeDrawer(false)}
+        className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]"
+        data-mobile-drawer-backdrop
+      />
+      <aside
+        ref={drawerRef}
+        id="mobile-navigation-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        className="relative flex h-dvh max-h-dvh w-[min(88vw,340px)] flex-col overflow-hidden bg-white shadow-2xl"
+      >
+        <div className="flex items-center justify-between border-b p-4">
+          <div className="min-w-0">
+            <p className="truncate font-semibold">{accountName}</p>
+            <p className="text-xs font-medium text-slate-500">{marketplace}</p>
+          </div>
+          <button
+            type="button"
+            autoFocus
+            aria-label="Close navigation"
+            onClick={() => closeDrawer()}
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" aria-label="Mobile navigation">
+          <NavItems links={links} onNavigate={() => closeDrawer(false)} />
+        </nav>
+      </aside>
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <>
       <button
@@ -216,45 +264,7 @@ export function MobileDrawer({ links, accountName, marketplace }: AppNavProps) {
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
-      {open ? (
-        <div className="fixed inset-0 z-50 lg:hidden" data-mobile-drawer>
-          <button
-            type="button"
-            aria-label="Close navigation"
-            onClick={() => closeDrawer(false)}
-            className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]"
-          />
-          <aside
-            ref={drawerRef}
-            id="mobile-navigation-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation"
-            className="relative flex h-dvh max-h-dvh w-[min(88vw,340px)] flex-col overflow-hidden bg-white shadow-2xl"
-          >
-            <div className="flex items-center justify-between border-b p-4">
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{accountName}</p>
-                <p className="text-xs font-medium text-slate-500">{marketplace}</p>
-              </div>
-              <button
-                type="button"
-                autoFocus
-                aria-label="Close navigation"
-                onClick={() => closeDrawer()}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50"
-              >
-                <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round">
-                  <path d="m6 6 12 12M18 6 6 18" />
-                </svg>
-              </button>
-            </div>
-            <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" aria-label="Mobile navigation">
-              <NavItems links={links} onNavigate={() => closeDrawer(false)} />
-            </nav>
-          </aside>
-        </div>
-      ) : null}
+      {drawer}
     </>
   );
 }

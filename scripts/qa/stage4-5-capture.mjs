@@ -13,8 +13,10 @@ import { evaluateSemanticContract, semanticPreflight } from "./stage4-6c-semanti
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = "http://127.0.0.1:3188";
-const SOURCE_SHA = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
-const BRANCH = execFileSync("git", ["branch", "--show-current"], { cwd: ROOT, encoding: "utf8" }).trim();
+const SOURCE_SHA = process.env.ATLAS_SOURCE_SHA
+  ?? execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+const BRANCH = process.env.ATLAS_BRANCH
+  ?? execFileSync("git", ["branch", "--show-current"], { cwd: ROOT, encoding: "utf8" }).trim();
 const BUILD_ID_PATH = path.join(ROOT, ".next", "BUILD_ID");
 if (!existsSync(BUILD_ID_PATH)) throw new Error("A production build is required before Stage 4.5 capture.");
 const BUILD_ID = (await readFile(BUILD_ID_PATH, "utf8")).trim();
@@ -24,6 +26,7 @@ const STAGING_DATABASE = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging
 const STAGING_FIXTURES = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "fixtures");
 const PROGRESS_PATH = path.join(PRIVATE_ROOT, "progress.json");
 const RESULT_PATH = path.join(PRIVATE_ROOT, "browser-results.json");
+const SEMANTIC_PREFLIGHT_PATH = path.join(ROOT, ".codex-tmp", "stage4-6c1", "semantic-preflight.json");
 const MASTER_ROOT = path.join(PRIVATE_ROOT, "full-page");
 const TRACE_ROOT = path.join(PRIVATE_ROOT, "traces");
 const STOP_PATH = path.join(PRIVATE_ROOT, "stop-after-current");
@@ -31,7 +34,7 @@ const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 
 function options(argv) {
-  const result = { headed: false, resume: false, force: false, verifyOnly: false, workers: 1 };
+  const result = { headed: false, resume: false, force: false, verifyOnly: false, semanticOnly: false, workers: 1 };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
     if (value === "--headed") result.headed = true;
@@ -39,7 +42,8 @@ function options(argv) {
     else if (value === "--resume") result.resume = true;
     else if (value === "--force") result.force = true;
     else if (value === "--verify-only") result.verifyOnly = true;
-    else if (["--route", "--state", "--viewport", "--workers"].includes(value)) {
+    else if (value === "--semantic-only") result.semanticOnly = true;
+    else if (["--route", "--state", "--states", "--viewport", "--viewports", "--workers"].includes(value)) {
       const key = value.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       result[key] = argv[++i];
     }
@@ -121,6 +125,14 @@ async function login(page, credential) {
   ]);
 }
 
+async function selectedAccountFromContext(context, credential, scenarioId) {
+  if (["AUTH_INVALID", "AUTH_EXPIRED"].includes(scenarioId)) return null;
+  const selected = (await context.cookies(BASE)).find((cookie) => cookie.name === "mpp_account")?.value ?? null;
+  if (selected === "stage3-account-fk-01") return "STAGE-FK-01";
+  if (selected === "stage3-account-amz-01") return "STAGE-AMZ-01";
+  return credential?.assignedAccount ?? null;
+}
+
 async function inspect(page) {
   return page.evaluate(() => {
     const visible = (element) => {
@@ -141,6 +153,12 @@ async function inspect(page) {
           href: element instanceof HTMLAnchorElement ? element.getAttribute("href") : null,
           disabled: "disabled" in element ? Boolean(element.disabled) : element.getAttribute("aria-disabled") === "true",
           formAction: form?.getAttribute("action") ?? null,
+          operational: element.tagName === "BUTTON"
+            || element.tagName === "SUMMARY"
+            || element.getAttribute("role") === "button"
+            || element.getAttribute("role") === "tab"
+            || Boolean(element.closest("nav,header,aside,[data-data-action-details]"))
+            || (element.tagName === "A" && /\b(inline-flex|rounded)/.test(element.getAttribute("class") ?? "")),
           width: Math.round(rect.width),
           height: Math.round(rect.height),
         };
@@ -156,7 +174,7 @@ async function inspect(page) {
       scrollWidth: Math.max(root.scrollWidth, body?.scrollWidth ?? 0),
       clientWidth: root.clientWidth,
       documentHeight: Math.max(root.scrollHeight, body?.scrollHeight ?? 0),
-      undersized: controls.filter((control) => ["BUTTON", "A", "SUMMARY"].includes(control.tag) && control.height < 40),
+      undersized: controls.filter((control) => control.operational && (control.width < 44 || control.height < 44)),
       stagingBanner: body?.innerText.includes("PRIVATE SYNTHETIC STAGING") ?? false,
       bodyText: (body?.innerText ?? "").replace(/\s+/g, " ").trim().slice(0, 100_000),
     };
@@ -172,6 +190,15 @@ async function inspectStable(page) {
     await page.waitForTimeout(250);
     return inspect(page);
   }
+}
+
+async function settleForAssertions(page) {
+  await page.waitForLoadState("domcontentloaded", { timeout: 10_000 });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await page.waitForTimeout(200);
 }
 
 function deviceScaleFactor() {
@@ -209,7 +236,7 @@ async function verifyPng(file, expectedWidth, expectedDocumentHeight, scale) {
   return { valid, width, height, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), entropy };
 }
 
-async function applyScenarioState(page, context, scenarioId) {
+async function applyScenarioState(page, context, scenarioId, { credential } = {}) {
   if (scenarioId === "AUTH_INVALID") {
     await page.locator('input[name="username"]').fill("synthetic-invalid-user");
     await page.locator('input[name="password"]').fill("synthetic-invalid-password");
@@ -244,6 +271,20 @@ async function applyScenarioState(page, context, scenarioId) {
       path.join(STAGING_FIXTURES, "catalog-two.csv"),
     ]);
   }
+  if (scenarioId === "DATA_EXPIRED_GRANT") {
+    await page.getByText("Purge QA operational data", { exact: true }).first().click();
+  }
+  if (scenarioId === "DATA_CONFIRMATION_MISMATCH") {
+    const details = page.locator("details[data-data-action-details]").filter({ hasText: "Quarantine image cache" }).first();
+    await details.locator("summary").click();
+    if (!credential?.password) throw new Error("Synthetic owner credential is required for the confirmation-mismatch preflight.");
+    await details.locator('input[name="ownerPassword"]').fill(credential.password);
+    await details.locator('input[name="confirmationPhrase"]').fill("SYNTHETIC MISMATCH - DO NOT DELETE");
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === "/owner/data-management" && url.searchParams.has("error"), { timeout: 15_000 }),
+      details.locator("form").evaluate((form) => form.requestSubmit()),
+    ]);
+  }
 }
 
 async function assertScenarioTruth(page, scenarioId) {
@@ -255,7 +296,27 @@ async function assertScenarioTruth(page, scenarioId) {
   };
   if (scenarioId === "OWNER_EMPTY_ACCOUNT") requires(/No seller accounts have been created yet/i, /Create First Seller Account/i);
   if (scenarioId === "MARK_COMPLETED") requires(/MARK:\s*COMPLETED/i, /completed by Synthetic Marker/i);
+  if (scenarioId === "ASSEMBLY_READY") {
+    requires(/Synthetic assembly-ready order/i, /ASSEMBLE/i, /\bREADY\b/i, /Pending quantity\s*1/i);
+  }
+  if (scenarioId === "ASSEMBLY_PARTIAL") {
+    requires(/Synthetic assembly-progress order/i, /IN PROGRESS/i, /Required quantity\s*2/i, /Completed quantity\s*1/i, /Pending quantity\s*1/i);
+  }
   if (scenarioId === "ASSEMBLY_COMPLETED") requires(/ASSEMBLE:\s*COMPLETED/i, /completed by Synthetic Assembler/i);
+  if (scenarioId === "AUTH_EXPIRED") {
+    requires(/Your session expired\. Sign in again to continue\./i);
+    if (!page.url().includes("/login") || !new URL(page.url()).searchParams.has("expired")) throw new Error("AUTH_EXPIRED did not reach the safe expired-session login route.");
+  }
+  if (scenarioId === "AUTH_FORBIDDEN" || scenarioId === "DATA_REPLAY_REJECTED") {
+    requires(/You do not have permission to open this page/i);
+    if (new URL(page.url()).pathname !== "/access-denied") throw new Error(`${scenarioId} did not reach /access-denied.`);
+  }
+  if (scenarioId === "CONSIGNMENT_REVIEW") {
+    requires(/Activation blocked/i, /blocking errors/i, /Review blocking issues/i);
+    const enabledActivation = page.getByRole("button", { name: /^(Activate|Activate with warnings)$/i }).filter({ hasNot: page.locator("[disabled]") });
+    if (await enabledActivation.count()) throw new Error("CONSIGNMENT_REVIEW exposed an enabled activation action.");
+  }
+  if (scenarioId === "CONSIGNMENT_INVALID_QUANTITY") requires(/\bERROR\b/i, /INVALID QUANTITY/i, /Correct or replace the source/i);
   if (scenarioId === "PACK_ASSEMBLY_LOCKED") {
     requires(/Assembly is required before packing/i);
     if (await page.getByRole("button", { name: /^Confirm packed$/i }).count()) throw new Error("PACK_ASSEMBLY_LOCKED exposed Confirm packed.");
@@ -317,11 +378,13 @@ const executablePath = existsSync(CHROME) ? CHROME : existsSync(EDGE) ? EDGE : u
 if (!executablePath) throw new Error("Installed Chrome or Edge is required; no bundled browser was downloaded.");
 
 const scenarioSet = [...REQUIRED_SCENARIOS, ...(!cli.state ? await sourceRouteScenarios() : [])];
+const requestedStates = new Set(String(cli.states ?? cli.state ?? "").split(",").map((value) => value.trim()).filter(Boolean));
+const requestedViewports = new Set(String(cli.viewports ?? cli.viewport ?? "").split(",").map((value) => value.trim()).filter(Boolean));
 let jobs = scenarioSet.flatMap((scenario) => VIEWPORTS
-  .filter((viewport) => !cli.viewport || viewport.id === cli.viewport)
+  .filter((viewport) => !requestedViewports.size || requestedViewports.has(viewport.id))
   .map((viewport) => ({ ...scenario, viewport })))
   .filter((job) => !cli.route || job.route.includes(cli.route))
-  .filter((job) => !cli.state || job.id === cli.state);
+  .filter((job) => !requestedStates.size || requestedStates.has(job.id));
 
 const prior = cli.resume ? await loadJson(PROGRESS_PATH, { completed: {} }) : { completed: {} };
 const currentJobKeys = new Set(scenarioSet.flatMap((scenario) => VIEWPORTS.map((viewport) => `${scenario.id}:${viewport.id}`)));
@@ -370,7 +433,11 @@ try {
     const pageErrors = [];
     const failedRequests = [];
     const errorResponses = [];
-    page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+    page.on("console", (message) => {
+      if (message.type() !== "error") return;
+      const location = message.location();
+      consoleErrors.push(`${message.text()}${location.url ? ` @ ${location.url}` : ""}`);
+    });
     page.on("pageerror", (error) => pageErrors.push(error.message));
     page.on("requestfailed", (request) => failedRequests.push({ url: request.url(), error: request.failure()?.errorText ?? "failed" }));
     page.on("response", (response) => { if (response.status() >= 400) errorResponses.push({ url: response.url(), status: response.status() }); });
@@ -390,19 +457,24 @@ try {
       if (job.id === "AUTH_EXPIRED") await context.clearCookies();
       const response = await page.goto(`${BASE}${job.route}`, { waitUntil: "domcontentloaded", timeout: 25_000 });
       await page.waitForTimeout(350);
-      await applyScenarioState(page, context, job.id);
+      await settleForAssertions(page);
+      await applyScenarioState(page, context, job.id, { credential: credentials.get(ROLE_TO_DISPLAY[job.role]) });
+      await settleForAssertions(page);
       await assertScenarioTruth(page, job.id);
       status = response?.status() ?? 0;
       inspection = await inspectStable(page);
       const item = semantic.registry.get(job.id);
+      const credential = credentials.get(ROLE_TO_DISPLAY[job.role]);
+      const actualSelectedAccount = await selectedAccountFromContext(context, credential, job.id);
       semanticAssertion = evaluateSemanticContract(item, {
         bodyText: inspection.bodyText,
         actions: inspection.controls,
         url: inspection.url,
         role: job.role,
-        selectedAccount: item?.selectedAccount ?? null,
+        selectedAccount: actualSelectedAccount,
       });
-      if (!cli.verifyOnly) {
+      if (!semanticAssertion.passed) throw new Error(`Semantic assertion failed: ${semanticAssertion.failures.join(", ")}`);
+      if (!cli.verifyOnly && !cli.semanticOnly) {
         await settleFullPage(page);
         await page.screenshot({ path: masterPath, type: "png", fullPage: true, animations: "disabled", caret: "hide", scale: "device" });
       }
@@ -414,7 +486,7 @@ try {
     const unexpectedFailed = failedRequests.filter((item) => !/example\.invalid|invalid\.example\.invalid/.test(item.url) && item.error !== "net::ERR_ABORTED");
     const unexpectedResponses = errorResponses;
     const smallControls = (inspection?.controls ?? []).filter((control) =>
-      ["BUTTON", "A", "SUMMARY"].includes(control.tag)
+      control.operational
       && !control.disabled
       && (control.width < 44 || control.height < 44)
     );
@@ -422,12 +494,14 @@ try {
     if (verified) await context.tracing.stop();
     else await context.tracing.stop({ path: tracePath });
     let masterEvidence = null;
-    if (!error && !cli.verifyOnly) {
+    if (!error && !cli.verifyOnly && !cli.semanticOnly) {
       try { masterEvidence = await verifyPng(masterPath, job.viewport.width * scale, inspection?.documentHeight ?? job.viewport.height, scale); }
       catch (caught) { error = caught instanceof Error ? caught.message : String(caught); }
     }
     const visualStateValid = !error && status > 0 && status < 400 && Boolean(inspection?.stagingBanner) && inspection?.heading !== "404";
-    const masterVerified = cli.verifyOnly
+    const masterVerified = cli.semanticOnly
+      ? false
+      : cli.verifyOnly
       ? priorResult?.fullPageCaptureStatus === "VERIFIED"
       : Boolean(masterEvidence?.valid) && visualStateValid;
     const result = {
@@ -442,7 +516,7 @@ try {
       route: job.route,
       dynamicRouteExample: job.route,
       role: job.role,
-      selectedAccount: semantic.registry.get(job.id)?.selectedAccount ?? null,
+      selectedAccount: await selectedAccountFromContext(context, credentials.get(ROLE_TO_DISPLAY[job.role]), job.id),
       scenarioId: job.id,
       stateName: job.id,
       stateCategory: job.id.split("_")[0],
@@ -477,19 +551,25 @@ try {
       startedAt,
       finishedAt: new Date().toISOString(),
       fingerprint: fingerprint({ job, inspection }),
-      auditStatus: verified && masterVerified ? "VERIFIED" : "BROKEN",
+      auditStatus: cli.semanticOnly
+        ? verified ? "SEMANTIC_VERIFIED" : "BROKEN"
+        : verified && masterVerified ? "VERIFIED" : "BROKEN",
       notes: verified ? "" : "Inspect private trace and browser evidence.",
     };
     results.push(result);
-    prior.completed[key] = result;
-    await writeJsonCheckpoint(PROGRESS_PATH, prior);
+    if (!cli.semanticOnly) {
+      prior.completed[key] = result;
+      await writeJsonCheckpoint(PROGRESS_PATH, prior);
+    }
     await context.close();
   }
 } finally {
   await browser.close();
 }
 
-const finalResults = cli.resume
+const finalResults = cli.semanticOnly
+  ? results
+  : cli.resume
   ? Object.values(prior.completed).sort((left, right) => left.id.localeCompare(right.id))
   : results;
 const summary = {
@@ -503,6 +583,7 @@ const summary = {
   requestedJobs: finalResults.length,
   jobsInThisRun: jobs.length,
   verified: finalResults.filter((entry) => entry.auditStatus === "VERIFIED").length,
+  semanticVerified: finalResults.filter((entry) => ["VERIFIED", "SEMANTIC_VERIFIED"].includes(entry.auditStatus)).length,
   broken: finalResults.filter((entry) => entry.auditStatus === "BROKEN").length,
   controlCount: finalResults.reduce((sum, entry) => sum + entry.controlCount, 0),
   fullPageMasters: finalResults.filter((entry) => entry.fullPageCaptureStatus === "VERIFIED").length,
@@ -513,5 +594,6 @@ const summary = {
   viewports: VIEWPORTS,
   syntheticOnly: true,
 };
-await writeJsonCheckpoint(RESULT_PATH, { summary, results: finalResults });
+await writeJsonCheckpoint(cli.semanticOnly ? SEMANTIC_PREFLIGHT_PATH : RESULT_PATH, { summary, results: finalResults });
 console.log(JSON.stringify(summary, null, 2));
+if (cli.semanticOnly && summary.semanticVerified !== jobs.length) process.exitCode = 2;

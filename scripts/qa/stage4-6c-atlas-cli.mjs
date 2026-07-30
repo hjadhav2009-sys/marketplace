@@ -13,6 +13,10 @@ import {
   writeAtlasPlan,
 } from "./stage4-6c-atlas-engine.mjs";
 import { createBrowserShardAdapter } from "./stage4-6c-browser-shard-adapter.mjs";
+import {
+  SEMANTIC_REGISTRY_VERSION,
+  SYNTHETIC_FIXTURE_VERSION,
+} from "./stage4-6c-semantic-registry.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -39,6 +43,8 @@ async function identity() {
     syntheticSeed: environment.seedVersion,
     browserVersion: "150.0.7871.187",
     nodeVersion: process.version,
+    semanticRegistryVersion: SEMANTIC_REGISTRY_VERSION,
+    syntheticFixtureVersion: SYNTHETIC_FIXTURE_VERSION,
     fixtures: {
       credentialRoles: [
         "Synthetic Owner",

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { copyFile, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { DatabaseSync } from "node:sqlite";
 import {
   readSafeCheckpoint,
@@ -17,7 +18,9 @@ import {
 } from "../../scripts/qa/stage4-6c-atlas-engine.mjs";
 import {
   evaluateSemanticContract,
+  SEMANTIC_REGISTRY_VERSION,
   semanticPreflight,
+  SYNTHETIC_FIXTURE_VERSION,
 } from "../../scripts/qa/stage4-6c-semantic-registry.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..", "..");
@@ -27,11 +30,25 @@ const artifactBytes = Buffer.from("synthetic atlas evidence");
 await writeFile(artifact, artifactBytes);
 const artifactHash = createHash("sha256").update(artifactBytes).digest("hex");
 
+async function removeTemporaryDirectory(directory) {
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    try {
+      await rm(directory, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!["EBUSY", "EPERM"].includes(error?.code) || attempt === 8) throw error;
+      await delay(100 * attempt);
+    }
+  }
+}
+
 try {
   const preflight = await semanticPreflight(ROOT);
   assert.equal(preflight.passed, true);
   assert.equal(preflight.semanticContracts, 141);
   assert.equal(preflight.fixtureMappings, 141);
+  assert.equal(SEMANTIC_REGISTRY_VERSION, "stage4.6c1-semantic-v2");
+  assert.equal(SYNTHETIC_FIXTURE_VERSION, "phase-7.3.6-stage4.6c1-semantic-fixtures-v2");
   for (const item of preflight.registry.values()) {
     assert.ok(item.requiredVisible.length > 0, `${item.id} needs a state-specific assertion`);
     assert.ok(Array.isArray(item.forbiddenVisible));
@@ -67,6 +84,39 @@ try {
   });
   assert.equal(wrongState.passed, false);
   assert.match(wrongState.failures.join(" "), /REQUIRED_VISIBLE_MISSING|FORBIDDEN_VISIBLE_PRESENT|FORBIDDEN_ACTION_ENABLED/);
+
+  const expired = preflight.registry.get("AUTH_EXPIRED");
+  assert.equal(evaluateSemanticContract(expired, {
+    bodyText: "Sign in. Your session expired. Sign in again to continue.",
+    actions: [],
+    role: "OWNER",
+    selectedAccount: null,
+    url: "/login?expired=1&next=%2Fdashboard",
+  }).passed, true, "expired authentication accepts the safe login redirect");
+  assert.match(evaluateSemanticContract(expired, {
+    bodyText: "Sign in. Your session expired. Sign in again to continue.",
+    actions: [],
+    role: "OWNER",
+    selectedAccount: null,
+    url: "/login?next=%2Fdashboard",
+  }).failures.join(" "), /QUERY_MISMATCH:expired/);
+
+  const forbidden = preflight.registry.get("AUTH_FORBIDDEN");
+  assert.equal(evaluateSemanticContract(forbidden, {
+    bodyText: "You do not have permission to open this page",
+    actions: [],
+    role: "PICKER",
+    selectedAccount: "STAGE-FK-01",
+    url: "/access-denied",
+  }).passed, true, "forbidden authentication accepts the genuine access-denied destination");
+
+  const captureSource = await readFile(path.join(ROOT, "scripts", "qa", "stage4-5-capture.mjs"), "utf8");
+  const adapterSource = await readFile(path.join(ROOT, "scripts", "qa", "stage4-6c-browser-shard-adapter.mjs"), "utf8");
+  assert.match(captureSource, /if \(!semanticAssertion\.passed\) throw new Error/, "Screenshots begin only after semantic verification");
+  assert.match(captureSource, /selectedAccountFromContext/, "Selected-account assertions use the browser cookie rather than the contract expectation");
+  assert.match(captureSource, /settleForAssertions/, "Assertions wait for route hydration and stable layout");
+  assert.match(captureSource, /process\.env\.ATLAS_SOURCE_SHA/, "Sandboxed capture children accept the parent-verified source identity");
+  assert.match(adapterSource, /env\.ATLAS_SOURCE_SHA = identity\.sourceSha/, "The owned shard adapter passes its exact plan identity to capture children");
 
   const identity = {
     sourceSha: "synthetic-sha",
@@ -275,5 +325,5 @@ try {
 } finally {
   const resolved = path.resolve(temporary);
   if (!resolved.startsWith(path.resolve(os.tmpdir()))) throw new Error("Refusing unsafe test cleanup.");
-  await rm(resolved, { recursive: true, force: true });
+  await removeTemporaryDirectory(resolved);
 }

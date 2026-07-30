@@ -127,6 +127,8 @@ export async function createBrowserShardAdapter({
     tokenSha256: sha256(config.runtimeIdentityToken),
   };
   const env = buildEnvironment(config, expected);
+  env.ATLAS_SOURCE_SHA = identity.sourceSha;
+  env.ATLAS_BRANCH = git(["branch", "--show-current"]);
 
   return {
     lifecycle: {

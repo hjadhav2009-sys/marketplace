@@ -7,8 +7,8 @@ export const VIEWPORTS = [
   { id: "1440x900", width: 1440, height: 900 },
 ];
 
-export const SCENARIO_VERSION = "phase-7.3.6-stage4.6-v1";
-export const CAPTURE_RUNNER_VERSION = "stage4.6-full-page-v1";
+export const SCENARIO_VERSION = "phase-7.3.6-stage4.6c1-v2";
+export const CAPTURE_RUNNER_VERSION = "stage4.6c1-semantic-first-v2";
 
 export const REQUIRED_SCENARIOS = [
   ["AUTH_DEFAULT", "/login", "PUBLIC"],
@@ -52,8 +52,8 @@ export const REQUIRED_SCENARIOS = [
   ["MARK_READY", "/work/mark", "MARKER"],
   ["MARK_PARTIAL", "/work/mark", "MARKER"],
   ["MARK_COMPLETED", "/work/consignments/items/stage4-line-mark-completed-mark", "MARKER"],
-  ["ASSEMBLY_READY", "/work/assemble", "ASSEMBLER"],
-  ["ASSEMBLY_PARTIAL", "/work/assemble", "ASSEMBLER"],
+  ["ASSEMBLY_READY", "/work/groups/ASSEMBLE/7f0fe233a21717e1b648fffa2f479d2de98fbb24c64860705163b85dbee09edc?source=ORDER", "ASSEMBLER"],
+  ["ASSEMBLY_PARTIAL", "/work/groups/ASSEMBLE/1de298071dd25c1e91c204ad679f3bf61910bc3fbaf628fce01e0db1ebc921fa?source=ORDER", "ASSEMBLER"],
   ["ASSEMBLY_COMPLETED", "/work/consignments/items/stage4-line-assembly-completed-assemble", "ASSEMBLER"],
   ["PACK_PICK_LOCKED", "/work/pack", "PACKER"],
   ["PACK_MARK_LOCKED", "/work/pack", "PACKER"],
@@ -68,11 +68,11 @@ export const REQUIRED_SCENARIOS = [
   ["SCANNER_COMPLETED", "/work/scan?q=STAGE-AWB-10", "PACKER"],
   ["PROBLEM_OPEN", "/problems?tab=open", "OWNER"],
   ["PROBLEM_RESOLVED", "/problems?tab=resolved", "OWNER"],
-  ["DATA_DELETE_PREVIEW", "/owner/data-management?tab=operational", "OWNER"],
+  ["DATA_DELETE_PREVIEW", "/owner/data-management?tab=history", "OWNER"],
   ["DATA_WRONG_PASSWORD", "/owner/data-management?tab=operational", "OWNER"],
-  ["DATA_CONFIRMATION_MISMATCH", "/owner/data-management?tab=operational", "OWNER"],
+  ["DATA_CONFIRMATION_MISMATCH", "/owner/data-management?tab=catalog", "OWNER"],
   ["DATA_EXPIRED_GRANT", "/owner/data-management?tab=operational", "OWNER"],
-  ["DATA_REPLAY_REJECTED", "/owner/data-management?tab=history", "OWNER"],
+  ["DATA_REPLAY_REJECTED", "/owner/data-management", "PICKER"],
   ["DATA_QUARANTINED", "/owner/data-management?tab=trash", "OWNER"],
   ["DATA_RESTORED", "/owner/data-management?tab=history", "OWNER"],
   ["DATA_RETENTION_BLOCKED", "/owner/data-management?tab=trash", "OWNER"],

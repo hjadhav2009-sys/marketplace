@@ -4,7 +4,16 @@ import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { REQUIRED_SCENARIOS, ROLE_TO_DISPLAY } from "./stage4-5-scenarios.mjs";
 
-const record = (table, column, value) => Object.freeze({ kind: "record", table, column, value });
+export const SEMANTIC_REGISTRY_VERSION = "stage4.6c1-semantic-v2";
+export const SYNTHETIC_FIXTURE_VERSION = "phase-7.3.6-stage4.6c1-semantic-fixtures-v2";
+
+const record = (table, column, value, expected = undefined) => Object.freeze({
+  kind: "record",
+  table,
+  column,
+  value,
+  ...(expected ? { expected: Object.freeze({ ...expected }) } : {}),
+});
 const fixtureFile = (relativePath) => Object.freeze({ kind: "file", relativePath });
 const routeFixture = (route) => Object.freeze({ kind: "route", route });
 const ROLE_USER_IDS = Object.freeze({
@@ -19,7 +28,7 @@ const ROLE_USER_IDS = Object.freeze({
 const NAMED_FIXTURES = Object.freeze({
   AUTH_DEFAULT: [routeFixture("/login")],
   AUTH_INVALID: [routeFixture("/login")],
-  AUTH_EXPIRED: [record("User", "id", "stage3-owner")],
+  AUTH_EXPIRED: [record("User", "id", "stage3-owner", { active: 1 })],
   AUTH_FORBIDDEN: [record("User", "id", "stage3-picker-a")],
   OWNER_EMPTY_ACCOUNT: [record("User", "id", "stage3-owner"), record("Account", "code", "STAGE-FK-01")],
   OWNER_POPULATED: [record("Account", "code", "STAGE-FK-01")],
@@ -45,8 +54,8 @@ const NAMED_FIXTURES = Object.freeze({
   MISSING_LISTING_HELD: [record("ImportRowIssue", "id", "stage4-missing-listing-issue")],
   MISSING_LISTING_RESOLVED: [record("ImportRowIssue", "id", "stage4-missing-listing-issue")],
   CONSIGNMENT_DRAFT: [record("ConsignmentBatch", "id", "stage3-batch-draft")],
-  CONSIGNMENT_REVIEW: [record("ConsignmentBatch", "id", "stage3-batch-review_required")],
-  CONSIGNMENT_INVALID_QUANTITY: [record("ConsignmentImportIssue", "id", "stage4-consignment-invalid-error")],
+  CONSIGNMENT_REVIEW: [record("ConsignmentBatch", "id", "stage3-batch-review_required", { status: "REVIEW_REQUIRED" })],
+  CONSIGNMENT_INVALID_QUANTITY: [record("ConsignmentImportIssue", "id", "stage4-consignment-invalid-error", { severity: "ERROR", issueType: "INVALID_QUANTITY", resolved: 0 })],
   CONSIGNMENT_ZERO_QUANTITY: [record("ConsignmentImportIssue", "id", "stage4-consignment-zero-info")],
   CONSIGNMENT_ACTIVE: [record("ConsignmentBatch", "id", "stage3-batch-active")],
   CONSIGNMENT_COMPLETED: [record("ConsignmentBatch", "id", "stage3-batch-completed")],
@@ -58,8 +67,8 @@ const NAMED_FIXTURES = Object.freeze({
   MARK_READY: [record("WorkTask", "id", "stage3-order-mark-ready-mark")],
   MARK_PARTIAL: [record("WorkTask", "id", "stage3-order-mark-progress-mark")],
   MARK_COMPLETED: [record("WorkTask", "id", "stage4-line-mark-completed-mark")],
-  ASSEMBLY_READY: [record("WorkTask", "id", "stage3-order-assembly-ready-assemble")],
-  ASSEMBLY_PARTIAL: [record("WorkTask", "id", "stage3-order-assembly-progress-assemble")],
+  ASSEMBLY_READY: [record("WorkTask", "id", "stage3-order-assembly-ready-assemble", { stage: "ASSEMBLE", status: "READY", requiredQuantity: { gt: 0 }, completedQuantity: 0, problemReason: null })],
+  ASSEMBLY_PARTIAL: [record("WorkTask", "id", "stage3-order-assembly-progress-assemble", { stage: "ASSEMBLE", status: "IN_PROGRESS", requiredQuantity: { gt: 1 }, completedQuantity: { gt: 0, ltColumn: "requiredQuantity" }, problemReason: null })],
   ASSEMBLY_COMPLETED: [record("WorkTask", "id", "stage4-line-assembly-completed-assemble")],
   PACK_PICK_LOCKED: [record("WorkTask", "id", "stage3-order-pick-ready-pick")],
   PACK_MARK_LOCKED: [record("WorkTask", "id", "stage3-order-mark-ready-mark")],
@@ -74,15 +83,15 @@ const NAMED_FIXTURES = Object.freeze({
   SCANNER_COMPLETED: [record("ScanLog", "id", "stage4-scan-packed")],
   PROBLEM_OPEN: [record("ProblemOrder", "id", "stage4-problem-open")],
   PROBLEM_RESOLVED: [record("ProblemOrder", "id", "stage4-problem-resolved")],
-  DATA_DELETE_PREVIEW: [record("DataDeletionJob", "id", "stage4-delete-preview")],
+  DATA_DELETE_PREVIEW: [record("DataDeletionJob", "id", "stage4-delete-preview", { actionKind: "PURGE_QA_OPERATIONAL_DATA", state: "PREVIEWED" })],
   DATA_WRONG_PASSWORD: [record("DataDeletionJob", "id", "stage4-delete-preview")],
   DATA_CONFIRMATION_MISMATCH: [record("DataDeletionJob", "id", "stage4-delete-preview")],
   DATA_EXPIRED_GRANT: [record("DataDeletionJob", "id", "stage4-delete-preview")],
-  DATA_REPLAY_REJECTED: [record("DataDeletionJob", "id", "stage4-delete-completed")],
-  DATA_QUARANTINED: [record("DataDeletionJob", "id", "stage4-delete-quarantined")],
-  DATA_RESTORED: [record("DataDeletionJob", "id", "stage4-delete-completed")],
-  DATA_RETENTION_BLOCKED: [record("DataDeletionJob", "id", "stage4-delete-quarantined")],
-  DATA_PURGED: [record("DataDeletionJob", "id", "stage4-delete-completed")],
+  DATA_REPLAY_REJECTED: [record("User", "id", "stage3-picker-a", { active: 1 })],
+  DATA_QUARANTINED: [record("DataDeletionJob", "id", "stage4-delete-quarantined", { state: "COMPLETED", totalFiles: { gt: 0 }, purgeAfter: { future: true } })],
+  DATA_RESTORED: [record("DataDeletionJob", "id", "stage4-delete-completed", { actionKind: "RESTORE_QUARANTINED_FILES", state: "COMPLETED" })],
+  DATA_RETENTION_BLOCKED: [record("DataDeletionJob", "id", "stage4-delete-quarantined", { state: "COMPLETED", totalFiles: { gt: 0 }, purgeAfter: { future: true } })],
+  DATA_PURGED: [record("DataDeletionJob", "id", "stage4-delete-purged", { actionKind: "PURGE_QUARANTINED_FILES", state: "PURGED" })],
   PERMISSION_OWNER: [record("User", "id", "stage3-owner")],
   PERMISSION_PICKER: [record("User", "id", "stage3-picker-a")],
   PERMISSION_MARKER: [record("User", "id", "stage3-marker")],
@@ -94,8 +103,8 @@ const NAMED_FIXTURES = Object.freeze({
 
 const NAMED_ASSERTIONS = Object.fromEntries([
   ["AUTH_DEFAULT", [["Sign in"], ["Access Denied"], [], ["Dashboard"]]],
-  ["AUTH_INVALID", [["Sign in", "Invalid username or password"], ["Warehouse overview"], [], ["Dashboard"]]],
-  ["AUTH_EXPIRED", [["Sign in"], ["404", "Warehouse overview"], [], ["Dashboard"]]],
+  ["AUTH_INVALID", [["Sign in", "The username or password is incorrect."], ["Warehouse overview"], [], ["Dashboard"]]],
+  ["AUTH_EXPIRED", [["Sign in", "Your session expired. Sign in again to continue."], ["404", "Warehouse overview"], [], ["Dashboard"]]],
   ["AUTH_FORBIDDEN", [["You do not have permission to open this page"], ["Worker users and sessions"], [], ["Create user"]]],
   ["OWNER_EMPTY_ACCOUNT", [["No seller accounts have been created yet", "Create First Seller Account"], ["Ask the owner", "Choose seller account"], ["Create First Seller Account"], []]],
   ["OWNER_POPULATED", [["Warehouse overview", "STAGE-FK-01"], ["No seller accounts have been created yet"], [], []]],
@@ -121,8 +130,8 @@ const NAMED_ASSERTIONS = Object.fromEntries([
   ["MISSING_LISTING_HELD", [["Missing Listings", "held"], ["No unresolved missing listings"], [], []]],
   ["MISSING_LISTING_RESOLVED", [["Missing Listings", "resolved"], ["Unresolved only"], [], []]],
   ["CONSIGNMENT_DRAFT", [["Consignment detail", "DRAFT"], ["COMPLETED"], [], []]],
-  ["CONSIGNMENT_REVIEW", [["Activation preview", "REVIEW"], ["Activated"], ["Activate Consignment"], []]],
-  ["CONSIGNMENT_INVALID_QUANTITY", [["issues", "INVALID_QUANTITY"], ["No issue rows"], [], []]],
+  ["CONSIGNMENT_REVIEW", [["Activation preview", "REVIEW_REQUIRED", "Activation blocked", "4 blocking errors"], ["Activated"], ["Review blocking issues"], ["Activate", "Activate with warnings"]]],
+  ["CONSIGNMENT_INVALID_QUANTITY", [["issues", "ERROR", "INVALID QUANTITY", "Correct or replace the source"], ["No issue rows"], ["Back to review"], []]],
   ["CONSIGNMENT_ZERO_QUANTITY", [["issues", "zero"], ["active work"], [], []]],
   ["CONSIGNMENT_ACTIVE", [["Consignment detail", "ACTIVE"], ["DRAFT"], [], []]],
   ["CONSIGNMENT_COMPLETED", [["Consignment detail", "COMPLETED"], ["Activate Consignment"], [], []]],
@@ -134,9 +143,9 @@ const NAMED_ASSERTIONS = Object.fromEntries([
   ["MARK_READY", [["Marking", "READY"], ["MARK: COMPLETED"], ["Marking Completed"], []]],
   ["MARK_PARTIAL", [["Marking", "IN PROGRESS"], ["MARK: COMPLETED"], ["Save Partial Quantity"], []]],
   ["MARK_COMPLETED", [["MARK: COMPLETED", "completed by Synthetic Marker", "Quantity", "history"], ["Marking Completed"], ["Details"], ["Marking Completed"]]],
-  ["ASSEMBLY_READY", [["Assembly", "READY"], ["ASSEMBLE: COMPLETED"], ["Assembly Completed"], []]],
-  ["ASSEMBLY_PARTIAL", [["Assembly", "IN PROGRESS"], ["ASSEMBLE: COMPLETED"], ["Save Partial Quantity"], []]],
-  ["ASSEMBLY_COMPLETED", [["ASSEMBLE: COMPLETED", "completed by Synthetic Assembler", "Quantity", "history"], ["Assembly Completed"], ["Details"], ["Assembly Completed"]]],
+  ["ASSEMBLY_READY", [["Synthetic assembly-ready order", "Current stage", "ASSEMBLE", "READY", "Pending quantity", "1"], ["ASSEMBLE: COMPLETED"], ["Assembly Completed"], []]],
+  ["ASSEMBLY_PARTIAL", [["Synthetic assembly-progress order", "Current stage", "ASSEMBLE", "IN PROGRESS", "Required quantity", "2", "Completed quantity", "1", "Pending quantity", "1"], ["ASSEMBLE: COMPLETED"], ["Partial Quantity", "Assembly Completed"], []]],
+  ["ASSEMBLY_COMPLETED", [["ASSEMBLE: COMPLETED", "completed by Synthetic Assembler", "Quantity", "history"], ["Assembly Completed"], ["Scan Next"], ["Assembly Completed"]]],
   ["PACK_PICK_LOCKED", [["Pick is required before packing", "locked"], ["Packing is complete"], [], ["Confirm packed"]]],
   ["PACK_MARK_LOCKED", [["Marking is required before packing", "locked"], ["Packing is complete"], [], ["Confirm packed"]]],
   ["PACK_ASSEMBLY_LOCKED", [["Assembly is required before packing", "locked"], ["Packing is complete"], [], ["Confirm packed"]]],
@@ -150,15 +159,15 @@ const NAMED_ASSERTIONS = Object.fromEntries([
   ["SCANNER_COMPLETED", [["PACKED", "STAGE-AWB-10", "packed by", "packed", "item", "quantity"], ["Confirm packed"], ["Open Details", "Scan Next"], ["Confirm packed"]]],
   ["PROBLEM_OPEN", [["Synthetic damaged item", "Synthetic open problem for UI audit", "stage"], ["No open problem orders"], ["Resolve"], []]],
   ["PROBLEM_RESOLVED", [["Synthetic assembly mismatch", "Synthetic resolution completed"], ["Resolve and return to work"], ["History"], ["Resolve and return to work"]]],
-  ["DATA_DELETE_PREVIEW", [["Data Management", "Preview"], ["Deleted"], ["Preview"], []]],
+  ["DATA_DELETE_PREVIEW", [["Data Management", "PURGE QA OPERATIONAL DATA", "PREVIEWED"], ["Deleted"], [], []]],
   ["DATA_WRONG_PASSWORD", [["Reauthenticate", "password"], ["Authorized"], ["Cancel"], []]],
-  ["DATA_CONFIRMATION_MISMATCH", [["confirmation", "does not match"], ["Deleted"], ["Cancel"], []]],
-  ["DATA_EXPIRED_GRANT", [["authorization expired"], ["Deleted"], ["Reauthenticate"], []]],
-  ["DATA_REPLAY_REJECTED", [["History", "replay"], ["Deleted twice"], [], []]],
-  ["DATA_QUARANTINED", [["Trash", "quarantined"], ["purged"], ["Restore"], []]],
-  ["DATA_RESTORED", [["History", "restored"], ["quarantined now"], [], []]],
-  ["DATA_RETENTION_BLOCKED", [["Trash", "retention"], ["Purge completed"], [], ["Purge"]]],
-  ["DATA_PURGED", [["History", "purged"], ["Restore"], [], ["Restore"]]],
+  ["DATA_CONFIRMATION_MISMATCH", [["Data Management", "Type exactly: QUARANTINE stage3-account-fk-01"], ["The authorized action completed"], [], []]],
+  ["DATA_EXPIRED_GRANT", [["Data Management", "Owner password", "Confirmation phrase", "scoped and single-use"], ["The authorized action completed"], ["Purge QA operational data", "Cancel"], []]],
+  ["DATA_REPLAY_REJECTED", [["You do not have permission to open this page"], ["Data Management", "Deletion History"], [], ["Purge", "Restore"]]],
+  ["DATA_QUARANTINED", [["Trash / Quarantine", "QUARANTINE IMPORT SOURCE FILE", "COMPLETED", "retained until"], ["Trash / Quarantine is empty"], ["Restore quarantined files"], []]],
+  ["DATA_RESTORED", [["Deletion History", "RESTORE QUARANTINED FILES", "COMPLETED"], ["No deletion actions have been recorded"], [], []]],
+  ["DATA_RETENTION_BLOCKED", [["Trash / Quarantine", "Permanently purge after retention", "Unavailable while", "retention window"], ["Purge completed"], [], ["Permanently purge after retention"]]],
+  ["DATA_PURGED", [["Deletion History", "PURGE QUARANTINED FILES", "PURGED"], ["No deletion actions have been recorded"], [], ["Restore quarantined files"]]],
   ["PERMISSION_OWNER", [["Work Hub"], ["Access Denied"], [], []]],
   ["PERMISSION_PICKER", [["Pick"], ["Worker users and sessions"], ["Details"], []]],
   ["PERMISSION_MARKER", [["Marking"], ["Complete Pick"], ["Details"], []]],
@@ -260,6 +269,13 @@ const DYNAMIC_EXAMPLES = {
   "/work/marking/[taskId]": "/work/marking/stage3-line-pick_mark_pack-mark",
 };
 
+const EXPECTED_DESTINATIONS = Object.freeze({
+  AUTH_INVALID: { url: "/login?error=invalid" },
+  AUTH_EXPIRED: { url: "/login?expired=1", requiredQuery: { expired: "1" } },
+  AUTH_FORBIDDEN: { url: "/access-denied" },
+  DATA_REPLAY_REJECTED: { url: "/access-denied" },
+});
+
 function routeId(route) {
   return `ROUTE_${route.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase() || "ROOT"}`;
 }
@@ -275,18 +291,23 @@ function contract({
   requiredActions,
   forbiddenActions,
   selectedAccount,
+  expectedUrl,
+  requiredQuery,
 }) {
   return Object.freeze({
     id,
     route,
-    expectedUrl: DYNAMIC_EXAMPLES[route] ?? route,
+    expectedUrl: expectedUrl ?? DYNAMIC_EXAMPLES[route] ?? route,
+    requiredQuery: Object.freeze({ ...(requiredQuery ?? {}) }),
     role,
-    selectedAccount: role === "PUBLIC" ? null : selectedAccount ?? "STAGE-FK-01",
+    selectedAccount: role === "PUBLIC" || selectedAccount === null ? null : selectedAccount ?? "STAGE-FK-01",
     fixtureIdentity,
     fixtureProbes: fixtureProbes.map((probe) => ({ ...probe })),
     requiredVisible: [...requiredVisible],
     forbiddenVisible: [...forbiddenVisible],
-    requiredActions: requiredActions.map((label) => ({ label, enabled: true })),
+    requiredActions: requiredActions.map((action) => typeof action === "string"
+      ? { label: action, enabled: true }
+      : { label: action.label, enabled: action.enabled !== false }),
     forbiddenActions: [...forbiddenActions],
   });
 }
@@ -297,6 +318,7 @@ const namedContracts = REQUIRED_SCENARIOS.map((scenario) => {
   const fixtureProbes = NAMED_FIXTURES[scenario.id];
   if (!fixtureProbes?.length) throw new Error(`Missing explicit named fixture probes for ${scenario.id}.`);
   const [requiredVisible, forbiddenVisible, requiredActions, forbiddenActions] = assertions;
+  const destination = EXPECTED_DESTINATIONS[scenario.id];
   return contract({
     ...scenario,
     fixtureIdentity: fixtureProbes.map(fixtureProbeIdentity).join("+"),
@@ -305,7 +327,11 @@ const namedContracts = REQUIRED_SCENARIOS.map((scenario) => {
     forbiddenVisible,
     requiredActions,
     forbiddenActions,
-    selectedAccount: scenario.id === "IMPORT_AMAZON_THREE_ROLE" ? "STAGE-AMZ-01" : undefined,
+    selectedAccount: ["AUTH_INVALID", "AUTH_EXPIRED"].includes(scenario.id)
+      ? null
+      : scenario.id === "IMPORT_AMAZON_THREE_ROLE" ? "STAGE-AMZ-01" : undefined,
+    expectedUrl: destination?.url,
+    requiredQuery: destination?.requiredQuery,
   });
 });
 
@@ -347,8 +373,12 @@ export function evaluateSemanticContract(item, evidence) {
   if (evidence?.role !== item.role) failures.push(`ROLE_MISMATCH:${evidence?.role ?? "missing"}`);
   if ((evidence?.selectedAccount ?? null) !== item.selectedAccount) failures.push("SELECTED_ACCOUNT_MISMATCH");
   const expectedPath = new URL(item.expectedUrl, "http://127.0.0.1").pathname;
-  const actualPath = new URL(evidence?.url ?? "/", "http://127.0.0.1").pathname;
+  const actualUrl = new URL(evidence?.url ?? "/", "http://127.0.0.1");
+  const actualPath = actualUrl.pathname;
   if (expectedPath !== actualPath) failures.push(`URL_MISMATCH:${actualPath}`);
+  for (const [name, expected] of Object.entries(item.requiredQuery ?? {})) {
+    if (actualUrl.searchParams.get(name) !== expected) failures.push(`QUERY_MISMATCH:${name}`);
+  }
   for (const text of item.requiredVisible) if (!body.toLocaleLowerCase().includes(text.toLocaleLowerCase())) failures.push(`REQUIRED_VISIBLE_MISSING:${text}`);
   for (const text of item.forbiddenVisible) if (body.toLocaleLowerCase().includes(text.toLocaleLowerCase())) failures.push(`FORBIDDEN_VISIBLE_PRESENT:${text}`);
   for (const required of item.requiredActions) {
@@ -459,8 +489,18 @@ function verifyFixtures(registry, { databasePath, fixtureRoot }) {
           continue;
         }
         try {
-          const found = database.prepare(`SELECT 1 AS present FROM "${probe.table}" WHERE "${probe.column}" = ? LIMIT 1`).get(probe.value);
+          const found = database.prepare(`SELECT * FROM "${probe.table}" WHERE "${probe.column}" = ? LIMIT 1`).get(probe.value);
           if (!found) failures.push(`${item.id}: missing synthetic record ${fixtureProbeIdentity(probe)}.`);
+          else for (const [field, expectation] of Object.entries(probe.expected ?? {})) {
+            const actual = found[field];
+            const matches = expectation && typeof expectation === "object"
+              ? (!Object.hasOwn(expectation, "gt") || Number(actual) > Number(expectation.gt))
+                && (!Object.hasOwn(expectation, "lt") || Number(actual) < Number(expectation.lt))
+                && (!Object.hasOwn(expectation, "ltColumn") || Number(actual) < Number(found[expectation.ltColumn]))
+                && (!expectation.future || Number(actual) > Date.now())
+              : actual === expectation;
+            if (!matches) failures.push(`${item.id}: synthetic record ${fixtureProbeIdentity(probe)} has invalid ${field}.`);
+          }
         } catch (error) {
           failures.push(`${item.id}: fixture probe failed for ${fixtureProbeIdentity(probe)} (${error instanceof Error ? error.message : String(error)}).`);
         }

@@ -39,7 +39,7 @@ assert.equal(prepared.database.counts.ImportRowIssue, 3); assertions += 1;
 assert.equal(prepared.database.counts.ConsignmentImportIssue, 3); assertions += 1;
 assert.equal(prepared.database.counts.ProblemOrder, 2); assertions += 1;
 assert.equal(prepared.database.counts.ScanLog, 3); assertions += 1;
-assert.equal(prepared.database.counts.DataDeletionJob, 3); assertions += 1;
+assert.equal(prepared.database.counts.DataDeletionJob, 4); assertions += 1;
 assert.equal(prepared.database.counts.AuditLog, 2); assertions += 1;
 const stagingDatabase = new DatabaseSync(core.DATABASE_PATH, { readOnly: true });
 try {

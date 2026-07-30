@@ -6,6 +6,7 @@ const root = process.cwd();
 const read = (file) => readFileSync(path.join(root, file), "utf8");
 
 const shell = read("components/AppShell.tsx");
+const rootLayout = read("app/layout.tsx");
 const coordinator = read("components/MobileOverlayCoordinator.tsx");
 const navigation = read("components/AppNav.tsx");
 const accountMenu = read("components/MobileAccountMenu.tsx");
@@ -24,6 +25,7 @@ assert.match(navigation, /min-h-0 flex-1 overflow-y-auto overscroll-contain/, "O
 assert.match(navigation, /createPortal\(/, "The fixed drawer escapes the filtered sticky-header containing block.");
 assert.match(navigation, /data-mobile-drawer-backdrop/, "The full-viewport backdrop has a stable interaction boundary.");
 assert.match(navigation, /triggerRef\.current\?\.focus/, "Closing the drawer restores trigger focus.");
+assert.match(rootLayout, /zIndex:\s*40/, "The synthetic staging banner stays below the z-50 mobile drawer.");
 assert.match(accountMenu, /useMobileOverlayCoordinator/, "The account menu participates in shared overlay state.");
 assert.match(accountMenu, /triggerRef\.current\?\.focus/, "Escape from the account menu restores trigger focus.");
 

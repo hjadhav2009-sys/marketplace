@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { closeSync, existsSync, openSync } from "node:fs";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,13 +25,23 @@ export const LOG_ROOT = path.join(STAGING_ROOT, "logs");
 export const REPORT_ROOT = path.join(STAGING_ROOT, "reports");
 export const ENV_PATH = path.join(RUNTIME_ROOT, "environment.json");
 export const PID_PATH = path.join(RUNTIME_ROOT, "server.json");
+export const START_LOCK_PATH = path.join(RUNTIME_ROOT, "start.lock.json");
 export const CREDENTIAL_PATH = path.join(CREDENTIALS_ROOT, "synthetic-users.json");
-export const PORT = 3188;
+export const SERVER_STDOUT_PATH = path.join(LOG_ROOT, "server.out.log");
+export const SERVER_STDERR_PATH = path.join(LOG_ROOT, "server.err.log");
+const requestedPort = process.env.STAGE3_STAGING_PORT ? Number(process.env.STAGE3_STAGING_PORT) : 3188;
+if (!Number.isInteger(requestedPort) || requestedPort < 1024 || requestedPort > 65535) throw new Error("Invalid private staging port.");
+if (requestedPort !== 3188 && requestedStagingRoot === defaultStagingRoot) throw new Error("A staging-port override is permitted only for an isolated Stage 3 test directory.");
+export const PORT = requestedPort;
 export const HOST = "127.0.0.1";
 export const PREPARE_PHRASE = "APPROVE PRIVATE SYNTHETIC STAGING PREPARATION";
 export const RESET_PHRASE = "RESET SYNTHETIC STAGING";
 export const CLEANUP_PHRASE = "CLEANUP SYNTHETIC STAGING";
 export const SEED_VERSION = "phase-7.3.6-stage4.6-reconciled-ui-v1";
+const START_TIMEOUT_MS = 120_000;
+const HEALTH_TIMEOUT_MS = 15_000;
+const STOP_TIMEOUT_MS = 15_000;
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
 
 export function isInside(parent, candidate, allowEqual = false) {
   const root = path.resolve(parent);
@@ -63,7 +73,7 @@ export function git(command) {
   return String(result.stdout).trim();
 }
 
-export function buildEnvironment(config) {
+export function buildEnvironment(config, runtimeIdentity = {}) {
   const inherited = {};
   for (const key of ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "ComSpec", "COMSPEC", "PATHEXT", "TEMP", "TMP", "LOCALAPPDATA", "APPDATA", "USERPROFILE", "HOME", "NODE_OPTIONS"]) {
     if (process.env[key] !== undefined) inherited[key] = process.env[key];
@@ -81,6 +91,9 @@ export function buildEnvironment(config) {
     STAGE3_SYNTHETIC_STAGING: "true",
     STAGING_UI_AUDIT: "true",
     STAGE3_RUNTIME_IDENTITY_TOKEN: config.runtimeIdentityToken,
+    STAGE3_SOURCE_SHA: runtimeIdentity.sourceSha ?? config.sourceSha,
+    STAGE3_BUILD_ID: runtimeIdentity.buildId ?? "",
+    STAGE3_COMMAND_FINGERPRINT: runtimeIdentity.commandFingerprint ?? "",
     PORT: String(PORT),
     HOSTNAME: HOST,
     IMPORT_JOB_STORAGE_ROOT: path.join(STORAGE_ROOT, "import-jobs"),
@@ -140,6 +153,162 @@ export async function portOwner() {
   });
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readJsonIfExists(filePath) {
+  if (!existsSync(filePath)) return null;
+  try { return JSON.parse(await readFile(filePath, "utf8")); }
+  catch { return null; }
+}
+
+export function pidExists(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; }
+  catch { return false; }
+}
+
+export function processInfo(pid) {
+  if (!pidExists(pid)) return null;
+  if (process.platform === "win32") {
+    const script = `try{$p=Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction Stop;if($p){[pscustomobject]@{pid=[int]$p.ProcessId;parentPid=[int]$p.ParentProcessId;executablePath=[string]$p.ExecutablePath;commandLine=[string]$p.CommandLine}|ConvertTo-Json -Compress}}catch{$p=Get-Process -Id ${pid} -ErrorAction SilentlyContinue;if($p){[pscustomobject]@{pid=[int]$p.Id;parentPid=0;executablePath=[string]$p.Path;commandLine=$null}|ConvertTo-Json -Compress}}`;
+    const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8", windowsHide: true, timeout: 10_000 });
+    if (result.status !== 0 || !String(result.stdout).trim()) return null;
+    try { return JSON.parse(String(result.stdout).trim()); }
+    catch { return null; }
+  }
+  const result = spawnSync("ps", ["-o", "pid=,ppid=,command=", "-p", String(pid)], { encoding: "utf8", timeout: 10_000 });
+  const line = String(result.stdout ?? "").trim();
+  if (result.status !== 0 || !line) return null;
+  const match = line.match(/^(\d+)\s+(\d+)\s+([\s\S]+)$/);
+  return match ? { pid: Number(match[1]), parentPid: Number(match[2]), executablePath: "", commandLine: match[3] } : null;
+}
+
+function expectedServerCommand() {
+  const nextBin = require.resolve("next/dist/bin/next");
+  const args = [nextBin, "start", "-H", HOST, "-p", String(PORT)];
+  return {
+    nextBin,
+    args,
+    commandLine: [process.execPath, ...args].join(" "),
+    commandFingerprint: sha256([nextBin, "start", HOST, String(PORT)].join("\0"))
+  };
+}
+
+function commandMatchesReceipt(info, receipt) {
+  if (!info || info.pid !== receipt.pid) return false;
+  const expected = expectedServerCommand();
+  if (receipt.commandFingerprint !== expected.commandFingerprint) return false;
+  if (!info.commandLine) {
+    const executable = String(info.executablePath ?? "").replaceAll("\\", "/").toLowerCase();
+    return executable === process.execPath.replaceAll("\\", "/").toLowerCase() && receipt.commandLine === expected.commandLine;
+  }
+  const command = String(info.commandLine ?? "").replaceAll("\\", "/").toLowerCase();
+  const nextBin = expected.nextBin.replaceAll("\\", "/").toLowerCase();
+  return command.includes(nextBin) && command.includes(" start ") && command.includes(` -h ${HOST}`) && command.includes(` -p ${PORT}`);
+}
+
+async function currentBuildIdentity() {
+  const buildReceiptPath = path.join(REPORT_ROOT, "current-build.json");
+  const buildIdPath = path.join(ROOT, ".next", "BUILD_ID");
+  const buildReceipt = await readJsonIfExists(buildReceiptPath);
+  if (!buildReceipt || !existsSync(buildIdPath)) return null;
+  const sourceSha = git(["rev-parse", "HEAD"]);
+  const buildId = String(await readFile(buildIdPath, "utf8")).trim();
+  return {
+    sourceSha,
+    buildId,
+    receiptMatches: buildReceipt.sourceSha === sourceSha && buildReceipt.buildId === buildId,
+    buildReceipt
+  };
+}
+
+async function rotateLog(filePath) {
+  if (!existsSync(filePath)) return;
+  const info = await stat(filePath);
+  if (info.size < MAX_LOG_BYTES) return;
+  const rotated = `${filePath}.1`;
+  await rm(rotated, { force: true });
+  await rename(filePath, rotated);
+}
+
+async function tailLog(filePath, maxLines = 80) {
+  if (!existsSync(filePath)) return [];
+  const content = await readFile(filePath, "utf8");
+  return content.split(/\r?\n/).filter(Boolean).slice(-maxLines);
+}
+
+async function acquireStartLock() {
+  await mkdir(RUNTIME_ROOT, { recursive: true });
+  const lock = { pid: process.pid, startedAt: new Date().toISOString(), token: randomBytes(16).toString("hex") };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await writeFile(START_LOCK_PATH, `${JSON.stringify(lock, null, 2)}\n`, { flag: "wx" });
+      return lock;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      const existing = await readJsonIfExists(START_LOCK_PATH);
+      if (existing?.pid && pidExists(existing.pid)) throw new Error("STAGING_START_ALREADY_IN_PROGRESS");
+      if (existing?.pid && !pidExists(existing.pid)) await rm(START_LOCK_PATH, { force: true });
+      else throw new Error("STAGING_START_ALREADY_IN_PROGRESS");
+    }
+  }
+  throw new Error("STAGING_START_ALREADY_IN_PROGRESS");
+}
+
+async function releaseStartLock(lock) {
+  const current = await readJsonIfExists(START_LOCK_PATH);
+  if (current?.token === lock.token && current.pid === lock.pid) await rm(START_LOCK_PATH, { force: true });
+}
+
+async function fetchWithTimeout(url, timeoutMs = 5_000) {
+  try {
+    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs), redirect: "manual" });
+    return { status: response.status, response };
+  } catch (error) {
+    return { status: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function probeHealth(receipt, timeoutMs = 5_000) {
+  const config = await loadPrivateConfig();
+  const [login, identityResponse] = await Promise.all([
+    fetchWithTimeout(`http://${HOST}:${PORT}/login`, timeoutMs),
+    fetchWithTimeout(`http://${HOST}:${PORT}/api/staging/identity`, timeoutMs)
+  ]);
+  let identity = null;
+  if (identityResponse.response) {
+    try { identity = await identityResponse.response.json(); }
+    catch { identity = null; }
+  }
+  const identityTokenMatches = identityResponse.status === 200
+    && identity?.environment === "PRIVATE_SYNTHETIC_STAGING"
+    && identity?.pid === receipt.pid
+    && identity?.tokenSha256 === sha256(config.runtimeIdentityToken);
+  const identityMatches = identityTokenMatches
+    && identity?.sourceSha === receipt.sourceSha
+    && identity?.buildId === receipt.buildId
+    && identity?.commandFingerprint === receipt.commandFingerprint;
+  return {
+    healthy: login.status === 200 && identityMatches,
+    loginStatus: login.status,
+    identityStatus: identityResponse.status,
+    identity,
+    identityTokenMatches,
+    identityMatches
+  };
+}
+
+async function waitForPortClosed(timeoutMs = STOP_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!await portOwner()) return true;
+    await delay(250);
+  }
+  return !await portOwner();
+}
+
 export function run(command, args, options = {}) {
   const executable = process.platform === "win32" && command.endsWith(".cmd") ? "cmd.exe" : command;
   const finalArgs = executable === "cmd.exe" ? ["/d", "/s", "/c", command, ...args] : args;
@@ -185,15 +354,22 @@ export function inspectDatabase() {
 export async function inspect() {
   const branch = git(["branch", "--show-current"]);
   const sourceSha = git(["rev-parse", "HEAD"]);
-  const processReceipt = existsSync(PID_PATH) ? JSON.parse(readFileSync(PID_PATH, "utf8")) : null;
+  const lifecycle = await status();
   return {
     environment: "PRIVATE_SYNTHETIC_STAGING",
     branch,
     sourceSha,
     host: HOST,
     port: PORT,
-    portOpen: await portOwner(),
-    processReceipt: processReceipt ? { pid: processReceipt.pid, sourceSha: processReceipt.sourceSha, startedAt: processReceipt.startedAt } : null,
+    portOpen: lifecycle.portOpen,
+    lifecycle,
+    processReceipt: lifecycle.receipt ? {
+      pid: lifecycle.receipt.pid,
+      launcherPid: lifecycle.receipt.launcherPid ?? null,
+      sourceSha: lifecycle.receipt.sourceSha,
+      buildId: lifecycle.receipt.buildId,
+      startedAt: lifecycle.receipt.startedAt
+    } : null,
     database: inspectDatabase(),
     credentialsPresent: existsSync(CREDENTIAL_PATH),
     seedVersion: SEED_VERSION,
@@ -201,45 +377,179 @@ export async function inspect() {
   };
 }
 
-async function verifiedRecordedProcess(receipt) {
+async function verifiedRecordedProcess(receipt, { allowLegacyIdentity = false } = {}) {
   if (!Number.isInteger(receipt.pid) || receipt.pid <= 0 || receipt.port !== PORT || receipt.host !== HOST) return false;
-  const config = await loadPrivateConfig();
-  const nextBin = require.resolve("next/dist/bin/next");
-  const expectedFingerprint = sha256([nextBin, "start", HOST, String(PORT)].join("\0"));
-  if (receipt.commandFingerprint !== expectedFingerprint) return false;
-  try {
-    const response = await fetch(`http://${HOST}:${PORT}/api/staging/identity`, { cache: "no-store" });
-    const identity = await response.json();
-    return response.status === 200 && identity.pid === receipt.pid && identity.tokenSha256 === sha256(config.runtimeIdentityToken);
-  } catch { return false; }
+  const info = processInfo(receipt.pid);
+  const legacyCommandVerified = allowLegacyIdentity
+    && !receipt.commandLine
+    && receipt.commandFingerprint === expectedServerCommand().commandFingerprint
+    && String(info?.executablePath ?? "").replaceAll("\\", "/").toLowerCase() === process.execPath.replaceAll("\\", "/").toLowerCase();
+  if (!commandMatchesReceipt(info, receipt) && !legacyCommandVerified) return false;
+  const health = await probeHealth(receipt);
+  return health.identityMatches || (allowLegacyIdentity && health.identityTokenMatches && health.identity?.sourceSha == null && health.identity?.buildId == null);
+}
+
+export async function status() {
+  const receipt = await readJsonIfExists(PID_PATH);
+  const portOpen = await portOwner();
+  const build = await currentBuildIdentity();
+  const base = {
+    environment: "PRIVATE_SYNTHETIC_STAGING",
+    state: "STOPPED",
+    pid: receipt?.pid ?? null,
+    port: PORT,
+    portOpen,
+    sourceSha: build?.sourceSha ?? git(["rev-parse", "HEAD"]),
+    buildId: build?.buildId ?? null,
+    loginStatus: null,
+    identityStatus: null,
+    logPaths: receipt?.logPaths ?? { stdout: SERVER_STDOUT_PATH, stderr: SERVER_STDERR_PATH },
+    receipt
+  };
+  if (!receipt) return { ...base, state: portOpen ? "MISMATCHED" : "STOPPED" };
+  const alive = pidExists(receipt.pid);
+  const info = alive ? processInfo(receipt.pid) : null;
+  if (!alive && !portOpen) return { ...base, state: "STALE", processAlive: false, commandVerified: false };
+  const commandVerified = commandMatchesReceipt(info, receipt);
+  const health = portOpen ? await probeHealth(receipt) : { healthy: false, loginStatus: null, identityStatus: null, identityMatches: false };
+  const exactBuild = Boolean(build?.receiptMatches && receipt.sourceSha === build.sourceSha && receipt.buildId === build.buildId);
+  const state = alive && portOpen && commandVerified && health.healthy && exactBuild ? "RUNNING" : "MISMATCHED";
+  return {
+    ...base,
+    state,
+    processAlive: alive,
+    commandVerified,
+    exactBuild,
+    loginStatus: health.loginStatus,
+    identityStatus: health.identityStatus,
+    identity: health.identity ?? null,
+    process: info ? { pid: info.pid, parentPid: info.parentPid, executablePath: info.executablePath, commandLine: info.commandLine } : null
+  };
+}
+
+export async function health() {
+  const startedAt = Date.now();
+  const result = await Promise.race([
+    status(),
+    delay(HEALTH_TIMEOUT_MS).then(() => { throw new Error("Staging health inspection exceeded 15 seconds."); })
+  ]);
+  return { ...result, healthy: result.state === "RUNNING", durationMs: Date.now() - startedAt };
+}
+
+async function stopStartedChild(receipt, { allowLegacy = false } = {}) {
+  const info = processInfo(receipt.pid);
+  const legacyCommandVerified = allowLegacy
+    && !receipt.commandLine
+    && receipt.commandFingerprint === expectedServerCommand().commandFingerprint
+    && String(info?.executablePath ?? "").replaceAll("\\", "/").toLowerCase() === process.execPath.replaceAll("\\", "/").toLowerCase();
+  if (!commandMatchesReceipt(info, receipt) && !legacyCommandVerified) return false;
+  try { process.kill(receipt.pid, "SIGTERM"); } catch {}
+  if (process.platform === "win32" && pidExists(receipt.pid)) {
+    spawnSync("taskkill.exe", ["/PID", String(receipt.pid), "/T"], { encoding: "utf8", windowsHide: true, timeout: 10_000 });
+  }
+  await waitForPortClosed();
+  return !pidExists(receipt.pid) && !await portOwner();
 }
 
 export async function start() {
   if (!existsSync(ENV_PATH) || !existsSync(DATABASE_PATH) || !existsSync(CREDENTIAL_PATH)) throw new Error("Prepare synthetic staging before start.");
   if (!existsSync(path.join(ROOT, ".next", "BUILD_ID"))) throw new Error("A reviewed production build is required before staging start.");
-  const buildReceiptPath = path.join(REPORT_ROOT, "current-build.json");
-  if (!existsSync(buildReceiptPath)) throw new Error("A current staging build receipt is required before staging start.");
-  if (await portOwner()) throw new Error("Port 3188 is already in use; refusing to stop or replace an unrelated process.");
-  const config = await loadPrivateConfig();
-  const buildReceipt = JSON.parse(await readFile(buildReceiptPath, "utf8"));
-  const sourceSha = git(["rev-parse", "HEAD"]);
-  const buildId = String(await readFile(path.join(ROOT, ".next", "BUILD_ID"), "utf8")).trim();
-  if (buildReceipt.sourceSha !== sourceSha || buildReceipt.buildId !== buildId) {
-    throw new Error("The staging production build does not match the current source HEAD. Run staging:build again.");
+  const lock = await acquireStartLock();
+  let startedReceipt = null;
+  try {
+    const current = await status();
+    if (current.state === "RUNNING") {
+      return {
+        status: "STAGING_ALREADY_RUNNING",
+        alreadyRunning: true,
+        pid: current.pid,
+        host: HOST,
+        port: PORT,
+        sourceSha: current.receipt.sourceSha,
+        buildId: current.receipt.buildId,
+        loginStatus: current.loginStatus,
+        identityStatus: current.identityStatus
+      };
+    }
+    if (current.state === "MISMATCHED") throw new Error("STAGING_SERVER_MISMATCHED: Port or receipt belongs to a different process/build; use staging:status and staging:stop only when ownership is verified.");
+    if (current.state === "STALE") {
+      if (pidExists(current.receipt.pid) || await portOwner()) throw new Error("STAGING_STALE_RECEIPT_NOT_SAFE_TO_REMOVE");
+      await rm(PID_PATH, { force: true });
+    }
+    const build = await currentBuildIdentity();
+    if (!build?.receiptMatches) throw new Error("The staging production build does not match the current source HEAD. Run staging:build again.");
+    const config = await loadPrivateConfig();
+    const command = expectedServerCommand();
+    const env = buildEnvironment(config, { sourceSha: build.sourceSha, buildId: build.buildId, commandFingerprint: command.commandFingerprint });
+    await rotateLog(SERVER_STDOUT_PATH);
+    await rotateLog(SERVER_STDERR_PATH);
+    const stdout = openSync(SERVER_STDOUT_PATH, "a");
+    const stderr = openSync(SERVER_STDERR_PATH, "a");
+    let child;
+    try {
+      const spawnArgs = requestedStagingRoot !== defaultStagingRoot && process.env.STAGE3_TEST_FAIL_CHILD_START === "true"
+        ? [path.join(STAGING_ROOT, "runtime", "missing-staging-entrypoint.mjs")]
+        : command.args;
+      child = spawn(process.execPath, spawnArgs, { cwd: ROOT, env, detached: true, stdio: ["ignore", stdout, stderr], windowsHide: true });
+    } finally {
+      closeSync(stdout);
+      closeSync(stderr);
+    }
+    child.unref();
+    startedReceipt = {
+      launcherPid: process.pid,
+      pid: child.pid,
+      serverPid: child.pid,
+      host: HOST,
+      port: PORT,
+      sourceSha: build.sourceSha,
+      buildId: build.buildId,
+      commandLine: command.commandLine,
+      commandFingerprint: command.commandFingerprint,
+      databasePath: DATABASE_PATH,
+      storagePath: STORAGE_ROOT,
+      logPaths: { stdout: SERVER_STDOUT_PATH, stderr: SERVER_STDERR_PATH },
+      startedAt: new Date().toISOString()
+    };
+    await writeFile(PID_PATH, `${JSON.stringify(startedReceipt, null, 2)}\n`, { flag: "wx" });
+    const deadline = Date.now() + START_TIMEOUT_MS;
+    let lastHealth = null;
+    while (Date.now() < deadline) {
+      if (!pidExists(child.pid)) throw new Error("Staging server child exited before becoming healthy.");
+      if (await portOwner()) {
+        lastHealth = await probeHealth(startedReceipt);
+        if (lastHealth.healthy) return {
+          status: "RUNNING",
+          alreadyRunning: false,
+          pid: child.pid,
+          host: HOST,
+          port: PORT,
+          sourceSha: build.sourceSha,
+          buildId: build.buildId,
+          loginStatus: lastHealth.loginStatus,
+          identityStatus: lastHealth.identityStatus,
+          logPaths: startedReceipt.logPaths,
+          startedAt: startedReceipt.startedAt
+        };
+      }
+      await delay(500);
+    }
+    throw new Error(`Private staging server did not become healthy within ${START_TIMEOUT_MS / 1000} seconds.`);
+  } catch (error) {
+    if (startedReceipt) {
+      await stopStartedChild(startedReceipt);
+      const currentReceipt = await readJsonIfExists(PID_PATH);
+      if (currentReceipt?.pid === startedReceipt.pid && currentReceipt?.startedAt === startedReceipt.startedAt) await rm(PID_PATH, { force: true });
+    }
+    const logs = {
+      stdout: await tailLog(SERVER_STDOUT_PATH),
+      stderr: await tailLog(SERVER_STDERR_PATH)
+    };
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${message}\nSTAGING_START_LOG_TAIL=${JSON.stringify(logs)}`);
+  } finally {
+    await releaseStartLock(lock);
   }
-  const env = buildEnvironment(config);
-  const nextBin = require.resolve("next/dist/bin/next");
-  const logHandle = await import("node:fs").then(({ openSync }) => openSync(path.join(LOG_ROOT, "server.log"), "a"));
-  const child = spawn(process.execPath, [nextBin, "start", "-H", HOST, "-p", String(PORT)], { cwd: ROOT, env, detached: true, stdio: ["ignore", logHandle, logHandle], windowsHide: true });
-  child.unref();
-  const receipt = { pid: child.pid, host: HOST, port: PORT, sourceSha, buildId, commandFingerprint: sha256([nextBin, "start", HOST, String(PORT)].join("\0")), startedAt: new Date().toISOString() };
-  await writeFile(PID_PATH, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx" });
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    if (await portOwner()) return receipt;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  throw new Error("Private staging server did not become ready.");
 }
 
 export async function build() {
@@ -257,24 +567,36 @@ export async function build() {
 
 export async function stop() {
   if (!existsSync(PID_PATH)) return { stopped: false, reason: "NO_RECORDED_STAGING_PROCESS" };
-  const receipt = JSON.parse(await readFile(PID_PATH, "utf8"));
-  if (!await portOwner()) {
+  const receipt = await readJsonIfExists(PID_PATH);
+  if (!receipt) throw new Error("The staging process receipt is unreadable; refusing to stop any process.");
+  const portOpen = await portOwner();
+  const alive = pidExists(receipt.pid);
+  if (!portOpen && !alive) {
     await rm(PID_PATH, { force: true });
     return { stopped: true, pid: receipt.pid, alreadyExited: true };
   }
-  if (!await verifiedRecordedProcess(receipt)) {
-    if (!await portOwner()) {
+  if (!await verifiedRecordedProcess(receipt, { allowLegacyIdentity: true })) {
+    if (!await portOwner() && !pidExists(receipt.pid)) {
       await rm(PID_PATH, { force: true });
       return { stopped: true, pid: receipt.pid, alreadyExited: true };
     }
     throw new Error("Recorded PID is not the verified Stage 3 server; refusing to kill it.");
   }
-  process.kill(receipt.pid, "SIGTERM");
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline && await portOwner()) await new Promise((resolve) => setTimeout(resolve, 250));
-  if (await portOwner()) throw new Error("Verified staging process did not stop cleanly.");
+  const stopped = await stopStartedChild(receipt, { allowLegacy: true });
+  if (!stopped) throw new Error("Verified staging process did not stop cleanly.");
   await rm(PID_PATH, { force: true });
   return { stopped: true, pid: receipt.pid };
+}
+
+export async function restart() {
+  const before = await status();
+  let stopResult = null;
+  if (before.receipt) stopResult = await stop();
+  else if (before.portOpen) throw new Error(`Port ${PORT} is occupied without a verified staging receipt; refusing to restart.`);
+  const startResult = await start();
+  const after = await health();
+  if (!after.healthy) throw new Error("Staging restart completed without a healthy exact-build server.");
+  return { before: before.state, stop: stopResult, start: startResult, after: after.state };
 }
 
 export async function reset({ confirmation }) {

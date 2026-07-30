@@ -13,6 +13,17 @@ import { sanitizeImportJobError } from "@/src/lib/import-jobs/safe-error";
 type Transaction = Prisma.TransactionClient;
 type Client = PrismaClient;
 export type ActivationProblem = { lineId?: string; rowNumber?: number; code: string; message: string };
+export type ConsignmentActivationEligibility = {
+  canActivate: boolean;
+  actionLabel: "Activate" | "Activate with warnings" | null;
+  blockingCount: number;
+  warningCount: number;
+  blockingReasons: string[];
+  lifecycleStatus: string | null;
+  lifecycleMessage: string;
+};
+
+const ACTIVATABLE_CONSIGNMENT_STATUSES = new Set(["REVIEW_REQUIRED", "READY_TO_ACTIVATE"]);
 
 function routeSupported(route: ProcessRoute | null): route is ProcessRoute {
   return route === "PICK_PACK" || route === "PICK_MARK_PACK" || route === "PICK_ASSEMBLE_PACK" || route === "PICK_MARK_ASSEMBLE_PACK";
@@ -90,6 +101,43 @@ export async function validateConsignmentActivation(batchId: string, accountId: 
   return { batch, problems, warnings };
 }
 
+export function resolveConsignmentActivationEligibility(
+  validation: Awaited<ReturnType<typeof validateConsignmentActivation>>,
+  lifecycleStatus = validation.batch?.status ?? null
+): ConsignmentActivationEligibility {
+  const blockingReasons = [...new Set(validation.problems.map((problem) => problem.message))].slice(0, 3);
+  const lifecycleAllowsActivation = lifecycleStatus !== null && ACTIVATABLE_CONSIGNMENT_STATUSES.has(lifecycleStatus);
+  const canActivate = Boolean(validation.batch) && lifecycleAllowsActivation && validation.problems.length === 0;
+  const actionLabel = canActivate ? (validation.warnings.length ? "Activate with warnings" : "Activate") : null;
+  const lifecycleMessage = !validation.batch
+    ? "Consignment is not available in the selected account."
+    : validation.problems.length
+      ? `${validation.problems.length} blocking ${validation.problems.length === 1 ? "error must" : "errors must"} be resolved before activation.`
+      : !lifecycleAllowsActivation
+        ? `Activation is unavailable while this consignment is ${String(lifecycleStatus).replaceAll("_", " ").toLowerCase()}.`
+        : validation.warnings.length
+          ? `${validation.warnings.length} non-blocking ${validation.warnings.length === 1 ? "warning is" : "warnings are"} present. Review them before activation.`
+          : "All activation checks passed.";
+  return {
+    canActivate,
+    actionLabel,
+    blockingCount: validation.problems.length,
+    warningCount: validation.warnings.length,
+    blockingReasons,
+    lifecycleStatus,
+    lifecycleMessage
+  };
+}
+
+export async function getConsignmentActivationEligibility(
+  batchId: string,
+  accountId: string,
+  client: PrismaClient | Transaction = prisma
+) {
+  const validation = await validateConsignmentActivation(batchId, accountId, client);
+  return resolveConsignmentActivationEligibility(validation);
+}
+
 function activationRoute(line: NonNullable<Awaited<ReturnType<typeof validateConsignmentActivation>>["batch"]>["lines"][number]): ProcessRoute {
   const ruleMatches = line.processRule?.active && line.processRule.accountId === line.accountId && line.processRule.marketplaceListingId === line.marketplaceListingId;
   const savedRule = ruleMatches ? line.processRule : line.marketplaceListing?.processRules[0];
@@ -123,7 +171,18 @@ async function writeSnapshotChunk(tx: Transaction, lines: NonNullable<Awaited<Re
 export async function activateConsignmentBatch(input: { batchId: string; accountId: string; actorUserId: string }, client: Client = prisma) {
   try {
     return await client.$transaction(async (tx) => {
-      const claimed = await tx.consignmentBatch.updateMany({ where: { id: input.batchId, accountId: input.accountId, status: "READY_TO_ACTIVATE" }, data: { status: "ACTIVATING" } });
+      const candidate = await tx.consignmentBatch.findFirst({
+        where: { id: input.batchId, accountId: input.accountId },
+        select: { status: true }
+      });
+      if (candidate?.status === "ACTIVE" || candidate?.status === "COMPLETED") {
+        return { activated: false, alreadyActive: true, taskCount: await tx.workTask.count({ where: { consignmentLine: { consignmentBatchId: input.batchId } } }) };
+      }
+      if (!candidate || !ACTIVATABLE_CONSIGNMENT_STATUSES.has(candidate.status)) throw new Error("Consignment is not ready to activate.");
+      const claimed = await tx.consignmentBatch.updateMany({
+        where: { id: input.batchId, accountId: input.accountId, status: candidate.status },
+        data: { status: "ACTIVATING" }
+      });
       if (claimed.count !== 1) {
         const existing = await tx.consignmentBatch.findFirst({ where: { id: input.batchId, accountId: input.accountId }, select: { status: true } });
         if (existing?.status === "ACTIVE" || existing?.status === "COMPLETED") return { activated: false, alreadyActive: true, taskCount: await tx.workTask.count({ where: { consignmentLine: { consignmentBatchId: input.batchId } } }) };
@@ -131,7 +190,8 @@ export async function activateConsignmentBatch(input: { batchId: string; account
       }
       if (await tx.workTask.count({ where: { consignmentLine: { consignmentBatchId: input.batchId } } })) throw new Error("Consignment already has a task plan.");
       const validation = await validateConsignmentActivation(input.batchId, input.accountId, tx);
-      if (!validation.batch || validation.problems.length) throw new Error(validation.problems[0]?.message ?? "Consignment validation failed.");
+      const eligibility = resolveConsignmentActivationEligibility(validation, candidate.status);
+      if (!eligibility.canActivate || !validation.batch) throw new Error(validation.problems[0]?.message ?? "Consignment validation failed.");
       const tasks: Prisma.WorkTaskCreateManyInput[] = validation.batch.lines.map((line) => {const route=activationRoute(line),savedRule=activationSavedRule(line),provenance=createImmutableRouteProvenance({route,rule:savedRule}),identifier=(type:string)=>line.marketplaceListing?.identifiers.find(item=>item.identifierType===type)?.rawValue??null;return({
         id: `wkt_${randomUUID().replace(/-/g, "")}`,
         accountId: input.accountId,

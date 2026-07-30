@@ -42,6 +42,8 @@ assert.match(scanner, /data-scanner-actions/, "Scanner actions have a stable lay
 assert.match(scanner, /Customer Order — Pick pending/, "Order Pick candidates identify their action scope.");
 assert.match(scanner, /package — \$\{candidate\.canAct \? "Pack ready" : "Pack locked"\}/, "Package candidates explain their distinct Pack scope.");
 assert.match(scanner, /Lookup completed in/, "Lookup timing has an explicit readable label.");
+assert.match(scanner, /visibleCompletedResults/, "Completed Scanner cards are counted separately from active work.");
+assert.match(scanner, /completed read-only result\(s\)/, "The Scanner summary labels completed matches as read-only.");
 
 for (const tone of ["quarantine", "archive", "restore", "permanent"]) {
   assert.match(dataManagement + dataActionDetails, new RegExp(`"${tone}"`), `Data Management exposes the ${tone} hierarchy.`);

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rename, stat, statfs, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, statfs } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
@@ -8,6 +8,8 @@ import sharp from "sharp";
 import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { CAPTURE_RUNNER_VERSION, REQUIRED_SCENARIOS, ROLE_TO_DISPLAY, SCENARIO_VERSION, VIEWPORTS } from "./stage4-5-scenarios.mjs";
+import { writeSafeCheckpoint } from "./atlas-safe-checkpoint.mjs";
+import { evaluateSemanticContract, semanticPreflight } from "./stage4-6c-semantic-registry.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = "http://127.0.0.1:3188";
@@ -106,9 +108,7 @@ async function loadJson(file, fallback) {
 }
 
 async function writeJsonCheckpoint(file, value) {
-  const temporary = `${file}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`);
-  await rename(temporary, file);
+  await writeSafeCheckpoint(file, value);
 }
 
 async function login(page, credential) {
@@ -158,6 +158,7 @@ async function inspect(page) {
       documentHeight: Math.max(root.scrollHeight, body?.scrollHeight ?? 0),
       undersized: controls.filter((control) => ["BUTTON", "A", "SUMMARY"].includes(control.tag) && control.height < 40),
       stagingBanner: body?.innerText.includes("PRIVATE SYNTHETIC STAGING") ?? false,
+      bodyText: (body?.innerText ?? "").replace(/\s+/g, " ").trim().slice(0, 100_000),
     };
   });
 }
@@ -307,6 +308,11 @@ await mkdir(TRACE_ROOT, { recursive: true });
 if (!existsSync(CREDENTIALS)) throw new Error("Synthetic staging credentials are missing.");
 const credentialFile = JSON.parse(await readFile(CREDENTIALS, "utf8"));
 const credentials = new Map(credentialFile.users.map((entry) => [entry.displayRole, entry]));
+const semantic = await semanticPreflight(ROOT, {
+  credentialRoles: [...credentials.keys()],
+  accountCodes: ["STAGE-FK-01", "STAGE-AMZ-01"],
+});
+if (!semantic.passed) throw new Error(`Atlas semantic preflight failed: ${semantic.failures.join(" ")}`);
 const executablePath = existsSync(CHROME) ? CHROME : existsSync(EDGE) ? EDGE : undefined;
 if (!executablePath) throw new Error("Installed Chrome or Edge is required; no bundled browser was downloaded.");
 
@@ -376,6 +382,7 @@ try {
     const startedAt = new Date().toISOString();
     let status = 0;
     let inspection = null;
+    let semanticAssertion = null;
     let error = null;
     let accountRestore = null;
     try {
@@ -387,6 +394,14 @@ try {
       await assertScenarioTruth(page, job.id);
       status = response?.status() ?? 0;
       inspection = await inspectStable(page);
+      const item = semantic.registry.get(job.id);
+      semanticAssertion = evaluateSemanticContract(item, {
+        bodyText: inspection.bodyText,
+        actions: inspection.controls,
+        url: inspection.url,
+        role: job.role,
+        selectedAccount: item?.selectedAccount ?? null,
+      });
       if (!cli.verifyOnly) {
         await settleFullPage(page);
         await page.screenshot({ path: masterPath, type: "png", fullPage: true, animations: "disabled", caret: "hide", scale: "device" });
@@ -398,7 +413,8 @@ try {
     }
     const unexpectedFailed = failedRequests.filter((item) => !/example\.invalid|invalid\.example\.invalid/.test(item.url) && item.error !== "net::ERR_ABORTED");
     const unexpectedResponses = errorResponses.filter((item) => !/\/favicon\.ico(?:\?|$)/.test(item.url));
-    const verified = !error && status > 0 && status < 400 && inspection?.stagingBanner && inspection?.heading !== "404" && !inspection?.overflow && pageErrors.length === 0 && unexpectedFailed.length === 0 && unexpectedResponses.length === 0;
+    const smallControls = (inspection?.controls ?? []).filter((control) => ["BUTTON", "A", "SUMMARY"].includes(control.tag) && !control.disabled && control.height < 44);
+    const verified = !error && status > 0 && status < 400 && inspection?.stagingBanner && inspection?.heading !== "404" && !inspection?.overflow && pageErrors.length === 0 && consoleErrors.length === 0 && unexpectedFailed.length === 0 && unexpectedResponses.length === 0 && smallControls.length === 0 && semanticAssertion?.passed === true;
     if (verified) await context.tracing.stop();
     else await context.tracing.stop({ path: tracePath });
     let masterEvidence = null;
@@ -422,7 +438,7 @@ try {
       route: job.route,
       dynamicRouteExample: job.route,
       role: job.role,
-      selectedAccount: "STAGE-FK-01",
+      selectedAccount: semantic.registry.get(job.id)?.selectedAccount ?? null,
       scenarioId: job.id,
       stateName: job.id,
       stateCategory: job.id.split("_")[0],
@@ -451,6 +467,8 @@ try {
       pageErrors,
       failedRequests,
       errorResponses,
+      semanticAssertion,
+      smallControls,
       error,
       startedAt,
       finishedAt: new Date().toISOString(),

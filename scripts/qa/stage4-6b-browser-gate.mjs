@@ -144,11 +144,12 @@ async function waitForEvidence(expected) {
 async function stopOwnedChild(child) {
   if (!child || child.exitCode != null) return;
   try { child.kill("SIGTERM"); } catch {}
-  let deadline = Date.now() + 10_000;
+  let deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     if (child.exitCode != null && !await portOwner()) return;
     await delay(250);
   }
+  if (!await portOwner()) return;
   if (process.platform === "win32") {
     const killed = spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], {
       encoding: "utf8",
@@ -156,6 +157,7 @@ async function stopOwnedChild(child) {
       timeout: 15_000,
     });
     if (killed.status !== 0 && child.exitCode == null) {
+      if (!await portOwner()) return;
       throw new Error(`Owned browser-gate process could not be terminated: ${String(killed.stderr || killed.stdout).trim()}`);
     }
   } else {

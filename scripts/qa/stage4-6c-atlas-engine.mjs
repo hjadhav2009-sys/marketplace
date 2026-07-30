@@ -4,6 +4,10 @@ import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { VIEWPORTS } from "./stage4-5-scenarios.mjs";
 import { readSafeCheckpoint, writeSafeCheckpoint } from "./atlas-safe-checkpoint.mjs";
+import {
+  shardIdentityRecord,
+  verifyEvidenceIdentity,
+} from "./stage4-6c-atlas-identity.mjs";
 import { semanticPreflight } from "./stage4-6c-semantic-registry.mjs";
 
 export const ATLAS_ENGINE_VERSION = "stage4.6c-sharded-v1";
@@ -51,6 +55,7 @@ export async function createAtlasPlan(root, identity) {
       shards.push({
         schema: "Stage4_6CAtlasShardV1",
         engineVersion: ATLAS_ENGINE_VERSION,
+        identity,
         id,
         viewport,
         batch: batchIndex + 1,
@@ -172,16 +177,39 @@ export async function runAtlasShard({
   progressPath,
   captureEntry,
   lifecycle,
+  identity,
   force = false,
   timeoutMs = SHARD_TIMEOUT_MS,
   now = () => Date.now(),
 }) {
   if (timeoutMs > SHARD_TIMEOUT_MS) throw new Error("No atlas shard may exceed 30 minutes.");
+  if (!identity?.runtimeSha || !identity?.runtimeBuildId || !identity?.runnerSha) {
+    throw new Error("Atlas shard execution requires explicit runtime and runner identities.");
+  }
+  const identityRecord = shardIdentityRecord(identity, shard);
   const progress = await readSafeCheckpoint(progressPath, {
     schema: "Stage4_6CAtlasShardProgressV1",
     shardId: shard.id,
+    identity: identityRecord,
     entries: {},
     journal: [],
+  });
+  if (progress.shardId !== shard.id) throw new Error("Atlas progress belongs to a different shard.");
+  if (progress.identity) {
+    const progressIdentity = verifyEvidenceIdentity(progress.identity, identity);
+    if (!progressIdentity.passed) {
+      throw new Error(`Atlas progress identity mismatch: ${progressIdentity.failures.join(", ")}.`);
+    }
+  } else if (Object.keys(progress.entries ?? {}).length) {
+    throw new Error("Existing atlas progress is missing runner identity; verify it explicitly instead of relabelling it.");
+  } else {
+    progress.identity = identityRecord;
+  }
+  const journalEvent = (entryId, event) => ({
+    ...identityRecord,
+    entryId,
+    event,
+    at: new Date().toISOString(),
   });
   const startedAt = now();
   let server;
@@ -191,23 +219,29 @@ export async function runAtlasShard({
       const remainingMs = timeoutMs - (now() - startedAt);
       if (remainingMs <= 0) throw new Error(`Shard ${shard.id} exceeded its bounded timeout.`);
       const prior = progress.entries[entry.id];
-      if (!force && prior?.status === "VERIFIED" && await verifyEvidenceFile(prior)) {
-        progress.journal.push({ entryId: entry.id, event: "SKIPPED_HASH_VERIFIED", at: new Date().toISOString() });
+      const priorIdentity = prior ? verifyEvidenceIdentity(prior, identity) : null;
+      if (!force && prior?.status === "VERIFIED" && priorIdentity?.passed && await verifyEvidenceFile(prior)) {
+        progress.journal.push(journalEvent(entry.id, "SKIPPED_HASH_VERIFIED"));
         continue;
       }
-      progress.journal.push({ entryId: entry.id, event: "CAPTURE_STARTED", at: new Date().toISOString() });
+      progress.journal.push(journalEvent(entry.id, "CAPTURE_STARTED"));
       await writeSafeCheckpoint(progressPath, progress);
       try {
         const result = await captureEntry(entry, { server, prior, remainingMs });
+        const resultIdentity = verifyEvidenceIdentity(result, identity);
+        if (!resultIdentity.passed) {
+          throw new Error(`Captured evidence identity mismatch: ${resultIdentity.failures.join(", ")}.`);
+        }
         progress.entries[entry.id] = result;
-        progress.journal.push({ entryId: entry.id, event: result.status === "VERIFIED" ? "CAPTURE_VERIFIED" : "CAPTURE_FAILED", at: new Date().toISOString() });
+        progress.journal.push(journalEvent(entry.id, result.status === "VERIFIED" ? "CAPTURE_VERIFIED" : "CAPTURE_FAILED"));
       } catch (error) {
         progress.entries[entry.id] = {
+          ...identityRecord,
           status: "FAILED",
           error: error instanceof Error ? error.message : String(error),
           failedAt: new Date().toISOString(),
         };
-        progress.journal.push({ entryId: entry.id, event: "CAPTURE_FAILED", at: new Date().toISOString() });
+        progress.journal.push(journalEvent(entry.id, "CAPTURE_FAILED"));
       }
       await writeSafeCheckpoint(progressPath, progress);
     }
@@ -215,30 +249,80 @@ export async function runAtlasShard({
     await lifecycle.stop(server);
   }
   const summary = shardSummary(shard, progress);
-  await writeSafeCheckpoint(`${progressPath}.result.json`, { summary, progress });
+  await writeSafeCheckpoint(`${progressPath}.result.json`, {
+    schema: "Stage4_6CAtlasShardResultV2",
+    identity: identityRecord,
+    summary,
+    progress,
+  });
   return { summary, progress };
 }
 
-export async function verifyAtlasShard(shard, progressPath) {
+export async function verifyAtlasShard(shard, progressPath, {
+  identity = null,
+  allowLegacyRunnerIdentity = false,
+} = {}) {
   const progress = await readSafeCheckpoint(progressPath, null);
-  if (!progress) return { passed: false, missing: shard.entries.map((entry) => entry.id), failed: [], verified: [] };
+  if (!progress) {
+    return {
+      passed: false,
+      identity: identity ? shardIdentityRecord(identity, shard) : null,
+      missing: shard.entries.map((entry) => entry.id),
+      failed: [],
+      verified: [],
+      identityFailures: [],
+      legacyRunnerIdentityEntries: [],
+    };
+  }
   const missing = [];
   const failed = [];
   const verified = [];
+  const identityFailures = [];
+  const legacyRunnerIdentityEntries = [];
+  if (identity && progress.identity) {
+    const progressIdentity = verifyEvidenceIdentity(progress.identity, identity);
+    if (!progressIdentity.passed) identityFailures.push(`PROGRESS:${progressIdentity.failures.join("+")}`);
+  }
   for (const entry of shard.entries) {
     const result = progress.entries?.[entry.id];
     if (!result) missing.push(entry.id);
-    else if (result.status === "VERIFIED" && await verifyEvidenceFile(result)) verified.push(entry.id);
-    else failed.push(entry.id);
+    else {
+      const evidenceIdentity = identity
+        ? verifyEvidenceIdentity(result, identity, { allowLegacyRunnerIdentity })
+        : { passed: true, legacyRunnerIdentity: false, failures: [] };
+      if (evidenceIdentity.legacyRunnerIdentity) legacyRunnerIdentityEntries.push(entry.id);
+      if (!evidenceIdentity.passed) {
+        failed.push(entry.id);
+        identityFailures.push(`${entry.id}:${evidenceIdentity.failures.join("+")}`);
+      } else if (result.status === "VERIFIED" && await verifyEvidenceFile(result)) {
+        verified.push(entry.id);
+      } else {
+        failed.push(entry.id);
+      }
+    }
   }
-  return { passed: missing.length === 0 && failed.length === 0, missing, failed, verified };
+  return {
+    passed: missing.length === 0 && failed.length === 0 && identityFailures.length === 0,
+    identity: identity ? shardIdentityRecord(identity, shard) : null,
+    missing,
+    failed,
+    verified,
+    identityFailures,
+    legacyRunnerIdentityEntries,
+  };
 }
 
-export async function aggregateAtlas(plan, shardProgressRoot) {
+export async function aggregateAtlas(plan, shardProgressRoot, {
+  identity = null,
+  allowLegacyRunnerIdentityForShards = new Set(),
+} = {}) {
   const entries = [];
   for (const shard of plan.shards) {
     const progressPath = path.join(shardProgressRoot, `${shard.id}.progress.json`);
-    const verification = await verifyAtlasShard(shard, progressPath);
+    const verification = await verifyAtlasShard(shard, progressPath, {
+      identity,
+      allowLegacyRunnerIdentity: allowLegacyRunnerIdentityForShards.has(shard.id),
+    });
     const progress = await readSafeCheckpoint(progressPath, { entries: {} });
     for (const planned of shard.entries) {
       const result = progress.entries?.[planned.id] ?? null;

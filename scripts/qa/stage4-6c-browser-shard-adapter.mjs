@@ -13,6 +13,10 @@ import {
   sha256,
 } from "../staging/core.mjs";
 import { readSafeCheckpoint } from "./atlas-safe-checkpoint.mjs";
+import {
+  assertAdapterIdentity,
+  verifyEvidenceIdentity,
+} from "./stage4-6c-atlas-identity.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -109,25 +113,28 @@ export async function createBrowserShardAdapter({
   shardRoot,
   force = false,
 } = {}) {
-  if (!identity?.sourceSha || !identity?.buildId) throw new Error("Shard adapter requires exact source/build identity.");
-  const currentSha = git(["rev-parse", "HEAD"]);
-  const currentBuild = String(await readFile(path.join(ROOT, ".next", "BUILD_ID"), "utf8")).trim();
-  if (currentSha !== identity.sourceSha || currentBuild !== identity.buildId) {
-    throw new Error("Shard adapter source or BUILD_ID does not match the plan.");
+  if (!identity?.runtimeSha || !identity?.runtimeBuildId || !identity?.runnerSha) {
+    throw new Error("Shard adapter requires separate runtime and runner identities.");
   }
+  const currentRunnerSha = git(["rev-parse", "HEAD"]);
+  const currentBuild = String(await readFile(path.join(ROOT, ".next", "BUILD_ID"), "utf8")).trim();
+  assertAdapterIdentity({ currentRunnerSha, currentBuildId: currentBuild, expected: identity });
   if (await portOwner()) throw new Error(`Port ${PORT} is occupied before shard start.`);
   await mkdir(shardRoot, { recursive: true });
   const config = await loadPrivateConfig();
   const nextBin = require.resolve("next/dist/bin/next");
   const commandFingerprint = sha256([nextBin, "start", HOST, String(PORT)].join("\0"));
   const expected = {
-    sourceSha: identity.sourceSha,
-    buildId: identity.buildId,
+    sourceSha: identity.runtimeSha,
+    buildId: identity.runtimeBuildId,
     commandFingerprint,
     tokenSha256: sha256(config.runtimeIdentityToken),
   };
   const env = buildEnvironment(config, expected);
-  env.ATLAS_SOURCE_SHA = identity.sourceSha;
+  env.ATLAS_RUNTIME_SHA = identity.runtimeSha;
+  env.ATLAS_RUNTIME_BUILD_ID = identity.runtimeBuildId;
+  env.ATLAS_RUNNER_SHA = identity.runnerSha;
+  env.ATLAS_SOURCE_SHA = identity.runtimeSha;
   env.ATLAS_BRANCH = git(["branch", "--show-current"]);
 
   return {
@@ -165,10 +172,14 @@ export async function createBrowserShardAdapter({
         timeoutMs: Math.max(1_000, Math.min(120_000, Number(remainingMs) || 120_000)),
         logPath,
       });
-      const globalProgress = path.join(ROOT, ".codex-tmp", "ui-state-atlas", "current", identity.sourceSha, "progress.json");
+      const globalProgress = path.join(ROOT, ".codex-tmp", "ui-state-atlas", "current", identity.runtimeSha, "progress.json");
       const progress = await readSafeCheckpoint(globalProgress, { completed: {} });
       const result = progress.completed?.[entry.id];
       if (!result) throw new Error(`Capture result ${entry.id} was not recorded.`);
+      const evidenceIdentity = verifyEvidenceIdentity(result, identity);
+      if (!evidenceIdentity.passed) {
+        throw new Error(`Capture result ${entry.id} has invalid dual identity: ${evidenceIdentity.failures.join(", ")}.`);
+      }
       const screenshotPath = result.fullPageMasterPath
         ? path.join(ROOT, ...result.fullPageMasterPath.split("/"))
         : null;
@@ -197,4 +208,5 @@ export async function createBrowserShardAdapter({
 export const browserShardAdapterInternals = {
   waitForHealth,
   stopOwnedProcess,
+  assertAdapterIdentity,
 };

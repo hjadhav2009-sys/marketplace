@@ -13,14 +13,20 @@ import { evaluateSemanticContract, semanticPreflight } from "./stage4-6c-semanti
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = "http://127.0.0.1:3188";
-const SOURCE_SHA = process.env.ATLAS_SOURCE_SHA
+const RUNTIME_SHA = process.env.ATLAS_RUNTIME_SHA
+  ?? process.env.ATLAS_SOURCE_SHA
+  ?? execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+const RUNNER_SHA = process.env.ATLAS_RUNNER_SHA
   ?? execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
 const BRANCH = process.env.ATLAS_BRANCH
   ?? execFileSync("git", ["branch", "--show-current"], { cwd: ROOT, encoding: "utf8" }).trim();
 const BUILD_ID_PATH = path.join(ROOT, ".next", "BUILD_ID");
 if (!existsSync(BUILD_ID_PATH)) throw new Error("A production build is required before Stage 4.5 capture.");
 const BUILD_ID = (await readFile(BUILD_ID_PATH, "utf8")).trim();
-const PRIVATE_ROOT = path.join(ROOT, ".codex-tmp", "ui-state-atlas", "current", SOURCE_SHA);
+if (process.env.ATLAS_RUNTIME_BUILD_ID && process.env.ATLAS_RUNTIME_BUILD_ID !== BUILD_ID) {
+  throw new Error("Capture runtime BUILD_ID does not match the explicit frozen runtime.");
+}
+const PRIVATE_ROOT = path.join(ROOT, ".codex-tmp", "ui-state-atlas", "current", RUNTIME_SHA);
 const CREDENTIALS = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "credentials", "synthetic-users.json");
 const STAGING_DATABASE = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "database", "staging.db");
 const STAGING_FIXTURES = path.join(ROOT, ".codex-tmp", "stage3-sanitized-staging", "fixtures");
@@ -414,7 +420,7 @@ try {
     const key = `${job.id}:${job.viewport.id}`;
     const priorResult = prior.completed[key];
     const alreadyComplete = priorResult?.fullPageCaptureStatus === "VERIFIED"
-      && priorResult?.commitSha === SOURCE_SHA
+      && (priorResult?.runtimeSha ?? priorResult?.commitSha) === RUNTIME_SHA
       && priorResult?.buildId === BUILD_ID
       && priorResult?.scenarioVersion === SCENARIO_VERSION
       && priorResult?.captureRunnerVersion === CAPTURE_RUNNER_VERSION;
@@ -442,7 +448,7 @@ try {
     page.on("requestfailed", (request) => failedRequests.push({ url: request.url(), error: request.failure()?.errorText ?? "failed" }));
     page.on("response", (response) => { if (response.status() >= 400) errorResponses.push({ url: response.url(), status: response.status() }); });
     const masterName = `${job.id}__${slug(job.route)}__${job.viewport.id}__FULL-PAGE@${scale}x.png`;
-    const masterRelative = path.posix.join(".codex-tmp", "ui-state-atlas", "current", SOURCE_SHA, "full-page", masterName);
+    const masterRelative = path.posix.join(".codex-tmp", "ui-state-atlas", "current", RUNTIME_SHA, "full-page", masterName);
     const masterPath = path.join(ROOT, ...masterRelative.split("/"));
     const traceRelative = path.posix.join(".codex-tmp", "stage4-2b", "traces", `${job.id}-${job.viewport.id}.zip`);
     const tracePath = path.join(ROOT, ...traceRelative.split("/"));
@@ -507,7 +513,10 @@ try {
     const result = {
       ...priorResult,
       branch: BRANCH,
-      commitSha: SOURCE_SHA,
+      runtimeSha: RUNTIME_SHA,
+      runtimeBuildId: BUILD_ID,
+      runnerSha: RUNNER_SHA,
+      commitSha: RUNTIME_SHA,
       buildId: BUILD_ID,
       scenarioVersion: SCENARIO_VERSION,
       captureRunnerVersion: CAPTURE_RUNNER_VERSION,
@@ -576,7 +585,10 @@ const summary = {
   generatedAt: new Date().toISOString(),
   browserEngine: executablePath,
   branch: BRANCH,
-  commitSha: SOURCE_SHA,
+  runtimeSha: RUNTIME_SHA,
+  runtimeBuildId: BUILD_ID,
+  runnerSha: RUNNER_SHA,
+  commitSha: RUNTIME_SHA,
   buildId: BUILD_ID,
   scenarioVersion: SCENARIO_VERSION,
   captureRunnerVersion: CAPTURE_RUNNER_VERSION,

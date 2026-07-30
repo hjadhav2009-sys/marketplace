@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -14,8 +15,16 @@ import {
   aggregateAtlas,
   createAtlasPlan,
   runAtlasShard,
+  verifyAtlasShard,
   verifyEvidenceFile,
 } from "../../scripts/qa/stage4-6c-atlas-engine.mjs";
+import {
+  assertAdapterIdentity,
+  assertPlanRuntimeIdentity,
+  createAtlasDualIdentity,
+  shardIdentityRecord,
+  verifyEvidenceIdentity,
+} from "../../scripts/qa/stage4-6c-atlas-identity.mjs";
 import {
   evaluateSemanticContract,
   SEMANTIC_REGISTRY_VERSION,
@@ -112,11 +121,134 @@ try {
 
   const captureSource = await readFile(path.join(ROOT, "scripts", "qa", "stage4-5-capture.mjs"), "utf8");
   const adapterSource = await readFile(path.join(ROOT, "scripts", "qa", "stage4-6c-browser-shard-adapter.mjs"), "utf8");
+  const cliSource = await readFile(path.join(ROOT, "scripts", "qa", "stage4-6c-atlas-cli.mjs"), "utf8");
   assert.match(captureSource, /if \(!semanticAssertion\.passed\) throw new Error/, "Screenshots begin only after semantic verification");
   assert.match(captureSource, /selectedAccountFromContext/, "Selected-account assertions use the browser cookie rather than the contract expectation");
   assert.match(captureSource, /settleForAssertions/, "Assertions wait for route hydration and stable layout");
-  assert.match(captureSource, /process\.env\.ATLAS_SOURCE_SHA/, "Sandboxed capture children accept the parent-verified source identity");
-  assert.match(adapterSource, /env\.ATLAS_SOURCE_SHA = identity\.sourceSha/, "The owned shard adapter passes its exact plan identity to capture children");
+  assert.match(captureSource, /process\.env\.ATLAS_RUNTIME_SHA/, "Capture children accept the frozen runtime identity");
+  assert.match(captureSource, /process\.env\.ATLAS_RUNNER_SHA/, "Capture children accept the committed runner identity");
+  assert.match(adapterSource, /env\.ATLAS_RUNTIME_SHA = identity\.runtimeSha/, "The shard adapter passes the frozen runtime SHA");
+  assert.match(adapterSource, /env\.ATLAS_RUNNER_SHA = identity\.runnerSha/, "The shard adapter passes the committed runner SHA separately");
+  assert.match(adapterSource, /sourceSha: identity\.runtimeSha/, "Server identity checks use the frozen runtime SHA");
+  assert.match(cliSource, /roots\(exactIdentity\.runtimeSha\)/, "Plan lookup is keyed by runtime SHA rather than runner HEAD");
+  assert.match(cliSource, /Supply --runtime-sha, --runtime-build-id, and --runner-sha/, "Ambiguous identity fails closed with explicit guidance");
+
+  const missingIdentityRun = spawnSync(process.execPath, [
+    path.join(ROOT, "scripts", "qa", "stage4-6c-atlas-cli.mjs"),
+    "verify-shard",
+    "--shard",
+    "synthetic",
+  ], { cwd: ROOT, encoding: "utf8", windowsHide: true, timeout: 30_000 });
+  assert.notEqual(missingIdentityRun.status, 0);
+  assert.match(`${missingIdentityRun.stdout}\n${missingIdentityRun.stderr}`, /Atlas runtime identity is ambiguous/);
+
+  const runtimeDiff = spawnSync("git", [
+    "diff",
+    "--name-only",
+    "--",
+    "app",
+    "components",
+    "src",
+    "prisma",
+    "middleware",
+    "mobile-app",
+  ], { cwd: ROOT, encoding: "utf8", windowsHide: true, timeout: 30_000 });
+  assert.equal(runtimeDiff.status, 0);
+  assert.equal(runtimeDiff.stdout.trim(), "", "dual-identity runner work must not modify runtime or mobile files");
+
+  const sameShaIdentity = createAtlasDualIdentity({
+    runtimeSha: "1".repeat(40),
+    runtimeBuildId: "same-build",
+    runnerSha: "1".repeat(40),
+    runnerVersion: "runner-v1",
+    semanticRegistryVersion: "semantic-v1",
+    fixtureVersion: "fixture-v1",
+    syntheticSeed: "seed-v1",
+    browserVersion: "browser-v1",
+    nodeVersion: "node-v1",
+  });
+  assert.equal(sameShaIdentity.runtimeSha, sameShaIdentity.runnerSha, "same runtime and runner SHA remains supported");
+
+  const dualIdentity = createAtlasDualIdentity({
+    runtimeSha: "2".repeat(40),
+    runtimeBuildId: "runtime-build",
+    runtimeTag: "synthetic-frozen-tag",
+    runnerSha: "3".repeat(40),
+    runnerVersion: "runner-v2",
+    semanticRegistryVersion: "semantic-v2",
+    fixtureVersion: "fixture-v2",
+    syntheticSeed: "seed-v2",
+    browserVersion: "browser-v2",
+    nodeVersion: "node-v2",
+  });
+  assert.notEqual(dualIdentity.runtimeSha, dualIdentity.runnerSha, "newer QA runner is represented independently");
+  assert.equal(dualIdentity.sourceSha, dualIdentity.runtimeSha, "compatibility source SHA remains the runtime SHA");
+  assert.equal(dualIdentity.buildId, dualIdentity.runtimeBuildId, "compatibility BUILD_ID remains the runtime BUILD_ID");
+  assert.deepEqual(assertPlanRuntimeIdentity({
+    sourceSha: dualIdentity.runtimeSha,
+    buildId: dualIdentity.runtimeBuildId,
+  }, dualIdentity), {
+    runtimeSha: dualIdentity.runtimeSha,
+    runtimeBuildId: dualIdentity.runtimeBuildId,
+    runtimeTag: null,
+  });
+  assert.throws(
+    () => assertPlanRuntimeIdentity({ sourceSha: "4".repeat(40), buildId: dualIdentity.runtimeBuildId }, dualIdentity),
+    /runtime SHA/,
+  );
+  assert.throws(
+    () => assertPlanRuntimeIdentity({ sourceSha: dualIdentity.runtimeSha, buildId: "wrong-build" }, dualIdentity),
+    /BUILD_ID/,
+  );
+  assert.equal(assertAdapterIdentity({
+    currentRunnerSha: dualIdentity.runnerSha,
+    currentBuildId: dualIdentity.runtimeBuildId,
+    expected: dualIdentity,
+  }), dualIdentity, "browser adapter validates runner HEAD separately from runtime BUILD_ID");
+  assert.throws(
+    () => assertAdapterIdentity({
+      currentRunnerSha: "4".repeat(40),
+      currentBuildId: dualIdentity.runtimeBuildId,
+      expected: dualIdentity,
+    }),
+    /runner SHA/,
+  );
+  assert.throws(
+    () => assertAdapterIdentity({
+      currentRunnerSha: dualIdentity.runnerSha,
+      currentBuildId: "wrong-build",
+      expected: dualIdentity,
+    }),
+    /BUILD_ID/,
+  );
+  assert.equal(verifyEvidenceIdentity({
+    runtimeSha: dualIdentity.runtimeSha,
+    runtimeBuildId: dualIdentity.runtimeBuildId,
+    runnerSha: dualIdentity.runnerSha,
+  }, dualIdentity).passed, true);
+  assert.deepEqual(verifyEvidenceIdentity({
+    runtimeSha: "4".repeat(40),
+    runtimeBuildId: dualIdentity.runtimeBuildId,
+    runnerSha: dualIdentity.runnerSha,
+  }, dualIdentity).failures, ["RUNTIME_SHA_MISMATCH"]);
+  assert.deepEqual(verifyEvidenceIdentity({
+    runtimeSha: dualIdentity.runtimeSha,
+    runtimeBuildId: "wrong-build",
+    runnerSha: dualIdentity.runnerSha,
+  }, dualIdentity).failures, ["RUNTIME_BUILD_ID_MISMATCH"]);
+  assert.deepEqual(verifyEvidenceIdentity({
+    runtimeSha: dualIdentity.runtimeSha,
+    runtimeBuildId: dualIdentity.runtimeBuildId,
+    runnerSha: "4".repeat(40),
+  }, dualIdentity).failures, ["RUNNER_SHA_MISMATCH"]);
+  assert.deepEqual(verifyEvidenceIdentity({
+    commitSha: dualIdentity.runtimeSha,
+    buildId: dualIdentity.runtimeBuildId,
+  }, dualIdentity).failures, ["RUNNER_SHA_MISSING"]);
+  assert.equal(verifyEvidenceIdentity({
+    commitSha: dualIdentity.runtimeSha,
+    buildId: dualIdentity.runtimeBuildId,
+  }, dualIdentity, { allowLegacyRunnerIdentity: true }).passed, true);
 
   const identity = {
     sourceSha: "synthetic-sha",
@@ -240,17 +372,21 @@ try {
     ],
   };
   const shardProgress = path.join(temporary, "shard.progress.json");
+  const shardIdentity = shardIdentityRecord(dualIdentity, shard);
   await writeSafeCheckpoint(shardProgress, {
     schema: "Stage4_6CAtlasShardProgressV1",
     shardId: shard.id,
+    identity: shardIdentity,
     entries: {
       "ONE:360x800": {
+        ...shardIdentity,
         status: "VERIFIED",
         screenshotPath: artifact,
         screenshotSha256: artifactHash,
         screenshotBytes: artifactBytes.length,
       },
       "TWO:360x800": {
+        ...shardIdentity,
         status: "FAILED",
         error: "synthetic prior failure",
       },
@@ -270,6 +406,7 @@ try {
     async captureEntry(entry) {
       captures += 1;
       return {
+        ...shardIdentity,
         status: "VERIFIED",
         screenshotPath: artifact,
         screenshotSha256: artifactHash,
@@ -277,11 +414,70 @@ try {
         entryId: entry.id,
       };
     },
+    identity: dualIdentity,
   });
   assert.equal(captures, 1, "resume must skip hash-verified entry and retry only failed entry");
   assert.equal(starts, 1);
   assert.equal(stops, 1);
   assert.equal(resumed.summary.verified, 2);
+  const resumedResult = await readSafeCheckpoint(`${shardProgress}.result.json`);
+  assert.equal(resumedResult.identity.runtimeSha, dualIdentity.runtimeSha);
+  assert.equal(resumedResult.identity.runnerSha, dualIdentity.runnerSha);
+  assert.equal(resumed.progress.journal.every((entry) =>
+    entry.runtimeSha === dualIdentity.runtimeSha
+    && entry.runtimeBuildId === dualIdentity.runtimeBuildId
+    && entry.runnerSha === dualIdentity.runnerSha
+    && entry.shardId === shard.id
+  ), true, "every new shard journal event records both identities");
+
+  const wrongIdentityProgress = path.join(temporary, "wrong-identity.progress.json");
+  await writeSafeCheckpoint(wrongIdentityProgress, {
+    schema: "Stage4_6CAtlasShardProgressV1",
+    shardId: shard.id,
+    entries: {
+      "ONE:360x800": {
+        ...shardIdentity,
+        runtimeSha: "4".repeat(40),
+        status: "VERIFIED",
+        screenshotPath: artifact,
+        screenshotSha256: artifactHash,
+        screenshotBytes: artifactBytes.length,
+      },
+      "TWO:360x800": {
+        ...shardIdentity,
+        status: "VERIFIED",
+        screenshotPath: artifact,
+        screenshotSha256: artifactHash,
+        screenshotBytes: artifactBytes.length,
+      },
+    },
+    journal: [],
+  });
+  const wrongIdentityVerification = await verifyAtlasShard(shard, wrongIdentityProgress, { identity: dualIdentity });
+  assert.equal(wrongIdentityVerification.passed, false);
+  assert.match(wrongIdentityVerification.identityFailures.join(" "), /RUNTIME_SHA_MISMATCH/);
+
+  const legacyProgress = path.join(temporary, "legacy-identity.progress.json");
+  await writeSafeCheckpoint(legacyProgress, {
+    schema: "Stage4_6CAtlasShardProgressV1",
+    shardId: shard.id,
+    entries: Object.fromEntries(shard.entries.map((entry) => [entry.id, {
+      commitSha: dualIdentity.runtimeSha,
+      buildId: dualIdentity.runtimeBuildId,
+      status: "VERIFIED",
+      screenshotPath: artifact,
+      screenshotSha256: artifactHash,
+      screenshotBytes: artifactBytes.length,
+    }])),
+    journal: [],
+  });
+  assert.equal((await verifyAtlasShard(shard, legacyProgress, { identity: dualIdentity })).passed, false, "missing runner identity is rejected by default");
+  const legacyVerification = await verifyAtlasShard(shard, legacyProgress, {
+    identity: dualIdentity,
+    allowLegacyRunnerIdentity: true,
+  });
+  assert.equal(legacyVerification.passed, true, "explicit legacy verification preserves existing evidence without relabelling");
+  assert.equal(legacyVerification.legacyRunnerIdentityEntries.length, shard.entries.length);
 
   let cleanupAfterFailure = 0;
   await runAtlasShard({
@@ -292,6 +488,7 @@ try {
       async stop() { cleanupAfterFailure += 1; },
     },
     async captureEntry() { throw new Error("synthetic capture failure"); },
+    identity: dualIdentity,
   });
   assert.equal(cleanupAfterFailure, 1, "owned runtime must stop in finally");
 

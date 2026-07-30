@@ -420,7 +420,7 @@ export default async function ScanResultPage({ params, searchParams }: ScanResul
       </section>
 
       <div className="mt-5 hidden lg:block">
-        <Link href="/packing" className="rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+        <Link href="/packing" className="inline-flex min-h-[44px] items-center rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
           Scan next AWB
         </Link>
       </div>

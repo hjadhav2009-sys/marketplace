@@ -159,6 +159,7 @@ async function measure(locator) {
       paddingTop: style.paddingTop,
       paddingBottom: style.paddingBottom,
       lineHeight: style.lineHeight,
+      rootFontSize: getComputedStyle(document.documentElement).fontSize,
       tabIndex: element.tabIndex,
       keyboardFocusable: element.tabIndex >= 0,
       outlineStyle: style.outlineStyle,
@@ -252,12 +253,21 @@ try {
     assert.match(bodyText, /Assembly is required before packing/i);
     assert.equal(await packerPage.getByRole("button", { name: /^Confirm packed$/i }).count(), 0, "Confirm packed must remain absent.");
     const scanLink = packerPage.getByRole("link", { name: "Scan next", exact: true }).first();
+    const desktopScanNextAwb = packerPage.locator('div.mt-5.hidden.lg\\:block > a[href="/packing"]');
+    const mobileScanNextAwb = packerPage.locator('div.fixed.lg\\:hidden a[href="/packing"]');
+    const scanNextAwb = viewport.width >= 1024 ? desktopScanNextAwb : mobileScanNextAwb;
+    viewportEvidence.scanNextAwbSelector = viewport.width >= 1024
+      ? 'div.mt-5.hidden.lg\\:block > a[href="/packing"]'
+      : 'div.fixed.lg\\:hidden a[href="/packing"]';
     const summary = await packerPage.locator("summary").filter({ hasText: /^Mark problem$/ }).first();
     await scanLink.waitFor({ state: "visible" });
+    await scanNextAwb.waitFor({ state: "visible" });
     await summary.waitFor({ state: "visible" });
     viewportEvidence.scanNext = await measure(scanLink);
+    viewportEvidence.scanNextAwb = await measure(scanNextAwb);
     viewportEvidence.markProblem = await measure(summary);
     assert.equal(await scanLink.getAttribute("href"), "/packing");
+    assert.equal(await scanNextAwb.getAttribute("href"), "/packing");
     assert.equal(await summary.evaluate((element) => element.parentElement?.open), false);
     await summary.click();
     assert.equal(await summary.evaluate((element) => element.parentElement?.open), true, "Mouse click must open Mark problem.");
@@ -270,6 +280,8 @@ try {
     assert.equal(await summary.evaluate((element) => element.parentElement?.open), false, "Space must close Mark problem.");
     await summary.focus();
     viewportEvidence.markProblemFocused = await measure(summary);
+    await scanNextAwb.focus();
+    viewportEvidence.scanNextAwbFocused = await measure(scanNextAwb);
     const saveProblem = packerPage.getByRole("button", { name: "Save problem", exact: true });
     await summary.click();
     await saveProblem.waitFor({ state: "visible" });
@@ -284,6 +296,7 @@ try {
       for (const [name, control] of Object.entries({
         mapFileHeaders: viewportEvidence.mapFileHeaders,
         scanNext: viewportEvidence.scanNext,
+        scanNextAwb: viewportEvidence.scanNextAwb,
         markProblem: viewportEvidence.markProblem,
       })) {
         assert.equal(control.enabled, true, `${name} must remain enabled.`);
@@ -292,6 +305,8 @@ try {
       }
       assert.ok(viewportEvidence.markProblemFocused.outlineStyle !== "none"
         && Number.parseFloat(viewportEvidence.markProblemFocused.outlineWidth) > 0, "Mark problem must retain a visible focus outline.");
+      assert.ok(viewportEvidence.scanNextAwbFocused.outlineStyle !== "none"
+        && Number.parseFloat(viewportEvidence.scanNextAwbFocused.outlineWidth) > 0, "Scan next AWB must retain a visible focus outline.");
       assert.ok(viewportEvidence.saveProblem.clickableBox.width >= 44
         && viewportEvidence.saveProblem.clickableBox.height >= 44, "Save problem must remain a separate usable control.");
     }
@@ -321,6 +336,7 @@ console.log(JSON.stringify({
     viewport: item.viewport,
     mapFileHeaders: item.mapFileHeaders.clickableBox,
     scanNext: item.scanNext.clickableBox,
+    scanNextAwb: item.scanNextAwb.clickableBox,
     markProblem: item.markProblem.clickableBox,
     overflow: item.importOverflow.overflow || item.packOverflow.overflow,
   })),

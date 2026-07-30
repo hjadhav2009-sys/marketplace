@@ -16,6 +16,11 @@ assert.match(
 );
 assert.match(
   packPage,
+  /<div className="mt-5 hidden lg:block">[\s\S]{0,180}<Link href="\/packing" className="inline-flex min-h-\[44px\] items-center[^"]*"[\s\S]{0,80}>[\s\S]{0,40}Scan next AWB/,
+  "The lower desktop Scan next AWB anchor uses an absolute 44px minimum.",
+);
+assert.match(
+  packPage,
   /<summary className="min-h-11 cursor-pointer py-2[^"]*">Mark problem<\/summary>/,
   "Mark problem remains a native summary with a 44px interactive target.",
 );

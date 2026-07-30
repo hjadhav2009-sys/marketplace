@@ -10,6 +10,7 @@ import { DatabaseSync } from "node:sqlite";
 import { CAPTURE_RUNNER_VERSION, REQUIRED_SCENARIOS, ROLE_TO_DISPLAY, SCENARIO_VERSION, VIEWPORTS } from "./stage4-5-scenarios.mjs";
 import { writeSafeCheckpoint } from "./atlas-safe-checkpoint.mjs";
 import { evaluateSemanticContract, semanticPreflight } from "./stage4-6c-semantic-registry.mjs";
+import { clearSyntheticSecurityThrottle } from "./synthetic-sqlite-cleanup.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = "http://127.0.0.1:3188";
@@ -218,13 +219,10 @@ function assertOperationalSafetyUnchanged(before) {
   }
 }
 
-function clearSyntheticOwnerReauthThrottle() {
-  const database = new DatabaseSync(STAGING_DATABASE);
-  try {
-    database.prepare("DELETE FROM SecurityThrottle WHERE scope = 'owner-data-reauth'").run();
-  } finally {
-    database.close();
-  }
+async function settleBeforeSyntheticCleanup(page) {
+  await page.waitForLoadState("domcontentloaded", { timeout: 10_000 });
+  await page.waitForLoadState("networkidle", { timeout: 2_000 }).catch(() => {});
+  await page.waitForTimeout(150);
 }
 
 async function inspect(page) {
@@ -367,16 +365,24 @@ async function applyScenarioState(page, context, scenarioId, { credential } = {}
   }
   if (scenarioId === "DATA_WRONG_PASSWORD") {
     const before = operationalSafetySnapshot();
-    const details = page.locator("details[data-data-action-details]").filter({ hasText: "Purge QA operational data" }).first();
-    await details.locator("summary").click();
-    await details.locator('input[name="ownerPassword"]').fill("synthetic-intentionally-wrong-password");
-    await details.locator('input[name="confirmationPhrase"]').fill("PURGE QA DATA stage3-account-fk-01");
-    await Promise.all([
-      page.waitForURL((url) => url.pathname === "/owner/data-management" && url.searchParams.has("error"), { timeout: 15_000 }),
-      details.locator("form").evaluate((form) => form.requestSubmit()),
-    ]);
-    assertOperationalSafetyUnchanged(before);
-    clearSyntheticOwnerReauthThrottle();
+    try {
+      const details = page.locator("details[data-data-action-details]").filter({ hasText: "Purge QA operational data" }).first();
+      await details.locator("summary").click();
+      await details.locator('input[name="ownerPassword"]').fill("synthetic-intentionally-wrong-password");
+      await details.locator('input[name="confirmationPhrase"]').fill("PURGE QA DATA stage3-account-fk-01");
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === "/owner/data-management" && url.searchParams.has("error"), { timeout: 15_000 }),
+        details.locator("form").evaluate((form) => form.requestSubmit()),
+      ]);
+      await settleBeforeSyntheticCleanup(page);
+      assertOperationalSafetyUnchanged(before);
+    } finally {
+      await settleBeforeSyntheticCleanup(page);
+      await clearSyntheticSecurityThrottle({
+        databasePath: STAGING_DATABASE,
+        scope: "owner-data-reauth",
+      });
+    }
     const rejectedDetails = page.locator("details[data-data-action-details]").filter({ hasText: "Purge QA operational data" }).first();
     await rejectedDetails.locator("summary").click();
   }

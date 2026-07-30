@@ -7,8 +7,8 @@ export const VIEWPORTS = [
   { id: "1440x900", width: 1440, height: 900 },
 ];
 
-export const SCENARIO_VERSION = "phase-7.3.6-stage4.6c1-v2";
-export const CAPTURE_RUNNER_VERSION = "stage4.6c1-semantic-first-v2";
+export const SCENARIO_VERSION = "phase-7.3.6-stage4.6c3e-v3";
+export const CAPTURE_RUNNER_VERSION = "stage4.6c3e-batch02-v3";
 
 export const REQUIRED_SCENARIOS = [
   ["AUTH_DEFAULT", "/login", "PUBLIC"],
@@ -30,7 +30,7 @@ export const REQUIRED_SCENARIOS = [
   ["IMPORT_MULTI_FILE", "/owner/product-inventory/refresh", "OWNER"],
   ["IMPORT_AMAZON_THREE_ROLE", "/owner/product-inventory/refresh", "OWNER"],
   ["IMPORT_NEEDS_MAPPING", "/owner/imports/stage4-import-mapping", "OWNER"],
-  ["IMPORT_VALIDATION_ERROR", "/owner/uploads/stage4-upload-needs-mapping/review", "OWNER"],
+  ["IMPORT_VALIDATION_ERROR", "/owner/imports/stage4-import-validation-error", "OWNER"],
   ["IMPORT_PROCESSING", "/owner/imports/stage4-import-running", "OWNER"],
   ["IMPORT_COMPLETED", "/owner/imports/stage4-import-completed", "OWNER"],
   ["IMPORT_COMPLETED_WARNINGS", "/owner/imports/stage4-import-warnings", "OWNER"],

@@ -4,8 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { REQUIRED_SCENARIOS, ROLE_TO_DISPLAY } from "./stage4-5-scenarios.mjs";
 
-export const SEMANTIC_REGISTRY_VERSION = "stage4.6c1-semantic-v2";
-export const SYNTHETIC_FIXTURE_VERSION = "phase-7.3.6-stage4.6c1-semantic-fixtures-v2";
+export const SEMANTIC_REGISTRY_VERSION = "stage4.6c3e-semantic-v3";
+export const SYNTHETIC_FIXTURE_VERSION = "phase-7.3.6-stage4.6c3e-batch02-fixtures-v3";
 
 const record = (table, column, value, expected = undefined) => Object.freeze({
   kind: "record",
@@ -30,7 +30,7 @@ const NAMED_FIXTURES = Object.freeze({
   AUTH_INVALID: [routeFixture("/login")],
   AUTH_EXPIRED: [record("User", "id", "stage3-owner", { active: 1 })],
   AUTH_FORBIDDEN: [record("User", "id", "stage3-picker-a")],
-  OWNER_EMPTY_ACCOUNT: [record("User", "id", "stage3-owner"), record("Account", "code", "STAGE-FK-01")],
+  OWNER_EMPTY_ACCOUNT: [record("User", "id", "stage3-owner", { active: 1 })],
   OWNER_POPULATED: [record("Account", "code", "STAGE-FK-01")],
   PRODUCT_ACTIVE: [record("MarketplaceListing", "id", "stage3-listing-fk-direct")],
   PRODUCT_INACTIVE: [record("MarketplaceListing", "id", "stage3-listing-fk-inactive")],
@@ -45,7 +45,15 @@ const NAMED_FIXTURES = Object.freeze({
   IMPORT_MULTI_FILE: [fixtureFile("catalog-one.csv"), fixtureFile("catalog-two.csv")],
   IMPORT_AMAZON_THREE_ROLE: [fixtureFile("amazon-all-listings.csv"), fixtureFile("catalog-one.csv"), fixtureFile("catalog-two.csv")],
   IMPORT_NEEDS_MAPPING: [record("ImportJob", "id", "stage4-import-mapping")],
-  IMPORT_VALIDATION_ERROR: [record("UploadBatch", "id", "stage4-upload-needs-mapping")],
+  IMPORT_VALIDATION_ERROR: [record("ImportJob", "id", "stage4-import-validation-error", {
+    marketplace: "FLIPKART",
+    importType: "FLIPKART_PRODUCT_INVENTORY",
+    status: "FAILED",
+    stage: "VALIDATING",
+    errorRows: 2,
+    finishedAt: null,
+    mergeStartedAt: null,
+  })],
   IMPORT_PROCESSING: [record("ImportJob", "id", "stage4-import-running")],
   IMPORT_COMPLETED: [record("ImportJob", "id", "stage4-import-completed")],
   IMPORT_COMPLETED_WARNINGS: [record("ImportJob", "id", "stage4-import-warnings")],
@@ -106,7 +114,7 @@ const NAMED_ASSERTIONS = Object.fromEntries([
   ["AUTH_INVALID", [["Sign in", "The username or password is incorrect."], ["Warehouse overview"], [], ["Dashboard"]]],
   ["AUTH_EXPIRED", [["Sign in", "Your session expired. Sign in again to continue."], ["404", "Warehouse overview"], [], ["Dashboard"]]],
   ["AUTH_FORBIDDEN", [["You do not have permission to open this page"], ["Worker users and sessions"], [], ["Create user"]]],
-  ["OWNER_EMPTY_ACCOUNT", [["No seller accounts have been created yet", "Create First Seller Account"], ["Ask the owner", "Choose seller account"], ["Create First Seller Account"], []]],
+  ["OWNER_EMPTY_ACCOUNT", [["No seller accounts have been created yet", "Create First Seller Account"], ["Ask the owner", "STAGE-FK-01", "STAGE-AMZ-01"], ["Create First Seller Account"], []]],
   ["OWNER_POPULATED", [["Warehouse overview", "STAGE-FK-01"], ["No seller accounts have been created yet"], [], []]],
   ["PRODUCT_ACTIVE", [["STAGE-FK-SKU-001", "Active"], ["Listing not found"], [], []]],
   ["PRODUCT_INACTIVE", [["STAGE-FK-SKU-INACTIVE", "Inactive"], ["Listing not found"], [], []]],
@@ -116,17 +124,17 @@ const NAMED_ASSERTIONS = Object.fromEntries([
   ["PRODUCT_IMAGES_ALL_BROKEN", [["STAGE-FK-SKU-MISSING-IMAGE", "Image unavailable"], ["Listing not found"], [], []]],
   ["PRODUCT_DELETE_AVAILABLE", [["Inactive", "Delete"], ["Active work prevents deletion"], ["Delete"], []]],
   ["PRODUCT_DELETE_BLOCKED", [["Active work", "Delete"], ["Deleted"], [], ["Delete permanently"]]],
-  ["IMPORT_UPLOAD_EMPTY", [["Product Inventory Refresh", "Choose files"], ["selected file"], [], ["Start Import"]]],
-  ["IMPORT_ONE_FILE", [["Product Inventory Refresh", "catalog-one.csv"], ["No file selected"], ["Start Import"], []]],
-  ["IMPORT_MULTI_FILE", [["Product Inventory Refresh", "2 files"], ["No file selected"], ["Start Import"], []]],
-  ["IMPORT_AMAZON_THREE_ROLE", [["Amazon", "3 files"], ["No file selected"], ["Start Import"], []]],
-  ["IMPORT_NEEDS_MAPPING", [["Map File Headers", "NEEDS MAPPING"], ["Import completed"], ["Save Profile and Retry"], []]],
-  ["IMPORT_VALIDATION_ERROR", [["Flipkart import review", "issue"], ["Import completed"], [], []]],
+  ["IMPORT_UPLOAD_EMPTY", [["Product Inventory Refresh", "Catalog, listings, enrichment files, or ZIP", "Accepted: CSV, TSV, TXT, XLSX, XLSM, or ZIP", "No file selected"], ["selected file"], ["Upload and start refresh"], []]],
+  ["IMPORT_ONE_FILE", [["Product Inventory Refresh", "catalog-one.csv"], ["No file selected"], ["Upload and start refresh"], []]],
+  ["IMPORT_MULTI_FILE", [["Product Inventory Refresh", "catalog-one.csv", "catalog-two.csv"], ["No file selected"], ["Upload and start refresh"], []]],
+  ["IMPORT_AMAZON_THREE_ROLE", [["Product Inventory Refresh", "AMAZON", "amazon-all-listings.csv", "catalog-one.csv", "catalog-two.csv"], ["No file selected", "Synthetic Flipkart Primary"], ["Upload and start refresh"], []]],
+  ["IMPORT_NEEDS_MAPPING", [["Map File Headers", "NEEDS MAPPING", "Current stage", "MAPPING"], ["Import completed"], ["Map File Headers"], ["Save Profile and Retry"]]],
+  ["IMPORT_VALIDATION_ERROR", [["Product Inventory Refresh", "FAILED", "VALIDATING", "Blocking errors", "Synthetic validation failed"], ["COMPLETED"], ["View Blocking Errors"], []]],
   ["IMPORT_PROCESSING", [["Import Progress", "RUNNING"], ["Import completed"], [], []]],
-  ["IMPORT_COMPLETED", [["Import Progress", "COMPLETED"], ["RUNNING"], [], []]],
+  ["IMPORT_COMPLETED", [["Import Progress", "COMPLETED", "100%", "100 / 100 rows", "Rows inserted", "Rows unchanged"], [], ["Open review", "View Product Inventory"], []]],
   ["IMPORT_COMPLETED_WARNINGS", [["Import Progress", "warning"], ["No warnings"], [], []]],
   ["IMPORT_FAILED", [["Import Progress", "FAILED"], ["COMPLETED"], [], []]],
-  ["IMPORT_CANCELLED", [["Import Progress", "CANCELLED"], ["RUNNING"], [], []]],
+  ["IMPORT_CANCELLED", [["Import Progress", "CANCELLED", "Current stage", "Cancelled Product Inventory jobs require a new upload"], [], ["Back to imports", "Start another import"], ["Request safe cancellation"]]],
   ["MISSING_LISTING_HELD", [["Missing Listings", "held"], ["No unresolved missing listings"], [], []]],
   ["MISSING_LISTING_RESOLVED", [["Missing Listings", "resolved"], ["Unresolved only"], [], []]],
   ["CONSIGNMENT_DRAFT", [["Consignment detail", "DRAFT"], ["COMPLETED"], [], []]],
@@ -141,8 +149,8 @@ const NAMED_ASSERTIONS = Object.fromEntries([
   ["PICK_ROUTE_OVERRIDE", [["Choose the next route", "reason"], ["Route saved"], ["Assembly"], []]],
   ["PICK_MISSING_INSTRUCTIONS", [["instructions are missing", "Continue"], ["machine settings"], ["Continue"], []]],
   ["MARK_READY", [["Marking", "READY"], ["MARK: COMPLETED"], ["Marking Completed"], []]],
-  ["MARK_PARTIAL", [["Marking", "IN PROGRESS"], ["MARK: COMPLETED"], ["Save Partial Quantity"], []]],
-  ["MARK_COMPLETED", [["MARK: COMPLETED", "completed by Synthetic Marker", "Quantity", "history"], ["Marking Completed"], ["Details"], ["Marking Completed"]]],
+  ["MARK_PARTIAL", [["Marking", "IN PROGRESS", "Completed quantity", "1", "Pending quantity", "1"], ["MARK: COMPLETED"], ["Marking Completed"], ["Save Partial Quantity"]]],
+  ["MARK_COMPLETED", [["MARK: COMPLETED", "completed by Synthetic Marker", "Quantity", "history"], ["Marking Completed"], ["Scan Next", "Back to Work"], ["Marking Completed"]]],
   ["ASSEMBLY_READY", [["Synthetic assembly-ready order", "Current stage", "ASSEMBLE", "READY", "Pending quantity", "1"], ["ASSEMBLE: COMPLETED"], ["Assembly Completed"], []]],
   ["ASSEMBLY_PARTIAL", [["Synthetic assembly-progress order", "Current stage", "ASSEMBLE", "IN PROGRESS", "Required quantity", "2", "Completed quantity", "1", "Pending quantity", "1"], ["ASSEMBLE: COMPLETED"], ["Partial Quantity", "Assembly Completed"], []]],
   ["ASSEMBLY_COMPLETED", [["ASSEMBLE: COMPLETED", "completed by Synthetic Assembler", "Quantity", "history"], ["Assembly Completed"], ["Scan Next"], ["Assembly Completed"]]],
@@ -160,7 +168,7 @@ const NAMED_ASSERTIONS = Object.fromEntries([
   ["PROBLEM_OPEN", [["Synthetic damaged item", "Synthetic open problem for UI audit", "stage"], ["No open problem orders"], ["Resolve"], []]],
   ["PROBLEM_RESOLVED", [["Synthetic assembly mismatch", "Synthetic resolution completed"], ["Resolve and return to work"], ["History"], ["Resolve and return to work"]]],
   ["DATA_DELETE_PREVIEW", [["Data Management", "PURGE QA OPERATIONAL DATA", "PREVIEWED"], ["Deleted"], [], []]],
-  ["DATA_WRONG_PASSWORD", [["Reauthenticate", "password"], ["Authorized"], ["Cancel"], []]],
+  ["DATA_WRONG_PASSWORD", [["Owner reauthentication failed", "Owner password", "Confirmation phrase"], ["The authorized action completed"], ["Purge QA operational data", "Cancel"], []]],
   ["DATA_CONFIRMATION_MISMATCH", [["Data Management", "Type exactly: QUARANTINE stage3-account-fk-01"], ["The authorized action completed"], [], []]],
   ["DATA_EXPIRED_GRANT", [["Data Management", "Owner password", "Confirmation phrase", "scoped and single-use"], ["The authorized action completed"], ["Purge QA operational data", "Cancel"], []]],
   ["DATA_REPLAY_REJECTED", [["You do not have permission to open this page"], ["Data Management", "Deletion History"], [], ["Purge", "Restore"]]],
@@ -327,7 +335,7 @@ const namedContracts = REQUIRED_SCENARIOS.map((scenario) => {
     forbiddenVisible,
     requiredActions,
     forbiddenActions,
-    selectedAccount: ["AUTH_INVALID", "AUTH_EXPIRED"].includes(scenario.id)
+    selectedAccount: ["AUTH_INVALID", "AUTH_EXPIRED", "OWNER_EMPTY_ACCOUNT"].includes(scenario.id)
       ? null
       : scenario.id === "IMPORT_AMAZON_THREE_ROLE" ? "STAGE-AMZ-01" : undefined,
     expectedUrl: destination?.url,
@@ -357,9 +365,64 @@ export async function sourceRouteContracts(root) {
   });
 }
 
-export async function semanticRegistry(root) {
+function resolveWorkGroupDetailsRoute(databasePath, taskId) {
+  if (!existsSync(databasePath)) return null;
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    const task = database.prepare(`
+      SELECT t.accountId, t.sourceType, t.stage, t.requiredQuantity, t.completedQuantity,
+             t.status, o.trackingId
+      FROM WorkTask t
+      LEFT JOIN "Order" o ON o.id = t.orderId
+      WHERE t.id = ?
+    `).get(taskId);
+    if (!task?.trackingId) return null;
+    const groups = database.prepare(`
+      SELECT groupKey
+      FROM WorkGroupProjection
+      WHERE accountId = ?
+        AND sourceType = ?
+        AND stage = ?
+        AND operationalIdentifier = ?
+        AND requiredQuantity = ?
+        AND completedQuantity = ?
+        AND status = ?
+      ORDER BY updatedAt DESC
+      LIMIT 2
+    `).all(
+      task.accountId,
+      task.sourceType,
+      task.stage,
+      task.trackingId,
+      task.requiredQuantity,
+      task.completedQuantity,
+      task.status,
+    );
+    if (groups.length !== 1) return null;
+    return `/work/groups/${task.stage}/${groups[0].groupKey}?source=${task.sourceType}`;
+  } finally {
+    database.close();
+  }
+}
+
+function withResolvedNamedRoutes(contracts, databasePath) {
+  const taskIds = {
+    MARK_READY: "stage3-order-mark-ready-mark",
+    MARK_PARTIAL: "stage3-order-mark-progress-mark",
+  };
+  return contracts.map((item) => {
+    const taskId = taskIds[item.id];
+    if (!taskId) return item;
+    const route = resolveWorkGroupDetailsRoute(databasePath, taskId);
+    return route ? Object.freeze({ ...item, route, expectedUrl: route }) : item;
+  });
+}
+
+export async function semanticRegistry(root, {
+  databasePath = path.join(root, ".codex-tmp", "stage3-sanitized-staging", "database", "staging.db"),
+} = {}) {
   const routeContracts = await sourceRouteContracts(root);
-  const contracts = [...namedContracts, ...routeContracts];
+  const contracts = [...withResolvedNamedRoutes(namedContracts, databasePath), ...routeContracts];
   const registry = new Map(contracts.map((item) => [item.id, item]));
   if (registry.size !== contracts.length) throw new Error("Semantic contract IDs are not unique.");
   return registry;
@@ -399,7 +462,7 @@ export async function semanticPreflight(root, {
   databasePath = path.join(root, ".codex-tmp", "stage3-sanitized-staging", "database", "staging.db"),
   fixtureRoot = path.join(root, ".codex-tmp", "stage3-sanitized-staging", "fixtures"),
 } = {}) {
-  const registry = await semanticRegistry(root);
+  const registry = await semanticRegistry(root, { databasePath });
   const failures = [];
   if (registry.size !== 141) failures.push(`Expected 141 semantic contracts, found ${registry.size}.`);
   for (const item of registry.values()) {

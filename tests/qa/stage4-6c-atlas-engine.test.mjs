@@ -56,8 +56,8 @@ try {
   assert.equal(preflight.passed, true);
   assert.equal(preflight.semanticContracts, 141);
   assert.equal(preflight.fixtureMappings, 141);
-  assert.equal(SEMANTIC_REGISTRY_VERSION, "stage4.6c1-semantic-v2");
-  assert.equal(SYNTHETIC_FIXTURE_VERSION, "phase-7.3.6-stage4.6c1-semantic-fixtures-v2");
+  assert.equal(SEMANTIC_REGISTRY_VERSION, "stage4.6c3e-semantic-v3");
+  assert.equal(SYNTHETIC_FIXTURE_VERSION, "phase-7.3.6-stage4.6c3e-batch02-fixtures-v3");
   for (const item of preflight.registry.values()) {
     assert.ok(item.requiredVisible.length > 0, `${item.id} needs a state-specific assertion`);
     assert.ok(Array.isArray(item.forbiddenVisible));
@@ -94,6 +94,33 @@ try {
   assert.equal(wrongState.passed, false);
   assert.match(wrongState.failures.join(" "), /REQUIRED_VISIBLE_MISSING|FORBIDDEN_VISIBLE_PRESENT|FORBIDDEN_ACTION_ENABLED/);
 
+  const markReady = preflight.registry.get("MARK_READY");
+  const markPartial = preflight.registry.get("MARK_PARTIAL");
+  assert.match(markReady.expectedUrl, /^\/work\/groups\/MARK\//, "Mark READY resolves to an exact projection group.");
+  assert.match(markPartial.expectedUrl, /^\/work\/groups\/MARK\//, "Mark PARTIAL resolves to an exact projection group.");
+  assert.notEqual(markReady.expectedUrl, markPartial.expectedUrl, "READY and PARTIAL use different exact work groups.");
+
+  const needsMapping = preflight.registry.get("IMPORT_NEEDS_MAPPING");
+  assert.equal(evaluateSemanticContract(needsMapping, {
+    bodyText: "Product Inventory Refresh. Status: NEEDS MAPPING. Current stage MAPPING. Map File Headers.",
+    actions: [{ label: "Map File Headers", disabled: false }],
+    role: "OWNER",
+    selectedAccount: "STAGE-FK-01",
+    url: needsMapping.expectedUrl,
+  }).passed, true, "mapping contract requires the current job-page action rather than mapping-form actions");
+
+  const validationError = preflight.registry.get("IMPORT_VALIDATION_ERROR");
+  assert.equal(validationError.fixtureProbes[0].expected.status, "FAILED");
+  assert.equal(validationError.fixtureProbes[0].expected.stage, "VALIDATING");
+  assert.equal(validationError.fixtureProbes[0].expected.errorRows, 2);
+  assert.equal(evaluateSemanticContract(validationError, {
+    bodyText: "Product Inventory Refresh. Status: FAILED. Current stage VALIDATING. Blocking errors 2. Synthetic validation failed.",
+    actions: [{ label: "View Blocking Errors", disabled: false }],
+    role: "OWNER",
+    selectedAccount: "STAGE-FK-01",
+    url: validationError.expectedUrl,
+  }).passed, true);
+
   const expired = preflight.registry.get("AUTH_EXPIRED");
   assert.equal(evaluateSemanticContract(expired, {
     bodyText: "Sign in. Your session expired. Sign in again to continue.",
@@ -124,6 +151,9 @@ try {
   const cliSource = await readFile(path.join(ROOT, "scripts", "qa", "stage4-6c-atlas-cli.mjs"), "utf8");
   assert.match(captureSource, /if \(!semanticAssertion\.passed\) throw new Error/, "Screenshots begin only after semantic verification");
   assert.match(captureSource, /selectedAccountFromContext/, "Selected-account assertions use the browser cookie rather than the contract expectation");
+  assert.match(captureSource, /selectSyntheticAccount\(page, "stage3-account-amz-01"\)/, "Amazon state selects the account through the real account form");
+  assert.match(captureSource, /synthetic-intentionally-wrong-password/, "Wrong-password evidence submits a real rejected password");
+  assert.match(captureSource, /assertOperationalSafetyUnchanged/, "Wrong-password evidence verifies protected records did not mutate");
   assert.match(captureSource, /settleForAssertions/, "Assertions wait for route hydration and stable layout");
   assert.match(captureSource, /process\.env\.ATLAS_RUNTIME_SHA/, "Capture children accept the frozen runtime identity");
   assert.match(captureSource, /process\.env\.ATLAS_RUNNER_SHA/, "Capture children accept the committed runner identity");

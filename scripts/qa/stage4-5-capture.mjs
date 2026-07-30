@@ -132,11 +132,99 @@ async function login(page, credential) {
 }
 
 async function selectedAccountFromContext(context, credential, scenarioId) {
-  if (["AUTH_INVALID", "AUTH_EXPIRED"].includes(scenarioId)) return null;
-  const selected = (await context.cookies(BASE)).find((cookie) => cookie.name === "mpp_account")?.value ?? null;
+  if (["AUTH_INVALID", "AUTH_EXPIRED", "OWNER_EMPTY_ACCOUNT"].includes(scenarioId)) return null;
+  const selected = (await context.cookies(BASE))
+    .find((cookie) => ["mpp_stage3_account", "mpp_account"].includes(cookie.name))?.value ?? null;
   if (selected === "stage3-account-fk-01") return "STAGE-FK-01";
   if (selected === "stage3-account-amz-01") return "STAGE-AMZ-01";
   return credential?.assignedAccount ?? null;
+}
+
+function resolveScenarioRoute(scenarioId, fallbackRoute) {
+  const taskIds = {
+    MARK_READY: "stage3-order-mark-ready-mark",
+    MARK_PARTIAL: "stage3-order-mark-progress-mark",
+  };
+  const taskId = taskIds[scenarioId];
+  if (!taskId) return fallbackRoute;
+  const database = new DatabaseSync(STAGING_DATABASE, { readOnly: true });
+  try {
+    const task = database.prepare(`
+      SELECT t.accountId, t.sourceType, t.stage, t.requiredQuantity,
+             t.completedQuantity, t.status, o.trackingId
+      FROM WorkTask t
+      LEFT JOIN "Order" o ON o.id = t.orderId
+      WHERE t.id = ?
+    `).get(taskId);
+    if (!task?.trackingId) throw new Error(`${scenarioId} has no exact operational identifier.`);
+    const groups = database.prepare(`
+      SELECT groupKey
+      FROM WorkGroupProjection
+      WHERE accountId = ?
+        AND sourceType = ?
+        AND stage = ?
+        AND operationalIdentifier = ?
+        AND requiredQuantity = ?
+        AND completedQuantity = ?
+        AND status = ?
+      ORDER BY updatedAt DESC
+      LIMIT 2
+    `).all(
+      task.accountId,
+      task.sourceType,
+      task.stage,
+      task.trackingId,
+      task.requiredQuantity,
+      task.completedQuantity,
+      task.status,
+    );
+    if (groups.length !== 1) throw new Error(`${scenarioId} did not resolve one exact current projection group.`);
+    return `/work/groups/${task.stage}/${groups[0].groupKey}?source=${task.sourceType}`;
+  } finally {
+    database.close();
+  }
+}
+
+async function selectSyntheticAccount(page, accountId) {
+  await page.goto(`${BASE}/accounts`, { waitUntil: "domcontentloaded", timeout: 25_000 });
+  await settleForAssertions(page);
+  const radio = page.locator(`input[name="accountId"][value="${accountId}"]`);
+  await radio.check();
+  await Promise.all([
+    page.waitForURL((url) => url.pathname !== "/accounts", { timeout: 15_000 }),
+    radio.locator("xpath=ancestor::form").evaluate((form) => form.requestSubmit()),
+  ]);
+}
+
+function operationalSafetySnapshot() {
+  const database = new DatabaseSync(STAGING_DATABASE, { readOnly: true });
+  try {
+    return {
+      orders: database.prepare("SELECT COUNT(*) AS count FROM \"Order\"").get().count,
+      tasks: database.prepare("SELECT COUNT(*) AS count FROM WorkTask").get().count,
+      consignments: database.prepare("SELECT COUNT(*) AS count FROM ConsignmentBatch").get().count,
+      deletionJobs: database.prepare("SELECT COUNT(*) AS count FROM DataDeletionJob").get().count,
+      ownerGrants: database.prepare("SELECT COUNT(*) AS count FROM OwnerActionGrant").get().count,
+    };
+  } finally {
+    database.close();
+  }
+}
+
+function assertOperationalSafetyUnchanged(before) {
+  const after = operationalSafetySnapshot();
+  for (const [key, expected] of Object.entries(before)) {
+    if (after[key] !== expected) throw new Error(`DATA_WRONG_PASSWORD changed protected synthetic state: ${key}.`);
+  }
+}
+
+function clearSyntheticOwnerReauthThrottle() {
+  const database = new DatabaseSync(STAGING_DATABASE);
+  try {
+    database.prepare("DELETE FROM SecurityThrottle WHERE scope = 'owner-data-reauth'").run();
+  } finally {
+    database.close();
+  }
 }
 
 async function inspect(page) {
@@ -277,6 +365,21 @@ async function applyScenarioState(page, context, scenarioId, { credential } = {}
       path.join(STAGING_FIXTURES, "catalog-two.csv"),
     ]);
   }
+  if (scenarioId === "DATA_WRONG_PASSWORD") {
+    const before = operationalSafetySnapshot();
+    const details = page.locator("details[data-data-action-details]").filter({ hasText: "Purge QA operational data" }).first();
+    await details.locator("summary").click();
+    await details.locator('input[name="ownerPassword"]').fill("synthetic-intentionally-wrong-password");
+    await details.locator('input[name="confirmationPhrase"]').fill("PURGE QA DATA stage3-account-fk-01");
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === "/owner/data-management" && url.searchParams.has("error"), { timeout: 15_000 }),
+      details.locator("form").evaluate((form) => form.requestSubmit()),
+    ]);
+    assertOperationalSafetyUnchanged(before);
+    clearSyntheticOwnerReauthThrottle();
+    const rejectedDetails = page.locator("details[data-data-action-details]").filter({ hasText: "Purge QA operational data" }).first();
+    await rejectedDetails.locator("summary").click();
+  }
   if (scenarioId === "DATA_EXPIRED_GRANT") {
     await page.getByText("Purge QA operational data", { exact: true }).first().click();
   }
@@ -300,8 +403,24 @@ async function assertScenarioTruth(page, scenarioId) {
       if (!pattern.test(text)) throw new Error(`${scenarioId} did not prove required state: ${pattern}`);
     }
   };
-  if (scenarioId === "OWNER_EMPTY_ACCOUNT") requires(/No seller accounts have been created yet/i, /Create First Seller Account/i);
-  if (scenarioId === "MARK_COMPLETED") requires(/MARK:\s*COMPLETED/i, /completed by Synthetic Marker/i);
+  if (scenarioId === "OWNER_EMPTY_ACCOUNT") {
+    requires(/No seller accounts have been created yet/i, /Create First Seller Account/i);
+    if (await page.locator('input[name="accountId"]').count()) throw new Error("OWNER_EMPTY_ACCOUNT exposed a populated account selector.");
+    if (/Ask the owner/i.test(text)) throw new Error("OWNER_EMPTY_ACCOUNT rendered worker-only guidance.");
+  }
+  if (scenarioId === "MARK_COMPLETED") {
+    requires(/MARK:\s*COMPLETED/i, /completed by Synthetic Marker/i, /Scan Next/i, /Back to Work/i);
+    if (await page.getByRole("button", { name: /Marking Completed/i }).count()) throw new Error("MARK_COMPLETED exposed a mutation action.");
+  }
+  if (scenarioId === "MARK_READY") {
+    requires(/Current stage\s*MARK/i, /Status\s*READY/i, /Required quantity\s*1/i, /Completed quantity\s*0/i, /Pending quantity\s*1/i);
+    if (!await page.getByRole("button", { name: /Marking Completed/i }).count()) throw new Error("MARK_READY has no normal completion action.");
+  }
+  if (scenarioId === "MARK_PARTIAL") {
+    requires(/Current stage\s*MARK/i, /Status\s*IN[_ ]PROGRESS/i, /Required quantity\s*2/i, /Completed quantity\s*1/i, /Pending quantity\s*1/i);
+    if (!await page.getByRole("button", { name: /Marking Completed/i }).count()) throw new Error("MARK_PARTIAL has no supported completion action.");
+    if (await page.getByRole("button", { name: /Save Partial Quantity/i }).count()) throw new Error("MARK_PARTIAL exposed an impossible partial-progress action with only one unit pending.");
+  }
   if (scenarioId === "ASSEMBLY_READY") {
     requires(/Synthetic assembly-ready order/i, /ASSEMBLE/i, /\bREADY\b/i, /Pending quantity\s*1/i);
   }
@@ -327,21 +446,83 @@ async function assertScenarioTruth(page, scenarioId) {
     requires(/Assembly is required before packing/i);
     if (await page.getByRole("button", { name: /^Confirm packed$/i }).count()) throw new Error("PACK_ASSEMBLY_LOCKED exposed Confirm packed.");
   }
+  if (scenarioId === "IMPORT_NEEDS_MAPPING") {
+    requires(/Status:\s*NEEDS MAPPING/i, /Current stage\s*MAPPING/i, /Map File Headers/i);
+    const mappingLink = page.getByRole("link", { name: "Map File Headers", exact: true });
+    if (await mappingLink.getAttribute("href") !== "/owner/imports/stage4-import-mapping/mapping") {
+      throw new Error("IMPORT_NEEDS_MAPPING has an incorrect mapping destination.");
+    }
+    const mappingPage = await page.context().newPage();
+    try {
+      await mappingPage.goto(`${BASE}/owner/imports/stage4-import-mapping/mapping`, { waitUntil: "domcontentloaded", timeout: 25_000 });
+      await settleForAssertions(mappingPage);
+      await requiresOnPage(mappingPage, /Map File Headers/i, /retained upload will retry automatically/i);
+      const requiredSelects = mappingPage.locator("select[required]");
+      for (let index = 0; index < await requiredSelects.count(); index += 1) {
+        const select = requiredSelects.nth(index);
+        const value = await select.locator("option").nth(index + 1).getAttribute("value");
+        if (!value) throw new Error("IMPORT_NEEDS_MAPPING could not prepare a valid required-field mapping.");
+        await select.selectOption(value);
+      }
+      if (!await mappingPage.getByRole("button", { name: "Save Profile and Retry", exact: true }).isEnabled()) {
+        throw new Error("IMPORT_NEEDS_MAPPING valid mapping does not enable Save Profile and Retry.");
+      }
+    } finally {
+      await mappingPage.close();
+    }
+  }
+  if (scenarioId === "IMPORT_VALIDATION_ERROR") {
+    requires(/Product Inventory Refresh/i, /Status:\s*FAILED/i, /Current stage\s*VALIDATING/i, /Blocking errors\s*2/i, /Synthetic validation failed/i);
+    if (!await page.getByRole("link", { name: /View Blocking Errors \(2\)/i }).count()) throw new Error("IMPORT_VALIDATION_ERROR has no safe issue-review action.");
+    if (/\bStatus:\s*COMPLETED\b/i.test(text)) throw new Error("IMPORT_VALIDATION_ERROR rendered a false completed state.");
+  }
+  if (scenarioId === "IMPORT_CANCELLED") {
+    requires(/Status:\s*CANCELLED/i, /Current stage\s*CANCELLED/i, /Cancelled Product Inventory jobs require a new upload/i);
+    if (/\bStatus:\s*RUNNING\b/i.test(text)) throw new Error("IMPORT_CANCELLED rendered a running lifecycle status.");
+  }
+  if (scenarioId === "IMPORT_COMPLETED") {
+    requires(/Status:\s*COMPLETED/i, /Current stage\s*COMPLETED/i, /100%/i, /100\s*\/\s*100 rows/i);
+    if (/\bStatus:\s*RUNNING\b/i.test(text)) throw new Error("IMPORT_COMPLETED rendered a running lifecycle status.");
+  }
+  if (scenarioId === "IMPORT_UPLOAD_EMPTY") {
+    const files = await selectedFileNames(page);
+    if (files.length !== 0) throw new Error("IMPORT_UPLOAD_EMPTY retained a selected file.");
+    requires(/Catalog, listings, enrichment files, or ZIP/i, /Accepted: CSV, TSV, TXT, XLSX, XLSM, or ZIP/i);
+  }
   if (scenarioId === "SCANNER_COMPLETED") requires(/\bPACKED\b/i, /Packing is complete\. This result is read-only/i, /Scan Next/i);
   if (scenarioId === "PROBLEM_OPEN") requires(/Synthetic damaged item/i, /Synthetic open problem for UI audit/i);
   if (scenarioId === "PROBLEM_RESOLVED") requires(/Synthetic assembly mismatch/i, /Synthetic resolution completed/i);
   if (scenarioId === "IMPORT_ONE_FILE") {
-    const count = await page.locator('input[name="files"]').evaluate((input) => input.files?.length ?? 0);
-    if (count !== 1) throw new Error("IMPORT_ONE_FILE did not retain exactly one selected synthetic file.");
+    const files = await selectedFileNames(page);
+    if (files.length !== 1 || files[0] !== "catalog-one.csv") throw new Error("IMPORT_ONE_FILE did not retain the exact selected synthetic file.");
   }
   if (scenarioId === "IMPORT_MULTI_FILE" || scenarioId === "IMPORT_AMAZON_THREE_ROLE") {
-    const expected = scenarioId === "IMPORT_MULTI_FILE" ? 2 : 3;
-    const count = await page.locator('input[name="files"]').evaluate((input) => input.files?.length ?? 0);
-    if (count !== expected) throw new Error(`${scenarioId} did not retain ${expected} selected synthetic files.`);
+    const expected = scenarioId === "IMPORT_MULTI_FILE"
+      ? ["catalog-one.csv", "catalog-two.csv"]
+      : ["amazon-all-listings.csv", "catalog-one.csv", "catalog-two.csv"];
+    const files = await selectedFileNames(page);
+    if (JSON.stringify(files) !== JSON.stringify(expected)) throw new Error(`${scenarioId} did not retain the exact selected synthetic files.`);
+    if (scenarioId === "IMPORT_AMAZON_THREE_ROLE") {
+      requires(/Synthetic Amazon Primary/i, /\bAMAZON\b/i);
+      if (/Synthetic Flipkart Primary/i.test(text)) throw new Error("IMPORT_AMAZON_THREE_ROLE rendered the wrong seller account.");
+    }
   }
   if (scenarioId === "PRODUCT_IMAGES_OK") {
     await page.locator("[data-work-gallery] img").first().waitFor({ state: "visible", timeout: 5_000 });
   }
+}
+
+async function requiresOnPage(page, ...patterns) {
+  const text = (await page.locator("body").innerText()).replace(/\s+/g, " ");
+  for (const pattern of patterns) {
+    if (!pattern.test(text)) throw new Error(`Required state is absent on ${page.url()}: ${pattern}`);
+  }
+}
+
+async function selectedFileNames(page) {
+  return page.locator('input[name="files"]').evaluate((input) =>
+    Array.from(input.files ?? []).map((file) => file.name),
+  );
 }
 
 function temporarilyDeactivateSyntheticAccounts() {
@@ -430,9 +611,6 @@ try {
     }
     const scale = deviceScaleFactor();
     const context = await browser.newContext({ viewport: { width: job.viewport.width, height: job.viewport.height }, deviceScaleFactor: scale, storageState: authStates.get(job.role) });
-    if (job.id === "IMPORT_AMAZON_THREE_ROLE") {
-      await context.addCookies([{ name: "mpp_account", value: "stage3-account-amz-01", url: BASE }]);
-    }
     await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
     const page = await context.newPage();
     const consoleErrors = [];
@@ -458,10 +636,18 @@ try {
     let semanticAssertion = null;
     let error = null;
     let accountRestore = null;
+    const scenarioRoute = resolveScenarioRoute(job.id, job.route);
     try {
-      if (job.id === "OWNER_EMPTY_ACCOUNT") accountRestore = temporarilyDeactivateSyntheticAccounts();
+      if (job.id === "OWNER_EMPTY_ACCOUNT") {
+        accountRestore = temporarilyDeactivateSyntheticAccounts();
+        await context.clearCookies({ name: "mpp_account" });
+        await context.clearCookies({ name: "mpp_stage3_account" });
+      }
+      if (job.id === "IMPORT_AMAZON_THREE_ROLE") {
+        await selectSyntheticAccount(page, "stage3-account-amz-01");
+      }
       if (job.id === "AUTH_EXPIRED") await context.clearCookies();
-      const response = await page.goto(`${BASE}${job.route}`, { waitUntil: "domcontentloaded", timeout: 25_000 });
+      const response = await page.goto(`${BASE}${scenarioRoute}`, { waitUntil: "domcontentloaded", timeout: 25_000 });
       await page.waitForTimeout(350);
       await settleForAssertions(page);
       await applyScenarioState(page, context, job.id, { credential: credentials.get(ROLE_TO_DISPLAY[job.role]) });
@@ -522,8 +708,8 @@ try {
       captureRunnerVersion: CAPTURE_RUNNER_VERSION,
       id: key,
       area: job.id.split("_")[0],
-      route: job.route,
-      dynamicRouteExample: job.route,
+       route: scenarioRoute,
+       dynamicRouteExample: scenarioRoute,
       role: job.role,
       selectedAccount: await selectedAccountFromContext(context, credentials.get(ROLE_TO_DISPLAY[job.role]), job.id),
       scenarioId: job.id,

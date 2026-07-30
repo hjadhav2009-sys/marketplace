@@ -318,3 +318,53 @@ At least one genuine runtime application defect remains. Under the Stage
 - no other viewport was started.
 
 Result: `STAGE4_6C3C_BLOCKED_APPLICATION_DEFECT`
+
+## Stage 4.6C3E current-runtime reconciliation
+
+This section records the QA-only reconciliation against the current frozen
+runtime. It does not promote or reuse evidence from the historical runtime.
+
+- Current runtime SHA: `b15fd367068c6bda754b9ffd7aab46a03b22b322`
+- Current runtime BUILD_ID: `si6GMY3CKc6-Bc0XwtVVd`
+- Current runtime tag: `phase-7.3.6-stage4.6c3d-frozen-rc`
+- Historical runtime evidence label: `HISTORICAL_PRE_C3D_RUNTIME_EVIDENCE`
+- Semantic registry: `stage4.6c3e-semantic-v3`
+- Synthetic fixture version: `phase-7.3.6-stage4.6c3e-batch02-fixtures-v3`
+- Full-page screenshots taken in this reconciliation: zero
+- Current-runtime Batch 02 atlas recapture: not started
+
+The 14-state semantic-only preflight at `360x800` passed 14/14. The targeted
+two-width check passed 27/28 entries. The sole failure is a current-runtime
+touch-target defect described below, so the checkpoint stopped before the
+QA-only commit, push, plan creation, or Batch 02 recapture.
+
+| Scenario | Previous class | Correction and authoritative state | Fixture / role / account | Route and actions | Preflight | Current class |
+| --- | --- | --- | --- | --- | --- | --- |
+| `DATA_WRONG_PASSWORD` | `RUNNER_WRONG` | Submit the real owner reauthentication form with an intentionally wrong synthetic password; verify rejection, unchanged operational row counts, and no owner-action grant. | `DataDeletionJob(stage4-delete-preview)` / OWNER / `STAGE-FK-01` | `/owner/data-management?tab=operational`; real purge disclosure and owner-password form; successful purge forbidden. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_AMAZON_THREE_ROLE` | `RUNNER_WRONG` | Select Amazon through the real account form and verify the hydrated shell/form show AMAZON and all three exact filenames. | three synthetic files / OWNER / `STAGE-AMZ-01` | `/owner/product-inventory/refresh`; `Upload and start refresh` required; Flipkart context forbidden. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_CANCELLED` | `CONTRACT_WRONG` | Match labelled status and current stage `CANCELLED`; do not reject instructional prose containing “running.” | `ImportJob(stage4-import-cancelled)` / OWNER / `STAGE-FK-01` | `/owner/imports/stage4-import-cancelled`; safe navigation required; lifecycle `RUNNING` forbidden. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_COMPLETED` | `CONTRACT_WRONG` | Require persisted `COMPLETED`, 100%, and completed totals without a global “running” substring check. | `ImportJob(stage4-import-completed)` / OWNER / `STAGE-FK-01` | `/owner/imports/stage4-import-completed`; completion/report actions required; lifecycle `RUNNING` forbidden. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_MULTI_FILE` | `CONTRACT_WRONG` | Inspect the native file input for exactly two files and verify both exact names. | `catalog-one.csv`, `catalog-two.csv` / OWNER / `STAGE-FK-01` | `/owner/product-inventory/refresh`; `Upload and start refresh` required. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_NEEDS_MAPPING` | repaired application plus stale contract | Keep job and mapping pages separate. The job page requires `Map File Headers`; the mapping page enables `Save Profile and Retry` only after valid required-field mappings. | `ImportJob(stage4-import-mapping)` / OWNER / `STAGE-FK-01` | Job `/owner/imports/stage4-import-mapping`; mapping `/owner/imports/stage4-import-mapping/mapping`; no submission. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_ONE_FILE` | `CONTRACT_WRONG` | Inspect the native input for exactly `catalog-one.csv`; use the current upload label. | one synthetic file / OWNER / `STAGE-FK-01` | `/owner/product-inventory/refresh`; `Upload and start refresh` required. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_UPLOAD_EMPTY` | `CONTRACT_WRONG` | Require zero native files, the accessible current file-input label, accepted-format guidance, and the current upload action. | route-only fixture / OWNER / `STAGE-FK-01` | `/owner/product-inventory/refresh`; browser-dependent “Choose files” text is not required. | Passed at both widths. | `RECONCILED` |
+| `IMPORT_VALIDATION_ERROR` | `FIXTURE_WRONG` | Use a real failed Product Inventory ImportJob at `VALIDATING`, two sanitized blocking issues, a retained synthetic source, no completed merge, and no worker task leak. | `ImportJob(stage4-import-validation-error)` plus safe issue rows / OWNER / `STAGE-FK-01` | `/owner/imports/stage4-import-validation-error`; `View Blocking Errors` required; completed state forbidden. | Passed at both widths. | `RECONCILED` |
+| `MARK_COMPLETED` | `CONTRACT_WRONG` | Require completed MARK facts, worker/history, `Scan Next`, and `Back to Work`; normal mutation action forbidden. | `WorkTask(stage4-line-mark-completed-mark)` / MARKER / `STAGE-FK-01` | Exact completed task Details route; a second `Details` link is not required. | Passed at both widths. | `RECONCILED` |
+| `MARK_PARTIAL` | `RUNNER_WRONG` | Resolve the exact current group from the real task/projection. Required 2, completed 1, pending 1 means final completion is supported and another partial save is correctly absent. | `WorkTask(stage3-order-mark-progress-mark)` / MARKER / `STAGE-FK-01` | Exact `/work/groups/MARK/<group>?source=ORDER`; `Marking Completed` required; false completed state and impossible partial save forbidden. | Passed at both widths. | `RECONCILED` |
+| `MARK_READY` | `RUNNER_WRONG` | Resolve the exact current READY group with zero completed quantity and satisfied Pick prerequisite. | `WorkTask(stage3-order-mark-ready-mark)` / MARKER / `STAGE-FK-01` | Exact `/work/groups/MARK/<group>?source=ORDER`; normal `Marking Completed` action required. | Passed at both widths. | `RECONCILED` |
+| `OWNER_EMPTY_ACCOUNT` | `RUNNER_WRONG` | Temporarily isolate all synthetic accounts, clear both staging and legacy selected-account cookies, and assert zero account radio rows. | temporary disposable staging state / OWNER / no selected account | `/accounts`; `Create First Seller Account` required; populated selector and worker-only wording forbidden. | Passed at both widths. | `RECONCILED` |
+| `PACK_ASSEMBLY_LOCKED` | repaired application scenario | Assembly remains incomplete; Packing stays locked; `Confirm packed` is absent; safe scanner/problem actions remain. | `WorkTask(stage4-order-pack-assembly-locked-pack)` / PACKER / `STAGE-FK-01` | `/packing/STAGE-AWB-ASSEMBLY-LOCKED`; semantic state passed at both widths. | Semantic pass, but `1440x900` touch-target gate failed. | `APPLICATION_DEFECT` |
+
+### Remaining current-runtime defect
+
+At `1440x900`, the lower enabled `Scan next AWB` link on the Assembly-locked
+Packing page measured `128x43`. Its semantic state, browser console, page,
+network, overflow, and authentication checks were otherwise clean. The strict
+minimum is `44x44`; therefore `43` pixels is not rounded up or waived.
+
+The earlier runtime repair changed the top `Scan next` link and the
+`Mark problem` summary, but this separate lower `Scan next AWB` link remains a
+true enabled operational target below the required height. Stage 4.6C3E does
+not authorize runtime application edits, so no runtime source was changed.
+
+Current result: `STAGE4_6C3E_BLOCKED_APPLICATION_DEFECT`

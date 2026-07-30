@@ -20,6 +20,29 @@ function assertPrivatePath(candidate) {
 
 function expectedRows(database) {
   return {
+    validationJob: database.prepare(`
+      SELECT id, accountId, marketplace, importType, fileName, filePath, batchId,
+             status, stage, totalRows, processedRows, errorRows, finishedAt,
+             mergeStartedAt, lastError
+      FROM ImportJob WHERE id = 'stage4-import-validation-error'
+    `).get(),
+    validationBatch: database.prepare(`
+      SELECT id, accountId, importType, status, totalRows, errorRows, blockingErrorRows
+      FROM UploadBatch WHERE id = 'stage4-batch-validation-error'
+    `).get(),
+    validationIssues: database.prepare(`
+      SELECT id, issueType, severity, rawData, safeDataJson, resolved
+      FROM ImportRowIssue
+      WHERE batchId = 'stage4-batch-validation-error'
+      ORDER BY rowNumber, id
+    `).all(),
+    validationWork: database.prepare(`
+      SELECT COUNT(*) AS count
+      FROM WorkTask
+      WHERE metadataJson LIKE '%stage4-import-validation-error%'
+         OR workCardSnapshotJson LIKE '%stage4-import-validation-error%'
+         OR routeSnapshotJson LIKE '%stage4-import-validation-error%'
+    `).get(),
     assemblyReady: database.prepare(`
       SELECT id, stage, status, requiredQuantity, completedQuantity, problemReason
       FROM WorkTask WHERE id = 'stage3-order-assembly-ready-assemble'
@@ -46,6 +69,32 @@ function expectedRows(database) {
 
 function verifyRows(rows) {
   const failures = [];
+  if (rows.validationJob?.accountId !== "stage3-account-fk-01"
+    || rows.validationJob?.marketplace !== "FLIPKART"
+    || rows.validationJob?.importType !== "FLIPKART_PRODUCT_INVENTORY"
+    || rows.validationJob?.status !== "FAILED"
+    || rows.validationJob?.stage !== "VALIDATING"
+    || rows.validationJob?.totalRows !== 3
+    || rows.validationJob?.processedRows !== 3
+    || rows.validationJob?.errorRows !== 2
+    || rows.validationJob?.finishedAt != null
+    || rows.validationJob?.mergeStartedAt != null
+    || !rows.validationJob?.filePath
+    || !existsSync(rows.validationJob.filePath)) failures.push("IMPORT_VALIDATION_ERROR_JOB");
+  if (rows.validationBatch?.accountId !== "stage3-account-fk-01"
+    || rows.validationBatch?.importType !== "ORDER_LABEL"
+    || rows.validationBatch?.status !== "FAILED"
+    || rows.validationBatch?.totalRows !== 3
+    || rows.validationBatch?.errorRows !== 2
+    || rows.validationBatch?.blockingErrorRows !== 2) failures.push("IMPORT_VALIDATION_ERROR_BATCH");
+  if (rows.validationIssues?.length !== 2
+    || rows.validationIssues.some((issue) =>
+      issue.severity !== "ERROR"
+      || issue.rawData != null
+      || !issue.safeDataJson
+      || issue.resolved !== 0
+    )) failures.push("IMPORT_VALIDATION_ERROR_ISSUES");
+  if (Number(rows.validationWork?.count) !== 0) failures.push("IMPORT_VALIDATION_ERROR_WORK_LEAK");
   if (rows.assemblyReady?.stage !== "ASSEMBLE"
     || rows.assemblyReady?.status !== "READY"
     || rows.assemblyReady?.requiredQuantity <= 0
@@ -78,6 +127,149 @@ async function prepare() {
   const now = Date.now();
   try {
     database.exec("BEGIN IMMEDIATE");
+    const source = database.prepare(`
+      SELECT filePath FROM ImportJob WHERE id = 'stage4-import-failed'
+    `).get();
+    if (!source?.filePath || !existsSync(source.filePath)) {
+      throw new Error("The retained synthetic import source is unavailable.");
+    }
+    database.prepare(`
+      INSERT INTO UploadBatch (
+        id, accountId, uploadedById, filename, importType, status, totalRows,
+        errorRows, warningRows, blockingErrorRows, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        accountId = excluded.accountId,
+        uploadedById = excluded.uploadedById,
+        filename = excluded.filename,
+        importType = excluded.importType,
+        status = excluded.status,
+        totalRows = excluded.totalRows,
+        errorRows = excluded.errorRows,
+        warningRows = excluded.warningRows,
+        blockingErrorRows = excluded.blockingErrorRows,
+        updatedAt = excluded.updatedAt
+    `).run(
+      "stage4-batch-validation-error",
+      "stage3-account-fk-01",
+      "stage3-import-manager",
+      "synthetic-product-inventory-validation.csv",
+      "ORDER_LABEL",
+      "FAILED",
+      3,
+      2,
+      0,
+      2,
+      now,
+      now,
+    );
+    database.prepare(`
+      INSERT INTO ImportJob (
+        id, accountId, createdByUserId, marketplace, importType, fileName,
+        filePath, batchId, status, totalRows, processedRows, createdRows,
+        updatedRows, unchangedRows, duplicateRows, warningRows, errorRows,
+        missingListingRows, missingImageRows, startedAt, finishedAt, lastError,
+        createdAt, updatedAt, stage, currentFile, totalFiles, processedFiles,
+        reportJson, attemptNumber, currentChunk
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        accountId = excluded.accountId,
+        createdByUserId = excluded.createdByUserId,
+        marketplace = excluded.marketplace,
+        importType = excluded.importType,
+        fileName = excluded.fileName,
+        filePath = excluded.filePath,
+        batchId = excluded.batchId,
+        status = excluded.status,
+        totalRows = excluded.totalRows,
+        processedRows = excluded.processedRows,
+        createdRows = excluded.createdRows,
+        updatedRows = excluded.updatedRows,
+        unchangedRows = excluded.unchangedRows,
+        duplicateRows = excluded.duplicateRows,
+        warningRows = excluded.warningRows,
+        errorRows = excluded.errorRows,
+        missingListingRows = excluded.missingListingRows,
+        missingImageRows = excluded.missingImageRows,
+        startedAt = excluded.startedAt,
+        finishedAt = excluded.finishedAt,
+        lastError = excluded.lastError,
+        updatedAt = excluded.updatedAt,
+        stage = excluded.stage,
+        currentFile = excluded.currentFile,
+        totalFiles = excluded.totalFiles,
+        processedFiles = excluded.processedFiles,
+        reportJson = excluded.reportJson,
+        cancelRequestedAt = NULL,
+        mergeStartedAt = NULL,
+        runnerId = NULL,
+        leaseExpiresAt = NULL,
+        heartbeatAt = NULL,
+        attemptNumber = excluded.attemptNumber,
+        checkpointJson = NULL,
+        currentEntryId = NULL,
+        currentChunk = excluded.currentChunk,
+        mergeCompletedEntryIdsJson = NULL
+    `).run(
+      "stage4-import-validation-error",
+      "stage3-account-fk-01",
+      "stage3-import-manager",
+      "FLIPKART",
+      "FLIPKART_PRODUCT_INVENTORY",
+      "synthetic-product-inventory-validation.csv",
+      source.filePath,
+      "stage4-batch-validation-error",
+      "FAILED",
+      3,
+      3,
+      0,
+      0,
+      1,
+      0,
+      0,
+      2,
+      0,
+      0,
+      now,
+      null,
+      "Synthetic validation failed. Review blocking issues.",
+      now,
+      now,
+      "VALIDATING",
+      "synthetic-product-inventory-validation.csv",
+      1,
+      1,
+      JSON.stringify({ synthetic: true, lifecycle: "VALIDATION_FAILED", blockingIssues: 2 }),
+      1,
+      0,
+    );
+    database.prepare(`
+      DELETE FROM ImportRowIssue WHERE batchId = 'stage4-batch-validation-error'
+    `).run();
+    const insertValidationIssue = database.prepare(`
+      INSERT INTO ImportRowIssue (
+        id, batchId, rowNumber, issueType, message, rawData, safeDataJson,
+        severity, sourceType, sourceId, resolved, version, createdAt
+      ) VALUES (?, ?, ?, ?, ?, NULL, ?, 'ERROR', 'PRODUCT_INVENTORY', NULL, 0, 1, ?)
+    `);
+    insertValidationIssue.run(
+      "stage4-validation-error-missing-sku",
+      "stage4-batch-validation-error",
+      2,
+      "MISSING_REQUIRED_IDENTIFIER",
+      "Synthetic row is missing the required Seller SKU.",
+      JSON.stringify({ row: 2, field: "sellerSku", synthetic: true }),
+      now,
+    );
+    insertValidationIssue.run(
+      "stage4-validation-error-invalid-price",
+      "stage4-batch-validation-error",
+      3,
+      "INVALID_PRICE",
+      "Synthetic row has an invalid non-negative price.",
+      JSON.stringify({ row: 3, field: "sellingPrice", synthetic: true }),
+      now,
+    );
     database.prepare(`
       UPDATE DataDeletionJob
       SET actionKind = 'QUARANTINE_IMPORT_SOURCE_FILE',

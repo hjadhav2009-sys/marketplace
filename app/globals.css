@@ -276,8 +276,10 @@ button:disabled {
 
   .ui-status-badge {
     display: inline-flex;
+    width: fit-content;
     max-width: 100%;
-    min-width: 0;
+    min-width: min-content;
+    align-self: flex-start;
     align-items: flex-start;
     gap: 0.375rem;
     border: 1px solid;
@@ -290,6 +292,7 @@ button:disabled {
   }
 
   .ui-status-badge__marker { margin-top: 0.1875rem; height: 0.625rem; width: 0.625rem; flex: none; }
+  .ui-status-badge > span { min-width: 0; overflow-wrap: anywhere; }
 
   .ui-empty-state {
     border-style: dashed;

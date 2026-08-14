@@ -72,6 +72,7 @@ const unknownStatus = renderToStaticMarkup(<StatusBadge value="WAREHOUSE_REVIEW_
 assert.match(unknownStatus, /data-tone="neutral"/);
 assert.match(unknownStatus, /Warehouse Review Pending With Long Label/);
 assert.match(globals, /\.ui-status-badge[\s\S]*max-width: 100%[\s\S]*overflow-wrap: anywhere/, "Long status labels remain intrinsic-width safe.");
+assert.match(globals, /\.ui-status-badge[\s\S]*width: fit-content[\s\S]*align-self: flex-start/, "Badges remain compact inside flex columns.");
 
 const normalSurface = renderToStaticMarkup(<Surface>Content</Surface>);
 const compactSurface = renderToStaticMarkup(<Surface variant="subtle" padding="compact">Content</Surface>);

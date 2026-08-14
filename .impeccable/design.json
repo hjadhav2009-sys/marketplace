@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "name": "Marketplace Pick & Pack Operations UI",
+  "colors": {
+    "berry": ["#fff1f2", "#ffe4e6", "#fecdd3", "#fb7185", "#9f1239"],
+    "slate": ["#f8fafc", "#f1f5f9", "#e2e8f0", "#64748b", "#0f172a"],
+    "teal": ["#f0fdfa", "#ccfbf1", "#5eead4", "#0f766e", "#134e4a"],
+    "amber": ["#fffbeb", "#fef3c7", "#fcd34d", "#92400e", "#451a03"],
+    "rose": ["#fff1f2", "#ffe4e6", "#fda4af", "#be123c", "#881337"]
+  },
+  "shadows": {
+    "surface": "0 1px 2px rgb(15 23 42 / 0.06)",
+    "raised": "0 8px 24px rgb(15 23 42 / 0.10)"
+  },
+  "motion": {
+    "fast": "120ms",
+    "spatial": "180ms",
+    "easing": "cubic-bezier(0.2, 0, 0, 1)",
+    "reducedMotion": "Remove non-essential transitions and all decorative movement"
+  },
+  "breakpoints": {
+    "mobileAudit": "390px",
+    "tabletAudit": "768px",
+    "desktopAudit": "1440px"
+  },
+  "narrative": {
+    "northStar": "Operations Ledger",
+    "overview": "A calm warehouse control surface where state, responsibility, evidence, and the next safe action are visible without decoration competing for attention.",
+    "rules": [
+      "Operational truth before decoration",
+      "One dominant task per worker view",
+      "Context travels with action",
+      "No document-level horizontal overflow",
+      "Color never carries state alone"
+    ],
+    "donts": [
+      "No gradients, glass, animated charts, or decorative illustration",
+      "No icons-only operational navigation",
+      "No invented instructions or hidden responsibility",
+      "No decorative motion on high-frequency worker actions"
+    ]
+  }
+}

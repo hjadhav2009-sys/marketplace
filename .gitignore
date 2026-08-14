@@ -62,3 +62,10 @@ config/mobile-app-release.local.json
 Thumbs.db
 .codex-tmp
 tsconfig.tsbuildinfo
+
+# Impeccable ephemeral/local state (shared design context remains tracked)
+.impeccable/cache/
+.impeccable/live/
+.impeccable/critique/
+.impeccable/mocks/
+.impeccable/*.log

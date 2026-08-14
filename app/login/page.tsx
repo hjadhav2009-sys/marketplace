@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { SubmitButton } from "@/components/SubmitButton";
+import { Field, fieldControlStyles } from "@/components/ui/Field";
+import { buttonStyles } from "@/components/ui/buttonStyles";
 import { getCurrentUser } from "@/lib/auth";
 import { loginAction } from "./actions";
 import { PasswordField } from "./PasswordField";
@@ -27,6 +29,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const hasExpiredMessage = params?.expired === "1";
   const hasPasswordChangedMessage = params?.passwordChanged === "1";
   const hasSetupComplete = params?.setup === "1";
+  const hasLoginError = hasInvalidError || hasSessionError;
   const showDevHint = process.env.NODE_ENV !== "production" && process.env.SHOW_DEV_LOGIN_HINTS === "true";
 
   return (
@@ -56,37 +59,34 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         ) : null}
 
-        {hasInvalidError || hasSessionError ? (
+        {hasLoginError ? (
           <div id="login-error" role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
             {hasInvalidError ? "The username or password is incorrect." : null}
             {hasSessionError ? "Session creation failed. Try again." : null}
           </div>
         ) : null}
 
-        <form action={loginAction} aria-describedby={hasInvalidError || hasSessionError ? "login-error" : undefined} className="space-y-5">
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Username</span>
-            <input
-              name="username"
-              autoComplete="username"
-              aria-invalid={hasInvalidError || hasSessionError}
-              autoFocus={hasInvalidError || hasSessionError}
-              className={`mt-2 min-h-12 w-full rounded-md border px-4 py-3 text-base outline-none transition focus:border-berry focus:ring-2 focus:ring-pink-100 ${
-                hasInvalidError || hasSessionError ? "border-rose-400 bg-rose-50/40" : "border-slate-300"
-              }`}
-              placeholder="Enter username"
-              required
-            />
-          </label>
+        <form action={loginAction} aria-describedby={hasLoginError ? "login-error" : undefined} className="space-y-5">
+          <Field id="login-username" label="Username" invalid={hasLoginError} describedBy={hasLoginError ? "login-error" : undefined} required>
+            {(attributes) => (
+              <input
+                {...attributes}
+                name="username"
+                autoComplete="username"
+                autoFocus={hasLoginError}
+                className={fieldControlStyles({ size: "large" })}
+                placeholder="Enter username"
+                required
+              />
+            )}
+          </Field>
 
-          <PasswordField invalid={hasInvalidError || hasSessionError} describedBy={hasInvalidError || hasSessionError ? "login-error" : undefined} />
+          <PasswordField invalid={hasLoginError} describedBy={hasLoginError ? "login-error" : undefined} />
 
-          <div className="[&_button]:min-h-12 [&_button]:w-full [&_button]:text-base [&_button]:font-semibold">
-            <SubmitButton pendingText="Signing in...">Sign in</SubmitButton>
-          </div>
+          <SubmitButton className="w-full" size="large" pendingText="Signing in...">Sign in</SubmitButton>
         </form>
 
-        <Link href="/forgot-password" className="mt-3 flex min-h-11 items-center justify-center text-sm font-semibold text-berry hover:text-pink-800">
+        <Link href="/forgot-password" className={buttonStyles({ variant: "quiet", className: "mt-3 w-full" })}>
           Forgot password?
         </Link>
 

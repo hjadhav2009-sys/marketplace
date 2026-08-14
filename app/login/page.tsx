@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { buttonStyles } from "@/components/ui/buttonStyles";
 import { getCurrentUser } from "@/lib/auth";
 import { loginAction } from "./actions";
@@ -42,28 +43,25 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         {hasSetupComplete ? (
-          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-            Setup complete. Login with your owner account.
-          </div>
+          <FeedbackBanner className="mb-4" tone="success" title="Setup complete. Login with your owner account." />
         ) : null}
 
         {hasPasswordChangedMessage ? (
-          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
-            Password changed, login again.
-          </div>
+          <FeedbackBanner className="mb-4" tone="success" title="Password changed, login again." />
         ) : null}
 
         {hasExpiredMessage ? (
-          <div role="status" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-            Your session expired. Sign in again to continue.
-          </div>
+          <FeedbackBanner className="mb-4" tone="warning" title="Your session expired. Sign in again to continue." />
         ) : null}
 
         {hasLoginError ? (
-          <div id="login-error" role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-            {hasInvalidError ? "The username or password is incorrect." : null}
-            {hasSessionError ? "Session creation failed. Try again." : null}
-          </div>
+          <FeedbackBanner
+            id="login-error"
+            className="mb-4"
+            tone="error"
+            announcement="alert"
+            title={hasInvalidError ? "The username or password is incorrect." : "Session creation failed. Try again."}
+          />
         ) : null}
 
         <form action={loginAction} aria-describedby={hasLoginError ? "login-error" : undefined} className="space-y-5">

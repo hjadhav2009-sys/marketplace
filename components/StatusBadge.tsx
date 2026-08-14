@@ -1,52 +1,91 @@
+import React from "react";
 import { titleCase } from "@/lib/format";
 
-const statusTone: Record<string, string> = {
-  READY: "bg-blue-50 text-blue-700 ring-blue-200",
-  FOUND: "bg-blue-50 text-blue-700 ring-blue-200",
-  PACKED: "bg-teal-50 text-teal-700 ring-teal-200",
-  PICKED: "bg-teal-50 text-teal-700 ring-teal-200",
-  PROBLEM: "bg-amber-50 text-amber-800 ring-amber-200",
-  NOT_FOUND: "bg-rose-50 text-rose-700 ring-rose-200",
-  MISSING_IMAGE: "bg-amber-50 text-amber-800 ring-amber-200",
-  OK: "bg-teal-50 text-teal-700 ring-teal-200",
-  WARNING: "bg-amber-50 text-amber-800 ring-amber-200",
-  NEEDS_ACTION: "bg-rose-50 text-rose-700 ring-rose-200",
-  OPEN: "bg-amber-50 text-amber-800 ring-amber-200",
-  RESOLVED: "bg-teal-50 text-teal-700 ring-teal-200",
-  IMPORTED: "bg-teal-50 text-teal-700 ring-teal-200",
-  COMPLETED: "bg-teal-50 text-teal-700 ring-teal-200",
-  COMPLETED_WITH_WARNINGS: "bg-amber-50 text-amber-800 ring-amber-200",
-  RUNNING: "bg-blue-50 text-blue-700 ring-blue-200",
-  QUEUED: "bg-slate-50 text-slate-700 ring-slate-200",
-  REVIEWED: "bg-blue-50 text-blue-700 ring-blue-200",
-  PARSED: "bg-violet-50 text-violet-700 ring-violet-200",
-  UPLOADED: "bg-slate-50 text-slate-700 ring-slate-200",
-  ACTIVE: "bg-teal-50 text-teal-700 ring-teal-200",
-  INACTIVE: "bg-slate-100 text-slate-600 ring-slate-200",
-  PASSWORD_REQUIRED: "bg-amber-50 text-amber-800 ring-amber-200",
-  OWNER: "bg-pink-50 text-pink-700 ring-pink-200",
-  PICKER: "bg-blue-50 text-blue-700 ring-blue-200",
-  PACKER: "bg-amber-50 text-amber-800 ring-amber-200",
-  FAILED: "bg-rose-50 text-rose-700 ring-rose-200",
-  CANCELLED: "bg-slate-100 text-slate-600 ring-slate-200"
+export type StatusTone = "neutral" | "info" | "success" | "warning" | "error";
+
+export const statusTone: Record<string, StatusTone> = {
+  READY: "info",
+  FOUND: "info",
+  RUNNING: "info",
+  PARSING: "info",
+  MERGING: "info",
+  REVIEWED: "info",
+  PARSED: "info",
+  IN_PROGRESS: "info",
+  ACTIVATING: "info",
+  READY_TO_ACTIVATE: "info",
+  PACKED: "success",
+  PICKED: "success",
+  RESOLVED: "success",
+  IMPORTED: "success",
+  COMPLETED: "success",
+  ACTIVE: "success",
+  OK: "success",
+  CACHED: "success",
+  MAPPED: "success",
+  OWNER_SELECTED: "success",
+  EXACT_SKU: "success",
+  EXACT_FSN: "success",
+  EXACT_FNSKU: "success",
+  EXACT_ASIN: "success",
+  EXACT_EXTERNAL_ID: "success",
+  EXACT_BARCODE: "success",
+  WARNING: "warning",
+  MISSING_IMAGE: "warning",
+  COMPLETED_WITH_WARNINGS: "warning",
+  PASSWORD_REQUIRED: "warning",
+  REVIEW_REQUIRED: "warning",
+  NEEDS_MAPPING: "warning",
+  AWAITING_FILE_ROLES: "warning",
+  RECHECK_NEEDED: "warning",
+  EXACT_MULTIPLE: "warning",
+  FAILED_RESTORED: "warning",
+  PROBLEM: "error",
+  OPEN: "error",
+  NOT_FOUND: "error",
+  NEEDS_ACTION: "error",
+  FAILED: "error",
+  BROKEN: "error",
+  INVALID: "error",
+  IDENTIFIER_CONFLICT: "error",
+  QUEUED: "neutral",
+  UPLOADED: "neutral",
+  INACTIVE: "neutral",
+  CANCELLED: "neutral",
+  DRAFT: "neutral",
+  LOCKED: "neutral",
+  SKIPPED: "neutral",
+  NOT_CACHED: "neutral",
+  OWNER: "neutral",
+  PICKER: "neutral",
+  PACKER: "neutral",
 };
 
+const toneClass: Record<StatusTone, string> = {
+  neutral: "ui-state--neutral",
+  info: "ui-state--info",
+  success: "ui-state--success",
+  warning: "ui-state--warning",
+  error: "ui-state--error",
+};
+
+function StatusMarker({ tone }: { tone: StatusTone }) {
+  if (tone === "success") return <path d="m2 5 2 2 4-5" />;
+  if (tone === "warning") return <path d="M5 2v4M5 8.25h.01" />;
+  if (tone === "error") return <path d="m2 2 6 6M8 2 2 8" />;
+  if (tone === "info") return <path d="M5 4.25V8M5 2h.01" />;
+  return <path d="M2 5h6" />;
+}
+
 export function StatusBadge({ value }: { value: string }) {
-  const icon =
-    ["COMPLETED", "PACKED", "PICKED", "RESOLVED", "IMPORTED", "ACTIVE", "OK"].includes(value)
-      ? "✓"
-      : ["FAILED", "NOT_FOUND", "NEEDS_ACTION"].includes(value)
-        ? "×"
-        : ["WARNING", "PROBLEM", "MISSING_IMAGE", "COMPLETED_WITH_WARNINGS", "PASSWORD_REQUIRED"].includes(value)
-          ? "!"
-          : ["RUNNING"].includes(value)
-            ? "↻"
-            : "•";
+  const tone = statusTone[value] ?? "neutral";
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusTone[value] ?? statusTone.UPLOADED}`}>
-      <span aria-hidden="true" className="font-black">{icon}</span>
-      {titleCase(value)}
+    <span className={`ui-status-badge ${toneClass[tone]}`} data-status={value} data-tone={tone}>
+      <svg aria-hidden="true" className="ui-status-badge__marker" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5">
+        <StatusMarker tone={tone} />
+      </svg>
+      <span>{titleCase(value)}</span>
     </span>
   );
 }

@@ -8,23 +8,35 @@ Business behavior is frozen: no database model/migration, route/action contract,
 
 ## Phase B — foundation and owner orientation
 
-### B1: tokens and primitives
+### B1a: tokens, actions, fields, and focus
 
-Scope: CSS/Tailwind token normalization and the smallest shared primitives supported by duplicate usage: button/link-button, fields, feedback banner, surface, metric, normalized status badge, empty state. No route redesign.
+Scope: CSS/Tailwind token normalization plus `Button`/link-button and base `Field` behavior. Normalize pending, disabled, danger, help/error, and visible-focus states without redesigning a route or changing a server-action contract.
 
-Gate: typecheck, lint, primitive tests where practical, detector, keyboard/focus states, contrast review, 390/768/1440 component harness or representative consumers. One commit.
+Gate: typecheck, lint, focused primitive tests, detector, keyboard/focus and contrast review, and representative consumers at 360/390/430/768/1024/1440. One commit.
+
+### B1b: feedback and surface primitives
+
+Scope: `FeedbackBanner`, `StatusBadge`, `Surface`/`SectionCard`, `EmptyState`, and `Metric`. Preserve semantic status vocabulary and existing data; normalize live-region behavior, hierarchy, radius/density, and intrinsic-width safety.
+
+Gate: success/warning/error/read-only/empty/long-label states, screen-reader semantics, no document overflow, and all six approved widths. One commit.
+
+### B1c: collection primitives, deferred
+
+Scope: introduce only the smallest `FilterBar`, `Pagination`, or bounded `DataRegion` primitives proven necessary by the first owner collection selected for migration. Do not build a speculative collection framework during B1a/B1b.
+
+Gate: at least two real consumers or defer the primitive; mobile list/card and desktop comparison behavior; labelled internal scrolling; all six approved widths. One commit only when the first owner collection is authorized.
 
 ### B2: shell
 
 Scope: `AppShell`, `AppNav`, mobile drawer/account menu/overlay support and at most the directly required primitive files. Group navigation, fix exact current-route ownership, complete keyboard/focus/background semantics, and make header density responsive.
 
-Gate: one `aria-current` for nested owner/worker routes; expanded/collapsed/drawer/account menu at 390/768/1440; Tab/Shift+Tab/Escape/arrows; no overflow; role/capability visibility unchanged. One commit.
+Gate: one `aria-current` for nested owner/worker routes; expanded/collapsed/drawer/account menu at all six approved widths; Tab/Shift+Tab/Escape/arrows/Home/End; background isolation; no overflow; role/capability visibility unchanged. One commit.
 
 ### B3: dashboard
 
 Scope: dashboard page plus its data adapter/loading/error presentation and directly used metrics/actions. Recompose as owner command center, correct marketplace/purpose labels, fix 360/390 overflow, and align loading/empty/error states. Do not invent new business metrics.
 
-Gate: populated/empty/error/import-risk states, owner account variants, 360/390/768/1440 measurements, exact action destinations, no document overflow, no console/page/request errors. One commit.
+Gate: populated/empty/error/import-risk states, owner account variants, all six approved widths, exact action destinations, no document overflow, no console/page/request errors. One commit.
 
 **Owner review gate:** approve foundation, shell, and dashboard before worker routes.
 
@@ -34,7 +46,7 @@ Gate: populated/empty/error/import-risk states, owner account variants, 360/390/
 
 Scope: common work-card anatomy and the smallest adapters for `GroupedWorkCard`/`WorkTaskCard`; no stage behavior change.
 
-Gate: source/account/stage/status/quantity/assignment/instructions/actions preserved for order and consignment cards at 390/768/1440; keyboard and long identifier tests. One commit.
+Gate: source/account/stage/status/quantity/assignment/instructions/actions preserved for order and consignment cards at all six approved widths; keyboard and long identifier tests. One commit.
 
 ### C2: Pick
 
@@ -74,7 +86,7 @@ Gate: no-result/multiple/exact/completed/read-only/permission/account mismatch; 
 
 Scope: product inventory list/filter/pagination/create/edit entry patterns.
 
-Gate: long identifiers, missing image/title/category, marketplace variants, mobile card/desktop comparison, 390/768/1440. One commit.
+Gate: long identifiers, missing image/title/category, marketplace variants, mobile card/desktop comparison, all six approved widths. One commit.
 
 ### D2: Product Details and Missing Data
 
@@ -94,22 +106,34 @@ Scope: batch list/create/import/review/detail/issues/activation presentation.
 
 Gate: draft/validation/blocking/warning/active/completed states, line form density, account/marketplace isolation, activation evidence. One commit, or split review from list/detail if over budget.
 
-### D5: Accounts and Users
+### D5a: Accounts
 
-Scope: summary list/table and single focused create/edit surfaces; all account, role, capability, assigned-account, active, and password-reset semantics remain intact.
+Scope: account summary collection and one focused create/edit surface. Preserve selected-account switching, marketplace/account identity, activation/deactivation, confirmation, last-import context, and every server-action contract.
 
-Gate: owner/worker variants, validation/errors, keyboard focus, 390/768/1440, exact permission payload parity. One commit, or split Accounts and Users if over budget.
+Gate: collapsed disclosure baseline, one/two-editor stress states, validation/errors, keyboard focus, exact account target boxes, all six approved widths, and exact mutation payload parity. One commit.
 
-### D6: Data Management, Reports, and System
+### D5b: Users
 
-Scope: administrative IA and shared status/metric/data-region patterns. Preserve typed phrases, quarantine/restore/purge retention, report data, audit evidence, and production checks.
+Scope: user/session summary collection and one focused create/edit surface. Preserve role, capability, assigned-account, active-session, password-reset, and permission semantics.
 
-Gate: destructive flows and disabled conditions, empty/history states, 760 px data region containment, report/system error states. Split into D6a/D6b if the normal file/line budget is exceeded.
+Gate: owner/worker variants, one/two-editor stress states, validation/errors, keyboard focus, all six approved widths, and exact permission payload parity. One commit.
+
+### D6a: Data Management
+
+Scope: destructive-action IA and shared status/data-region patterns. Preserve typed phrases, quarantine/restore/purge retention, audit evidence, disabled conditions, and production protections.
+
+Gate: destructive flows without executing them in visual QA, disabled conditions, empty/history states, 760 px data-region containment, focus/recovery, and all six approved widths. One commit.
+
+### D6b: Reports and System
+
+Scope: report/system hierarchy, status/metric patterns, download/action targets, production checks, and error/empty presentation. Preserve report data and operational behavior.
+
+Gate: report/system empty/error/healthy states, exact link destinations, true control target boxes, responsive containment at all six approved widths, and no console/page/request errors. One commit.
 
 **Owner review gate:** approve owner/admin consistency, data safety, and responsive behavior.
 
 ## Phase E — focused QA and closure
 
-No broad redesign. Fix only defects found in the accepted B–D surfaces. Run full typecheck/lint/tests/build, detector, protected-path check, browser matrix at 390/768/1440 plus 360 stress cases, keyboard/focus/reduced-motion/contrast review, long-content and empty/error/loading/conflict states, and console/page/request error review. Re-run any business invariants whose presentation changed around a server action.
+No broad redesign. Fix only defects found in the accepted B–D surfaces. Run full typecheck/lint/tests/build, detector, protected-path check, browser matrix at 360/390/430/768/1024/1440, keyboard/focus/reduced-motion/contrast review, long-content and empty/error/loading/conflict states, and console/page/request error review. Re-run any business invariants whose presentation changed around a server action.
 
 Phase E ends with an owner evidence review and a separate release decision. It does not implicitly authorize PostgreSQL migration, deployment, merging, or mobile work.

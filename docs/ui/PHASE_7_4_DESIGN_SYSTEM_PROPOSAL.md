@@ -17,12 +17,25 @@ This is a proposal for later implementation, not a claim that current code alrea
 | text | slate-950 / `#0f172a` | primary identity/content |
 | muted | slate-600/500 | supporting metadata with verified contrast |
 | border | slate-200/300 | grouping and control boundaries |
-| action | berry-800 / `#9f1239` | one primary action/current identity |
+| action | proposed berry-800 / `#9f1239` | one primary action/current identity; owner approval required |
 | success | teal-700 plus teal-50 | completed/healthy/safe confirmation |
 | warning | amber-800 plus amber-50 | attention/locked/missing prerequisite |
 | danger | rose-700 plus rose-50 | blocking error/problem/destructive intent |
 
 No semantic meaning is encoded by background alone. Avoid using berry as a decorative brand wash.
+
+The implemented primary berry is currently `#be185d` (matching `tailwind.config.ts`, `DESIGN.md`, and `.impeccable/design.json`). Moving to the darker proposed `#9f1239` is an explicit owner-review decision, not an approved Phase 7.4A change. Until approved and implemented in a bounded chunk, current-system documentation must continue to report `#be185d`.
+
+### B1a palette decision evidence
+
+| Check | Current `#be185d` | Proposed `#9f1239` | Decision implication |
+| --- | --- | --- | --- |
+| White text contrast | 6.04:1 | 8.02:1 | Both pass WCAG AA for normal text; the proposal is darker |
+| Current hover | `pink-800` / `#9d174d`; 7.88:1 with white | No hover token approved; `#9d174d` would be only 1.02:1 from the proposed base | B1a must define and visibly test a distinct proposed hover state rather than inherit it silently |
+| Focus visibility | Global teal `#0f766e` outline is offset by a 2 px gap and contrasts 5.47:1 with the surrounding white surface | Same focus treatment requires visual verification on every proposed state | Keep the offset separation; do not depend on teal-versus-berry hue contrast alone |
+| Danger/warning distinction | Berry is close in luminance to rose danger and amber warning | Darker berry remains close to both semantic colors | Continue explicit labels/icons and pale semantic surfaces; color alone is insufficient |
+
+Status: OWNER_DECISION_REQUIRED. Phase 7.4A documents the comparison only; it does not change runtime tokens.
 
 ### Type roles
 
@@ -42,18 +55,21 @@ Reduce indiscriminate `font-black`; reserve it for primary identifiers, urgent v
 - Shadow: border-first surfaces; small shadow for ordinary cards; raised shadow only for overlays/sticky elevated regions.
 - Control heights: 44 px standard, 56 px scan-first.
 
-## Primitive set for B1
+## Primitive sequence
 
 Implement only primitives proven by current duplication:
 
-- `Button`/link-button variants: primary, secondary, quiet, danger; pending/disabled/focus states.
-- `Field`, `SelectField`, `TextAreaField`, error/help text.
-- `FeedbackBanner`: status, warning, error with correct live-region behavior.
-- `Surface`/`SectionCard` with two radius/density variants.
-- `Metric`: value, label, timeframe/scope, status/action linkage.
-- `StatusBadge`: normalized semantic mapping, icon/text, shrink behavior.
-- `EmptyState` refinement.
-- `FilterBar`, `Pagination`, and internally scrollable `DataRegion` only if they stay small and composable.
+### B1a
+
+- Token normalization, `Button`/link-button variants, base `Field`, help/error text, and shared focus behavior.
+
+### B1b
+
+- `FeedbackBanner`, `StatusBadge`, `Surface`/`SectionCard`, `EmptyState`, and `Metric`.
+
+### B1c — deferred until the first owner collection
+
+- `FilterBar`, `Pagination`, and internally scrollable `DataRegion` only when the first authorized collection proves at least two real consumers.
 
 Do not create a speculative component catalog. Each primitive needs at least two real consumers in the planned sequence.
 
@@ -85,7 +101,7 @@ This anatomy unifies presentation while keeping stage/business behavior separate
 
 - Mobile: card/list with key identity, state, top evidence, one action, and disclosure.
 - Desktop: table for comparison only, with intentional column preset and constrained scroll region.
-- Detail/edit: one selected object in a page, drawer, or dialog chosen by complexity; not every editor expanded at once.
+- Detail/edit: one selected object in a page, drawer, or dialog chosen by complexity; do not instantiate every repeated editor/form in the initial collection DOM.
 
 ### Dashboard
 
@@ -140,7 +156,7 @@ Use an inline `role=status` near the affected scope for durable or recoverable a
 
 ## Library decision
 
-No new dependency is approved by this proposal. If hand-maintaining overlay/menu behavior becomes the main risk, evaluate Base UI in an isolated B1 proof. Record minified/gzip impact, accessibility coverage, styling/control fit, maintenance health, SSR compatibility, and rollback before adoption.
+No new dependency is approved by this proposal. If hand-maintaining overlay/menu behavior becomes the main risk, evaluate Base UI in an isolated B1a/B2 proof. Record minified/gzip impact, accessibility coverage, styling/control fit, maintenance health, SSR compatibility, and rollback before adoption.
 
 ## Governance
 

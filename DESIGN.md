@@ -2,7 +2,7 @@
 name: Marketplace Pick & Pack Operations UI
 description: A restrained, high-clarity warehouse operations system built from stone surfaces, slate text, berry actions, and semantic status colors.
 colors:
-  primary: "#9f1239"
+  primary: "#be185d"
   background: "#fafaf9"
   foreground: "#0f172a"
   muted: "#64748b"
@@ -37,7 +37,7 @@ The system is intentionally restrained. Density is acceptable when the informati
 
 - Canvas: stone/near-white `#fafaf9`.
 - Primary text: slate `#0f172a`; secondary text uses slate-600/500 only where contrast remains sufficient.
-- Primary action/accent: berry `#9f1239`; use selectively for the main action, current nav identity, and links.
+- Primary action/accent: implemented berry `#be185d`; use selectively for the main action, current nav identity, and links. The darker `#9f1239` remains an unapproved proposal requiring owner review before implementation.
 - Success: teal surfaces and text. Warning: amber. Blocking/error: rose. Neutral/inactive: slate.
 - Do not color every metric. A neutral value stays neutral until status or urgency gives color semantic work.
 - Pale colored backgrounds require dark semantic text and an explicit label or icon.
@@ -70,6 +70,6 @@ No decorative motion on scan, claim, quantity, route, complete, pack, or problem
 
 # Do and Don't
 
-Do preserve the app's calm stone/slate/berry character, make responsibility visible, use specific recovery copy, and test at 390/768/1440 with real long identifiers and every important state.
+Do preserve the app's calm stone/slate/berry character, make responsibility visible, use specific recovery copy, and test at 360/390/430/768/1024/1440 with real long identifiers and every important state.
 
 Do not add gradients, glass effects, decorative illustrations, animated charts, icon-only operational navigation, arbitrary large whitespace, or generic dashboard decoration. Do not merge business-distinct Amazon and Flipkart import flows. Do not hide worker actions or production instructions behind visual novelty.

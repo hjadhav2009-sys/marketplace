@@ -2,7 +2,7 @@
   "version": 1,
   "name": "Marketplace Pick & Pack Operations UI",
   "colors": {
-    "berry": ["#fff1f2", "#ffe4e6", "#fecdd3", "#fb7185", "#9f1239"],
+    "berry": ["#fff1f2", "#ffe4e6", "#fecdd3", "#fb7185", "#be185d"],
     "slate": ["#f8fafc", "#f1f5f9", "#e2e8f0", "#64748b", "#0f172a"],
     "teal": ["#f0fdfa", "#ccfbf1", "#5eead4", "#0f766e", "#134e4a"],
     "amber": ["#fffbeb", "#fef3c7", "#fcd34d", "#92400e", "#451a03"],

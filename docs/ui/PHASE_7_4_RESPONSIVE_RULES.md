@@ -81,7 +81,7 @@ Every implementation chunk must be checked at all six owner-approved widths: 360
 
 ## Known baseline defect
 
-Preserved evidence for the source-identical dashboard at 360 px recorded `clientWidth=360`, `scrollWidth=433`, and 73 px document overflow. Both Recent imports links measured about 419 px wide inside a card reaching x=433. The causal chain is the dashboard's implicit single-column grid, a card without `min-w-0`, a flex row with gap, a nowrap truncated filename, metadata, and an intrinsic-width `StatusBadge`. This must be fixed and remeasured in B3; clipping or `overflow-x-hidden` on the document is not an acceptable fix.
+Fresh focused evidence recorded dashboard `clientWidth/scrollWidth` of `360/433`, `390/433`, and `430/433`, for 73, 43, and 3 px overflow; 768/1024/1440 had none. Recent imports anchors measured about 419 px wide inside a card reaching x=433. The import filename/metadata/intrinsic-badge min-content chain establishes an oversized implicit grid track, and the sibling Recent work card expands to the same track. This must be fixed and remeasured in B3; clipping or `overflow-x-hidden` on the document is not an acceptable fix.
 
 ## Browser QA matrix
 
@@ -97,4 +97,4 @@ For every representative route/state record: route, role/account, fixture/state,
 - accounts/users create/edit/permission variants;
 - Data Management destructive flow, Reports, and System health.
 
-Fresh Phase 7.4A browser execution was unavailable because the connected browser runtime reported `No browser is available` and port 3188 had no listener. Source analysis and preserved source-identical dashboard evidence are documented, but future implementation cannot claim its browser gate from this audit alone.
+Phase 7.4A1 completed a controlled repository-Playwright run against `PRIVATE_SYNTHETIC_STAGING`: 102 route/state/width records, seven sanitized screenshots, and no console/page/request/HTTP errors. Only Dashboard overflowed the document, at 360/390/430; the other inspected routes were contained. Shell current-link, drawer isolation, account-menu keyboard, collapsed-but-instantiated admin forms, and exact Accounts target sizes were measured. See [Phase 7.4A1 focused browser evidence](./PHASE_7_4A_BROWSER_EVIDENCE.md). Populated Mark, Assembly, Pack, and Work Problems states were not reproduced, so their later chunks must still satisfy their own browser gates.

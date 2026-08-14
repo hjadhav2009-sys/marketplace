@@ -2,7 +2,7 @@
 
 ## Scope and method
 
-This inventory covers the Next.js web application at audit baseline `1ea806db0da41cc94bc6973a364ab33c87b9b9c7`. It is a source inventory, not a claim that every state was freshly rendered. The repository contains roughly 186 `app` files (16.8k lines), 28 `components` files (3.6k lines), 82 `src` files (10.6k lines), and 56 `lib` files (7.5k lines).
+This inventory covers the Next.js web application at audit/source baseline `e81c2f25f29fba99cbf4a254adf26b39856c4a65`. It combines source inventory with the bounded states rendered in the [focused browser evidence](./PHASE_7_4A_BROWSER_EVIDENCE.md); it does not claim that every possible state was populated. The repository contains roughly 186 `app` files (16.8k lines), 28 `components` files (3.6k lines), 82 `src` files (10.6k lines), and 56 `lib` files (7.5k lines).
 
 ## Shared shell and primitives
 
@@ -15,13 +15,13 @@ This inventory covers the Next.js web application at audit baseline `1ea806db0da
 | `StatusBadge` | semantic status label | Dashboard, imports, consignments, inventory, users, reports, packing, problems, system | Keep; normalize sizes and no-shrink behavior |
 | `SubmitButton` | pending-state server-action control | Very broad | Keep; unify variants, disabled/pending/live feedback |
 | `EmptyState` | list/workflow empty state | Imports, catalog, cleanup, consignments, manual review, system, reports, problems | Keep; require cause and safe next action |
-| `StatCard` | KPI card | Dashboard, manual review, system | Consolidate with metric semantics in B1/B3 |
+| `StatCard` | KPI card | Dashboard, manual review, system | Consolidate with metric semantics in B1b/B3 |
 | `ProductImage` and galleries | safe product/image presentation and retry | Inventory and worker details | Keep; standardize aspect/placeholder/retry language |
 | `ProductDetailsDrawer` | detailed listing/product information | Pick/product workflows | Keep; address focus/background semantics in C1/C2 |
 | `GroupedWorkCard` | projected grouped work and stage action | Smart Pick/Mark/Assembly/Pack | Core worker primitive; normalize in C1 |
 | `WorkTaskCard` | legacy/consignment task card | Consignment queues/problems | Consolidate visual grammar in C1, preserve logic |
 | `UniversalScannerPanel` | exact account-scoped work lookup and actions | `/work/scan`, packing integrations | Strong operational pattern; refine in C6 |
-| `DataActionDetails` | high-risk data-management action details | Data Management | Keep confirmation/provenance; improve hierarchy in D6 |
+| `DataActionDetails` | high-risk data-management action details | Data Management | Keep confirmation/provenance; improve hierarchy in D6a |
 | `MarketplaceImportWizard` | legacy import flow | Owner upload/import entry points | Preserve behavior; split marketplace/purpose intent in D3 |
 
 ## Complete reusable-file classification
@@ -34,11 +34,11 @@ Variants/routes are summarized by family; responsive and accessibility notes des
 | `components/AppNav.tsx` | owner/worker navigation | expanded, collapsed, mobile; permission-driven | Prefix active bug; long ungrouped nav | REFACTOR P1; grouped route-owned nav B2 |
 | `components/AppShell.tsx` | global authenticated frame | desktop rail/mobile header/account context | Breakpoints use viewport more than remaining rail width | POLISH P1; responsive shell B2 |
 | `components/AwbBarcodeScanner.tsx` | packing scan capture | client scanner/input behaviors | Scanner input patterns overlap universal scan | CONSOLIDATE P2; scanner-input contract C5/C6 |
-| `components/DataActionDetails.tsx` | destructive scope/evidence | disclosure/detail presentation | Unique safety content; visual shell duplicated | KEEP P1; risk-detail surface D6 |
+| `components/DataActionDetails.tsx` | destructive scope/evidence | disclosure/detail presentation | Unique safety content; visual shell duplicated | KEEP P1; risk-detail surface D6a |
 | `components/DynamicMarketplaceListingForm.tsx` | marketplace listing form | field sets by marketplace | Large specialized form; basic fields repeated | POLISH P2; shared field primitives D1/D2 |
-| `components/EmptyState.tsx` | empty collections/work | title/description/optional action | Several routes hand-roll empty boxes | CONSOLIDATE P1; causal empty state B1 |
+| `components/EmptyState.tsx` | empty collections/work | title/description/optional action | Several routes hand-roll empty boxes | CONSOLIDATE P1; causal empty state B1b |
 | `components/FileUploadField.tsx` | file upload input | file constraints/help | Upload pages also hand-roll file controls | POLISH P2; upload field D3/D4 |
-| `components/FormPendingStatus.tsx` | pending feedback | client pending state | Live-region usage inconsistent around forms | CONSOLIDATE P1; feedback contract B1 |
+| `components/FormPendingStatus.tsx` | pending feedback | client pending state | Live-region usage inconsistent around forms | CONSOLIDATE P1; feedback contract B1b |
 | `components/ImportJobProgress.tsx` | import state/progress | status-specific progress | Import job/list cards duplicate status hierarchy | POLISH P1; import progress D3 |
 | `components/MarketplaceImportWizard.tsx` | legacy marketplace import wizard | purpose/marketplace steps | Entry intent stale/overlapping; preserve importer logic | REFACTOR P1; import-intent shell D3 |
 | `components/MobileAccountMenu.tsx` | mobile account/actions menu | menu roles, Escape/outside close, focus return | Missing arrow/Home/End and managed initial focus | REFACTOR P1; accessible menu B2 |
@@ -50,10 +50,10 @@ Variants/routes are summarized by family; responsive and accessibility notes des
 | `components/product-image-actions.ts` | image-related actions | server-action helpers | Behavior, not a visual primitive | KEEP; frozen business behavior |
 | `components/ProductImageGallery.tsx` | product gallery | thumbnails/active image | Similar Work gallery | CONSOLIDATE P2; gallery primitive D2 |
 | `components/ScannerPickRouteDialog.tsx` | scanner route choice | dialog/form/action state | Overlaps `WorkRouteDialog`; verify focus contract | CONSOLIDATE P1; route decision dialog C2/C6 |
-| `components/StatCard.tsx` | metrics | basic label/value/detail | Manual metrics and dashboard cards duplicate | REPLACE P1; scoped Metric B1/B3 |
-| `components/StatusBadge.tsx` | status vocabulary | mapped semantic classes/fallback | No-shrink/intrinsic width contributes to overflow | POLISH P1; normalized badge B1 |
+| `components/StatCard.tsx` | metrics | basic label/value/detail | Manual metrics and dashboard cards duplicate | REPLACE P1; scoped Metric B1b/B3 |
+| `components/StatusBadge.tsx` | status vocabulary | mapped semantic classes/fallback | No-shrink/intrinsic width contributes to overflow | POLISH P1; normalized badge B1b |
 | `components/StructuredDetails.tsx` | grouped label/value details | sectioned disclosure/read-only | Useful operational density | KEEP P2; detail sections C/D |
-| `components/SubmitButton.tsx` | server-action submission | primary/secondary/pending | Route buttons/links use many ad hoc classes | CONSOLIDATE P1; Button family B1 |
+| `components/SubmitButton.tsx` | server-action submission | primary/secondary/pending | Route buttons/links use many ad hoc classes | CONSOLIDATE P1; Button family B1a |
 | `components/UniversalScanInput.tsx` | scan-first exact input | focus/select behavior | AWB/queue search inputs overlap | CONSOLIDATE P1; scanner input C6 |
 | `components/UniversalScannerPanel.tsx` | account-scoped lookup/results/actions | filters, candidate states, action-specific forms | Dense monolith; strongest business-specific pattern | REFACTOR P1; scanner composition C6 |
 | `components/WorkImageGallery.tsx` | worker reference gallery | work images/fallback | Duplicates product-gallery frame | CONSOLIDATE P2; gallery primitive C1/C3/C4 |
@@ -68,7 +68,7 @@ Variants/routes are summarized by family; responsive and accessibility notes des
 | `app/work/WorkerQueuePage.tsx` | legacy consignment queue | search/status tabs/task cards | Naming and card grammar diverge from SmartStage | CONSOLIDATE P1; stage-page adapter C1–C5 |
 | `app/work/assembly/OrderAssemblyCard.tsx` | order assembly task | instruction/action card | Stage-specific but repeats work-card anatomy | CONSOLIDATE P1; Assembly adapter C4 |
 
-Native buttons, links, inputs, selects, textareas, checkboxes/radios, `details/summary`, tables, tabs, pagination, cards, alerts, and loading blocks are also repeatedly authored at route level. They are not separate component files today; B1 should introduce only the smallest primitives with multiple proven consumers. Dialog, sheet, and drawer selection rules live in the design-system proposal.
+Native buttons, links, inputs, selects, textareas, checkboxes/radios, `details/summary`, tables, tabs, pagination, cards, alerts, and loading blocks are also repeatedly authored at route level. They are not separate component files today; B1a/B1b should introduce only the smallest primitives with multiple proven consumers, while B1c collection primitives remain deferred until the first owner collection. Dialog, sheet, and drawer selection rules live in the design-system proposal.
 
 ## Route families
 
@@ -114,8 +114,8 @@ Native buttons, links, inputs, selects, textareas, checkboxes/radios, `details/s
 
 - `/owner/accounts` creates/edits seller accounts and exposes last-import/account context.
 - `/owner/users` creates workers, assigns accounts/capabilities, edits identity/permissions, resets passwords, and lists users.
-- P2: owner user page is 565 lines and renders expanded edit/password forms per mapped user before/around the table. This is a high cognitive and DOM load; use a summary list/table plus one focused edit surface.
-- Owner account page similarly mixes create and repeated edit cards; standardize with selection/detail patterns without changing permissions.
+- P2: Accounts has five disclosures and Users has twelve; all are visually closed initially, but their repeated create/edit/capability/password forms are already instantiated (10 Accounts forms; 41 Users forms and about 2,200 DOM nodes). Use a summary collection plus one focused edit surface.
+- Accounts also has four true controls measuring 40 px high at all six audited widths. Address Accounts in D5a and Users in D5b without changing permissions or server actions.
 
 ### Data management, reports, and system
 

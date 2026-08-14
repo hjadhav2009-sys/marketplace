@@ -60,7 +60,7 @@ No UI dependency is added in 7.4A. If a later chunk needs a robust dialog, menu,
 
 1. Read `PRODUCT.md`, `DESIGN.md`, this policy, the master audit, and the chunk definition.
 2. Confirm protected business behavior and exact runtime-file budget.
-3. Capture before-state evidence at 390/768/1440 where applicable.
+3. Capture before-state evidence at 360/390/430/768/1024/1440 where applicable.
 4. Implement one bounded chunk; do not bundle neighboring routes opportunistically.
 5. Run detector, typecheck, lint, relevant tests, keyboard/focus review, overflow measurements, and browser screenshots.
 6. Stop for the required owner-review gate after each chunk group.

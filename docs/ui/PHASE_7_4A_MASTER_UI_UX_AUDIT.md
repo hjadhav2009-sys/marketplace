@@ -10,15 +10,15 @@ No P0 safety defect was identified in this UI-only audit. Three P1 findings need
 
 - Repository: `hjadhav2009-sys/marketplace`
 - Branch: `phase-7.4a-ui-foundation-audit`
-- Baseline SHA: `1ea806db0da41cc94bc6973a364ab33c87b9b9c7`
-- Scope: design skills, source audit, responsive/accessibility analysis, design-system proposal, implementation sequence, and PostgreSQL roadmap.
+- Baseline/source SHA: `e81c2f25f29fba99cbf4a254adf26b39856c4a65`
+- Scope: design skills, source audit, controlled synthetic-staging browser evidence, responsive/accessibility analysis, design-system proposal, implementation sequence, and PostgreSQL roadmap.
 - Frozen: runtime application code, business logic, routes/actions, permissions, account isolation, workflow/database semantics, imports/reports, mobile app, deployment, merge, and PR creation.
 
 ## Evidence quality
 
-The audit combined repository-wide source inspection, component/route usage mapping, Prisma schema comparison, installed-skill detector output, and two independent Impeccable critiques. A fresh interactive browser audit could not run: the browser integration returned `No browser is available`, port 3188 had no listener, and the staging build did not yield a startable receipt during the audit window.
+The audit combined repository-wide source inspection, component/route usage mapping, Prisma schema comparison, installed-skill detector output, two independent Impeccable critiques, and a fresh repository-controlled Playwright run against `PRIVATE_SYNTHETIC_STAGING`. The closure produced 102 route/state/width records at the six approved widths, seven sanitized screenshots, and zero console errors, page errors, unexpected failed requests, or HTTP error responses. Full measurements and reproduction limits are in [Phase 7.4A1 focused browser evidence](./PHASE_7_4A_BROWSER_EVIDENCE.md).
 
-One preserved synthetic dashboard trace is applicable because the dashboard/shell/nav source is byte-equivalent between its runtime SHA `b3e0e85b89caab391f12b22cb1d43c9b5f48ac75` and this audit baseline. It records the 360 px overflow described below. Older captures whose shell markup differed were excluded. Therefore all other responsive conclusions are source-grounded hypotheses that require fresh verification in B/C/D implementation gates.
+The browser closure confirms the dashboard overflow, marketplace/import mismatch, multiple-current navigation, shell keyboard gaps, admin DOM complexity, and responsive containment findings described below. It disproves the earlier wording that repeated Accounts/Users editors were visually expanded initially: the disclosures are closed, but their forms are already instantiated. Populated Mark, Assembly, Pack, and Work Problems states were not reproduced and remain mandatory C3–C6 implementation gates.
 
 ## What is working
 
@@ -26,7 +26,7 @@ One preserved synthetic dashboard trace is applicable because the dashboard/shel
 - Scanning/searching does not mutate work; actions remain explicit.
 - Worker surfaces preserve quantities, assignment, workflow snapshots, problem state, and missing-instruction warnings.
 - Global focus styling is visible (3 px teal outline with 2 px offset).
-- Most operational controls meet a 44 px target; scanner controls are 56 px.
+- Most operational controls meet a 44 px target; scanner controls are 56 px. Four Accounts controls measure 40 px high and are tracked as F13.
 - Drawer code handles Escape, focus looping, focus return, and body-scroll lock.
 - Status is normally expressed with text and semantic color, not color alone.
 - Product inventory cards demonstrate a useful responsive identity/details pattern.
@@ -45,12 +45,13 @@ One preserved synthetic dashboard trace is applicable because the dashboard/shel
 | F04 P2 | Dashboard `page.tsx:83,110,120–134`; `StatusBadge.tsx:47` | Owner; 360/390 | Intrinsic grid/flex sizing yields 433 px document on 360 px client | Constraint-safe grid/card/row primitive with `min-w-0` | Hidden/clipped UI; B3 |
 | F05 P2 | Owner/worker shell `AppNav`, `AppShell` | All; 360–1440 | ~22 owner links and long capability nav lack task chunking | Grouped labelled navigation; no icons-only fallback | High search/recall cost; B2 |
 | F06 P2 | Imports `app/owner/imports/page.tsx` | Owner/import manager; 360–1024 | 18-column, 1500 px table is a narrow peephole | Mobile cards plus desktop column presets/data region | Comparison/overflow; D3 |
-| F07 P2 | Users `app/owner/users/page.tsx:251,314–401` | Owner; all | Repeated expanded edit/password forms per user | Summary collection plus one focused editor | Error/cognitive/DOM cost; D5 |
+| F07 P2 | Users `app/owner/users/page.tsx:251,314–401` | Owner; all | Disclosures start closed, but repeated edit/password forms are already instantiated per user | Summary collection plus one focused editor | Error/cognitive/DOM cost; D5b |
 | F08 P2 | Worker `GroupedWorkCard`, `WorkTaskCard`, `UniversalScannerPanel` | Workers/owner; all | Multiple card anatomies reorder identity/state/evidence/action | Shared WorkCard anatomy with stage adapters | Misread/maintenance drift; C1–C6 |
-| F09 P2 | Mobile drawer/account menu/role tabs | All; 360–1024 | Incomplete inert/menu-arrow/tab keyboard behavior | Shared overlay/menu/tab primitives with complete focus patterns | Keyboard/a11y; B1/B2 |
-| F10 P2 | Shared app/components | All; all | Repeated cards/banners/filters/pagination; seven radius families | Tokenized primitives migrated only by chunk | Visual/behavior drift; B1 then C/D |
+| F09 P2 | Mobile drawer/account menu/role tabs | All; 360–1024 | Incomplete inert/menu-arrow/tab keyboard behavior | Shared overlay/menu/tab primitives with complete focus patterns | Keyboard/a11y; B1a/B2 |
+| F10 P2 | Shared app/components | All; all | Repeated cards/banners/filters/pagination; seven radius families | Tokenized primitives migrated only by chunk | Visual/behavior drift; B1a–B1c then C/D |
 | F11 P2 | Consignment review/details | Owner/import manager; all | Dense repeated per-line forms mix evidence and mutations | Review row/card with issue summary and focused action | Activation error risk; D4 |
 | F12 P3 | Dashboard/loading | Owner; 360–430 | Fifth equal KPI is orphaned and skeleton differs from content | Deliberate metric priority and state-parity skeleton | Polish/comprehension; B3 |
+| F13 P2 | Accounts `/owner/accounts` | Owner; all six widths | Switch, Deactivate, Reactivate, and deactivation-confirmation input are each 40 px high | Raise true interactive boxes to at least 44 px without changing actions | Touch/motor target; D5a |
 
 Every later defect must use this same evidence shape. A recommendation does not authorize business behavior change.
 
@@ -86,7 +87,7 @@ Recommendation: adopt the responsive rules document, constraint-based grid track
 
 ### P2 — confirmed dashboard document overflow
 
-At 360 px, preserved evidence records `clientWidth=360`, `scrollWidth=433`, overflow 73 px. Recent imports anchors measured 419 px. The root cause is intrinsic grid/flex sizing around `app/dashboard/page.tsx` lines 83, 110, and 120–134: implicit grid track, missing `min-w-0`, nowrap/truncate filename plus metadata and an intrinsic status badge.
+Fresh evidence records `clientWidth/scrollWidth` of `360/433`, `390/433`, and `430/433`, for exact overflow of 73, 43, and 3 px; the defect is absent at 768/1024/1440. Recent imports anchors measured about 419 px. The root cause is intrinsic grid/flex sizing around `app/dashboard/page.tsx` lines 83, 110, and 120–134: the import filename/metadata/badge min-content chain establishes an oversized implicit grid track, and the sibling Recent work card expands to the same track.
 
 Recommendation: fix the sizing chain in B3 and remeasure. Do not conceal the defect with document clipping.
 
@@ -97,19 +98,19 @@ Recommendation: fix the sizing chain in B3 and remeasure. Do not conceal the def
 - Drawer does not make background content inert.
 - Dynamic result counts and some action feedback are visually present but not consistently announced.
 
-Recommendation: B1 defines feedback and composite patterns; B2 fixes shell menu/drawer; route chunks adopt them.
+Recommendation: B1a defines action/field/focus behavior, B1b defines feedback/surface semantics, and B2 fixes the shell menu/drawer; route chunks adopt them.
 
 ### P2 — duplicated primitives create drift
 
 Cards, headers, banners, tabs, filters, pagination, tables, metrics, and work cards are repeatedly handwritten. Radius use alone spans seven families, dominated by 814 `rounded-md`, 117 pills, 110 `rounded-xl`, and 58 `rounded-lg`. Root design tokens exist but are sparsely consumed.
 
-Recommendation: B1 creates tokens and minimal primitives without broad route rewrites. Later chunks migrate only in their bounded scope.
+Recommendation: B1a creates tokens/actions/fields, B1b creates feedback/surface primitives, and deferred B1c creates collection primitives only when a first owner collection proves them. Later chunks migrate only in their bounded scope.
 
 ### P2 — user/account administration overloads each page
 
-The user page is about 565 lines and instantiates repeated edit/capability/password forms per user around the mapped list/table. Accounts similarly combine create and repeated edit cards. This increases cognitive and DOM load and weakens a single focus.
+The user page is about 565 lines and instantiates repeated edit/capability/password forms per user around the mapped list/table. Its twelve disclosures are visually closed initially, but 41 forms and about 2,200 DOM nodes are already present. Accounts similarly starts with five closed disclosures while instantiating 10 forms; four true controls measure only 40 px high. This increases cognitive and DOM load and weakens a single focus.
 
-Recommendation: D5 uses a summary list/table plus one selected create/edit surface, preserving every permission and server action.
+Recommendation: D5a handles Accounts and its target boxes; D5b handles Users. Each uses a summary list/table plus one selected create/edit surface while preserving every permission and server action.
 
 ### P2 — worker presentation models diverge
 
@@ -127,7 +128,7 @@ Recommendation: B3 establishes deliberate metric priority/order and state-parity
 
 Frequent `font-black`, uppercase micro-labels, and multiple adjacent pills flatten hierarchy and reduce reading speed. Some functional text approaches the lower legibility bound.
 
-Recommendation: B1 defines weight/size roles; route chunks reduce emphasis without reducing information.
+Recommendation: B1a defines weight/size roles; route chunks reduce emphasis without reducing information.
 
 ## Heuristic scorecard
 
@@ -177,4 +178,4 @@ Do not add more whitespace as a blanket solution; turn navigation into icons onl
 
 ## Readiness conclusion
 
-The repository is ready for bounded Phase 7.4B–E work after an owner accepts this audit and a working browser runtime is available. B1/B2/B3 should resolve the shared-system, shell, and dashboard P1s before route-by-route polish. No runtime change should begin from this branch without that review gate.
+The focused browser closure is complete, and the repository is ready for bounded Phase 7.4B–E work after owner acceptance. Execute B1a, B1b, B2, and B3 as separate proofs; defer B1c until the first authorized owner collection. Populated Mark, Assembly, Pack, and Problems states still require focused C3–C6 fixture/browser gates. No runtime change should begin from this audit branch without the owner review gate.

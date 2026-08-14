@@ -79,13 +79,15 @@ function StatusMarker({ tone }: { tone: StatusTone }) {
 
 export function StatusBadge({ value }: { value: string }) {
   const tone = statusTone[value] ?? "neutral";
+  const label = titleCase(value);
+  const wrapLongLabel = label.length > 20;
 
   return (
     <span className={`ui-status-badge ${toneClass[tone]}`} data-status={value} data-tone={tone}>
       <svg aria-hidden="true" className="ui-status-badge__marker" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5">
         <StatusMarker tone={tone} />
       </svg>
-      <span>{titleCase(value)}</span>
+      <span className={`ui-status-badge__label${wrapLongLabel ? " ui-status-badge__label--wrap" : ""}`}>{label}</span>
     </span>
   );
 }

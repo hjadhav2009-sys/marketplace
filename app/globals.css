@@ -292,7 +292,8 @@ button:disabled {
   }
 
   .ui-status-badge__marker { margin-top: 0.1875rem; height: 0.625rem; width: 0.625rem; flex: none; }
-  .ui-status-badge > span { min-width: 0; overflow-wrap: anywhere; }
+  .ui-status-badge__label { min-width: 0; white-space: nowrap; }
+  .ui-status-badge__label--wrap { white-space: normal; overflow-wrap: anywhere; }
 
   .ui-empty-state {
     border-style: dashed;

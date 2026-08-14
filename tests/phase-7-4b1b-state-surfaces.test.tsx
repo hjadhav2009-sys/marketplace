@@ -71,6 +71,8 @@ for (const [value, tone] of Object.entries(knownStatusTones)) {
 const unknownStatus = renderToStaticMarkup(<StatusBadge value="WAREHOUSE_REVIEW_PENDING_WITH_LONG_LABEL" />);
 assert.match(unknownStatus, /data-tone="neutral"/);
 assert.match(unknownStatus, /Warehouse Review Pending With Long Label/);
+assert.match(unknownStatus, /ui-status-badge__label--wrap/, "Long and unknown labels retain an intentional wrapping path.");
+assert.doesNotMatch(renderToStaticMarkup(<StatusBadge value="FAILED" />), /ui-status-badge__label--wrap/, "Short status words are not split unnecessarily.");
 assert.match(globals, /\.ui-status-badge[\s\S]*max-width: 100%[\s\S]*overflow-wrap: anywhere/, "Long status labels remain intrinsic-width safe.");
 assert.match(globals, /\.ui-status-badge[\s\S]*width: fit-content[\s\S]*align-self: flex-start/, "Badges remain compact inside flex columns.");
 

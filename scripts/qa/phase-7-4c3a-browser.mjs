@@ -76,7 +76,7 @@ try {
     const current = await session(browser, viewport);
     const { page, errors } = current;
 
-    await openMark(page, "STAGE-C3A-MULTI-CHOICE");
+    await openMark(page, "STAGE-FK-SKU-002");
     const multiCard = page.locator("[data-responsive-work-card]").first();
     const multiButton = multiCard.getByRole("button", { name: "Marking Completed" });
     await multiButton.waitFor();
@@ -100,7 +100,7 @@ try {
     results.push({
       state: "MULTI_DESTINATION_MARK",
       viewport: viewport.id,
-      pass: flowText.includes("Send to Pack") && flowText.includes("Send to Assembly") && focusInDialog && focusReturned && bounds.min === "1" && bounds.max === "5" && multiInspection.clientWidth === multiInspection.scrollWidth && multiInspection.undersized.length === 0 && errorsHealthy(errors),
+      pass: flowText.includes("Send to Pack") && flowText.includes("Send to Assembly") && focusInDialog && focusReturned && bounds.min === "1" && bounds.max === "1" && multiInspection.clientWidth === multiInspection.scrollWidth && multiInspection.undersized.length === 0 && errorsHealthy(errors),
       flowText,
       focusInDialog,
       focusReturned,
@@ -109,9 +109,9 @@ try {
       errors: structuredClone(errors),
     });
 
-    await openMark(page, "STAGE-C3A-SINGLE-DESTINATION");
+    await openMark(page, "STAGE-C1A1-B-FALLBACK-ACTUAL-MARK");
     const singleCard = page.locator("[data-responsive-work-card]").first();
-    const singleComplete = singleCard.getByRole("button", { name: "Complete remaining 6" });
+    const singleComplete = singleCard.getByRole("button", { name: "Complete remaining 3" });
     await singleComplete.waitFor();
     const singleInspection = await inspect(page);
     results.push({

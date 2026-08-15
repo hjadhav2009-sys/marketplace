@@ -142,6 +142,11 @@ async function inspect(page) {
       undersized: targets.filter((target) => target.width < 44 || target.height < 44),
       text,
       invalidCopy: /\b(undefined|null|Invalid Date)\b/.test(text),
+      firstViewport: ["queue", "attention"].map((kind) => {
+        const element = document.querySelector(`[data-dashboard-${kind === "queue" ? "queue-value" : "attention-cue"}]`);
+        if (!(element instanceof HTMLElement) || !visible(element)) return { kind, visible: false, bottom: null };
+        return { kind, visible: true, bottom: element.getBoundingClientRect().bottom };
+      }),
       statusValues: [...document.querySelectorAll("[data-status]")].map((item) => ({ status: item.getAttribute("data-status"), tone: item.getAttribute("data-tone"), text: item.textContent?.trim() })),
     };
   });
@@ -184,6 +189,7 @@ try {
       && expectedCommon.every((href) => flipkart.mainHrefs.includes(href))
       && flipkart.mainHrefs.includes("/owner/uploads/new")
       && flipkart.undersized.length === 0
+      && (viewport.id !== "390x844" || flipkart.firstViewport.every((item) => item.visible && item.bottom <= viewport.height))
       && !flipkart.invalidCopy
       && flipkartKeyboard.passed
       && health(errors);
@@ -202,6 +208,9 @@ try {
       && expectedCommon.every((href) => amazon.mainHrefs.includes(href))
       && !amazon.mainHrefs.includes("/owner/uploads/new")
       && !amazon.text.includes("Latest Daily Orders")
+      && !amazon.text.includes("Packed today")
+      && !amazon.text.includes("Open order problems today")
+      && !amazon.text.includes("customer orders")
       && amazon.text.includes("Amazon Product Catalog")
       && amazon.undersized.length === 0
       && !amazon.invalidCopy
@@ -240,7 +249,7 @@ try {
     const inspection = await inspect(page);
     const pass = inspection.clientWidth === inspection.documentScrollWidth
       && inspection.clientWidth === inspection.bodyScrollWidth
-      && inspection.text.includes("Selected seller account")
+      && inspection.text.toLowerCase().includes("selected seller account")
       && inspection.text.includes("Work queues")
       && inspection.text.includes("Recent imports")
       && expectedCommon.every((href) => inspection.mainHrefs.includes(href))

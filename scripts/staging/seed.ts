@@ -32,7 +32,8 @@ const users = [
   { id: "stage3-disabled", display: "Synthetic Disabled Worker", username: "stage3-disabled", role: "PICKER", scenario: "DISABLED", account: accounts[0].id, active: false, permissions: { canPick: true } },
   { id: "stage3-pick-pack", display: "Synthetic Pick + Pack Worker", username: "stage3-pick-pack", role: "PICKER", scenario: "PICK_PACK", account: accounts[0].id, active: true, permissions: { canPick: true, canPack: true, canReportProblem: true } },
   { id: "stage3-no-account", display: "Synthetic No-Account Worker", username: "stage3-no-account", role: "PICKER", scenario: "NO_ACCOUNT", account: null, active: true, permissions: { canPick: true } },
-  { id: "stage3-owner-no-account", display: "Synthetic No-Account Owner", username: "stage3-owner-no-account", role: "OWNER", scenario: "OWNER_NO_ACCOUNT", account: null, active: true, permissions: {} }
+  { id: "stage3-owner-no-account", display: "Synthetic No-Account Owner", username: "stage3-owner-no-account", role: "OWNER", scenario: "OWNER_NO_ACCOUNT", account: null, active: true, permissions: {} },
+  { id: "stage4-pick-view-all", display: "Synthetic Pick Read-Only Reviewer", username: "stage4-pick-view-all", role: "PICKER", scenario: "C1_PICK_READ_ONLY", account: accounts[0].id, active: true, permissions: { canPick: true, canViewAllWork: true } }
 ] as const;
 
 const listings = [
@@ -73,14 +74,14 @@ async function writeSyntheticImage(safeSku: string) {
   await writeFile(path.join(directory, "card.png"), syntheticPng, { flag: "wx" });
 }
 
-async function createTask(input: { id: string; accountId?: string; orderId?: string; consignmentLineId?: string; sourceType?: "ORDER" | "CONSIGNMENT"; stage: WorkStage; sequence: number; status: WorkTaskStatus; quantity?: number; completed?: number; assigned?: string; sku: string; title: string; route: string | null; problem?: string }) {
+async function createTask(input: { id: string; accountId?: string; orderId?: string; consignmentLineId?: string; sourceType?: "ORDER" | "CONSIGNMENT"; stage: WorkStage; sequence: number; status: WorkTaskStatus; quantity?: number; completed?: number; assigned?: string; sku: string; title: string; route: string | null; problem?: string; metadataJson?: string }) {
   return prisma.workTask.create({ data: {
     id: input.id, accountId: input.accountId ?? accounts[0].id, sourceType: input.sourceType ?? "ORDER", orderId: input.orderId, consignmentLineId: input.consignmentLineId,
     stage: input.stage, sequenceNumber: input.sequence, requiredQuantity: input.quantity ?? 1, completedQuantity: input.completed ?? (input.status === "COMPLETED" ? input.quantity ?? 1 : 0), status: input.status,
     assignedUserId: input.assigned, startedByUserId: input.status === "IN_PROGRESS" ? input.assigned : undefined, startedAt: input.status === "IN_PROGRESS" ? new Date() : undefined,
     completedByUserId: input.status === "COMPLETED" ? input.assigned ?? users[0].id : undefined, completedAt: input.status === "COMPLETED" ? new Date() : undefined,
     problemReason: input.problem, problemReportedAt: input.problem ? new Date() : undefined, problemReportedByUserId: input.problem ? input.assigned ?? users[0].id : undefined,
-    statusBeforeProblem: input.problem ? "READY" : undefined, metadataJson: JSON.stringify({ synthetic: true, processRoute: input.route ?? "PICK_PACK", instruction: input.stage === "MARK" ? "Use synthetic marking guide." : input.stage === "ASSEMBLE" ? "Use synthetic assembly guide." : null }),
+    statusBeforeProblem: input.problem ? "READY" : undefined, metadataJson: input.metadataJson ?? JSON.stringify({ synthetic: true, processRoute: input.route ?? "PICK_PACK", instruction: input.stage === "MARK" ? "Use synthetic marking guide." : input.stage === "ASSEMBLE" ? "Use synthetic assembly guide." : null }),
     workCardSnapshotJson: snapshot(input.sku, input.title, input.route), routeSnapshotJson: routeSnapshot(input.route, input.stage)
   } });
 }
@@ -206,6 +207,18 @@ async function seed() {
     const lineId = `stage3-line-${route.toLowerCase()}`, batchId = "stage3-batch-active", sku = listings[index][1], stage = index === 0 ? "PACK" : index === 1 ? "MARK" : "ASSEMBLE";
     await prisma.consignmentLine.create({ data: { id: lineId, consignmentBatchId: batchId, accountId: accounts[0].id, rowNumber: index + 1, sellerSkuSource: sku, requiredQuantity: index + 1, marketplaceListingId: `stage3-listing-${listings[index][0]}`, matchStatus: "EXACT_SKU", processRoute: route, activated: true, sellerSkuSnapshot: sku, productTitleSnapshot: listings[index][2], catalogSnapshotJson: snapshot(sku, listings[index][2], route) } });
     await createTask({ id: `${lineId}-${stage.toLowerCase()}`, consignmentLineId: lineId, sourceType: "CONSIGNMENT", stage, sequence: stage === "PACK" ? 4 : 2, status: "READY", quantity: index + 1, assigned: stage === "PACK" ? users[6].id : stage === "MARK" ? users[4].id : users[5].id, sku, title: listings[index][2], route });
+  }
+  await prisma.marketplaceListing.create({ data: { id: "stage4-c1-listing-no-image", accountId: accounts[0].id, marketplace: "FLIPKART", sellerSkuId: "STAGE-C1-NO-IMAGE-SKU", sku: "STAGE-C1-NO-IMAGE-SKU", productTitle: "Synthetic C1 missing image product", listingStatus: "ACTIVE", fsn: "STAGE-C1-NO-IMAGE-FSN", listingId: "STAGE-C1-NO-IMAGE-LISTING" } });
+  await prisma.consignmentBatch.create({ data: { id: "stage4-batch-c1-work-cards", accountId: accounts[0].id, marketplace: "FLIPKART", externalConsignmentNumber: `STAGE-C1-${"LONG-CONSIGNMENT-REFERENCE-".repeat(4)}001`, displayName: `Synthetic C1 ${"Long Worker Card Evidence ".repeat(4)}`, status: "ACTIVE", sourceFileName: "synthetic-c1-work-cards.csv", sourceFileSha256: "4".repeat(64), totalSourceRows: 4, totalValidLines: 4, totalRequiredQuantity: 13, matchedLines: 4, unmatchedLines: 0, createdByUserId: users[0].id, activatedAt: new Date(), activatedByUserId: users[0].id } });
+  const c1Lines = [
+    { id: "stage4-c1-line-pick-ready", row: 1, sku: `STAGE-C1-${"LONG-SELLER-SKU-".repeat(5)}READY`, title: `Synthetic C1 ${"very long product title for wrapping and operational scanning ".repeat(4)}`, listingId: "stage3-listing-fk-direct", quantity: 6, stage: "PICK" as const, status: "READY" as const, assigned: users[2].id, problem: undefined, metadataJson: undefined },
+    { id: "stage4-c1-line-pick-problem", row: 2, sku: "STAGE-C1-PROBLEM-SKU", title: "Synthetic C1 paused consignment product", listingId: "stage3-listing-fk-missing-image", quantity: 2, stage: "PICK" as const, status: "PROBLEM" as const, assigned: users[2].id, problem: "QUANTITY_SHORT", metadataJson: undefined },
+    { id: "stage4-c1-line-assembly-manual", row: 3, sku: "STAGE-C1-MANUAL-ASSEMBLY-SKU", title: "Synthetic C1 manual route assembly product", listingId: "stage3-listing-fk-assembly", quantity: 4, stage: "ASSEMBLE" as const, status: "READY" as const, assigned: users[5].id, problem: undefined, metadataJson: JSON.stringify({ synthetic: true, instructionStatus: "MISSING", warning: "Manual route instructions need supervisor confirmation", routedByUserId: users[0].id, routedAt: new Date().toISOString(), workerNote: "Synthetic C1 manual route evidence only." }) },
+    { id: "stage4-c1-line-pick-no-image", row: 4, sku: "STAGE-C1-NO-IMAGE-SKU", title: "Synthetic C1 missing image product", listingId: "stage4-c1-listing-no-image", quantity: 1, stage: "PICK" as const, status: "READY" as const, assigned: users[2].id, problem: undefined, metadataJson: undefined },
+  ];
+  for (const item of c1Lines) {
+    await prisma.consignmentLine.create({ data: { id: item.id, consignmentBatchId: "stage4-batch-c1-work-cards", accountId: accounts[0].id, rowNumber: item.row, sellerSkuSource: item.sku, requiredQuantity: item.quantity, marketplaceListingId: item.listingId, matchStatus: "EXACT_SKU", processRoute: item.stage === "ASSEMBLE" ? "PICK_ASSEMBLE_PACK" : "PICK_PACK", activated: true, sellerSkuSnapshot: item.sku, productTitleSnapshot: item.title, catalogSnapshotJson: snapshot(item.sku, item.title, item.stage === "ASSEMBLE" ? "PICK_ASSEMBLE_PACK" : "PICK_PACK") } });
+    await createTask({ id: `${item.id}-${item.stage.toLowerCase()}`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: item.stage, sequence: item.stage === "PICK" ? 1 : 2, status: item.status, quantity: item.quantity, assigned: item.assigned, sku: item.sku, title: item.title, route: item.stage === "ASSEMBLE" ? "PICK_ASSEMBLE_PACK" : "PICK_PACK", problem: item.problem, metadataJson: item.metadataJson });
   }
   const completedConsignmentStates = [
     { lineId: "stage4-line-mark-completed", rowNumber: 20, sku: "STAGE-FK-SKU-002", title: "Synthetic completed Mark item", route: "PICK_MARK_PACK" as const, stage: "MARK" as const, workerId: users[4].id },

@@ -31,7 +31,7 @@ export function WorkImageGallery({
         if (event.key === "ArrowRight") move(1);
       }}
       className={compact
-        ? "relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 sm:h-28 sm:w-28"
+        ? "relative h-24 w-24 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 sm:h-28 sm:w-28"
         : `relative mx-auto w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 ${available.length ? "aspect-square" : "aspect-[4/3]"}`
       }
       data-work-gallery

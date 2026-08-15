@@ -401,10 +401,10 @@ assert.equal(
 );
 
 const taskStore = readFileSync("src/lib/workflow/task-store.ts", "utf8");
-const card = readFileSync("app/work/WorkTaskCard.tsx", "utf8");
+const card = readFileSync("app/work/WorkTaskCardView.tsx", "utf8");
 const statusRoute = readFileSync("app/owner/imports/[jobId]/status/route.ts", "utf8");
 assert.match(taskStore, /task\.stage === "PACK"[\s\S]{0,120}Packing must use the authoritative Pack Completed action/);
-assert.match(card, /task\.stage!=="PACK"/);
+assert.match(card, /task\.stage !== "PACK"/);
 assert.doesNotMatch(statusRoute, /startImportJob|startProductInventoryJob/);
 
 console.log(

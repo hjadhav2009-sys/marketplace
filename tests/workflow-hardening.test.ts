@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read=(path:string)=>readFileSync(path,"utf8");
 const problems=read("app/work/problems/page.tsx");
-const card=read("app/work/WorkTaskCard.tsx");
+const card=read("app/work/WorkTaskCardView.tsx");
 const access=read("src/lib/workflow/worker-access.ts");
 const queues=read("src/lib/workflow/queues.ts");
 const taskStore=read("src/lib/workflow/task-store.ts");

@@ -5,6 +5,9 @@ import type { WorkStage } from "@prisma/client";
 import { completeExactPickRouteAction, completeGroupedStageAction } from "@/app/work/stage-actions";
 import { ROUTE_CHANGE_REASONS } from "@/src/lib/workflow/route-decision-policy";
 import { SubmitButton } from "./SubmitButton";
+import { FeedbackBanner } from "./ui/FeedbackBanner";
+import { fieldControlStyles } from "./ui/Field";
+import { buttonStyles } from "./ui/buttonStyles";
 
 type Route = "DIRECT_PACK" | "MARK" | "ASSEMBLE" | "MARK_ASSEMBLE";
 type Option = { route: Route; label: string; nextStage: WorkStage };
@@ -106,29 +109,27 @@ export function WorkRouteDialog({ card, triggerLabel }: { card: WorkRouteDialogC
   </> : null;
 
   return <>
-    <button ref={triggerRef} type="button" onClick={() => setOpen(true)} className="min-h-11 rounded-xl bg-slate-950 px-3 font-black text-white">{triggerLabel}</button>
+    <button ref={triggerRef} type="button" onClick={() => setOpen(true)} className={buttonStyles({ className: "w-full" })}>{triggerLabel}</button>
     {open ? (
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-3" data-work-reason-dialog>
-        <button type="button" aria-label="Close route dialog" className="absolute inset-0 bg-slate-950/50 backdrop-blur-[1px]" onClick={close}/>
-        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="route-dialog-title" className="relative max-h-[calc(100vh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:p-5">
+        <button type="button" aria-label="Close route dialog" className="absolute inset-0 bg-slate-950/50" onClick={close}/>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="route-dialog-title" className="relative max-h-[calc(100vh-1.5rem)] w-full max-w-md overflow-y-auto rounded-lg bg-white p-4 shadow-xl sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-berry">Complete {card.stage.toLowerCase()}</p>
-              <h2 id="route-dialog-title" className="text-xl font-black">{selected ? selected.label : "Choose the next route"}</h2>
+              <h2 id="route-dialog-title" className="text-xl font-semibold">{selected ? selected.label : "Choose the next route"}</h2>
             </div>
-            <button type="button" aria-label="Close" onClick={close} className="min-h-11 min-w-11 rounded-xl border text-xl">×</button>
+            <button type="button" aria-label="Close" onClick={close} className={buttonStyles({ variant: "secondary", className: "px-2 text-xl" })}>×</button>
           </div>
           {!selected ? <>
-            <p className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950">
-              {card.hasExplicitSavedRoute ? `Saved route: ${card.savedProcessRoute?.replaceAll("_", " ")}` : "System fallback — Direct to Pack"}
-            </p>
+            <FeedbackBanner className="mt-2" tone="info" title={card.hasExplicitSavedRoute ? `Saved route: ${card.savedProcessRoute?.replaceAll("_", " ")}` : "System fallback — Direct to Pack"} />
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {options.map((option) => (
                 <button
                   key={option.route}
                   type="button"
                   onClick={() => { setSelected(option); setRouteReason(""); }}
-                  className={`min-h-12 rounded-xl border px-3 py-2 text-left text-sm font-black hover:border-berry ${isRecommended(option) ? "border-blue-400 bg-blue-50" : ""}`}
+                  className={`min-h-12 rounded-md border px-3 py-2 text-left text-sm font-semibold hover:border-berry ${isRecommended(option) ? "border-blue-400 bg-blue-50" : ""}`}
                 >
                   {option.label}
                   {isRecommended(option) ? <span className="mt-1 block text-xs text-blue-800">Recommended</span> : null}
@@ -139,24 +140,24 @@ export function WorkRouteDialog({ card, triggerLabel }: { card: WorkRouteDialogC
             <form action={card.stage === "PICK" ? completeExactPickRouteAction : completeGroupedStageAction} className="mt-4 grid gap-3">
               {hidden}
               {reasonRequired ? (
-                <label className="text-sm font-black">
+                <label className="text-sm font-semibold">
                   Why are you changing the saved route?
-                  <select autoFocus name="routeReason" required value={routeReason} onChange={(event) => setRouteReason(event.currentTarget.value)} className="mt-2 min-h-11 w-full rounded-xl border bg-white px-3">
+                  <select autoFocus name="routeReason" required value={routeReason} onChange={(event) => setRouteReason(event.currentTarget.value)} className={fieldControlStyles({ className: "mt-2" })}>
                     <option value="">Choose a reason</option>
                     {ROUTE_CHANGE_REASONS.map((reason) => <option key={reason}>{reason}</option>)}
                   </select>
                 </label>
               ) : null}
-              {reasonRequired && routeReason === "Other" ? <label className="text-sm font-black">Short route-change reason<textarea name="routeOtherReason" required maxLength={240} className="mt-2 min-h-24 w-full rounded-xl border p-3" placeholder="Enter a short operational reason"/></label> : null}
+              {reasonRequired && routeReason === "Other" ? <label className="text-sm font-semibold">Short route-change reason<textarea name="routeOtherReason" required maxLength={240} className={fieldControlStyles({ className: "mt-2 min-h-24" })} placeholder="Enter a short operational reason"/></label> : null}
               {missing.length ? (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                  <p className="font-black">Saved instructions are unavailable for {missing.join(" and ").toLowerCase()}.</p>
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  <p className="font-semibold">Saved instructions are unavailable for {missing.join(" and ").toLowerCase()}.</p>
                   <p className="mt-1">No machine settings or directions will be invented.</p>
                   <label className="mt-3 flex items-start gap-2 font-bold"><input type="checkbox" name="confirmMissingInstructions" value="1" required className="mt-1 h-5 w-5"/>I understand and want to continue.</label>
                 </div>
               ) : !card.hasExplicitSavedRoute ? <p className="rounded-xl bg-slate-50 p-3 text-sm font-bold">System fallback selection: {selected.label}. No override reason is required.</p> : null}
-              <details className="rounded-xl border p-3"><summary className="cursor-pointer text-sm font-black">Add note (optional)</summary><textarea name="workerNote" maxLength={240} className="mt-2 min-h-20 w-full rounded-xl border p-3" placeholder="Operational note for the next worker"/></details>
-              <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setSelected(null); setRouteReason(""); }} className="min-h-11 rounded-xl border font-black">Cancel</button><SubmitButton pendingText="Routing...">Continue</SubmitButton></div>
+              <details className="rounded-md border p-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">Add note (optional)</summary><textarea name="workerNote" maxLength={240} className={fieldControlStyles({ className: "mt-2 min-h-20" })} placeholder="Operational note for the next worker"/></details>
+              <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setSelected(null); setRouteReason(""); }} className={buttonStyles({ variant: "secondary" })}>Cancel</button><SubmitButton pendingText="Routing...">Continue</SubmitButton></div>
             </form>
           )}
         </div>

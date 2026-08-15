@@ -17,7 +17,7 @@ const format = read("lib/format.ts");
 const users = read("app/owner/users/page.tsx");
 const accounts = read("app/owner/accounts/page.tsx");
 const reports = read("app/reports/page.tsx");
-const groupedCard = read("app/work/GroupedWorkCard.tsx");
+const groupedCard = read("app/work/GroupedWorkCard.tsx") + read("components/work-card/WorkCard.tsx") + read("components/work-card/WorkCardQuantity.tsx");
 const workDialog = read("components/WorkRouteDialog.tsx");
 const scannerDialog = read("components/ScannerPickRouteDialog.tsx");
 const workHub = read("app/work/LiveWorkHubSummary.tsx");
@@ -70,7 +70,7 @@ assert.match(groupedCard, /Complete Pack/);
 assert.doesNotMatch(groupedCard, /Picked All|Pack Completed/);
 assert.match(groupedCard, /role="progressbar"/);
 assert.match(groupedCard, /aria-valuenow/);
-assert.match(groupedCard, /More identifiers/);
+assert.match(groupedCard, /Identifiers and work context/);
 for (const dialog of [workDialog, scannerDialog]) {
   assert.match(dialog, /ROUTE_CHANGE_REASONS/);
   assert.match(dialog, /name="routeReason"/);

@@ -152,6 +152,7 @@
     "phase7.4b1b:test": "tsx tests/phase-7-4b1b-state-surfaces.test.tsx",
     "phase7.4b2:test": "tsx tests/phase-7-4b2-app-shell.test.tsx",
     "phase7.4b3:test": "tsx tests/phase-7-4b3-dashboard.test.tsx",
+    "phase7.4c1:test": "tsx tests/phase-7-4c1-work-card-foundation.test.tsx",
     "stage4-2c:editor-proof": "node scripts/qa/stage4-2c-editor-proof.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",
     "data-management:test": "tsx tests/data-management.test.ts",

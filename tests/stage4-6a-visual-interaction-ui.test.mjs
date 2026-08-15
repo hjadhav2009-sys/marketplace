@@ -10,7 +10,7 @@ const rootLayout = read("app/layout.tsx");
 const coordinator = read("components/MobileOverlayCoordinator.tsx");
 const navigation = read("components/AppNav.tsx");
 const accountMenu = read("components/MobileAccountMenu.tsx");
-const groupedCard = read("app/work/GroupedWorkCard.tsx");
+const groupedCard = read("app/work/GroupedWorkCard.tsx") + read("components/work-card/WorkCardSections.tsx");
 const gallery = read("components/WorkImageGallery.tsx");
 const scanner = read("components/UniversalScannerPanel.tsx");
 const dataManagement = read("app/owner/data-management/page.tsx");
@@ -41,10 +41,10 @@ assert.match(rootLayout, /icons:\s*\{[\s\S]*\/icon\.svg/, "The browser favicon i
 assert.match(shell, /className="flex min-h-11 min-w-0 flex-1 flex-col justify-center xl:hidden"/, "The app-shell account/home link provides a 44px target.");
 
 assert.match(gallery, /compact \? "work" : "lg"/, "Worker cards use the compact image fallback.");
-assert.match(groupedCard, /data-action-mode="problem"/, "Problem work has a distinct action state.");
-assert.match(groupedCard, /Work paused — an open problem must be resolved/, "Problem work explains why processing is paused.");
+assert.match(groupedCard, /WorkCardActions mode="problem"/, "Problem work has a distinct action state.");
+assert.match(groupedCard, /Work paused[\s\S]*open problem must be resolved/, "Problem work explains why processing is paused.");
 assert.match(groupedCard, />Open Problem</, "Problem work links to its review surface.");
-assert.match(groupedCard, /data-action-mode="read-only"/, "Read-only work has a distinct action state.");
+assert.match(groupedCard, /WorkCardActions mode="read-only"/, "Read-only work has a distinct action state.");
 assert.match(groupedCard, /current permissions do not allow/, "Read-only work explains the exact capability boundary.");
 assert.match(groupedCard, /Marking Completed/, "Mark actions retain their supported completion label.");
 assert.match(groupedCard, /Assembly Completed/, "Assembly actions retain their supported completion label.");

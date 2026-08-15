@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const source = await readFile(new URL("../app/work/GroupedWorkCard.tsx", import.meta.url), "utf8");
+const source = (await Promise.all([
+  "../app/work/GroupedWorkCard.tsx",
+  "../components/work-card/WorkCard.tsx",
+  "../components/work-card/WorkCardSections.tsx",
+].map((path) => readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
 
 assert.doesNotMatch(source, /onClickCapture[\s\S]*setProcessing/, "A click-capture render must not remove a form before its server action submits.");
 assert.doesNotMatch(source, /if\s*\(processing\)[\s\S]*Processing group/, "Grouped actions must not replace the form before submission.");

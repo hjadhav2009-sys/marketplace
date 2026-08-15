@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ProductImage } from "./ProductImage";
+import { buttonStyles } from "./ui/buttonStyles";
+import { useWorkerOverlay } from "./worker-overlay/WorkerOverlay";
 
 export function WorkImageGallery({
   images,
@@ -15,11 +17,19 @@ export function WorkImageGallery({
   compact?: boolean;
 }) {
   const available = [...new Set(images.filter((value): value is string => Boolean(value)))];
+  const { openOverlay } = useWorkerOverlay();
   const [index, setIndex] = useState(0);
   const current = available[index] ?? null;
   const move = (offset: number) => {
     setIndex((value) => (value + offset + Math.max(available.length, 1)) % Math.max(available.length, 1));
   };
+
+  if (compact) {
+    const thumbnail = <ProductImage src={current} alt={alt} size="work" showBadge={false} priority={priority} />;
+    return <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 sm:h-28 sm:w-28" data-work-gallery data-image-count={available.length}>
+      {current ? <button type="button" aria-label={`Open large image preview for ${alt}`} onClick={() => openOverlay({ id: `image:${alt}`, kind: "IMAGE", surface: "lightbox", title: "Product image", content: <ImagePreview images={available} alt={alt} initialIndex={index} /> })} className="block h-full w-full cursor-zoom-in text-left">{thumbnail}<span className="sr-only">Open image preview</span></button> : thumbnail}
+    </div>;
+  }
 
   return (
     <div
@@ -30,10 +40,7 @@ export function WorkImageGallery({
         if (event.key === "ArrowLeft") move(-1);
         if (event.key === "ArrowRight") move(1);
       }}
-      className={compact
-        ? "relative h-24 w-24 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 sm:h-28 sm:w-28"
-        : `relative mx-auto w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 ${available.length ? "aspect-square" : "aspect-[4/3]"}`
-      }
+      className={`relative mx-auto w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 ${available.length ? "aspect-square" : "aspect-[4/3]"}`}
       data-work-gallery
       data-image-count={available.length}
     >
@@ -76,4 +83,13 @@ export function WorkImageGallery({
       ) : null}
     </div>
   );
+}
+
+function ImagePreview({ images, alt, initialIndex }: { images: string[]; alt: string; initialIndex: number }) {
+  const [previewIndex, setPreviewIndex] = useState(initialIndex);
+  const move = (offset: number) => setPreviewIndex((value) => (value + offset + images.length) % images.length);
+  return <div className="grid gap-3" onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); } if (event.key === "ArrowRight") { event.preventDefault(); move(1); } }}>
+    <div className="relative mx-auto aspect-square w-full max-w-2xl overflow-hidden rounded-lg bg-slate-100"><ProductImage src={images[previewIndex]} alt={`${alt}${images.length > 1 ? ` image ${previewIndex + 1} of ${images.length}` : ""}`} size="lg" showBadge={false} /></div>
+    {images.length > 1 ? <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3"><button type="button" onClick={() => move(-1)} className={buttonStyles({ variant: "secondary" })}>Previous</button><p aria-live="polite" className="text-center text-sm font-semibold text-slate-600">Image {previewIndex + 1} of {images.length}</p><button type="button" onClick={() => move(1)} className={buttonStyles({ variant: "secondary" })}>Next</button></div> : null}
+  </div>;
 }

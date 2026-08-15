@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AppNav, MobileDrawer } from "@/components/AppNav";
 import { MobileAccountMenu } from "@/components/MobileAccountMenu";
 import { MobileOverlayCoordinator } from "@/components/MobileOverlayCoordinator";
+import { WorkerOverlayProvider } from "@/components/worker-overlay/WorkerOverlay";
 import { capabilityHomePath, clearSession, getSelectedAccount, requireAccount, requireUser } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit";
 import { navigationForUser, type NavigationUser } from "@/lib/app-navigation";
@@ -57,7 +58,8 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
     : `${accountName} / ${accountCode}`;
 
   return (
-    <div className="flex min-h-screen bg-stone-50 text-slate-950">
+    <WorkerOverlayProvider>
+    <div className="flex min-h-screen bg-stone-50 text-slate-950" data-app-shell-root>
       <AppNav
         links={links}
         companyName={account?.companyName}
@@ -117,5 +119,6 @@ export async function AppShell({ children, title, allowNoAccount = false }: AppS
         </main>
       </div>
     </div>
+    </WorkerOverlayProvider>
   );
 }

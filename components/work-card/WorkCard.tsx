@@ -6,6 +6,7 @@ type WorkCardProps = {
   disclosure?: ReactNode;
   identity: ReactNode;
   media: ReactNode;
+  processFlow?: ReactNode;
   quantity: ReactNode;
   state?: ReactNode;
   source: string;
@@ -13,7 +14,7 @@ type WorkCardProps = {
   status: string;
 };
 
-export function WorkCard({ actions, context, disclosure, identity, media, quantity, state, source, stage, status }: WorkCardProps) {
+export function WorkCard({ actions, context, disclosure, identity, media, processFlow, quantity, state, source, stage, status }: WorkCardProps) {
   return (
     <article
       className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
@@ -26,6 +27,7 @@ export function WorkCard({ actions, context, disclosure, identity, media, quanti
       <div className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] gap-3 p-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-4 sm:p-4 xl:grid-cols-[7rem_minmax(0,1fr)_minmax(13rem,0.68fr)_minmax(12rem,0.62fr)] xl:items-start">
         <div className="min-w-0">{media}</div>
         <div className="min-w-0">{identity}</div>
+        {processFlow ? <div className="col-span-2 min-w-0 border-t border-slate-100 pt-2 xl:col-start-2 xl:col-end-3" data-process-flow>{processFlow}</div> : null}
         <div className="col-span-2 min-w-0 xl:col-span-1" data-quantity-panel>{quantity}</div>
         {state ? <div className="col-span-2 min-w-0 xl:col-start-2 xl:col-end-4" data-work-state>{state}</div> : null}
         <div className="col-span-2 min-w-0 xl:col-start-4 xl:row-start-1 xl:row-span-2" data-work-actions>{actions}</div>

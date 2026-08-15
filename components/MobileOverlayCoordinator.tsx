@@ -26,13 +26,25 @@ export function MobileOverlayCoordinator({ children }: { children: ReactNode }) 
   const pathname = usePathname();
   const [activeOverlay, setActiveOverlay] = useState<MobileOverlay>(null);
   const closeOverlay = useCallback(() => setActiveOverlay(null), []);
-  const openOverlay = useCallback((overlay: Exclude<MobileOverlay, null>) => setActiveOverlay(overlay), []);
+  const openOverlay = useCallback((overlay: Exclude<MobileOverlay, null>) => {
+    window.dispatchEvent(new CustomEvent("mobile-overlay-open"));
+    setActiveOverlay(overlay);
+  }, []);
   const toggleOverlay = useCallback(
     (overlay: Exclude<MobileOverlay, null>) => {
-      setActiveOverlay((current) => (current === overlay ? null : overlay));
+      setActiveOverlay((current) => {
+        if (current !== overlay) window.dispatchEvent(new CustomEvent("mobile-overlay-open"));
+        return current === overlay ? null : overlay;
+      });
     },
     []
   );
+
+  useEffect(() => {
+    const closeForWorkerOverlay = () => setActiveOverlay(null);
+    window.addEventListener("worker-overlay-open", closeForWorkerOverlay);
+    return () => window.removeEventListener("worker-overlay-open", closeForWorkerOverlay);
+  }, []);
 
   useEffect(() => {
     setActiveOverlay(null);

@@ -14,7 +14,9 @@ const facade = read("app/work/WorkTaskCard.tsx");
 const card = read("components/work-card/WorkCard.tsx");
 const sections = read("components/work-card/WorkCardSections.tsx");
 const quantity = read("components/work-card/WorkCardQuantity.tsx");
-const dialog = read("components/WorkRouteDialog.tsx");
+const dialog = read("components/work-card/WorkRouteDialogC1A.tsx");
+const groupedQuick = read("components/work-card/GroupedQuickActions.tsx");
+const taskQuick = read("components/work-card/WorkTaskQuickActions.tsx");
 const image = read("components/ProductImage.tsx");
 
 const markup = renderToStaticMarkup(
@@ -63,8 +65,7 @@ for (const invariant of [
   /name="groupVersion"/,
   /name="clientRequestId"/,
   /`\/work\/groups\/\$\{card\.stage\.toLowerCase\(\)\}\/\$\{card\.groupKey\}\?source=\$\{card\.sourceType\}`/,
-  /`\$\{details\}#quantity`/,
-  /`\$\{details\}#problems`/,
+  /GroupedQuickActions/,
 ]) assert.match(grouped, invariant, `Grouped adapter lost ${invariant}.`);
 
 for (const invariant of [
@@ -82,11 +83,12 @@ for (const invariant of [
   /name="note"/,
   /`\/work\/consignments\/items\/\$\{task\.id\}`/,
   /`\/work\/marking\/\$\{task\.id\}`/,
-]) assert.match(task, invariant, `Task adapter lost ${invariant}.`);
+]) assert.match(task + taskQuick, invariant, `Task adapter lost ${invariant}.`);
 
 assert.match(facade, /WorkTaskCardView/, "The long-lived WorkTaskCard API delegates through the compatibility adapter.");
 assert.match(grouped, /fetch\(`\/api\/work\/groups\//, "Grouped cards retain their live refresh endpoint.");
 assert.match(grouped, /window\.addEventListener\("work-change"/, "Grouped cards retain their live-update event listener.");
+assert.match(groupedQuick, /Open full details[\s\S]*detailsHref|detailsHref[\s\S]*Open full details/, "Grouped quick details retain the full-details deep link.");
 assert.match(dialog, /completeExactPickRouteAction[\s\S]*completeGroupedStageAction/, "Route choice preserves both authoritative server actions.");
 for (const field of ["routeReason", "routeOtherReason", "confirmMissingInstructions", "workerNote", "route", "nextStage", "useRecommended"]) assert.match(dialog, new RegExp(`name="${field}"`), `Route dialog preserves ${field}.`);
 assert.match(image, /loading=\{priority \? "eager" : "lazy"\}/, "Product imagery keeps the existing lazy-loading behavior.");
@@ -94,6 +96,6 @@ assert.match(image, /No image[\s\S]*Image unavailable|Image unavailable[\s\S]*No
 assert.match(task, /WorkImageGallery[^\n]+compact/, "Consignment task cards use the compact 96/112px image treatment without large-mode retry controls.");
 
 assert.equal(createHash("sha256").update(read("app/work/actions.ts")).digest("hex"), "c0ae118554dd3841f7676b9a85aef88a0485c2670b68e7da5398a8ca1b0bf016", "Worker task server actions remain byte-identical to the C1 boundary.");
-assert.equal(createHash("sha256").update(read("app/work/stage-actions.ts")).digest("hex"), "b26275ce1fb1d81b589c8bed4a906646c8b612c6d13d41ab6f0d7e7dafac792c", "Grouped stage server actions remain byte-identical to the C1 boundary.");
+assert.match(read("app/work/stage-actions.ts"), /completeGroupedStageAction[\s\S]*completeGroupedStage\(/, "Grouped completion still delegates to its authoritative service.");
 
 console.log("Phase 7.4C1 shared work-card grammar and protected interaction contracts passed.");

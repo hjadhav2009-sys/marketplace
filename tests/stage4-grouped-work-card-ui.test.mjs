@@ -5,6 +5,7 @@ const source = (await Promise.all([
   "../app/work/GroupedWorkCard.tsx",
   "../components/work-card/WorkCard.tsx",
   "../components/work-card/WorkCardSections.tsx",
+  "../components/work-card/GroupedQuickActions.tsx",
 ].map((path) => readFile(new URL(path, import.meta.url), "utf8")))).join("\n");
 
 assert.doesNotMatch(source, /onClickCapture[\s\S]*setProcessing/, "A click-capture render must not remove a form before its server action submits.");

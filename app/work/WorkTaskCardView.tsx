@@ -4,26 +4,24 @@ import type { User } from "@prisma/client";
 import Link from "next/link";
 import { SubmitButton } from "@/components/SubmitButton";
 import { WorkImageGallery } from "@/components/WorkImageGallery";
-import { WorkRouteDialog } from "@/components/WorkRouteDialog";
-import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { buttonStyles } from "@/components/ui/buttonStyles";
 import {
   WorkCard,
   WorkCardActions,
   WorkCardContext,
-  WorkCardDisclosure,
   WorkCardIdentity,
-  WorkCardMetadata,
-  WorkCardMetadataItem,
   WorkCardQuantity,
   WorkCardState,
 } from "@/components/work-card";
+import { WorkProcessFlow } from "@/components/work-card/WorkProcessFlow";
+import { WorkRouteActionButton, WorkRouteDialogC1A, type WorkRouteDialogCard } from "@/components/work-card/WorkRouteDialogC1A";
+import { WorkTaskQuickActions, type WorkTaskQuickModel } from "@/components/work-card/WorkTaskQuickActions";
 import { parseConsignmentCatalogSnapshot } from "@/src/lib/consignments/amazon/catalog-snapshot";
 import { parseConsignmentAssemblyMetadata, parseOrderMarkingMetadata } from "@/src/lib/workflow/route-task-metadata";
 import { parseImmutableRouteProvenance } from "@/src/lib/workflow/route-provenance";
 import type { WorkerQueueTask } from "@/src/lib/workflow/queues";
 import { getWorkTaskCapabilities } from "@/src/lib/workflow/worker-access";
-import { claimTaskAction, completeTaskAction, reportTaskProblemAction, setTaskProgressAction } from "./actions";
+import { claimTaskAction, completeTaskAction } from "./actions";
 
 export function WorkTaskCardView({ task, returnPath, user }: { task: WorkerQueueTask; returnPath: string; user: User }) {
   const line = task.consignmentLine;
@@ -47,6 +45,22 @@ export function WorkTaskCardView({ task, returnPath, user }: { task: WorkerQueue
     <input type="hidden" name="clientRequestId" value={`${token}:${randomUUID()}:${suffix}`} />
     <input type="hidden" name="returnPath" value={returnPath} />
   </>;
+  const savedRoute = provenance?.savedProcessRoute ?? line.processRoute ?? null;
+  const routeCard: WorkRouteDialogCard = { stage: task.stage, sourceType: "CONSIGNMENT", groupKey: task.id, groupVersion: task.updatedAt.toISOString(), taskId: task.id, completedQuantity: task.completedQuantity, hasExplicitSavedRoute: Boolean(provenance?.hasExplicitSavedRoute), savedProcessRoute: savedRoute, missingInstructionStages: [...(!provenance?.markingInstructionSnapshot ? ["MARK" as const] : []), ...(!provenance?.assemblyInstructionSnapshot ? ["ASSEMBLE" as const] : [])] };
+  const quickModel: WorkTaskQuickModel = {
+    taskId: task.id, stage: task.stage, status: task.status, returnPath, fullDetailsHref: detailsHref,
+    title: line.productTitleSnapshot ?? catalog?.title ?? line.productNameSource ?? "Untitled product",
+    sellerSku: line.sellerSkuSnapshot ?? line.sellerSkuSource ?? "No SKU", imageUrl: line.productImageSnapshot ?? catalog?.mainImageUrl ?? line.marketplaceListing?.mainImageUrl ?? null, source: "Consignment", marketplace: line.consignmentBatch.marketplace,
+    reference: line.consignmentBatch.externalConsignmentNumber, route: savedRoute, required: task.requiredQuantity, completed: task.completedQuantity, assignment,
+    identifiers: [
+      { label: "Consignment", value: line.consignmentBatch.externalConsignmentNumber },
+      { label: amazon ? "ASIN" : "FSN", value: (amazon ? line.asinSnapshot ?? line.asinSource : line.fsnSnapshot ?? line.fsnSource) ?? "Not available" },
+      { label: amazon ? "FNSKU" : "Listing ID", value: (amazon ? line.fnskuSnapshot ?? line.fnskuSource : line.listingIdSnapshot) ?? "Not available" },
+    ],
+    instructions: [marking?.instructions ?? asset?.instructions, assembly?.assemblyTitle, assembly?.assemblyInstructions, manual?.workerNote].filter((value): value is string => Boolean(value)),
+    priorStages: line.workTasks.map((item) => ({ stage: item.stage, status: item.status })),
+    problem: task.status === "PROBLEM" ? { reason: task.problemReason ?? "Problem", reporter: task.problemReportedBy?.name ?? "Unknown worker", reportedAt: task.problemReportedAt?.toLocaleString() ?? null, note: task.actionLogs[0]?.note ?? null } : undefined,
+  };
 
   return (
     <WorkCard
@@ -64,60 +78,35 @@ export function WorkTaskCardView({ task, returnPath, user }: { task: WorkerQueue
           metadata={<>{task.account.accountDisplayName ?? task.account.name}<span aria-hidden="true"> · </span>{line.consignmentBatch.displayName}</>}
         />
       }
+      processFlow={task.stage === "PICK" ? <WorkRouteDialogC1A card={routeCard}/> : <WorkProcessFlow currentStage={task.stage} route={savedRoute}/>}
       quantity={<WorkCardQuantity stage={task.stage} required={task.requiredQuantity} completed={task.completedQuantity} mode={task.stage === "PACK" ? "package" : "standard"} assignment={assignment} />}
       state={<TaskState task={task} capabilities={capabilities} manual={manual} assembly={assembly} asset={asset} marking={marking} catalogMaterial={catalog?.material} />}
       actions={
         <TaskActions
           task={task}
           capabilities={capabilities}
-          detailsHref={detailsHref}
           hidden={hidden}
-          provenance={provenance}
           remaining={remaining}
+          routeCard={routeCard}
+          quickModel={quickModel}
         />
-      }
-      disclosure={
-        <div className="divide-y divide-slate-100">
-          <WorkCardDisclosure label="Identifiers and route context">
-            <WorkCardMetadata>
-              <WorkCardMetadataItem label="Route" value={line.processRoute?.replaceAll("_", " → ") ?? "Choose after Pick"} />
-              <WorkCardMetadataItem label="Assignment" value={assignment} />
-              {amazon ? <><WorkCardMetadataItem label="ASIN" value={line.asinSnapshot ?? line.asinSource ?? "missing"} /><WorkCardMetadataItem label="FNSKU" value={line.fnskuSnapshot ?? line.fnskuSource ?? "missing"} /></> : <><WorkCardMetadataItem label="FSN" value={line.fsnSnapshot ?? line.fsnSource ?? "missing"} /><WorkCardMetadataItem label="Listing ID" value={line.listingIdSnapshot ?? "missing"} /></>}
-            </WorkCardMetadata>
-          </WorkCardDisclosure>
-          <WorkCardDisclosure label="Prior stages">
-            <div className="flex flex-wrap gap-2">{line.workTasks.map((item) => <span key={item.id} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs">{item.stage}: {item.status}</span>)}</div>
-          </WorkCardDisclosure>
-          {capabilities.canReportProblem ? <ProblemDisclosure hidden={hidden} /> : null}
-        </div>
       }
     />
   );
 }
 
 type Capabilities = ReturnType<typeof getWorkTaskCapabilities>;
-type Provenance = ReturnType<typeof parseImmutableRouteProvenance>;
-
-function TaskActions({ task, capabilities, detailsHref, hidden, provenance, remaining }: { task: WorkerQueueTask; capabilities: Capabilities; detailsHref: string; hidden: (suffix: string) => ReactNode; provenance: Provenance; remaining: number }) {
+function TaskActions({ task, capabilities, hidden, remaining, routeCard, quickModel }: { task: WorkerQueueTask; capabilities: Capabilities; hidden: (suffix: string) => ReactNode; remaining: number; routeCard: WorkRouteDialogCard; quickModel: WorkTaskQuickModel }) {
   const mode = task.status === "PROBLEM" ? "problem" : task.status === "COMPLETED" ? "completed" : capabilities.readOnly ? "read-only" : "ready";
   return (
     <WorkCardActions mode={mode}>
       {capabilities.canClaim ? <form action={claimTaskAction} className="col-span-2">{hidden("claim")}<SubmitButton pendingText="Starting..." className="w-full">Start {task.stage.toLowerCase()}</SubmitButton></form> : null}
-      {capabilities.canProgress && task.stage !== "PACK" ? (
-        <form action={setTaskProgressAction} className="col-span-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-          {hidden("set")}
-          <Field id={`target-quantity-${task.id}`} label="Exact completed quantity">
-            {(attributes) => <input {...attributes} name="targetQuantity" type="number" min={task.completedQuantity} max={task.requiredQuantity} step="1" defaultValue={task.completedQuantity} className={fieldControlStyles()} />}
-          </Field>
-          <SubmitButton pendingText="Saving..." variant="secondary" className="w-full self-end">Save exact quantity</SubmitButton>
-        </form>
-      ) : null}
       {capabilities.canProgress ? task.stage === "PICK" ? (
-        <div className="col-span-2 grid"><WorkRouteDialog card={{ stage: "PICK", sourceType: "CONSIGNMENT", groupKey: task.id, groupVersion: task.updatedAt.toISOString(), taskId: task.id, completedQuantity: task.completedQuantity, hasExplicitSavedRoute: Boolean(provenance?.hasExplicitSavedRoute), savedProcessRoute: provenance?.savedProcessRoute ?? null, missingInstructionStages: [...(!provenance?.markingInstructionSnapshot ? ["MARK" as const] : []), ...(!provenance?.assemblyInstructionSnapshot ? ["ASSEMBLE" as const] : [])] }} triggerLabel={`Complete ${remaining} and choose route`} /></div>
+        <WorkRouteActionButton card={routeCard} label={`Complete ${remaining} and choose route`} />
       ) : (
-        <form action={completeTaskAction} className="col-span-2">{hidden("complete")}<SubmitButton pendingText="Completing..." className="w-full">{task.stage === "PACK" ? "Pack Completed" : `Complete remaining ${remaining}`}</SubmitButton></form>
+        <form action={completeTaskAction}>{hidden("complete")}<SubmitButton pendingText="Completing..." className="w-full">{task.stage === "PACK" ? "Pack Completed" : `Complete remaining ${remaining}`}</SubmitButton></form>
       ) : null}
-      <Link href={detailsHref} className={buttonStyles({ variant: "secondary", className: "col-span-2 w-full" })}>Details</Link>
+      <WorkTaskQuickActions model={quickModel} canProgress={capabilities.canProgress} canReportProblem={capabilities.canReportProblem}/>
     </WorkCardActions>
   );
 }
@@ -140,23 +129,6 @@ function taskInstructionState({ task, manual, assembly, asset, marking, catalogM
   }
   if (task.stage === "ASSEMBLE") return <WorkCardState tone={assembly ? "neutral" : "danger"} title={assembly?.assemblyTitle ?? "Assembly instructions unavailable"}><p className="whitespace-pre-wrap">{assembly?.assemblyInstructions ?? "Saved assembly instructions are unavailable."}</p>{assembly?.assemblyImageUrl ? <a href={assembly.assemblyImageUrl} target="_blank" rel="noreferrer" className={buttonStyles({ variant: "secondary", className: "mt-2 w-full sm:w-fit" })}>Open assembly reference</a> : null}</WorkCardState>;
   return null;
-}
-
-function ProblemDisclosure({ hidden }: { hidden: (suffix: string) => ReactNode }) {
-  return (
-    <WorkCardDisclosure label="Report problem">
-      <form action={reportTaskProblemAction} className="grid gap-3 pb-1">
-        {hidden("problem")}
-        <Field id={`problem-reason-${randomUUID()}`} label="Problem reason" required>
-          {(attributes) => <select {...attributes} name="reason" required className={fieldControlStyles()}>{["PRODUCT_NOT_FOUND", "WRONG_PRODUCT", "QUANTITY_SHORT", "DAMAGED_PRODUCT", "MARKING_INSTRUCTION_MISSING", "MARKING_IMAGE_MISSING", "MARKING_FAILED", "PACKING_BLOCKED", "IDENTIFIER_NOT_MATCHING", "OTHER"].map((reason) => <option key={reason}>{reason.replaceAll("_", " ")}</option>)}</select>}
-        </Field>
-        <Field id={`problem-note-${randomUUID()}`} label="Note" help="Optional, up to 1,000 characters.">
-          {(attributes) => <textarea {...attributes} name="note" maxLength={1000} className={fieldControlStyles({ className: "min-h-20" })} />}
-        </Field>
-        <SubmitButton pendingText="Reporting..." variant="secondary" className="w-full sm:w-fit">Report problem</SubmitButton>
-      </form>
-    </WorkCardDisclosure>
-  );
 }
 
 function manualRouteMetadata(value: string | null) {

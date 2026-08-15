@@ -22,13 +22,10 @@ export function WorkCardQuantity({ assignment, completed, itemCount, label = "Qu
 
   if (mode === "package") {
     return (
-      <section className="rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="Package quantity">
+      <section className="rounded-md bg-slate-50 px-3 py-2.5" aria-label="Package quantity">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Package quantity</p>
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <QuantityValue label="Item count" value={itemCount ?? 1} />
-          <QuantityValue label="Total units" value={required} />
-        </div>
-        <p className="mt-3 break-words text-xs text-slate-500">{assignment}</p>
+        <p className="mt-1 text-sm font-semibold tabular-nums text-slate-950"><span className="sr-only">Item count </span>{itemCount ?? 1} items <span aria-hidden="true">·</span> <span className="sr-only">Total units </span>{required} units</p>
+        <p className="mt-1 break-words text-xs text-slate-600">{assignment}</p>
       </section>
     );
   }
@@ -36,21 +33,13 @@ export function WorkCardQuantity({ assignment, completed, itemCount, label = "Qu
   const pending = required - completed;
   const percent = required === 0 ? 0 : Math.min(100, completed / required * 100);
   return (
-    <section className="rounded-md border border-slate-200 bg-slate-50 p-3" aria-label={`${stage} quantity`}>
+    <section className="rounded-md bg-slate-50 px-3 py-2.5" aria-label={`${stage} quantity`}>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <QuantityValue label="Required" value={required} />
-        <QuantityValue label="Completed" value={completed} />
-        <QuantityValue label="Pending" value={pending} />
-      </div>
-      <div role="progressbar" aria-label={`${stage} quantity completed`} aria-valuemin={0} aria-valuemax={required} aria-valuenow={completed} className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+      <p className="mt-1 text-sm font-semibold tabular-nums text-slate-950"><span className="sr-only">Required </span>{required} required <span aria-hidden="true">·</span> <span className="sr-only">Completed </span>{completed} done <span aria-hidden="true">·</span> <span className="sr-only">Pending </span>{pending} remaining</p>
+      <div role="progressbar" aria-label={`${stage} quantity completed`} aria-valuemin={0} aria-valuemax={required} aria-valuenow={completed} className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200">
         <div className="h-full rounded-full bg-teal-600" style={{ width: `${percent}%` }} />
       </div>
-      <p className="mt-3 break-words text-xs text-slate-500">{assignment}</p>
+      <p className="mt-1.5 break-words text-xs text-slate-600">{assignment}</p>
     </section>
   );
-}
-
-function QuantityValue({ label, value }: { label: string; value: number }) {
-  return <div className="min-w-0"><p className="text-xs text-slate-500">{label}</p><p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-950">{value}</p></div>;
 }

@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type WorkStage } from "@prisma/client";
 import { createWorkRouteSnapshot } from "../src/lib/workflow/dynamic-route";
+import { resolveForwardStageEligibility } from "../src/lib/workflow/route-stage-eligibility";
 import { createImmutableRouteProvenance } from "../src/lib/workflow/route-provenance";
 import { completeStageAndChooseNext } from "../src/lib/workflow/stage-transition";
 import {
@@ -57,7 +58,7 @@ const provenance = createImmutableRouteProvenance({
   },
 });
 
-function routeSnapshot(selectedStages: string[] = ["PICK", "MARK"]) {
+function routeSnapshot(selectedStages: WorkStage[] = ["PICK", "MARK"]) {
   return JSON.stringify({
     ...createWorkRouteSnapshot({ processRoute: "PICK_MARK_PACK", currentStage: "MARK" }),
     ...provenance,
@@ -79,8 +80,9 @@ async function createLineWithMark(input: {
   listing?: string;
   assignedUserId?: string;
   completedQuantity?: number;
-  selectedStages?: string[];
+  selectedStages?: WorkStage[];
   includePack?: boolean;
+  downstreamStages?: WorkStage[];
 }) {
   const targetAccount = input.account ?? accountId;
   const listingId = input.listing ?? "listing";
@@ -117,15 +119,16 @@ async function createLineWithMark(input: {
       routeSnapshotJson: routeSnapshot(input.selectedStages),
     },
   });
-  if (input.includePack !== false) {
+  const downstreamStages = input.downstreamStages ?? (input.includePack === false ? [] : ["PACK"] as WorkStage[]);
+  for (const [index, stage] of downstreamStages.entries()) {
     await db.workTask.create({
       data: {
-        id: `pack-${input.id}`,
+        id: `${stage.toLowerCase()}-${input.id}`,
         accountId: targetAccount,
         sourceType: "CONSIGNMENT",
         consignmentLineId: `line-${input.id}`,
-        stage: "PACK",
-        sequenceNumber: 3,
+        stage,
+        sequenceNumber: 3 + index,
         requiredQuantity,
         status: "LOCKED",
         workCardSnapshotJson: cardSnapshot(input.id),
@@ -178,12 +181,15 @@ try {
     { id: "other-batch", accountId: "other-account", marketplace: "FLIPKART", externalConsignmentNumber: "C3A-OTHER", displayName: "Other C3A", status: "ACTIVE", sourceFileName: "other.csv", sourceFileSha256: "c3a-other" },
   ] });
 
-  const fixtures = [
+  const fixtures: Array<Parameters<typeof createLineWithMark>[0]> = [
     { id: "set-full", rowNumber: 1 },
     { id: "increment-full", rowNumber: 2, completedQuantity: 5 },
+    { id: "complete-bypass", rowNumber: 14 },
     { id: "partial-set", rowNumber: 3 },
     { id: "partial-increment", rowNumber: 4 },
-    { id: "single", rowNumber: 5, selectedStages: ["PICK", "MARK", "ASSEMBLE"] },
+    { id: "single", rowNumber: 5, selectedStages: ["PICK", "MARK", "ASSEMBLE"], downstreamStages: ["ASSEMBLE", "PACK"] },
+    { id: "deterministic-pack", rowNumber: 15, selectedStages: ["PICK", "MARK", "PACK"] },
+    { id: "mismatched-next", rowNumber: 16, selectedStages: ["PICK", "MARK", "ASSEMBLE"] },
     { id: "route-pack", rowNumber: 6 },
     { id: "route-assembly", rowNumber: 7 },
     { id: "stale", rowNumber: 8, completedQuantity: 1 },
@@ -197,6 +203,8 @@ try {
   await createLineWithMark({ id: "other-account", rowNumber: 1, account: "other-account", listing: "other-listing" });
 
   assert.deepEqual(selectableForwardStages("MARK", ["PICK", "MARK"], ["PICK"]), ["ASSEMBLE", "PACK"]);
+  assert.deepEqual(resolveForwardStageEligibility({ currentStage: "MARK", selectedStages: ["PICK", "MARK", "ASSEMBLE"], completedStages: ["PICK"] }), { valid: true, selectableStages: ["PACK"], preselectedNextStage: "ASSEMBLE" });
+  assert.deepEqual(resolveForwardStageEligibility({ currentStage: "MARK", selectedStages: ["PICK", "MARK", "PACK"], completedStages: ["PICK"] }), { valid: true, selectableStages: ["ASSEMBLE"], preselectedNextStage: "PACK" });
   await assert.rejects(
     () => setWorkTaskProgress({ taskId: "mark-set-full", accountId, actorUserId: "marker", expectedQuantity: 0, targetQuantity: 6, clientRequestId: "set-full" }, db),
     /Mark completion action/i,
@@ -208,6 +216,13 @@ try {
     /Mark completion action/i,
   );
   await assertRejectedRequestDidNotMutate("increment-full", "increment-full", 5);
+
+  assert.deepEqual(selectableForwardStages("MARK", ["PICK", "MARK"], ["PICK"]), ["ASSEMBLE", "PACK"]);
+  await assert.rejects(
+    () => completeWorkTask({ taskId: "mark-complete-bypass", accountId, actorUserId: "marker", expectedQuantity: 0, clientRequestId: "complete-bypass" }, db),
+    /Choose where Mark work goes next/i,
+  );
+  await assertRejectedRequestDidNotMutate("complete-bypass", "complete-bypass");
 
   const partialSet = await setWorkTaskProgress({ taskId: "mark-partial-set", accountId, actorUserId: "marker", expectedQuantity: 0, targetQuantity: 3, clientRequestId: "partial-set" }, db);
   assert.deepEqual(partialSet, { completedQuantity: 3, completed: false, idempotent: false });
@@ -223,7 +238,22 @@ try {
 
   const single = await completeWorkTask({ taskId: "mark-single", accountId, actorUserId: "marker", expectedQuantity: 0, clientRequestId: "single-complete" }, db);
   assert.deepEqual(single, { completedQuantity: 6, completed: true, idempotent: false });
-  assert.equal((await db.workTask.findUniqueOrThrow({ where: { id: "pack-single" } })).status, "READY");
+  assert.equal((await db.workTask.findUniqueOrThrow({ where: { id: "assemble-single" } })).status, "READY");
+  assert.equal((await db.workTask.findUniqueOrThrow({ where: { id: "pack-single" } })).status, "LOCKED");
+
+  const deterministicPackInput = { taskId: "mark-deterministic-pack", accountId, actorUserId: "marker", expectedQuantity: 0, clientRequestId: "deterministic-pack" };
+  const deterministicPack = await completeWorkTask(deterministicPackInput, db);
+  assert.deepEqual(deterministicPack, { completedQuantity: 6, completed: true, idempotent: false });
+  assert.equal((await db.workTask.findUniqueOrThrow({ where: { id: "pack-deterministic-pack" } })).status, "READY");
+  const deterministicPackReplay = await completeWorkTask(deterministicPackInput, db);
+  assert.equal(deterministicPackReplay.idempotent, true);
+  assert.equal(await db.workActionLog.count({ where: { taskId: "mark-deterministic-pack", clientRequestId: "deterministic-pack", action: "TASK_COMPLETED" } }), 1);
+
+  await assert.rejects(
+    () => completeWorkTask({ taskId: "mark-mismatched-next", accountId, actorUserId: "marker", expectedQuantity: 0, clientRequestId: "mismatched-next" }, db),
+    /route does not match the next task/i,
+  );
+  await assertRejectedRequestDidNotMutate("mismatched-next", "mismatched-next");
 
   const packInput = { actorUserId: "marker", selectedAccountId: accountId, taskId: "mark-route-pack", currentStage: "MARK" as const, expectedVersion: 1, expectedCompletedQuantity: 0, nextStage: "PACK" as const, clientRequestId: "route-pack" };
   const routedPack = await completeStageAndChooseNext(packInput, db);

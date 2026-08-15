@@ -1,4 +1,5 @@
 import type { ProcessRoute, WorkStage } from "@prisma/client";
+export { selectableForwardStages } from "./route-stage-eligibility";
 
 const ROUTE_STAGES: Record<ProcessRoute, WorkStage[]> = {
   PICK_PACK: ["PICK", "PACK"],
@@ -111,9 +112,4 @@ export function resolveWorkRoutePresentation(input: {
 export function routeRelevantMissingInstructionStages(routeStages: WorkStage[], missingStages: WorkStage[]) {
   const missing = new Set(missingStages);
   return (["MARK", "ASSEMBLE"] as WorkStage[]).filter((stage) => routeStages.includes(stage) && missing.has(stage));
-}
-
-export function selectableForwardStages(currentStage: WorkStage, selectedStages: WorkStage[], completedStages: WorkStage[]) {
-  const candidates: WorkStage[] = currentStage === "PICK" ? ["MARK", "ASSEMBLE", "PACK"] : currentStage === "MARK" ? ["ASSEMBLE", "PACK"] : currentStage === "ASSEMBLE" ? ["PACK"] : [];
-  return candidates.filter((stage) => !selectedStages.includes(stage) && !completedStages.includes(stage));
 }

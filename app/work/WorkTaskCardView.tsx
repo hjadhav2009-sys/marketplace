@@ -19,7 +19,8 @@ import { WorkTaskQuickActions, type WorkTaskQuickModel } from "@/components/work
 import { parseConsignmentCatalogSnapshot } from "@/src/lib/consignments/amazon/catalog-snapshot";
 import { parseConsignmentAssemblyMetadata, parseOrderMarkingMetadata } from "@/src/lib/workflow/route-task-metadata";
 import { parseImmutableRouteProvenance } from "@/src/lib/workflow/route-provenance";
-import { resolveWorkRoutePresentation, routeRelevantMissingInstructionStages, selectableForwardStages } from "@/src/lib/workflow/work-route-presentation";
+import { resolveForwardStageEligibility } from "@/src/lib/workflow/route-stage-eligibility";
+import { resolveWorkRoutePresentation, routeRelevantMissingInstructionStages } from "@/src/lib/workflow/work-route-presentation";
 import type { WorkerQueueTask } from "@/src/lib/workflow/queues";
 import { getWorkTaskCapabilities } from "@/src/lib/workflow/worker-access";
 import { claimTaskAction, completeTaskAction } from "./actions";
@@ -50,7 +51,7 @@ export function WorkTaskCardView({ task, returnPath, user }: { task: WorkerQueue
   const routePresentation = resolveWorkRoutePresentation({ routeSnapshotJson: task.routeSnapshotJson, metadataJson: task.metadataJson, savedProcessRoute: savedRoute, currentStage: task.stage });
   const availableMissingInstructionStages = [...(!provenance?.markingInstructionSnapshot ? ["MARK" as const] : []), ...(!provenance?.assemblyInstructionSnapshot ? ["ASSEMBLE" as const] : [])];
   const requiredMissingInstructionStages = routeRelevantMissingInstructionStages(routePresentation.stages, availableMissingInstructionStages);
-  const selectableNextStages = selectableForwardStages(task.stage, routePresentation.selectedStages, routePresentation.completedStages);
+  const selectableNextStages = resolveForwardStageEligibility({ currentStage: task.stage, selectedStages: routePresentation.selectedStages, completedStages: routePresentation.completedStages }).selectableStages;
   const routeCard: WorkRouteDialogCard = { stage: task.stage, sourceType: "CONSIGNMENT", groupKey: task.id, groupVersion: task.updatedAt.toISOString(), taskId: task.id, taskVersion: task.version, completedQuantity: task.completedQuantity, hasExplicitSavedRoute: Boolean(provenance?.hasExplicitSavedRoute), savedProcessRoute: savedRoute, processRoute: routePresentation.processRoute, routeDegraded: routePresentation.degraded, missingInstructionStages: availableMissingInstructionStages, selectableNextStages, actionScope: "TASK", requestBase, returnPath };
   const quickModel: WorkTaskQuickModel = {
     taskId: task.id, stage: task.stage, status: task.status, returnPath, fullDetailsHref: detailsHref,

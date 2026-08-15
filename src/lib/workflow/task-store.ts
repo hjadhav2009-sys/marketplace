@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Prisma, type PrismaClient, type ProcessRoute, type WorkActionType, type WorkRequestKind } from "@prisma/client";
+import { Prisma, type PrismaClient, type ProcessRoute, type WorkActionType, type WorkRequestKind, type WorkStage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildTaskPlan } from "./tasks";
 import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutateStage, userCanResolveConsignmentProblems } from "./worker-access";
-import { createWorkRouteSnapshot } from "./dynamic-route";
+import { createWorkRouteSnapshot, parseWorkRouteSnapshot, recommendedStages } from "./dynamic-route";
+import { resolveForwardStageEligibility } from "./route-stage-eligibility";
 import { refreshAffectedWorkGroups } from "./work-group-projection";
 import { createImmutableRouteProvenance } from "./route-provenance";
 import { resolveConsignmentLineWorkflowPrerequisites } from "./workflow-prerequisites";
@@ -226,7 +227,7 @@ export async function activateConsignmentBatch(input: { batchId: string; account
 
 async function taskForMutation(tx: Transaction | Client, input: { taskId: string; accountId: string; actorUserId: string }) {
   const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
-  const task = await tx.workTask.findFirst({ where: { id: input.taskId, accountId: input.accountId, sourceType: "CONSIGNMENT" }, include: { consignmentLine: { select: { id: true, accountId: true, consignmentBatchId: true } } } });
+  const task = await tx.workTask.findFirst({ where: { id: input.taskId, accountId: input.accountId, sourceType: "CONSIGNMENT" }, include: { consignmentLine: { select: { id: true, accountId: true, consignmentBatchId: true, processRoute: true } } } });
   if (!task?.consignmentLine || task.consignmentLine.accountId !== input.accountId) throw new Error("Task is not available in the selected account.");
   if (!userCanMutateStage(user, task.stage)) throw new Error("Worker lacks permission for this stage.");
   return { user, task };
@@ -348,6 +349,50 @@ export async function completeConsignmentPackTasksInTransaction(tx: Transaction,
   return { taskIds: tasks.map(task => task.id), completedAt };
 }
 
+async function assertDeterministicMarkCompletion(tx: Transaction, task: {
+  consignmentLineId: string | null;
+  sequenceNumber: number;
+  routeSnapshotJson: string | null;
+  consignmentLine: { processRoute: ProcessRoute | null } | null;
+}): Promise<WorkStage> {
+  const snapshot = parseWorkRouteSnapshot(task.routeSnapshotJson);
+  let selectedStages: WorkStage[];
+  let completedStages: WorkStage[];
+
+  if (snapshot?.currentStage === "MARK") {
+    selectedStages = snapshot.actualStages;
+    completedStages = snapshot.completedStages;
+  } else if (snapshot) {
+    const legacyPlan = snapshot.currentStage === "PICK"
+      && snapshot.actualStages.length === 1
+      && snapshot.actualStages[0] === "PICK"
+      && snapshot.completedStages.length === 0;
+    if (!legacyPlan) throw new Error("Choose where Mark work goes next before completing marking.");
+    selectedStages = snapshot.recommendedStages;
+    completedStages = snapshot.completedStages;
+  } else if (!task.routeSnapshotJson && routeSupported(task.consignmentLine?.processRoute ?? null)) {
+    selectedStages = recommendedStages(task.consignmentLine!.processRoute);
+    completedStages = [];
+  } else {
+    throw new Error("Choose where Mark work goes next before completing marking.");
+  }
+
+  const eligibility = resolveForwardStageEligibility({ currentStage: "MARK", selectedStages, completedStages });
+  const expectedNextStage = eligibility.valid ? eligibility.preselectedNextStage : null;
+  if (expectedNextStage !== "ASSEMBLE" && expectedNextStage !== "PACK") {
+    throw new Error("Choose where Mark work goes next before completing marking.");
+  }
+
+  const downstream = await tx.workTask.findFirst({
+    where: { consignmentLineId: task.consignmentLineId!, sequenceNumber: task.sequenceNumber + 1 },
+    select: { stage: true, status: true },
+  });
+  if (!downstream || downstream.stage !== expectedNextStage || downstream.status !== "LOCKED") {
+    throw new Error("Mark route does not match the next task. Refresh before completing marking.");
+  }
+  return expectedNextStage;
+}
+
 export async function setWorkTaskProgress(input: { taskId: string; accountId: string; actorUserId: string; expectedQuantity: number; targetQuantity?: number; clientRequestId?: string; action?: "set" | "increment"; requestKind?: "INCREMENT" | "SET_PROGRESS" | "COMPLETE" }, client: Client = prisma) {
   if (!Number.isSafeInteger(input.expectedQuantity) || input.expectedQuantity < 0 || (input.targetQuantity !== undefined && (!Number.isSafeInteger(input.targetQuantity) || input.targetQuantity < 0))) throw new Error("Work quantity must be a non-negative whole number.");
   const requestKind = input.requestKind ?? (input.action === "increment" ? "INCREMENT" : "SET_PROGRESS");
@@ -365,6 +410,7 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     const fingerprint=requestFingerprint({expectedQuantity:input.expectedQuantity,targetQuantity,requestKind});
     if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
     const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId,fingerprint }); if (prior) return prior;
+    const deterministicMarkNextStage = task.stage === "MARK" && requestKind === "COMPLETE" ? await assertDeterministicMarkCompletion(tx, task) : null;
     if (task.stage === "PICK" && requestKind !== "COMPLETE" && targetQuantity === task.requiredQuantity) throw new Error("Use Complete Pick and choose a processing flow to finish picking.");
     if (task.stage === "MARK" && requestKind !== "COMPLETE" && targetQuantity === task.requiredQuantity) throw new Error("Use the Mark completion action to finish marking.");
     if (task.status === "COMPLETED" && targetQuantity === task.requiredQuantity) return { completedQuantity: task.completedQuantity, completed: true, idempotent: true };
@@ -379,7 +425,8 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     const action: WorkActionType = nextStatus === "COMPLETED" ? "TASK_COMPLETED" : input.action === "increment" ? "TASK_INCREMENTED" : "TASK_PROGRESS_SET";
     await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action, requestKind,fingerprint, before: task.completedQuantity, after: targetQuantity, clientRequestId: input.clientRequestId });
     if (nextStatus === "COMPLETED") {
-      await unlockNextTask(tx, task.consignmentLineId!, task.sequenceNumber);
+      const unlocked = await unlockNextTask(tx, task.consignmentLineId!, task.sequenceNumber);
+      if (deterministicMarkNextStage && unlocked.count !== 1) throw new Error("Mark route changed; refresh before completing marking.");
       await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id });
     }
     await refreshTaskProjection(tx,task);

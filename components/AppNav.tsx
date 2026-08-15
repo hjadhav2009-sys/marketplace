@@ -56,10 +56,12 @@ function NavIcon({ icon }: { icon: NavigationIcon }) {
 function NavItems({
   links,
   collapsed = false,
+  idPrefix,
   onNavigate
 }: {
   links: AppNavLink[];
   collapsed?: boolean;
+  idPrefix: "desktop" | "mobile";
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -69,9 +71,9 @@ function NavItems({
   return (
     <div className="space-y-6">
       {sections.map((section) => (
-        <section key={section} aria-labelledby={`navigation-section-${section.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}>
+        <section key={section} aria-labelledby={`${idPrefix}-navigation-section-${section.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}>
           <h2
-            id={`navigation-section-${section.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}
+            id={`${idPrefix}-navigation-section-${section.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}
             className={collapsed ? "sr-only" : "mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"}
           >
             {section}
@@ -167,7 +169,7 @@ export function AppNav({ links, companyName, accountName, accountCode, marketpla
         ) : null}
       </div>
       <nav className="flex-1 overflow-y-auto p-3" aria-label="Main navigation">
-        <NavItems links={links} collapsed={collapsed} />
+        <NavItems links={links} collapsed={collapsed} idPrefix="desktop" />
       </nav>
     </aside>
   );
@@ -277,7 +279,7 @@ export function MobileDrawer({ links, companyName, accountName, accountCode, mar
           </button>
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" aria-label="Mobile navigation">
-          <NavItems links={links} onNavigate={() => closeDrawer(false)} />
+          <NavItems links={links} idPrefix="mobile" onNavigate={() => closeDrawer(false)} />
         </nav>
       </aside>
     </div>,

@@ -92,6 +92,8 @@ assert.match(shell, /navigationForUser\(user\)/, "Permission-derived links are s
 assert.doesNotMatch(nav, /canPick|canPack|canMark|canAssemble|canViewAllWork/, "The client navigation never receives permission computation.");
 assert.match(nav, /resolveCurrentNavigationId\(pathname, links\)/, "One central resolver owns current-route state.");
 assert.match(nav, /aria-current=\{active \? "page" : undefined\}/);
+assert.match(nav, /idPrefix="desktop"/);
+assert.match(nav, /idPrefix="mobile"/, "Desktop and drawer navigation headings keep distinct IDs.");
 assert.match(nav, /xl:flex/);
 assert.match(nav, /xl:hidden/);
 assert.match(nav, /min-h-11 min-w-11/, "Shell controls preserve 44px operational targets.");

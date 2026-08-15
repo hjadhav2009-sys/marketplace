@@ -99,7 +99,7 @@ try {
 
     await openMark(owner.page, "/work/mark?source=ORDER");
     const order = await inspect(owner.page);
-    results.push({ state: "ORDER_MARK", viewport: viewport.id, pass: healthy(order, owner.errors, viewport.width) && order.cards > 0 && order.guidance > 0 && order.text.includes("STAGE-MARKING-MASTER-001") && order.text.includes("Marking Completed") && order.text.includes("Power") && order.text.includes("Speed"), inspection: order, errors: structuredClone(owner.errors) });
+    results.push({ state: "ORDER_MARK", viewport: viewport.id, pass: healthy(order, owner.errors, viewport.width) && order.cards > 0 && order.guidance > 0 && order.text.includes("STAGE-MARKING-MASTER-001") && order.text.includes("Marking Completed") && order.text.toUpperCase().includes("POWER") && order.text.toUpperCase().includes("SPEED"), inspection: order, errors: structuredClone(owner.errors) });
 
     await openMark(owner.page, "/work/mark?source=CONSIGNMENT");
     const consignment = await inspect(owner.page);

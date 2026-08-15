@@ -17,7 +17,7 @@ export type NavigationUser = {
 };
 
 export const ownerNavigation: readonly AppNavLink[] = [
-  { id: "dashboard", href: "/dashboard", label: "Dashboard", section: "OVERVIEW", icon: "overview", ownedPaths: ["/owner"] },
+  { id: "dashboard", href: "/dashboard", label: "Dashboard", section: "OVERVIEW", icon: "overview" },
   { id: "work-hub", href: "/work", label: "Work Hub", section: "WORK", icon: "work" },
   { id: "pick", href: "/work/pick?source=ORDER", label: "Pick", section: "WORK", icon: "pick" },
   { id: "mark", href: "/work/mark", label: "Mark", section: "WORK", icon: "mark" },

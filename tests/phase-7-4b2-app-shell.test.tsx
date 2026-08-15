@@ -57,12 +57,20 @@ for (const [pathname, expected] of [
   ["/owner/product-inventory/refresh", "new-import"],
   ["/owner/imports/stage4-import/mapping", "import-history"],
   ["/owner/consignments/stage3-batch/review", "consignments"],
-  ["/owner", "dashboard"],
+  ["/owner", null],
+  ["/owner/cleanup", null],
+  ["/owner/manual-review", null],
+  ["/owner/old-pending", null],
+  ["/owner/sku-mappings", null],
+  ["/owner/sku-mappings/import", null],
+  ["/owner/uploads/new", null],
+  ["/owner/uploads/stage3-batch/review", null],
   ["/workshop", null],
   ["/unowned/route", null],
 ] as const) {
   assert.equal(resolveCurrentNavigationId(pathname, ownerNavigation), expected, `${pathname} has one explicit navigation owner.`);
 }
+assert.equal(ownerNavigation.find((link) => link.id === "dashboard")?.ownedPaths, undefined, "Dashboard has no broad /owner prefix ownership.");
 
 const ownerSections = [...new Set(ownerNavigation.map((link) => link.section))];
 assert.deepEqual(ownerSections, ["OVERVIEW", "WORK", "CATALOG", "IMPORTS", "PEOPLE", "INSIGHTS & SYSTEM", "PROFILE"]);

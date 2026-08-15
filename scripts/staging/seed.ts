@@ -236,14 +236,14 @@ async function seed() {
     ["mapping", "NEEDS_MAPPING", "MAPPING", 20, 0, 0, null],
     ["running", "RUNNING", "MERGING", 100, 45, 2, null],
     ["completed", "COMPLETED", "COMPLETED", 100, 100, 0, null],
-    ["warnings", "COMPLETED", "COMPLETED_WITH_WARNINGS", 100, 100, 5, null],
+    ["warnings", "COMPLETED_WITH_WARNINGS", "COMPLETED", 100, 100, 5, null],
     ["failed", "FAILED", "FAILED", 40, 12, 3, "Synthetic parser failure."],
     ["cancelled", "CANCELLED", "CANCELLED", 20, 5, 0, null]
   ] as const;
   for (const [suffix, status, stage, totalRows, processedRows, warningRows, lastError] of importStates) {
     await prisma.importJob.create({ data: {
       id: `stage4-import-${suffix}`, accountId: accounts[0].id, createdByUserId: users[1].id, marketplace: "FLIPKART", importType: "PRODUCT_INVENTORY",
-      fileName: `synthetic-${suffix}.csv`, filePath: syntheticImportFile, batchId: `stage4-batch-${suffix}`, status, stage, totalRows, processedRows,
+      fileName: suffix === "failed" ? `synthetic-${"attention-and-long-filename-".repeat(8)}failed.csv` : `synthetic-${suffix}.csv`, filePath: syntheticImportFile, batchId: `stage4-batch-${suffix}`, status, stage, totalRows, processedRows,
       createdRows: suffix === "completed" ? 25 : 0, unchangedRows: suffix === "completed" ? 75 : 0, warningRows, errorRows: suffix === "failed" ? 3 : 0,
       totalFiles: 1, processedFiles: ["completed", "warnings", "failed", "cancelled"].includes(suffix) ? 1 : 0, lastError,
       startedAt: ["running", "completed", "warnings", "failed", "cancelled"].includes(suffix) ? new Date() : undefined,
@@ -257,6 +257,11 @@ async function seed() {
       }) : undefined
     } });
   }
+  await prisma.importJob.create({ data: {
+    id: "stage4-import-amazon-completed", accountId: accounts[1].id, createdByUserId: users[0].id, marketplace: "AMAZON", importType: "AMAZON_PRODUCT_INVENTORY",
+    fileName: "synthetic-amazon-product-inventory.xlsx", filePath: syntheticImportFile, status: "COMPLETED", stage: "COMPLETED", totalRows: 24, processedRows: 24,
+    createdRows: 24, totalFiles: 1, processedFiles: 1, startedAt: new Date(), finishedAt: new Date(), reportJson: JSON.stringify({ synthetic: true, state: "amazon-completed" })
+  } });
   await prisma.uploadBatch.create({ data: { id: "stage4-upload-needs-mapping", accountId: accounts[0].id, createdByUserId: users[1].id, fileName: "synthetic-needs-mapping.csv", importType: "ORDER_LABEL", status: "NEEDS_MAPPING", totalRows: 3, errorRows: 1, warningRows: 1, blockingErrorRows: 1 } });
   await prisma.importRowIssue.createMany({ data: [
     { id: "stage4-import-warning", batchId: "stage4-upload-needs-mapping", rowNumber: 2, issueType: "UNKNOWN_HEADER", message: "Synthetic header requires mapping.", safeDataJson: JSON.stringify({ sellerSku: "STAGE-FK-SKU-001" }), severity: "WARNING" },

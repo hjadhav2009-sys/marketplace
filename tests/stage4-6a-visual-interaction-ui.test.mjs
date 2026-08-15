@@ -67,7 +67,7 @@ assert.match(dataActionDetails, /summaryRef\.current\?\.focus/, "Closing a Data 
 assert.match(dataManagement, /executeOwnerDataAction/, "The existing authoritative Data Management action remains wired.");
 
 for (const [source, pattern, label] of [
-  [dashboard, /href="\/owner\/imports" className="inline-flex min-h-11 items-center/, "dashboard section link"],
+  [dashboard, /href="\/owner\/imports" className=\{buttonStyles\(\{ variant: "quiet" \}\)\}/, "dashboard section link"],
   [importProgress, /inline-flex min-h-11 items-center rounded-md/, "import progress actions"],
   [importDetails, /View issues[\s\S]*Download issues[\s\S]*min-h-11/, "import detail actions"],
   [uploadReview, /inline-flex min-h-11 items-center text-sm font-semibold text-berry/, "upload review actions"],

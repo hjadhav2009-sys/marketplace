@@ -1,1 +1,5 @@
-import { SmartStagePage } from "../SmartStagePage";export default function Page({searchParams}:{searchParams:Promise<{source?:string;page?:string;success?:string;error?:string}>}){return <SmartStagePage stage="MARK" searchParams={searchParams}/>}
+import { MarkWorkspace, type MarkSearchParams } from "./MarkWorkspace";
+
+export default function Page({ searchParams }: { searchParams: MarkSearchParams }) {
+  return <MarkWorkspace searchParams={searchParams}/>;
+}

@@ -9,6 +9,8 @@ import { buttonStyles } from "@/components/ui/buttonStyles";
 import { ProductImage } from "@/components/ProductImage";
 import { useWorkerOverlay } from "@/components/worker-overlay/WorkerOverlay";
 import { humanProcessRoute } from "./WorkProcessFlow";
+import { MarkingDetails } from "./MarkingGuidance";
+import type { ManualMarkingGuidance, MarkingGuidance } from "@/src/lib/workflow/marking-guidance";
 
 const PROBLEM_REASONS = ["PRODUCT_NOT_FOUND", "WRONG_PRODUCT", "QUANTITY_SHORT", "DAMAGED_PRODUCT", "MARKING_FILE_MISSING", "MARKING_FILE_WRONG", "MARKING_FAILED", "PACKING_BLOCKED", "IDENTIFIER_NOT_MATCHING", "OTHER"];
 
@@ -19,6 +21,7 @@ export type WorkTaskQuickModel = {
   route: string | null; required: number; completed: number; assignment: string;
   identifiers: Array<{ label: string; value: string }>;
   instructions: string[]; missingInstructionStages: WorkStage[]; priorStages: Array<{ stage: string; status: string }>;
+  markingGuidance: MarkingGuidance | null; manualMarkingGuidance: ManualMarkingGuidance | null;
   problem?: { reason: string; reporter: string; reportedAt: string | null; note: string | null };
 };
 
@@ -65,6 +68,8 @@ function TaskDetails({ model }: { model: WorkTaskQuickModel }) {
     <DetailSection title="Process flow"><p className="font-semibold">{humanProcessRoute(model.route)}</p><p className="mt-1 text-sm text-slate-600">Current stage: {titleCase(model.stage)}</p></DetailSection>
     <DetailSection title="Quantity"><p className="tabular-nums">{model.required} required · {model.completed} completed · {model.required - model.completed} remaining</p><p className="mt-1 text-sm text-slate-600">{model.assignment}</p></DetailSection>
     <DetailSection title="Identifiers"><dl className="grid gap-2">{model.identifiers.map((item) => <div key={item.label}><dt className="text-xs font-semibold text-slate-500">{item.label}</dt><dd className="break-all text-sm font-medium">{item.value}</dd></div>)}</dl></DetailSection>
+    {model.markingGuidance ? <DetailSection title="Marking"><MarkingDetails guidance={model.markingGuidance}/></DetailSection> : null}
+    {model.manualMarkingGuidance ? <DetailSection title="Manual marking guidance"><p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{model.manualMarkingGuidance.warning}{model.manualMarkingGuidance.workerNote ? <span className="mt-1 block whitespace-pre-wrap font-medium">Worker note: {model.manualMarkingGuidance.workerNote}</span> : null}</p></DetailSection> : null}
     {model.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{model.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : null}
     {model.missingInstructionStages.length ? <DetailSection title="Missing required instructions"><p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Saved instructions are unavailable for {model.missingInstructionStages.map(titleCase).join(" and ")}. No settings will be invented.</p></DetailSection> : null}
     <DetailSection title="Recent stage history"><ol className="space-y-2">{model.priorStages.map((item) => <li key={`${item.stage}:${item.status}`} className="text-sm"><span className="font-semibold">{titleCase(item.stage)}</span> · {titleCase(item.status)}</li>)}</ol></DetailSection>

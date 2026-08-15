@@ -81,7 +81,7 @@ const protectedHashes: Record<string, string> = {
   "src/lib/workflow/route-selection.ts": "d7f465a9cfe7b92254ea2d6479eb238dfca25f3eff729a2ed6fc0ca3c517402f",
   "src/lib/workflow/grouped-transition.ts": "5a52d4798bed591c1f6f8af9c6c6646e65ad6596595a5b7f9c797ffee4f2517c",
   "src/lib/workflow/grouped-progress.ts": "98592bc58d9e2ce8deff9417e4917415ad0ddf82d679d7b620fd0a2903890266",
-  "src/lib/workflow/task-store.ts": "37e2b0f9045e8d4ad4d0b9260020ecf643450a3b6ec09d077f6278ea21d0d071",
+  "src/lib/workflow/task-store.ts": "f5f6018e48e9398797ca058b6ec634e12904b512f46ac96a37d06bab1e52dd3a",
   "src/lib/workflow/order-pack-scope.ts": "65e30f0f66dd536f16b92bed8b0979f9b13da4609a9ab45df7541b1d564ad6f3",
   "src/lib/workflow/worker-access.ts": "30b946c5facf23e977393c2031f5808a023cd5d753f1928a3cea2b93469a377c",
   "prisma/schema.prisma": "1d37d77d8564eade98a0153c898707e61e4cc25ac03892ec9a30fa5a4862cc78",

@@ -80,6 +80,17 @@ function syntheticImageRoute(safeSku: string) {
   return `/product-images/meesho/${accounts[0].id}/${safeSku}/card.png`;
 }
 
+function syntheticMarkMetadata(sku: string, title: string, extra: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    version: 1, source: "PROCESS_RULE", routeChoice: "MARK", processRoute: "PICK_MARK_PACK", requestFingerprint: `synthetic-mark:${sku}`,
+    marketplaceListingId: "stage3-listing-fk-mark", processRuleId: "stage3-listing-fk-mark-rule", markingAssetId: "stage4-synthetic-marking-asset",
+    markingAssetName: "Synthetic Marking Guide", masterDesignId: "STAGE-MARKING-MASTER-001", material: "Synthetic alloy", markingPosition: "Front centre",
+    markingWidthMm: 24, markingHeightMm: 12, powerSetting: 30, speedSetting: 500, frequencySetting: 25, passes: 1,
+    instructions: "Keep the synthetic engraving centered inside the approved border.", sellerSkuSnapshot: sku, productTitleSnapshot: title,
+    productImageSnapshot: syntheticImageRoute("stage3-fk-mark"), requestedByUserId: users[0].id, requestedAt: new Date(0).toISOString(), ...extra
+  });
+}
+
 async function writeSyntheticImage(safeSku: string) {
   const directory = path.join(productImageStorageRoot!, "meesho", accounts[0].id, safeSku);
   await mkdir(directory, { recursive: true });
@@ -93,7 +104,7 @@ async function createTask(input: { id: string; accountId?: string; orderId?: str
     assignedUserId: input.assigned, startedByUserId: input.status === "IN_PROGRESS" ? input.assigned : undefined, startedAt: input.status === "IN_PROGRESS" ? new Date() : undefined,
     completedByUserId: input.status === "COMPLETED" ? input.assigned ?? users[0].id : undefined, completedAt: input.status === "COMPLETED" ? new Date() : undefined,
     problemReason: input.problem, problemReportedAt: input.problem ? new Date() : undefined, problemReportedByUserId: input.problem ? input.assigned ?? users[0].id : undefined,
-    statusBeforeProblem: input.problem ? "READY" : undefined, metadataJson: input.metadataJson ?? JSON.stringify({ synthetic: true, processRoute: input.route ?? "PICK_PACK", instruction: input.stage === "MARK" ? "Use synthetic marking guide." : input.stage === "ASSEMBLE" ? "Use synthetic assembly guide." : null }),
+    statusBeforeProblem: input.problem ? "READY" : undefined, metadataJson: input.metadataJson ?? (input.stage === "MARK" ? syntheticMarkMetadata(input.sku, input.title) : JSON.stringify({ synthetic: true, processRoute: input.route ?? "PICK_PACK", instruction: input.stage === "ASSEMBLE" ? "Use synthetic assembly guide." : null })),
     workCardSnapshotJson: input.workCardSnapshotJson ?? snapshot(input.sku, input.title, input.route), routeSnapshotJson: input.routeSnapshotJson ?? routeSnapshot(input.route, input.stage)
   } });
 }
@@ -150,6 +161,10 @@ async function seed() {
       markingPosition: "Centered",
       markingWidthMm: 24,
       markingHeightMm: 12,
+      powerSetting: 30,
+      speedSetting: 500,
+      frequencySetting: 25,
+      passes: 1,
       instructions: "Use the synthetic alignment guide. No production settings.",
       status: "APPROVED",
       active: true,
@@ -247,7 +262,7 @@ async function seed() {
     const provenance = createImmutableRouteProvenance({ route: item.savedRoute ?? "PICK_PACK", rule: item.savedRoute ? { id: `${item.id}-saved-rule`, route: item.savedRoute } : null, now: new Date(0) });
     const cardSnapshot = JSON.stringify({ ...provenance, sellerSku: item.sku, productTitle: item.title, primaryImage: image, synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase() });
     await prisma.consignmentLine.create({ data: { id: item.id, consignmentBatchId: "stage4-batch-c1a1-route-truth", accountId: accounts[0].id, rowNumber: item.row, sellerSkuSource: item.sku, requiredQuantity: item.quantity, marketplaceListingId: item.listingId, matchStatus: "EXACT_SKU", processRoute: item.savedRoute, activated: true, sellerSkuSnapshot: item.sku, productTitleSnapshot: item.title, catalogSnapshotJson: cardSnapshot } });
-    await createTask({ id: `${item.id}-${item.stage.toLowerCase()}`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: item.stage, sequence: item.stage === "PICK" ? 1 : 2, status: "READY", quantity: item.quantity, assigned: item.assigned, sku: item.sku, title: item.title, route: item.savedRoute, metadataJson: JSON.stringify({ synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase(), workerNote: item.id.endsWith("case-a") ? "Actual flow intentionally differs from the saved product default." : null }), workCardSnapshotJson: cardSnapshot, routeSnapshotJson: actualRouteSnapshot({ savedRoute: item.savedRoute, actualRoute: item.actualRoute, currentStage: item.stage, completedStages: item.stage === "MARK" ? ["PICK"] : [] }) });
+    await createTask({ id: `${item.id}-${item.stage.toLowerCase()}`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: item.stage, sequence: item.stage === "PICK" ? 1 : 2, status: "READY", quantity: item.quantity, assigned: item.assigned, sku: item.sku, title: item.title, route: item.savedRoute, metadataJson: item.stage === "MARK" && !item.id.endsWith("case-d") ? syntheticMarkMetadata(item.sku, item.title, { c1a1Case: item.id.slice(-1).toUpperCase(), workerNote: item.id.endsWith("case-a") ? "Actual flow intentionally differs from the saved product default." : null }) : JSON.stringify({ synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase() }), workCardSnapshotJson: cardSnapshot, routeSnapshotJson: actualRouteSnapshot({ savedRoute: item.savedRoute, actualRoute: item.actualRoute, currentStage: item.stage, completedStages: item.stage === "MARK" ? ["PICK"] : [] }) });
   }
   await prisma.consignmentBatch.create({ data: { id: "stage4-batch-c3a-mark-safety", accountId: accounts[0].id, marketplace: "FLIPKART", externalConsignmentNumber: "STAGE-C3A-MARK-SAFETY", displayName: "Synthetic C3A Mark safety", status: "ACTIVE", sourceFileName: "synthetic-c3a-mark-safety.csv", sourceFileSha256: "8".repeat(64), totalSourceRows: 2, totalValidLines: 2, totalRequiredQuantity: 12, matchedLines: 2, unmatchedLines: 0, createdByUserId: users[0].id, activatedAt: new Date(), activatedByUserId: users[0].id } });
   const c3aCases = [
@@ -263,6 +278,22 @@ async function seed() {
     await createTask({ id: `${item.id}-mark`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: "MARK", sequence: 2, status: "READY", quantity: 6, assigned: users[4].id, sku: item.sku, title: item.title, route: "PICK_MARK_PACK", metadataJson: JSON.stringify({ synthetic: true, processRoute: "PICK_MARK_PACK", c3aCase: item.id }), workCardSnapshotJson: cardSnapshot, routeSnapshotJson: c3aRouteSnapshot });
     if (preselectedAssembly) await createTask({ id: `${item.id}-assemble`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: "ASSEMBLE", sequence: 3, status: "LOCKED", quantity: 6, assigned: users[5].id, sku: item.sku, title: item.title, route: "PICK_MARK_ASSEMBLE_PACK", workCardSnapshotJson: cardSnapshot, routeSnapshotJson: c3aRouteSnapshot });
     await createTask({ id: `${item.id}-pack`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: "PACK", sequence: preselectedAssembly ? 4 : 3, status: "LOCKED", quantity: 6, assigned: users[6].id, sku: item.sku, title: item.title, route: preselectedAssembly ? "PICK_MARK_ASSEMBLE_PACK" : "PICK_MARK_PACK", workCardSnapshotJson: cardSnapshot, routeSnapshotJson: c3aRouteSnapshot });
+  }
+  await prisma.consignmentBatch.create({ data: { id: "stage4-batch-c3b-mark-experience", accountId: accounts[0].id, marketplace: "FLIPKART", externalConsignmentNumber: "STAGE-C3B-MARK-EXPERIENCE", displayName: "Synthetic C3B Mark experience", status: "ACTIVE", sourceFileName: "synthetic-c3b-mark-experience.csv", sourceFileSha256: "9".repeat(64), totalSourceRows: 4, totalValidLines: 4, totalRequiredQuantity: 17, matchedLines: 4, unmatchedLines: 0, createdByUserId: users[0].id, activatedAt: new Date(), activatedByUserId: users[0].id } });
+  const c3bCases = [
+    { id: "stage4-c3b-manual", row: 1, sku: "STAGE-C3B-MANUAL-MARK", title: "Synthetic manual guidance Mark task", listingId: "stage3-listing-fk-missing-image", quantity: 4, status: "READY" as const, completed: 0, assigned: users[4].id, problem: undefined, metadataJson: JSON.stringify({ instructionStatus: "MISSING", warning: "Saved marking instructions unavailable", routedByUserId: users[0].id, routedAt: new Date(0).toISOString(), workerNote: `Use the approved paper template. ${"Keep the pendant aligned with the physical centre guide. ".repeat(8)}` }) },
+    { id: "stage4-c3b-problem", row: 2, sku: "STAGE-C3B-PROBLEM-MARK", title: "Synthetic marking task paused after a file check", listingId: "stage3-listing-fk-broken-image", quantity: 3, status: "PROBLEM" as const, completed: 1, assigned: users[4].id, problem: "MARKING_FILE_WRONG", metadataJson: syntheticMarkMetadata("STAGE-C3B-PROBLEM-MARK", "Synthetic marking task paused after a file check") },
+    { id: "stage4-c3b-gallery", row: 3, sku: "STAGE-C3B-GALLERY-MARK", title: `Synthetic ${"long marking product title with gallery references and safe wrapping ".repeat(4)}`, listingId: "stage3-listing-fk-gallery", quantity: 8, status: "IN_PROGRESS" as const, completed: 3, assigned: users[4].id, problem: undefined, metadataJson: syntheticMarkMetadata("STAGE-C3B-GALLERY-MARK", "Synthetic gallery Mark task") },
+    { id: "stage4-c3b-assigned-other", row: 4, sku: "STAGE-C3B-ASSIGNED-OTHER", title: "Synthetic Mark task assigned to another worker", listingId: "stage3-listing-fk-mark", quantity: 2, status: "READY" as const, completed: 0, assigned: users[0].id, problem: undefined, metadataJson: syntheticMarkMetadata("STAGE-C3B-ASSIGNED-OTHER", "Synthetic Mark task assigned to another worker") },
+  ];
+  for (const item of c3bCases) {
+    const actualRoute = "PICK_MARK_PACK" as const;
+    const provenance = createImmutableRouteProvenance({ route: actualRoute, rule: item.id === "stage4-c3b-manual" ? null : { id: `${item.id}-rule`, route: actualRoute, markingRequired: true, markingAsset: { id: "stage4-synthetic-marking-asset", name: "Synthetic Marking Guide", masterDesignId: "STAGE-MARKING-MASTER-001", material: "Synthetic alloy", markingPosition: "Front centre", markingWidthMm: 24, markingHeightMm: 12, powerSetting: 30, speedSetting: 500, frequencySetting: 25, passes: 1, instructions: "Keep the synthetic engraving centered inside the approved border." } }, now: new Date(0) });
+    const cardSnapshot = JSON.stringify({ ...provenance, sellerSku: item.sku, productTitle: item.title, primaryImage: item.listingId === "stage3-listing-fk-missing-image" ? null : syntheticImageRoute(item.listingId === "stage3-listing-fk-gallery" ? "stage3-fk-gallery" : "stage3-fk-mark"), synthetic: true, c3bCase: item.id });
+    const routeJson = actualRouteSnapshot({ savedRoute: item.id === "stage4-c3b-manual" ? null : actualRoute, actualRoute, currentStage: "MARK", completedStages: ["PICK"] });
+    await prisma.consignmentLine.create({ data: { id: item.id, consignmentBatchId: "stage4-batch-c3b-mark-experience", accountId: accounts[0].id, rowNumber: item.row, sellerSkuSource: item.sku, requiredQuantity: item.quantity, marketplaceListingId: item.listingId, markingAssetId: item.id === "stage4-c3b-manual" ? null : "stage4-synthetic-marking-asset", matchStatus: "EXACT_SKU", processRoute: item.id === "stage4-c3b-manual" ? null : actualRoute, activated: true, sellerSkuSnapshot: item.sku, productTitleSnapshot: item.title, productImageSnapshot: item.listingId === "stage3-listing-fk-missing-image" ? null : syntheticImageRoute(item.listingId === "stage3-listing-fk-gallery" ? "stage3-fk-gallery" : "stage3-fk-mark"), catalogSnapshotJson: cardSnapshot } });
+    await createTask({ id: `${item.id}-mark`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: "MARK", sequence: 2, status: item.status, quantity: item.quantity, completed: item.completed, assigned: item.assigned, sku: item.sku, title: item.title, route: item.id === "stage4-c3b-manual" ? null : actualRoute, problem: item.problem, metadataJson: item.metadataJson, workCardSnapshotJson: cardSnapshot, routeSnapshotJson: routeJson });
+    await createTask({ id: `${item.id}-pack`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: "PACK", sequence: 3, status: "LOCKED", quantity: item.quantity, sku: item.sku, title: item.title, route: actualRoute, workCardSnapshotJson: cardSnapshot, routeSnapshotJson: routeJson });
   }
   const completedConsignmentStates = [
     { lineId: "stage4-line-mark-completed", rowNumber: 20, sku: "STAGE-FK-SKU-002", title: "Synthetic completed Mark item", route: "PICK_MARK_PACK" as const, stage: "MARK" as const, workerId: users[4].id },
@@ -333,11 +364,14 @@ async function seed() {
   ] });
   await prisma.order.create({ data: { id: "stage4-order-pick-projection-failure", accountId: accounts[4].id, marketplace: "FLIPKART", shipmentId: "STAGE-PICK-FAIL-SHIP", orderItemId: "STAGE-PICK-FAIL-ITEM", trackingId: "STAGE-PICK-FAIL-TRACK", awb: "STAGE-PICK-FAIL-AWB", sku: "STAGE-PICK-FAIL-SKU", qty: 1, orderNo: "STAGE-PICK-FAIL-ORDER", productDescription: "Synthetic projection unavailable Pick work", pickStatus: "READY", packStatus: "READY", status: "READY" } });
   await createTask({ id: "stage4-order-pick-projection-failure-task", accountId: accounts[4].id, orderId: "stage4-order-pick-projection-failure", sourceType: "ORDER", stage: "PICK", sequence: 1, status: "READY", quantity: 1, sku: "STAGE-PICK-FAIL-SKU", title: "Synthetic projection unavailable Pick work", route: "PICK_PACK" });
+  await prisma.order.create({ data: { id: "stage4-order-mark-projection-failure", accountId: accounts[4].id, marketplace: "FLIPKART", shipmentId: "STAGE-MARK-FAIL-SHIP", orderItemId: "STAGE-MARK-FAIL-ITEM", trackingId: "STAGE-MARK-FAIL-TRACK", awb: "STAGE-MARK-FAIL-AWB", sku: "STAGE-MARK-FAIL-SKU", qty: 2, orderNo: "STAGE-MARK-FAIL-ORDER", productDescription: "Synthetic projection unavailable Mark work", pickStatus: "PICKED", packStatus: "READY", status: "READY" } });
+  await createTask({ id: "stage4-order-mark-projection-failure-task", accountId: accounts[4].id, orderId: "stage4-order-mark-projection-failure", sourceType: "ORDER", stage: "MARK", sequence: 2, status: "READY", quantity: 2, sku: "STAGE-MARK-FAIL-SKU", title: "Synthetic projection unavailable Mark work", route: "PICK_MARK_PACK" });
 
   for (const account of accounts.filter((item) => item.active)) for (const sourceType of ["ORDER", "CONSIGNMENT"] as const) for (const stage of ["PICK", "MARK", "ASSEMBLE", "PACK"] as const) {
     await rebuildWorkGroupProjection({ accountId: account.id, sourceType, stage }, prisma);
   }
   await prisma.workProjectionState.update({ where: { accountId_sourceType_stage: { accountId: accounts[4].id, sourceType: "ORDER", stage: "PICK" } }, data: { state: "FAILED", errorSummary: "Synthetic C2 projection failure" } });
+  await prisma.workProjectionState.update({ where: { accountId_sourceType_stage: { accountId: accounts[4].id, sourceType: "ORDER", stage: "MARK" } }, data: { state: "FAILED", errorSummary: "Synthetic C3 projection failure" } });
   await prisma.auditLog.createMany({ data: [
     { id: "stage3-seed-audit", userId: users[0].id, accountId: accounts[0].id, action: "STAGE4_6_SYNTHETIC_SEED", entityType: "SyntheticStaging", entityId: "phase-7.3.6-stage4.6c1-semantic-fixtures-v2", metadata: JSON.stringify({ synthetic: true }) },
     { id: "stage4-delete-audit", userId: users[0].id, accountId: accounts[0].id, action: "DATA_MANAGEMENT_PREVIEW", entityType: "DataDeletionJob", entityId: "stage4-delete-preview", metadata: JSON.stringify({ synthetic: true, result: "PREVIEWED" }) }

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { ReactNode } from "react";
 import type { User } from "@prisma/client";
 import Link from "next/link";
-import { ProductImage } from "@/components/ProductImage";
 import { SubmitButton } from "@/components/SubmitButton";
+import { WorkImageGallery } from "@/components/WorkImageGallery";
 import { WorkRouteDialog } from "@/components/WorkRouteDialog";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { buttonStyles } from "@/components/ui/buttonStyles";
@@ -54,7 +54,7 @@ export function WorkTaskCardView({ task, returnPath, user }: { task: WorkerQueue
       stage={task.stage}
       status={task.status}
       context={<WorkCardContext source="Consignment" marketplace={line.consignmentBatch.marketplace} stage={task.stage} status={task.status} />}
-      media={<ProductImage src={line.productImageSnapshot ?? catalog?.mainImageUrl ?? line.marketplaceListing?.mainImageUrl} alt={line.productTitleSnapshot ?? catalog?.title ?? line.sellerSkuSnapshot ?? "Consignment product"} size="lg" showBadge={false} />}
+      media={<WorkImageGallery images={[line.productImageSnapshot ?? catalog?.mainImageUrl ?? line.marketplaceListing?.mainImageUrl]} alt={line.productTitleSnapshot ?? catalog?.title ?? line.sellerSkuSnapshot ?? "Consignment product"} compact />}
       identity={
         <WorkCardIdentity
           eyebrow={line.consignmentBatch.externalConsignmentNumber}

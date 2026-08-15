@@ -190,6 +190,8 @@ try {
     { id: "single", rowNumber: 5, selectedStages: ["PICK", "MARK", "ASSEMBLE"], downstreamStages: ["ASSEMBLE", "PACK"] },
     { id: "deterministic-pack", rowNumber: 15, selectedStages: ["PICK", "MARK", "PACK"] },
     { id: "mismatched-next", rowNumber: 16, selectedStages: ["PICK", "MARK", "ASSEMBLE"] },
+    { id: "preselected-reroute-repro", rowNumber: 17, selectedStages: ["PICK", "MARK", "ASSEMBLE"], downstreamStages: ["ASSEMBLE", "PACK"] },
+    { id: "preselected-pack-reroute", rowNumber: 18, selectedStages: ["PICK", "MARK", "PACK"] },
     { id: "route-pack", rowNumber: 6 },
     { id: "route-assembly", rowNumber: 7 },
     { id: "stale", rowNumber: 8, completedQuantity: 1 },
@@ -223,6 +225,29 @@ try {
     /Choose where Mark work goes next/i,
   );
   await assertRejectedRequestDidNotMutate("complete-bypass", "complete-bypass");
+
+  assert.equal(resolveForwardStageEligibility({ currentStage: "MARK", selectedStages: ["PICK", "MARK", "ASSEMBLE"], completedStages: ["PICK"] }).preselectedNextStage, "ASSEMBLE");
+  const rerouteSnapshotBefore = (await db.workTask.findUniqueOrThrow({ where: { id: "mark-preselected-reroute-repro" } })).routeSnapshotJson;
+  await assert.rejects(
+    () => completeStageAndChooseNext({ actorUserId: "marker", selectedAccountId: accountId, taskId: "mark-preselected-reroute-repro", currentStage: "MARK", expectedVersion: 1, expectedCompletedQuantity: 0, nextStage: "PACK", clientRequestId: "preselected-reroute-repro" }, db),
+    /next processing stage is already selected/i,
+  );
+  const rerouteMark = await db.workTask.findUniqueOrThrow({ where: { id: "mark-preselected-reroute-repro" } });
+  const rerouteAssembly = await db.workTask.findUniqueOrThrow({ where: { id: "assemble-preselected-reroute-repro" } });
+  const reroutePack = await db.workTask.findUniqueOrThrow({ where: { id: "pack-preselected-reroute-repro" } });
+  assert.deepEqual({ status: rerouteMark.status, completedQuantity: rerouteMark.completedQuantity, assignedUserId: rerouteMark.assignedUserId, routeSnapshotJson: rerouteMark.routeSnapshotJson }, { status: "READY", completedQuantity: 0, assignedUserId: null, routeSnapshotJson: rerouteSnapshotBefore });
+  assert.equal(rerouteAssembly.status, "LOCKED");
+  assert.equal(reroutePack.status, "LOCKED");
+  assert.equal(await db.workRouteDecision.count({ where: { taskId: rerouteMark.id } }), 0);
+  assert.equal(await db.auditLog.count({ where: { entityId: rerouteMark.id, action: "WORK_STAGE_COMPLETED_AND_ROUTED" } }), 0);
+  assert.equal(await db.workActionLog.count({ where: { taskId: rerouteMark.id } }), 0);
+  assert.equal(await db.workChangeEvent.count({ where: { entityId: rerouteMark.id } }), 0);
+
+  await assert.rejects(
+    () => completeStageAndChooseNext({ actorUserId: "marker", selectedAccountId: accountId, taskId: "mark-preselected-pack-reroute", currentStage: "MARK", expectedVersion: 1, expectedCompletedQuantity: 0, nextStage: "ASSEMBLE", clientRequestId: "preselected-pack-reroute" }, db),
+    /next processing stage is already selected/i,
+  );
+  await assertRejectedRequestDidNotMutate("preselected-pack-reroute", "preselected-pack-reroute");
 
   const partialSet = await setWorkTaskProgress({ taskId: "mark-partial-set", accountId, actorUserId: "marker", expectedQuantity: 0, targetQuantity: 3, clientRequestId: "partial-set" }, db);
   assert.deepEqual(partialSet, { completedQuantity: 3, completed: false, idempotent: false });

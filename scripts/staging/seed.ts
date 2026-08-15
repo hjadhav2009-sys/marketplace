@@ -59,6 +59,16 @@ function routeSnapshot(route: string | null, currentStage: WorkStage) {
   return JSON.stringify({ version: 3, routeRecommendation: route ?? "PICK_PACK", routeRecommendationSource: route ? "EXPLICIT_PRODUCT_RULE" : "SYSTEM_FALLBACK", hasExplicitSavedRoute: Boolean(route), selectedProcessRoute: route ?? "PICK_PACK", currentStage, completedStages: [], decision: "SYNTHETIC_SEED" });
 }
 
+function actualRouteSnapshot(input: { savedRoute: ProcessRoute | null; actualRoute: ProcessRoute; currentStage: WorkStage; completedStages?: WorkStage[] }) {
+  const actualStages: Record<ProcessRoute, WorkStage[]> = {
+    PICK_PACK: ["PICK", "PACK"],
+    PICK_MARK_PACK: ["PICK", "MARK", "PACK"],
+    PICK_ASSEMBLE_PACK: ["PICK", "ASSEMBLE", "PACK"],
+    PICK_MARK_ASSEMBLE_PACK: ["PICK", "MARK", "ASSEMBLE", "PACK"],
+  };
+  return JSON.stringify({ version: 3, routeRecommendation: input.savedRoute ?? "PICK_PACK", routeRecommendationSource: input.savedRoute ? "EXPLICIT_PRODUCT_RULE" : "SYSTEM_FALLBACK", hasExplicitSavedRoute: Boolean(input.savedRoute), selectedActualRoute: input.actualRoute, actualProcessRoute: input.actualRoute, actualStages: actualStages[input.actualRoute], currentStage: input.currentStage, completedStages: input.completedStages ?? [], decision: "SYNTHETIC_C1A1_ROUTE_TRUTH" });
+}
+
 const syntheticPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWPYJxH7H4QZYAwATQoIyfshja4AAAAASUVORK5CYII=",
   "base64"
@@ -74,7 +84,7 @@ async function writeSyntheticImage(safeSku: string) {
   await writeFile(path.join(directory, "card.png"), syntheticPng, { flag: "wx" });
 }
 
-async function createTask(input: { id: string; accountId?: string; orderId?: string; consignmentLineId?: string; sourceType?: "ORDER" | "CONSIGNMENT"; stage: WorkStage; sequence: number; status: WorkTaskStatus; quantity?: number; completed?: number; assigned?: string; sku: string; title: string; route: string | null; problem?: string; metadataJson?: string }) {
+async function createTask(input: { id: string; accountId?: string; orderId?: string; consignmentLineId?: string; sourceType?: "ORDER" | "CONSIGNMENT"; stage: WorkStage; sequence: number; status: WorkTaskStatus; quantity?: number; completed?: number; assigned?: string; sku: string; title: string; route: string | null; problem?: string; metadataJson?: string; routeSnapshotJson?: string; workCardSnapshotJson?: string }) {
   return prisma.workTask.create({ data: {
     id: input.id, accountId: input.accountId ?? accounts[0].id, sourceType: input.sourceType ?? "ORDER", orderId: input.orderId, consignmentLineId: input.consignmentLineId,
     stage: input.stage, sequenceNumber: input.sequence, requiredQuantity: input.quantity ?? 1, completedQuantity: input.completed ?? (input.status === "COMPLETED" ? input.quantity ?? 1 : 0), status: input.status,
@@ -82,7 +92,7 @@ async function createTask(input: { id: string; accountId?: string; orderId?: str
     completedByUserId: input.status === "COMPLETED" ? input.assigned ?? users[0].id : undefined, completedAt: input.status === "COMPLETED" ? new Date() : undefined,
     problemReason: input.problem, problemReportedAt: input.problem ? new Date() : undefined, problemReportedByUserId: input.problem ? input.assigned ?? users[0].id : undefined,
     statusBeforeProblem: input.problem ? "READY" : undefined, metadataJson: input.metadataJson ?? JSON.stringify({ synthetic: true, processRoute: input.route ?? "PICK_PACK", instruction: input.stage === "MARK" ? "Use synthetic marking guide." : input.stage === "ASSEMBLE" ? "Use synthetic assembly guide." : null }),
-    workCardSnapshotJson: snapshot(input.sku, input.title, input.route), routeSnapshotJson: routeSnapshot(input.route, input.stage)
+    workCardSnapshotJson: input.workCardSnapshotJson ?? snapshot(input.sku, input.title, input.route), routeSnapshotJson: input.routeSnapshotJson ?? routeSnapshot(input.route, input.stage)
   } });
 }
 
@@ -219,6 +229,19 @@ async function seed() {
   for (const item of c1Lines) {
     await prisma.consignmentLine.create({ data: { id: item.id, consignmentBatchId: "stage4-batch-c1-work-cards", accountId: accounts[0].id, rowNumber: item.row, sellerSkuSource: item.sku, requiredQuantity: item.quantity, marketplaceListingId: item.listingId, matchStatus: "EXACT_SKU", processRoute: item.stage === "ASSEMBLE" ? "PICK_ASSEMBLE_PACK" : "PICK_PACK", activated: true, sellerSkuSnapshot: item.sku, productTitleSnapshot: item.title, catalogSnapshotJson: snapshot(item.sku, item.title, item.stage === "ASSEMBLE" ? "PICK_ASSEMBLE_PACK" : "PICK_PACK") } });
     await createTask({ id: `${item.id}-${item.stage.toLowerCase()}`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: item.stage, sequence: item.stage === "PICK" ? 1 : 2, status: item.status, quantity: item.quantity, assigned: item.assigned, sku: item.sku, title: item.title, route: item.stage === "ASSEMBLE" ? "PICK_ASSEMBLE_PACK" : "PICK_PACK", problem: item.problem, metadataJson: item.metadataJson });
+  }
+  await prisma.consignmentBatch.create({ data: { id: "stage4-batch-c1a1-route-truth", accountId: accounts[0].id, marketplace: "FLIPKART", externalConsignmentNumber: "STAGE-C1A1-ROUTE-TRUTH", displayName: "Synthetic C1A.1 route truth", status: "ACTIVE", sourceFileName: "synthetic-c1a1-route-truth.csv", sourceFileSha256: "7".repeat(64), totalSourceRows: 4, totalValidLines: 4, totalRequiredQuantity: 15, matchedLines: 4, unmatchedLines: 0, createdByUserId: users[0].id, activatedAt: new Date(), activatedByUserId: users[0].id } });
+  const c1a1Cases = [
+    { id: "stage4-c1a1-case-a", row: 1, sku: "STAGE-C1A1-A-ACTUAL-OVERRIDE", title: "C1A1 Case A actual Mark and Assembly route", listingId: "stage3-listing-fk-direct", quantity: 4, stage: "MARK" as const, savedRoute: "PICK_PACK" as ProcessRoute | null, actualRoute: "PICK_MARK_ASSEMBLE_PACK" as ProcessRoute, assigned: users[4].id },
+    { id: "stage4-c1a1-case-b", row: 2, sku: "STAGE-C1A1-B-FALLBACK-ACTUAL-MARK", title: "C1A1 Case B fallback with actual Mark route", listingId: "stage3-listing-fk-fallback", quantity: 3, stage: "MARK" as const, savedRoute: null, actualRoute: "PICK_MARK_PACK" as ProcessRoute, assigned: users[4].id },
+    { id: "stage4-c1a1-case-c", row: 3, sku: "STAGE-C1A1-C-DIRECT-PACK-GALLERY", title: "C1A1 Case C direct Pack without optional instructions", listingId: "stage3-listing-fk-gallery", quantity: 6, stage: "PICK" as const, savedRoute: "PICK_PACK" as ProcessRoute | null, actualRoute: "PICK_PACK" as ProcessRoute, assigned: users[2].id },
+    { id: "stage4-c1a1-case-d", row: 4, sku: "STAGE-C1A1-D-MARK-INSTRUCTIONS-MISSING", title: "C1A1 Case D actual Mark with required instructions missing", listingId: "stage4-c1-listing-no-image", quantity: 2, stage: "MARK" as const, savedRoute: "PICK_MARK_PACK" as ProcessRoute | null, actualRoute: "PICK_MARK_PACK" as ProcessRoute, assigned: users[4].id },
+  ];
+  for (const item of c1a1Cases) {
+    const image = item.id.endsWith("case-c") ? syntheticImageRoute("stage3-fk-gallery") : null;
+    const cardSnapshot = JSON.stringify({ sellerSku: item.sku, productTitle: item.title, primaryImage: image, routeRecommendation: item.savedRoute ?? "PICK_PACK", routeRecommendationSource: item.savedRoute ? "PRODUCT_RULE" : "SYSTEM_FALLBACK", hasExplicitSavedRoute: Boolean(item.savedRoute), savedProcessRoute: item.savedRoute, synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase() });
+    await prisma.consignmentLine.create({ data: { id: item.id, consignmentBatchId: "stage4-batch-c1a1-route-truth", accountId: accounts[0].id, rowNumber: item.row, sellerSkuSource: item.sku, requiredQuantity: item.quantity, marketplaceListingId: item.listingId, matchStatus: "EXACT_SKU", processRoute: item.savedRoute, activated: true, sellerSkuSnapshot: item.sku, productTitleSnapshot: item.title, catalogSnapshotJson: cardSnapshot } });
+    await createTask({ id: `${item.id}-${item.stage.toLowerCase()}`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: item.stage, sequence: item.stage === "PICK" ? 1 : 2, status: "READY", quantity: item.quantity, assigned: item.assigned, sku: item.sku, title: item.title, route: item.savedRoute, metadataJson: JSON.stringify({ synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase(), workerNote: item.id.endsWith("case-a") ? "Actual flow intentionally differs from the saved product default." : null }), workCardSnapshotJson: cardSnapshot, routeSnapshotJson: actualRouteSnapshot({ savedRoute: item.savedRoute, actualRoute: item.actualRoute, currentStage: item.stage, completedStages: item.stage === "MARK" ? ["PICK"] : [] }) });
   }
   const completedConsignmentStates = [
     { lineId: "stage4-line-mark-completed", rowNumber: 20, sku: "STAGE-FK-SKU-002", title: "Synthetic completed Mark item", route: "PICK_MARK_PACK" as const, stage: "MARK" as const, workerId: users[4].id },

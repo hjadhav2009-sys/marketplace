@@ -16,7 +16,7 @@ const PROBLEM_REASONS = ["PRODUCT_NOT_FOUND", "WRONG_PRODUCT", "QUANTITY_SHORT",
 export type GroupedQuickCard = {
   groupKey: string; groupVersion: string; sourceType: "ORDER" | "CONSIGNMENT"; stage: WorkStage; status: string;
   productTitle: string | null; sellerSku: string; marketplace: string; productImageUrl: string | null;
-  savedProcessRoute: string | null; hasExplicitSavedRoute: boolean; requiredQuantity: number; completedQuantity: number; pendingQuantity: number;
+  savedProcessRoute: string | null; actualProcessRoute: string | null; processRoute: string; hasExplicitSavedRoute: boolean; requiredQuantity: number; completedQuantity: number; pendingQuantity: number;
   assignedUserName: string | null; memberCount: number; problemCount: number; missingInstructionStages: WorkStage[];
   orderItemId: string | null; orderNumber: string | null; shipmentId: string | null; trackingId: string | null; consignmentNumber: string | null;
 };
@@ -52,12 +52,13 @@ function GroupedDetails({ card, detailsHref }: { card: GroupedQuickCard; details
   const { data, loading, error } = useQuickDetails(card);
   return <div className="grid gap-5">
     <DetailSection title="Product"><div className="flex items-start gap-3"><ProductImage src={card.productImageUrl} alt={card.productTitle ?? card.sellerSku} size="md" showBadge={false}/><div className="min-w-0"><ProductSummary card={card}/><p className="mt-2 text-sm text-slate-600">{card.sourceType === "ORDER" ? "Customer order" : "Consignment"} · {card.marketplace}</p></div></div></DetailSection>
-    <DetailSection title="Process flow"><p className="font-semibold">{humanProcessRoute(card.savedProcessRoute)}</p><p className="mt-1 text-sm text-slate-600">Current stage: {titleCase(card.stage)}</p></DetailSection>
+    <DetailSection title="Process flow"><p className="font-semibold">{humanProcessRoute(card.processRoute)}</p><p className="mt-1 text-sm text-slate-600">Current stage: {titleCase(card.stage)}</p></DetailSection>
     <DetailSection title="Quantity"><p className="tabular-nums">{card.requiredQuantity} required · {card.completedQuantity} completed · {card.pendingQuantity} remaining</p><p className="mt-1 text-sm text-slate-600">{card.assignedUserName ? `Assigned to ${card.assignedUserName}` : "Unassigned"}</p></DetailSection>
     <DetailSection title="Identifiers"><dl className="grid gap-2">{identifiers(card).map((item) => <div key={item.label}><dt className="text-xs font-semibold text-slate-500">{item.label}</dt><dd className="break-all text-sm font-medium">{item.value}</dd></div>)}</dl></DetailSection>
     {loading ? <p role="status" className="text-sm text-slate-600">Loading current details…</p> : null}
     {error ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Current quick details could not be loaded. Open full details for the complete record.</p> : null}
-    {data?.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{data.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : data && card.missingInstructionStages.length ? <DetailSection title="Instructions"><p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Saved instructions are unavailable for {card.missingInstructionStages.map(titleCase).join(" and ")}. No settings will be invented.</p></DetailSection> : null}
+    {data?.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{data.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : null}
+    {data && card.missingInstructionStages.length ? <DetailSection title="Missing required instructions"><p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Saved instructions are unavailable for {card.missingInstructionStages.map(titleCase).join(" and ")}. No settings will be invented.</p></DetailSection> : null}
     {data?.tasks.some((task) => task.problemReason) ? <DetailSection title="Problem">{data.tasks.filter((task) => task.problemReason).map((task) => <p key={task.taskId} className="text-sm font-semibold text-rose-800">{titleCase(task.problemReason!)} · {task.reference}</p>)}</DetailSection> : null}
     {data?.history.length ? <DetailSection title="Recent history"><ol className="space-y-2">{data.history.map((item) => <li key={item.id} className="text-sm"><span className="font-semibold">{titleCase(item.action)}</span> by {item.actor}<span className="block text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</span></li>)}</ol></DetailSection> : null}
     <FullDetailsLink href={detailsHref}/>

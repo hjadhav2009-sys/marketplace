@@ -59,7 +59,7 @@ export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = 
     : card.sourceType === "ORDER"
       ? `Order Item ${card.orderItemId ?? card.reference}`
       : `Consignment line ${card.consignmentLineId?.slice(-8) ?? card.reference}`;
-  const routeCard: WorkRouteDialogCard = { stage: card.stage, sourceType: card.sourceType, groupKey: card.groupKey, groupVersion: card.groupVersion, taskId: card.memberTaskIds[0], completedQuantity: card.completedQuantity, hasExplicitSavedRoute: card.hasExplicitSavedRoute, savedProcessRoute: card.savedProcessRoute, missingInstructionStages: card.missingInstructionStages };
+  const routeCard: WorkRouteDialogCard = { stage: card.stage, sourceType: card.sourceType, groupKey: card.groupKey, groupVersion: card.groupVersion, taskId: card.memberTaskIds[0], completedQuantity: card.completedQuantity, hasExplicitSavedRoute: card.hasExplicitSavedRoute, savedProcessRoute: card.savedProcessRoute, processRoute: card.processRoute, routeDegraded: card.processRouteDegraded, missingInstructionStages: card.availableMissingInstructionStages };
   return (
     <WorkCard
       source={card.sourceType}

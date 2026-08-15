@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProductImage } from "./ProductImage";
 import { buttonStyles } from "./ui/buttonStyles";
 import { useWorkerOverlay } from "./worker-overlay/WorkerOverlay";
@@ -88,7 +88,17 @@ export function WorkImageGallery({
 function ImagePreview({ images, alt, initialIndex }: { images: string[]; alt: string; initialIndex: number }) {
   const [previewIndex, setPreviewIndex] = useState(initialIndex);
   const move = (offset: number) => setPreviewIndex((value) => (value + offset + images.length) % images.length);
-  return <div className="grid gap-3" onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); } if (event.key === "ArrowRight") { event.preventDefault(); move(1); } }}>
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      setPreviewIndex((value) => (value + (event.key === "ArrowLeft" ? -1 : 1) + images.length) % images.length);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [images.length]);
+  return <div className="grid gap-3">
     <div className="relative mx-auto aspect-square w-full max-w-2xl overflow-hidden rounded-lg bg-slate-100"><ProductImage src={images[previewIndex]} alt={`${alt}${images.length > 1 ? ` image ${previewIndex + 1} of ${images.length}` : ""}`} size="lg" showBadge={false} /></div>
     {images.length > 1 ? <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3"><button type="button" onClick={() => move(-1)} className={buttonStyles({ variant: "secondary" })}>Previous</button><p aria-live="polite" className="text-center text-sm font-semibold text-slate-600">Image {previewIndex + 1} of {images.length}</p><button type="button" onClick={() => move(1)} className={buttonStyles({ variant: "secondary" })}>Next</button></div> : null}
   </div>;

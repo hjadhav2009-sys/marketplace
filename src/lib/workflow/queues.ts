@@ -14,7 +14,7 @@ export const WORK_TASK_INCLUDE = {
   actionLogs: { where: { action: "TASK_PROBLEM_REPORTED" as const }, orderBy: { createdAt: "desc" as const }, take: 1, select: { note: true } },
   consignmentLine: { include: {
     consignmentBatch: { select: { id: true, displayName: true, externalConsignmentNumber: true, marketplace: true, status: true } },
-    marketplaceListing: { select: { mainImageUrl: true } },
+    marketplaceListing: { select: { mainImageUrl: true, imageUrl1: true, imageUrl2: true, imageUrl3: true } },
     markingAsset: true,
     workTasks: { select: { id: true, stage: true, status: true, sequenceNumber: true }, orderBy: { sequenceNumber: "asc" as const } }
   } }

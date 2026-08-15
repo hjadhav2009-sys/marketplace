@@ -150,6 +150,7 @@
     "stage4-6a:test": "node tests/stage4-6a-visual-interaction-ui.test.mjs",
     "phase7.4b1a:test": "tsx tests/phase-7-4b1a-controls.test.tsx",
     "phase7.4b1b:test": "tsx tests/phase-7-4b1b-state-surfaces.test.tsx",
+    "phase7.4b2:test": "tsx tests/phase-7-4b2-app-shell.test.tsx",
     "stage4-2c:editor-proof": "node scripts/qa/stage4-2c-editor-proof.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",
     "data-management:test": "tsx tests/data-management.test.ts",

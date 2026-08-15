@@ -29,7 +29,9 @@ const users = [
   { id: "stage3-packer-a", display: "Synthetic Packer A", username: "stage3-packer-a", role: "PACKER", scenario: "PACKER", account: accounts[0].id, active: true, permissions: { canPack: true, canReportProblem: true } },
   { id: "stage3-packer-b", display: "Synthetic Packer B", username: "stage3-packer-b", role: "PACKER", scenario: "PACKER_B", account: accounts[0].id, active: true, permissions: { canPack: true, canReportProblem: true } },
   { id: "stage3-view-all", display: "Synthetic View-All Worker", username: "stage3-view-all", role: "PICKER", scenario: "VIEW_ALL", account: accounts[0].id, active: true, permissions: { canViewAllWork: true, canViewConsignments: true } },
-  { id: "stage3-disabled", display: "Synthetic Disabled Worker", username: "stage3-disabled", role: "PICKER", scenario: "DISABLED", account: accounts[0].id, active: false, permissions: { canPick: true } }
+  { id: "stage3-disabled", display: "Synthetic Disabled Worker", username: "stage3-disabled", role: "PICKER", scenario: "DISABLED", account: accounts[0].id, active: false, permissions: { canPick: true } },
+  { id: "stage3-pick-pack", display: "Synthetic Pick + Pack Worker", username: "stage3-pick-pack", role: "PICKER", scenario: "PICK_PACK", account: accounts[0].id, active: true, permissions: { canPick: true, canPack: true, canReportProblem: true } },
+  { id: "stage3-no-account", display: "Synthetic No-Account Worker", username: "stage3-no-account", role: "PICKER", scenario: "NO_ACCOUNT", account: null, active: true, permissions: { canPick: true } }
 ] as const;
 
 const listings = [
@@ -87,7 +89,7 @@ async function seed() {
   const credentialRows = [];
   for (const user of users) {
     const password = `S3!${randomBytes(18).toString("base64url")}`;
-    await prisma.user.create({ data: { id: user.id, username: user.username, passwordHash: hashPassword(password), name: user.display, role: user.role as "OWNER" | "PICKER" | "PACKER", active: user.active, accountId: user.account, assignedAccounts: { connect: [{ id: user.account }] }, ...user.permissions } });
+    await prisma.user.create({ data: { id: user.id, username: user.username, passwordHash: hashPassword(password), name: user.display, role: user.role as "OWNER" | "PICKER" | "PACKER", active: user.active, accountId: user.account ?? undefined, assignedAccounts: user.account ? { connect: [{ id: user.account }] } : undefined, ...user.permissions } });
     credentialRows.push({ displayRole: user.display, username: user.username, password, assignedAccount: accounts.find((item) => item.id === user.account)?.code, permissions: user.permissions, scenario: user.scenario, active: user.active });
   }
   await writeFile(credentialPath!, `${JSON.stringify({ environment: "PRIVATE_SYNTHETIC_STAGING", generatedAt: new Date().toISOString(), users: credentialRows }, null, 2)}\n`, { flag: "wx" });

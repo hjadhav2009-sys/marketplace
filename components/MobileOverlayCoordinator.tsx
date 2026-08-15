@@ -46,10 +46,14 @@ export function MobileOverlayCoordinator({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     if (activeOverlay !== "navigation") return;
+    const shellBackground = document.querySelector<HTMLElement>("[data-app-shell-background]");
     const previousOverflow = document.body.style.overflow;
+    const wasInert = shellBackground?.inert ?? false;
     document.body.style.overflow = "hidden";
+    if (shellBackground) shellBackground.inert = true;
     return () => {
       document.body.style.overflow = previousOverflow;
+      if (shellBackground) shellBackground.inert = wasInert;
     };
   }, [activeOverlay]);
 

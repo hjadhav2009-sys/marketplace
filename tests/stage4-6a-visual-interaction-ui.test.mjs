@@ -33,12 +33,12 @@ assert.match(navigation, /min-h-0 flex-1 overflow-y-auto overscroll-contain/, "O
 assert.match(navigation, /createPortal\(/, "The fixed drawer escapes the filtered sticky-header containing block.");
 assert.match(navigation, /data-mobile-drawer-backdrop/, "The full-viewport backdrop has a stable interaction boundary.");
 assert.match(navigation, /triggerRef\.current\?\.focus/, "Closing the drawer restores trigger focus.");
-assert.match(navigation, /href="\/dashboard" className="flex min-h-11 min-w-0 flex-col justify-center"/, "The desktop sidebar home link provides a 44px target.");
+assert.match(navigation, /href="\/dashboard"[\s\S]{0,120}className="flex min-h-11 min-w-0 flex-col justify-center"/, "The desktop sidebar home link provides a 44px target.");
 assert.match(rootLayout, /zIndex:\s*40/, "The synthetic staging banner stays below the z-50 mobile drawer.");
 assert.match(accountMenu, /useMobileOverlayCoordinator/, "The account menu participates in shared overlay state.");
 assert.match(accountMenu, /triggerRef\.current\?\.focus/, "Escape from the account menu restores trigger focus.");
 assert.match(rootLayout, /icons:\s*\{[\s\S]*\/icon\.svg/, "The browser favicon is declared explicitly instead of falling back to a missing /favicon.ico.");
-assert.match(shell, /className="flex min-h-11 min-w-0 flex-col justify-center"/, "The app-shell account/home link provides a 44px target.");
+assert.match(shell, /className="flex min-h-11 min-w-0 flex-1 flex-col justify-center xl:hidden"/, "The app-shell account/home link provides a 44px target.");
 
 assert.match(gallery, /compact \? "work" : "lg"/, "Worker cards use the compact image fallback.");
 assert.match(groupedCard, /data-action-mode="problem"/, "Problem work has a distinct action state.");

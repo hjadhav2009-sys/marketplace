@@ -208,6 +208,10 @@ try {
   const readOnlyInspection = await inspect(readOnly.page);
   const readOnlyButtons = await readOnly.page.locator("[data-work-actions] button").allTextContents();
   results.push({ state: "VIEW_ALL_READ_ONLY", viewport: "390x844", pass: healthy(readOnlyInspection, readOnly.errors, 390) && readOnlyInspection.text.includes("Read-only Pick view") && readOnlyButtons.every((label) => ["Details", "Open Problem"].includes(label.trim())) && !readOnlyButtons.some((label) => /Complete|Partial|^Problem$/.test(label)), inspection: readOnlyInspection, buttons: readOnlyButtons, errors: readOnly.errors });
+  await openPick(readOnly.page, "/work/pick?source=CONSIGNMENT");
+  const readOnlyConsignmentInspection = await inspect(readOnly.page);
+  const readOnlyConsignmentButtons = await readOnly.page.locator("[data-work-actions] button").allTextContents();
+  results.push({ state: "VIEW_ALL_CONSIGNMENT_READ_ONLY", viewport: "390x844", pass: healthy(readOnlyConsignmentInspection, readOnly.errors, 390) && readOnlyConsignmentInspection.text.includes("Read-only Pick view") && readOnlyConsignmentButtons.every((label) => ["Details", "Open Problem"].includes(label.trim())) && !readOnlyConsignmentButtons.some((label) => /Complete|Partial|^Problem$/.test(label)), inspection: readOnlyConsignmentInspection, buttons: readOnlyConsignmentButtons, errors: readOnly.errors });
   await readOnly.context.close();
 
   const noPick = await session(browser, { width: 390, height: 844 }, "IMPORT_MANAGER");

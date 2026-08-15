@@ -6,6 +6,10 @@ import { PrismaClient } from "@prisma/client";
 import { selectableForwardStages } from "../src/lib/workflow/work-route-presentation";
 import { setWorkTaskProgress } from "../src/lib/workflow/task-store";
 
+// Historical pre-fix evidence. Its assertions intentionally describe the vulnerable result at
+// commit 63c88acdcd21b726bf8ce1f677fb4e8d20a7dd06. After C3A, run the passing safety regression
+// instead: npm.cmd run phase7.4c3a:test.
+
 const temporaryDirectory = resolve(process.cwd(), ".codex-tmp");
 mkdirSync(temporaryDirectory, { recursive: true });
 const databaseFile = resolve(temporaryDirectory, "phase-7-4c3-mark-progress-bypass.db");

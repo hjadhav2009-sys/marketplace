@@ -77,7 +77,7 @@ const protectedHashes: Record<string, string> = {
   "src/lib/workflow/stage-transition.ts": "c357bfa890b8ef6549525463fe4ec98a5637c813047c5914959dfe2d20d574af",
   "src/lib/workflow/order-pack-scope.ts": "65e30f0f66dd536f16b92bed8b0979f9b13da4609a9ab45df7541b1d564ad6f3",
   "src/lib/workflow/order-problems.ts": "d2f6c7f2fb570883c93b7733832a3fc5e088654cd9b91cee00e67715b4533314",
-  "src/lib/workflow/task-store.ts": "37e2b0f9045e8d4ad4d0b9260020ecf643450a3b6ec09d077f6278ea21d0d071",
+  "src/lib/workflow/task-store.ts": "4b2585611526ff1a680b86c7a8c5c23c8845f861b239f4d5552f9325d8d7dfe8",
 };
 for (const [file, expected] of Object.entries(protectedHashes)) assert.equal(createHash("sha256").update(read(file)).digest("hex"), expected, `${file} crossed the protected C2 boundary.`);
 

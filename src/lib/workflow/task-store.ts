@@ -366,6 +366,7 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
     const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId,fingerprint }); if (prior) return prior;
     if (task.stage === "PICK" && requestKind !== "COMPLETE" && targetQuantity === task.requiredQuantity) throw new Error("Use Complete Pick and choose a processing flow to finish picking.");
+    if (task.stage === "MARK" && requestKind !== "COMPLETE" && targetQuantity === task.requiredQuantity) throw new Error("Use the Mark completion action to finish marking.");
     if (task.status === "COMPLETED" && targetQuantity === task.requiredQuantity) return { completedQuantity: task.completedQuantity, completed: true, idempotent: true };
     if (!["READY", "IN_PROGRESS"].includes(task.status)) throw new Error("Task cannot advance from its current status.");
     if (task.completedQuantity !== input.expectedQuantity) throw new Error("Work changed; refresh before updating.");

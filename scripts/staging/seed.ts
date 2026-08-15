@@ -31,7 +31,8 @@ const users = [
   { id: "stage3-view-all", display: "Synthetic View-All Worker", username: "stage3-view-all", role: "PICKER", scenario: "VIEW_ALL", account: accounts[0].id, active: true, permissions: { canViewAllWork: true, canViewConsignments: true } },
   { id: "stage3-disabled", display: "Synthetic Disabled Worker", username: "stage3-disabled", role: "PICKER", scenario: "DISABLED", account: accounts[0].id, active: false, permissions: { canPick: true } },
   { id: "stage3-pick-pack", display: "Synthetic Pick + Pack Worker", username: "stage3-pick-pack", role: "PICKER", scenario: "PICK_PACK", account: accounts[0].id, active: true, permissions: { canPick: true, canPack: true, canReportProblem: true } },
-  { id: "stage3-no-account", display: "Synthetic No-Account Worker", username: "stage3-no-account", role: "PICKER", scenario: "NO_ACCOUNT", account: null, active: true, permissions: { canPick: true } }
+  { id: "stage3-no-account", display: "Synthetic No-Account Worker", username: "stage3-no-account", role: "PICKER", scenario: "NO_ACCOUNT", account: null, active: true, permissions: { canPick: true } },
+  { id: "stage3-owner-no-account", display: "Synthetic No-Account Owner", username: "stage3-owner-no-account", role: "OWNER", scenario: "OWNER_NO_ACCOUNT", account: null, active: true, permissions: {} }
 ] as const;
 
 const listings = [

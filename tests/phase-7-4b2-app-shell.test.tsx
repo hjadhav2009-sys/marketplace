@@ -121,6 +121,7 @@ assert.match(pageHeader, /buttonStyles\(\{ variant: "primary" \}\)/, "PageHeader
 assert.match(pageHeader, /break-words/, "PageHeader contains long titles and descriptions.");
 assert.match(seed, /Synthetic Pick \+ Pack Worker/);
 assert.match(seed, /Synthetic No-Account Worker/);
+assert.match(seed, /Synthetic No-Account Owner/);
 assert.match(shell, /No seller account selected[\s\S]*Create or choose an account/);
 assert.match(shell, /No assigned seller account[\s\S]*Ask the owner to assign an account/);
 

@@ -187,6 +187,7 @@ try {
     { id: "route-pack", rowNumber: 6 },
     { id: "route-assembly", rowNumber: 7 },
     { id: "stale", rowNumber: 8, completedQuantity: 1 },
+    { id: "stale-version", rowNumber: 13 },
     { id: "assigned", rowNumber: 9, assignedUserId: "marker-two" },
     { id: "view-only", rowNumber: 10 },
     { id: "no-permission", rowNumber: 11 },
@@ -245,6 +246,11 @@ try {
   assert.equal(await db.auditLog.count({ where: { entityId: "mark-route-assembly", action: "WORK_STAGE_COMPLETED_AND_ROUTED" } }), 1);
 
   await assert.rejects(() => setWorkTaskProgress({ taskId: "mark-stale", accountId, actorUserId: "marker", expectedQuantity: 0, targetQuantity: 2, clientRequestId: "stale" }, db), /changed.*refresh/i);
+  await assert.rejects(
+    () => completeStageAndChooseNext({ actorUserId: "marker", selectedAccountId: accountId, taskId: "mark-stale-version", currentStage: "MARK", expectedVersion: 99, expectedCompletedQuantity: 0, nextStage: "PACK", clientRequestId: "stale-version" }, db),
+    /changed.*refreshed/i,
+  );
+  await assertRejectedRequestDidNotMutate("stale-version", "stale-version");
   await assert.rejects(() => setWorkTaskProgress({ taskId: "mark-assigned", accountId, actorUserId: "marker", expectedQuantity: 0, targetQuantity: 2, clientRequestId: "assigned" }, db), /taken by another worker/i);
   await assert.rejects(() => setWorkTaskProgress({ taskId: "mark-other-account", accountId, actorUserId: "marker", expectedQuantity: 0, targetQuantity: 2, clientRequestId: "account-isolation" }, db), /not available|unavailable|permission/i);
   await assert.rejects(() => setWorkTaskProgress({ taskId: "mark-view-only", accountId, actorUserId: "viewer", expectedQuantity: 0, targetQuantity: 2, clientRequestId: "view-only" }, db), /lacks permission|MARK permission/i);

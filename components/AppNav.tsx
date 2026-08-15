@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   resolveCurrentNavigationId,
   type AppNavLink,
@@ -57,11 +57,13 @@ function NavItems({
   links,
   collapsed = false,
   idPrefix,
+  ownsCurrentRoute,
   onNavigate
 }: {
   links: AppNavLink[];
   collapsed?: boolean;
   idPrefix: "desktop" | "mobile";
+  ownsCurrentRoute: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -89,7 +91,7 @@ function NavItems({
                     href={link.href}
                     prefetch
                     onClick={onNavigate}
-                    aria-current={active ? "page" : undefined}
+                    aria-current={active && ownsCurrentRoute ? "page" : undefined}
                     aria-label={collapsed ? link.label : undefined}
                     title={collapsed ? link.label : undefined}
                     data-navigation-id={link.id}
@@ -113,8 +115,31 @@ function NavItems({
   );
 }
 
+function subscribeToDesktopShell(onStoreChange: () => void) {
+  const query = window.matchMedia("(min-width: 1280px)");
+  query.addEventListener("change", onStoreChange);
+  return () => query.removeEventListener("change", onStoreChange);
+}
+
+function getDesktopShellSnapshot() {
+  return window.matchMedia("(min-width: 1280px)").matches;
+}
+
+function getDesktopShellServerSnapshot() {
+  return false;
+}
+
+function useDesktopShell() {
+  return useSyncExternalStore(
+    subscribeToDesktopShell,
+    getDesktopShellSnapshot,
+    getDesktopShellServerSnapshot
+  );
+}
+
 export function AppNav({ links, companyName, accountName, accountCode, marketplace }: AppNavProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const desktopShell = useDesktopShell();
   const identityTitle = [companyName, accountName, marketplace, accountCode].filter(Boolean).join(" / ");
 
   return (
@@ -169,7 +194,12 @@ export function AppNav({ links, companyName, accountName, accountCode, marketpla
         ) : null}
       </div>
       <nav className="flex-1 overflow-y-auto p-3" aria-label="Main navigation">
-        <NavItems links={links} collapsed={collapsed} idPrefix="desktop" />
+        <NavItems
+          links={links}
+          collapsed={collapsed}
+          idPrefix="desktop"
+          ownsCurrentRoute={desktopShell}
+        />
       </nav>
     </aside>
   );
@@ -179,6 +209,7 @@ export function MobileDrawer({ links, companyName, accountName, accountCode, mar
   const { activeOverlay, closeOverlay, openOverlay } = useMobileOverlayCoordinator();
   const open = activeOverlay === "navigation";
   const [portalReady, setPortalReady] = useState(false);
+  const desktopShell = useDesktopShell();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -279,7 +310,12 @@ export function MobileDrawer({ links, companyName, accountName, accountCode, mar
           </button>
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" aria-label="Mobile navigation">
-          <NavItems links={links} idPrefix="mobile" onNavigate={() => closeDrawer(false)} />
+          <NavItems
+            links={links}
+            idPrefix="mobile"
+            ownsCurrentRoute={!desktopShell}
+            onNavigate={() => closeDrawer(false)}
+          />
         </nav>
       </aside>
     </div>,

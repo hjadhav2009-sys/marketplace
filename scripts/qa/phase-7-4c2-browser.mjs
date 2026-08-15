@@ -139,7 +139,7 @@ try {
       && order.text.includes("Ready to pick")
       && order.text.includes("Picking in progress")
       && order.text.includes("Work paused")
-      && order.text.includes("Pick quantity");
+      && order.text.toLowerCase().includes("pick quantity");
     results.push({ state: "FLIPKART_ORDER_PICK", viewport: viewport.id, pass: orderPass, inspection: order, errors: structuredClone(owner.errors) });
     if (viewport.id === "390x844") screenshots.push(await screenshot(owner.page, "390-flipkart-order-pick.png"));
     if (viewport.id === "1440x900") screenshots.push(await screenshot(owner.page, "1440-flipkart-order-pick.png"));

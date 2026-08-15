@@ -155,7 +155,7 @@
     "phase7.4c1:test": "tsx tests/phase-7-4c1-work-card-foundation.test.tsx",
     "phase7.4c1a:test": "tsx tests/phase-7-4c1a-worker-interaction-surfaces.test.tsx",
     "phase7.4c1a1:test": "tsx tests/phase-7-4c1a1-interaction-truth.test.tsx && tsx tests/phase-7-4c1a1-mutation-safety.test.ts",
-    "phase7.4c2:test": "tsx tests/phase-7-4c2-pick-experience.test.tsx",
+    "phase7.4c2:test": "tsx tests/phase-7-4c2-pick-experience.test.tsx && tsx tests/phase-7-4c2-mutation-safety.test.ts",
     "phase7.4c2:browser": "node scripts/qa/phase-7-4c2-browser.mjs",
     "phase7.4c1a1:browser": "node scripts/qa/phase-7-4c1a1-browser.mjs",
     "stage4-2c:editor-proof": "node scripts/qa/stage4-2c-editor-proof.mjs",

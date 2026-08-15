@@ -27,8 +27,8 @@ export function WorkCard({ actions, context, disclosure, identity, media, quanti
         <div className="min-w-0">{media}</div>
         <div className="min-w-0">{identity}</div>
         <div className="col-span-2 min-w-0 xl:col-span-1" data-quantity-panel>{quantity}</div>
-        <div className="col-span-2 min-w-0 xl:col-span-1 xl:row-span-2" data-work-actions>{actions}</div>
-        {state ? <div className="col-span-2 min-w-0 xl:col-start-2 xl:col-end-4">{state}</div> : null}
+        {state ? <div className="col-span-2 min-w-0 xl:col-start-2 xl:col-end-4" data-work-state>{state}</div> : null}
+        <div className="col-span-2 min-w-0 xl:col-start-4 xl:row-start-1 xl:row-span-2" data-work-actions>{actions}</div>
       </div>
       {disclosure ? <div className="border-t border-slate-100 px-3 sm:px-4">{disclosure}</div> : null}
     </article>

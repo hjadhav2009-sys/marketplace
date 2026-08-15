@@ -60,7 +60,7 @@ function routeSnapshot(route: string | null, currentStage: WorkStage) {
 }
 
 const syntheticPng = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGP4z8DAwMDAxMDAwMAAAAwAAf4C/qkAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZpK0AAAAASUVORK5CYII=",
   "base64"
 );
 
@@ -160,7 +160,7 @@ async function seed() {
   });
 
   const orderStates = [
-    ["pick-ready", "PICK", "READY", "STAGE-FK-SKU-001", "PICK_PACK", users[2].id], ["pick-progress", "PICK", "IN_PROGRESS", "STAGE-FK-SKU-002", "PICK_MARK_PACK", users[2].id], ["pick-problem", "PICK", "PROBLEM", "STAGE-FK-SKU-003", "PICK_ASSEMBLE_PACK", users[3].id],
+    ["pick-ready", "PICK", "READY", "STAGE-FK-SKU-001", "PICK_PACK", users[2].id], ["pick-progress", "PICK", "IN_PROGRESS", "STAGE-FK-SKU-002", "PICK_MARK_PACK", users[2].id], ["pick-problem", "PICK", "PROBLEM", "STAGE-FK-SKU-003", "PICK_ASSEMBLE_PACK", users[3].id], ["pick-fallback", "PICK", "READY", "STAGE-FK-SKU-005", null, users[2].id],
     ["mark-ready", "MARK", "READY", "STAGE-FK-SKU-002", "PICK_MARK_PACK", users[4].id], ["mark-progress", "MARK", "IN_PROGRESS", "STAGE-FK-SKU-004", "PICK_MARK_ASSEMBLE_PACK", users[4].id],
     ["assembly-ready", "ASSEMBLE", "READY", "STAGE-FK-SKU-003", "PICK_ASSEMBLE_PACK", users[5].id], ["assembly-progress", "ASSEMBLE", "IN_PROGRESS", "STAGE-FK-SKU-004", "PICK_MARK_ASSEMBLE_PACK", users[5].id], ["assembly-problem", "ASSEMBLE", "PROBLEM", "STAGE-FK-SKU-003", "PICK_ASSEMBLE_PACK", users[5].id],
     ["pack-ready", "PACK", "READY", "STAGE-FK-SKU-001", "PICK_PACK", users[6].id], ["pack-complete", "PACK", "COMPLETED", "STAGE-FK-SKU-001", "PICK_PACK", users[6].id]

@@ -104,7 +104,10 @@ async function inspect(page) {
       cardCount: cards.length,
       cards: cards.map((card) => {
         const rect = card.getBoundingClientRect();
-        const media = card.querySelector("[data-work-gallery]")?.getBoundingClientRect() ?? card.querySelector("img")?.parentElement?.getBoundingClientRect();
+        const media = card.querySelector("[data-work-gallery]")?.getBoundingClientRect() ?? card.querySelector("img")?.parentElement?.getBoundingClientRect() ?? card.querySelector("[title]")?.getBoundingClientRect();
+        const image = card.querySelector("img");
+        const state = card.querySelector("[data-work-state]");
+        const actions = card.querySelector("[data-work-actions]");
         return {
           source: card.getAttribute("data-source"),
           stage: card.getAttribute("data-stage"),
@@ -115,6 +118,8 @@ async function inspect(page) {
           actions: [...card.querySelectorAll("[data-work-actions] a,[data-work-actions] button")].filter(visible).map((item) => item.textContent?.trim()),
           details: [...card.querySelectorAll('a[href*="/work/"]')].map((item) => item.getAttribute("href")).filter((href) => href?.includes("groups") || href?.includes("consignments/items")),
           media: media ? { width: media.width, height: media.height } : null,
+          imageLoaded: Boolean(image?.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity !== "0"),
+          stateBeforeActions: Boolean(state && actions && (state.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING)),
           progress: card.querySelector('[role="progressbar"]') ? {
             now: card.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
             max: card.querySelector('[role="progressbar"]')?.getAttribute("aria-valuemax"),
@@ -242,6 +247,7 @@ try {
       const pass = basePass(inspection, ownerSession.errors)
         && stageCards.length > 0
         && stageCards.every((card) => card.source === "ORDER" && card.media && card.media.width <= 112.5 && card.media.height <= 112.5)
+        && stageCards.every((card) => card.stateBeforeActions)
         && stageCards.some((card) => card.actions.includes(primary))
         && stageCards.every((card) => card.details.length > 0);
       results.push({ state: `GROUPED_${stage}`, viewport: viewport.id, pass, inspection, errors: structuredClone(ownerSession.errors) });
@@ -281,17 +287,20 @@ try {
       && longCard?.stage === "PICK"
       && longCard?.status === "READY"
       && longCard?.actionMode === "ready"
+      && longCard?.imageLoaded
+      && longCard?.stateBeforeActions
       && longCard?.media && longCard.media.width <= 112.5 && longCard.media.height <= 112.5
+      && ready.cards.some((card) => card.text.includes("No image"))
       && longCard?.details.some((href) => href?.startsWith("/work/consignments/items/"));
     results.push({ state: "TASK_PICK_READY_LONG", viewport: viewport.id, pass: Boolean(readyPass), inspection: ready, errors: structuredClone(pickerSession.errors) });
     const problem = await open(pickerSession.page, "/work/consignments/pick?status=problem");
     if (viewport.id === "390x844") await pickerSession.page.waitForTimeout(5_600);
     const problemSettled = viewport.id === "390x844" ? await inspect(pickerSession.page) : problem;
-    const problemPass = basePass(problemSettled, pickerSession.errors) && problemSettled.cards.some((card) => card.status === "PROBLEM" && card.actionMode === "problem" && card.text.includes("QUANTITY SHORT") && !card.actions.some((action) => /Complete|Start|Save/.test(action ?? ""))) && (viewport.id !== "390x844" || problemSettled.cards.some((card) => card.text.includes("Image unavailable")));
+    const problemPass = basePass(problemSettled, pickerSession.errors) && problemSettled.cards.some((card) => card.status === "PROBLEM" && card.actionMode === "problem" && card.stateBeforeActions && card.text.includes("QUANTITY SHORT") && !card.actions.some((action) => /Complete|Start|Save/.test(action ?? ""))) && (viewport.id !== "390x844" || problemSettled.cards.some((card) => card.text.includes("Image unavailable")));
     results.push({ state: "TASK_PICK_PROBLEM", viewport: viewport.id, pass: problemPass, inspection: problemSettled, errors: structuredClone(pickerSession.errors) });
     if (viewport.id === "390x844") await capture(pickerSession.page, "task-problem-mobile.png", "problem-mobile.png");
     const completed = await open(pickerSession.page, "/work/consignments/pick?status=completed");
-    const completedPass = basePass(completed, pickerSession.errors) && completed.cards.some((card) => card.status === "COMPLETED" && card.actionMode === "completed" && card.text.includes("Work completed") && !card.actions.some((action) => /Complete|Start|Save/.test(action ?? "")));
+    const completedPass = basePass(completed, pickerSession.errors) && completed.cards.some((card) => card.status === "COMPLETED" && card.actionMode === "completed" && card.stateBeforeActions && card.text.includes("Work completed") && !card.actions.some((action) => /Complete|Start|Save/.test(action ?? "")));
     results.push({ state: "TASK_PICK_COMPLETED", viewport: viewport.id, pass: completedPass, inspection: completed, errors: structuredClone(pickerSession.errors) });
     if (viewport.id === "390x844") {
       await open(pickerSession.page, "/work/consignments/pick");

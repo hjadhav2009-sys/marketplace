@@ -37,6 +37,7 @@ for (const marker of ["data-responsive-work-card", "Customer order", "FLIPKART",
 }
 assert.ok(markup.indexOf("Customer order") < markup.indexOf("Order item 42"), "Context precedes identity.");
 assert.ok(markup.indexOf("Order item 42") < markup.indexOf("Required"), "Identity precedes work quantity.");
+assert.ok(markup.indexOf("Ready to process") < markup.indexOf("<button>Complete</button>"), "Current state precedes mutation actions in the mobile/DOM scan order.");
 assert.match(markup, /role="progressbar"[^>]*aria-valuemax="8"[^>]*aria-valuenow="3"/, "Valid quantity renders bounded progress semantics.");
 
 const invalidQuantity = renderToStaticMarkup(<WorkCardQuantity stage="MARK" required={2} completed={4} assignment="Unassigned" />);

@@ -18,7 +18,7 @@ export type WorkTaskQuickModel = {
   title: string; sellerSku: string; imageUrl: string | null; source: string; marketplace: string; reference: string;
   route: string | null; required: number; completed: number; assignment: string;
   identifiers: Array<{ label: string; value: string }>;
-  instructions: string[]; priorStages: Array<{ stage: string; status: string }>;
+  instructions: string[]; missingInstructionStages: WorkStage[]; priorStages: Array<{ stage: string; status: string }>;
   problem?: { reason: string; reporter: string; reportedAt: string | null; note: string | null };
 };
 
@@ -67,7 +67,7 @@ function TaskDetails({ model }: { model: WorkTaskQuickModel }) {
     <DetailSection title="Process flow"><p className="font-semibold">{humanProcessRoute(model.route)}</p><p className="mt-1 text-sm text-slate-600">Current stage: {titleCase(model.stage)}</p></DetailSection>
     <DetailSection title="Quantity"><p className="tabular-nums">{model.required} required · {model.completed} completed · {model.required - model.completed} remaining</p><p className="mt-1 text-sm text-slate-600">{model.assignment}</p></DetailSection>
     <DetailSection title="Identifiers"><dl className="grid gap-2">{model.identifiers.map((item) => <div key={item.label}><dt className="text-xs font-semibold text-slate-500">{item.label}</dt><dd className="break-all text-sm font-medium">{item.value}</dd></div>)}</dl></DetailSection>
-    {model.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{model.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : null}
+    {model.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{model.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : model.missingInstructionStages.length ? <DetailSection title="Instructions"><p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Saved instructions are unavailable for {model.missingInstructionStages.map(titleCase).join(" and ")}. No settings will be invented.</p></DetailSection> : null}
     <DetailSection title="Recent stage history"><ol className="space-y-2">{model.priorStages.map((item) => <li key={`${item.stage}:${item.status}`} className="text-sm"><span className="font-semibold">{titleCase(item.stage)}</span> · {titleCase(item.status)}</li>)}</ol></DetailSection>
     {model.problem ? <DetailSection title="Problem"><p className="text-sm font-semibold text-rose-800">{titleCase(model.problem.reason)}</p></DetailSection> : null}
     <FullDetailsLink model={model}/>

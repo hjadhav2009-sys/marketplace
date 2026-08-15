@@ -57,7 +57,7 @@ export function WorkTaskCardView({ task, returnPath, user }: { task: WorkerQueue
       { label: amazon ? "ASIN" : "FSN", value: (amazon ? line.asinSnapshot ?? line.asinSource : line.fsnSnapshot ?? line.fsnSource) ?? "Not available" },
       { label: amazon ? "FNSKU" : "Listing ID", value: (amazon ? line.fnskuSnapshot ?? line.fnskuSource : line.listingIdSnapshot) ?? "Not available" },
     ],
-    instructions: [marking?.instructions ?? asset?.instructions, assembly?.assemblyTitle, assembly?.assemblyInstructions, manual?.workerNote].filter((value): value is string => Boolean(value)),
+    instructions: [marking?.instructions ?? asset?.instructions, assembly?.assemblyTitle, assembly?.assemblyInstructions, manual?.workerNote].filter((value): value is string => Boolean(value)), missingInstructionStages: routeCard.missingInstructionStages,
     priorStages: line.workTasks.map((item) => ({ stage: item.stage, status: item.status })),
     problem: task.status === "PROBLEM" ? { reason: task.problemReason ?? "Problem", reporter: task.problemReportedBy?.name ?? "Unknown worker", reportedAt: task.problemReportedAt?.toLocaleString() ?? null, note: task.actionLogs[0]?.note ?? null } : undefined,
   };

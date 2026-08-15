@@ -17,11 +17,11 @@ export type GroupedQuickCard = {
   groupKey: string; groupVersion: string; sourceType: "ORDER" | "CONSIGNMENT"; stage: WorkStage; status: string;
   productTitle: string | null; sellerSku: string; marketplace: string; productImageUrl: string | null;
   savedProcessRoute: string | null; hasExplicitSavedRoute: boolean; requiredQuantity: number; completedQuantity: number; pendingQuantity: number;
-  assignedUserName: string | null; memberCount: number; problemCount: number;
+  assignedUserName: string | null; memberCount: number; problemCount: number; missingInstructionStages: WorkStage[];
   orderItemId: string | null; orderNumber: string | null; shipmentId: string | null; trackingId: string | null; consignmentNumber: string | null;
 };
 
-type QuickTask = { taskId: string; orderId: string | null; version: number; status: string; requiredQuantity: number; completedQuantity: number; assignment: string; reference: string; problemReason: string | null };
+type QuickTask = { taskId: string; orderId: string | null; version: number; status: string; requiredQuantity: number; completedQuantity: number; assignment: string; reference: string; problemReason: string | null; problemReporter: string | null; problemReportedAt: string | null };
 type QuickDetails = { groupVersion: string; tasks: QuickTask[]; history: Array<{ id: string; action: string; actor: string; createdAt: string; quantityAfter: number | null }>; instructions: string[] };
 
 export function GroupedQuickActions({ card, detailsHref, canAct, canReportProblem }: { card: GroupedQuickCard; detailsHref: string; canAct: boolean; canReportProblem: boolean }) {
@@ -57,7 +57,7 @@ function GroupedDetails({ card, detailsHref }: { card: GroupedQuickCard; details
     <DetailSection title="Identifiers"><dl className="grid gap-2">{identifiers(card).map((item) => <div key={item.label}><dt className="text-xs font-semibold text-slate-500">{item.label}</dt><dd className="break-all text-sm font-medium">{item.value}</dd></div>)}</dl></DetailSection>
     {loading ? <p role="status" className="text-sm text-slate-600">Loading current details…</p> : null}
     {error ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Current quick details could not be loaded. Open full details for the complete record.</p> : null}
-    {data?.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{data.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : null}
+    {data?.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{data.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : data && card.missingInstructionStages.length ? <DetailSection title="Instructions"><p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Saved instructions are unavailable for {card.missingInstructionStages.map(titleCase).join(" and ")}. No settings will be invented.</p></DetailSection> : null}
     {data?.tasks.some((task) => task.problemReason) ? <DetailSection title="Problem">{data.tasks.filter((task) => task.problemReason).map((task) => <p key={task.taskId} className="text-sm font-semibold text-rose-800">{titleCase(task.problemReason!)} · {task.reference}</p>)}</DetailSection> : null}
     {data?.history.length ? <DetailSection title="Recent history"><ol className="space-y-2">{data.history.map((item) => <li key={item.id} className="text-sm"><span className="font-semibold">{titleCase(item.action)}</span> by {item.actor}<span className="block text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</span></li>)}</ol></DetailSection> : null}
     <FullDetailsLink href={detailsHref}/>
@@ -72,7 +72,7 @@ function GroupedProblem({ card, detailsHref, readOnly }: { card: GroupedQuickCar
   const requestId = useId();
   if (loading) return <p role="status" className="text-sm text-slate-600">Loading exact work members…</p>;
   if (error || !data) return <div className="grid gap-3"><p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Exact member details are unavailable. No problem action is enabled.</p><FullDetailsLink href={detailsHref}/></div>;
-  if (readOnly) return <div className="grid gap-4"><ProductSummary card={card}/><div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-rose-950"><p className="font-semibold">Work paused</p>{data.tasks.filter((task) => task.problemReason).map((task) => <p key={task.taskId} className="mt-1 text-sm">{titleCase(task.problemReason!)} · {task.reference} · {task.completedQuantity}/{task.requiredQuantity}</p>)}</div><FullDetailsLink href={detailsHref}/></div>;
+  if (readOnly) return <div className="grid gap-4"><ProductSummary card={card}/><div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-rose-950"><p className="font-semibold">Work paused</p>{data.tasks.filter((task) => task.problemReason).map((task) => <div key={task.taskId} className="mt-2 text-sm"><p>{titleCase(task.problemReason!)} · {task.reference} · {task.completedQuantity}/{task.requiredQuantity}</p><p className="mt-1 text-xs">Reported by {task.problemReporter ?? "Unknown worker"}{task.problemReportedAt ? ` · ${new Date(task.problemReportedAt).toLocaleString()}` : ""} · {task.assignment}</p></div>)}</div><FullDetailsLink href={detailsHref}/></div>;
   return <form action={reportGroupedProblemAction} className="grid gap-4">
     <ProductSummary card={card}/><p className="text-sm font-medium text-slate-700">Current stage: {titleCase(card.stage)}</p>
     {actionable.length > 1 ? <Field id={`problem-member-${card.groupKey}`} label="Affected work item" required>{(attributes) => <select {...attributes} value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.currentTarget.value)} className={fieldControlStyles()}><option value="">Choose the exact item</option>{actionable.map((task) => <option key={task.taskId} value={task.taskId}>{task.reference} · {task.completedQuantity}/{task.requiredQuantity}</option>)}</select>}</Field> : null}

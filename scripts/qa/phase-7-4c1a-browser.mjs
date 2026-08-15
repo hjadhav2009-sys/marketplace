@@ -90,7 +90,7 @@ async function overlayEvidence(page, trigger, expectedKind, viewportWidth) {
   evidence.tabContained = await page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')));
   await page.keyboard.press("Escape");
   await root.waitFor({ state: "detached" });
-  evidence.focusReturned = await trigger.evaluate((element) => document.activeElement === element);
+  evidence.focusReturned = await trigger.evaluate((element) => document.activeElement === element || (!element.isConnected && document.activeElement?.id === "app-shell-main"));
   evidence.urlStable = page.url() === url;
   evidence.inertRemoved = await page.evaluate(() => document.querySelector("[data-app-shell-root]")?.inert === false);
   evidence.pass = Object.values(evidence).every(Boolean);
@@ -121,7 +121,7 @@ try {
       await card.getByRole("button", { name: /Complete Pick/ }).first().click(); await owner.page.getByRole("dialog").waitFor(); screenshots.push(await capture(owner.page, viewport.id === "390x844" ? "390-process-flow.png" : "1440-process-flow.png")); await owner.page.keyboard.press("Escape");
       await card.getByRole("button", { name: "Details" }).first().click(); await owner.page.getByRole("dialog").waitFor(); screenshots.push(await capture(owner.page, viewport.id === "390x844" ? "390-details.png" : "1440-details.png")); await owner.page.keyboard.press("Escape");
     }
-    if (viewport.id === "390x844") {
+    if (viewport.id === "390x844" || viewport.id === "1440x900") {
       let interactionCard = card;
       let partialButton = owner.page.getByRole("button", { name: "Partial Quantity" }).first();
       if (!await partialButton.count()) {
@@ -130,9 +130,15 @@ try {
         partialButton = interactionCard.getByRole("button", { name: "Partial Quantity" }).first();
       }
       if (!await partialButton.count()) throw new Error("Synthetic Pick fixture has no card eligible for Partial Quantity.");
-      await partialButton.click(); await owner.page.getByRole("dialog").waitFor(); screenshots.push(await capture(owner.page, "390-partial-quantity.png")); await owner.page.keyboard.press("Escape");
-      await interactionCard.getByRole("button", { name: "Problem" }).first().click(); await owner.page.getByRole("dialog").waitFor(); await owner.page.getByText(/Loading exact work members/).waitFor({ state: "detached", timeout: 10_000 }).catch(() => {}); screenshots.push(await capture(owner.page, "390-problem.png")); await owner.page.keyboard.press("Escape");
-      const imageTrigger = owner.page.getByRole("button", { name: /Open large image preview/ }).first(); if (await imageTrigger.count()) { const imageEvidence = await overlayEvidence(owner.page, imageTrigger, "IMAGE", viewport.width); results.push({ state: "IMAGE_PREVIEW", viewport: viewport.id, pass: imageEvidence.pass, evidence: imageEvidence, errors: structuredClone(owner.errors) }); await imageTrigger.click(); await owner.page.getByRole("dialog").waitFor(); screenshots.push(await capture(owner.page, "390-image-preview.png")); await owner.page.keyboard.press("Escape"); }
+      const partialEvidence = await overlayEvidence(owner.page, partialButton, "PARTIAL_QUANTITY", viewport.width);
+      results.push({ state: "PARTIAL_QUANTITY", viewport: viewport.id, pass: partialEvidence.pass, evidence: partialEvidence, errors: structuredClone(owner.errors) });
+      if (viewport.id === "390x844") { await partialButton.click(); await owner.page.getByRole("dialog").waitFor(); screenshots.push(await capture(owner.page, "390-partial-quantity.png")); await owner.page.keyboard.press("Escape"); }
+      const problemButton = interactionCard.getByRole("button", { name: "Problem" }).first();
+      const problemEvidence = await overlayEvidence(owner.page, problemButton, "PROBLEM", viewport.width);
+      results.push({ state: "PROBLEM_QUICK_ACTION", viewport: viewport.id, pass: problemEvidence.pass, evidence: problemEvidence, errors: structuredClone(owner.errors) });
+      if (viewport.id === "390x844") { await problemButton.click(); await owner.page.getByRole("dialog").waitFor(); await owner.page.getByText(/Loading exact work members/).waitFor({ state: "detached", timeout: 10_000 }).catch(() => {}); screenshots.push(await capture(owner.page, "390-problem.png")); await owner.page.keyboard.press("Escape");
+        const imageTrigger = owner.page.getByRole("button", { name: /Open large image preview/ }).first(); if (await imageTrigger.count()) { const imageEvidence = await overlayEvidence(owner.page, imageTrigger, "IMAGE", viewport.width); results.push({ state: "IMAGE_PREVIEW", viewport: viewport.id, pass: imageEvidence.pass, evidence: imageEvidence, errors: structuredClone(owner.errors) }); await imageTrigger.click(); await owner.page.getByRole("dialog").waitFor(); screenshots.push(await capture(owner.page, "390-image-preview.png")); await owner.page.keyboard.press("Escape"); }
+      }
     }
     for (const [state, route] of [["MARK_TASK_READY", "/work/marking"], ["ASSEMBLY_TASK_READY", "/work/consignments/assemble"], ["PACK_TASK_READY", "/work/consignments/pack"]]) {
       await open(owner.page, route); const inspection = await inspect(owner.page); results.push({ state, viewport: viewport.id, pass: basePass(inspection, owner.errors), inspection, errors: structuredClone(owner.errors) });

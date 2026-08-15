@@ -56,6 +56,8 @@ assert.match(taskQuick, /setTaskProgressAction/);
 assert.match(groupApi, /getGroupedWorkDetails/);
 assert.match(groupApi, /pageSize:25[\s\S]*historyPageSize:5/);
 assert.doesNotMatch(groupApi, /Response\.json\(details\)/, "Quick Details never returns raw Prisma details.");
+assert.match(groupApi, /problemReporter:[\s\S]*problemReportedAt:/, "Grouped Open Problem retains reporter and reported-time context.");
+assert.match(groupedQuick + taskQuick, /Saved instructions are unavailable[\s\S]*No settings will be invented/, "Quick Details states known missing instructions truthfully.");
 assert.match(groupedQuick + taskQuick, /Open full details/);
 assert.match(groupedQuick, /tasks\.filter[\s\S]*selectedTaskId/);
 assert.match(groupedQuick, /Choose the exact item/);

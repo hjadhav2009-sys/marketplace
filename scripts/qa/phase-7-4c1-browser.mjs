@@ -306,7 +306,7 @@ try {
     const problem = await open(pickerSession.page, "/work/consignments/pick?status=problem");
     if (viewport.id === "390x844") await pickerSession.page.waitForTimeout(5_600);
     const problemSettled = viewport.id === "390x844" ? await inspect(pickerSession.page) : problem;
-    const problemPass = basePass(problemSettled, pickerSession.errors) && problemSettled.cards.some((card) => card.status === "PROBLEM" && card.actionMode === "problem" && card.stateBeforeActions && card.text.includes("QUANTITY SHORT") && !card.actions.some((action) => /Complete|Start|Save/.test(action ?? ""))) && (viewport.id !== "390x844" || problemSettled.cards.some((card) => card.text.includes("Image unavailable")));
+    const problemPass = basePass(problemSettled, pickerSession.errors) && problemSettled.cards.some((card) => card.status === "PROBLEM" && card.actionMode === "problem" && card.stateBeforeActions && card.text.includes("QUANTITY SHORT") && !card.text.includes("Retry image") && !card.actions.some((action) => /Complete|Start|Save/.test(action ?? ""))) && (viewport.id !== "390x844" || problemSettled.cards.some((card) => card.text.includes("Image unavailable")));
     results.push({ state: "TASK_PICK_PROBLEM", viewport: viewport.id, pass: problemPass, inspection: problemSettled, errors: structuredClone(pickerSession.errors) });
     if (viewport.id === "390x844") await capture(pickerSession.page, "task-problem-mobile.png", "problem-mobile.png");
     const completed = await open(pickerSession.page, "/work/consignments/pick?status=completed");

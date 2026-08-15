@@ -57,7 +57,7 @@ Use Inter when available, then the system sans-serif stack. Worker quantities an
 # Components
 
 - Page header: eyebrow for durable context, concise title, one-sentence purpose, and at most the primary adjacent actions.
-- Work card: identity and state first, production evidence second, permitted action last. Preserve source/stage/quantity/assignment at every responsive size.
+- Work card: follow the Operations Ledger sequence `context -> identity -> quantity -> state -> actions -> disclosure`. Keep source/stage/quantity/assignment at every responsive size. Compact/mobile cards use 96 px media and place state before actions; from the small breakpoint media is 112 px, and at extra-large widths actions move into a dedicated right column while disclosure remains below the card body.
 - Status badge: semantic label plus color/icon; compact but never the sole carrier of meaning.
 - Form controls: minimum 44 px height; scanner controls may be 56 px. Labels remain visible for consequential fields.
 - Feedback: success uses `role=status` when it follows an async action; errors use `role=alert`; provide recovery guidance.

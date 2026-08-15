@@ -30,6 +30,7 @@
       "Operational truth before decoration",
       "One dominant task per worker view",
       "Context travels with action",
+      "Work cards follow context -> identity -> quantity -> state -> actions -> disclosure; mobile uses 96 px media with state before actions, while desktop uses 112 px media with a right action column",
       "No document-level horizontal overflow",
       "Color never carries state alone"
     ],

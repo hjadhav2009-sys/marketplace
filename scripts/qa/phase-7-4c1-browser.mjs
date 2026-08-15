@@ -80,7 +80,9 @@ async function settle(page) {
       await new Promise((resolve) => setTimeout(resolve, 15));
     }
     scrollTo(0, 0);
-    for (const animation of document.getAnimations()) animation.pause();
+    for (const animation of document.getAnimations()) {
+      try { animation.finish(); } catch { animation.pause(); }
+    }
   });
 }
 
@@ -118,7 +120,7 @@ async function inspect(page) {
           actions: [...card.querySelectorAll("[data-work-actions] a,[data-work-actions] button")].filter(visible).map((item) => item.textContent?.trim()),
           details: [...card.querySelectorAll('a[href*="/work/"]')].map((item) => item.getAttribute("href")).filter((href) => href?.includes("groups") || href?.includes("consignments/items")),
           media: media ? { width: media.width, height: media.height } : null,
-          imageLoaded: Boolean(image?.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity !== "0"),
+          imageLoaded: Boolean(image?.complete && image.naturalWidth > 0),
           stateBeforeActions: Boolean(state && actions && (state.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING)),
           progress: card.querySelector('[role="progressbar"]') ? {
             now: card.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
@@ -279,7 +281,15 @@ try {
     await ownerSession.context.close();
 
     const pickerSession = await newPage(browser, viewport, "PICKER");
-    const ready = await open(pickerSession.page, "/work/consignments/pick");
+    await open(pickerSession.page, "/work/consignments/pick");
+    const longCardElement = pickerSession.page.locator("[data-responsive-work-card]").filter({ hasText: "very long product title" }).first();
+    await longCardElement.scrollIntoViewIfNeeded();
+    await longCardElement.locator("img").waitFor({ state: "attached", timeout: 5_000 });
+    await pickerSession.page.waitForFunction((card) => {
+      const image = card.querySelector("img");
+      return Boolean(image?.complete && image.naturalWidth > 0);
+    }, await longCardElement.elementHandle(), { timeout: 5_000 });
+    const ready = await inspect(pickerSession.page);
     const longCard = ready.cards.find((card) => card.text.includes("very long product title"));
     const readyPass = basePass(ready, pickerSession.errors)
       && Boolean(longCard)

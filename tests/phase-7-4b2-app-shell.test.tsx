@@ -92,7 +92,8 @@ assert.match(shell, /navigationForUser\(user\)/, "Permission-derived links are s
 assert.doesNotMatch(nav, /canPick|canPack|canMark|canAssemble|canViewAllWork/, "The client navigation never receives permission computation.");
 assert.match(nav, /resolveCurrentNavigationId\(pathname, links\)/, "One central resolver owns current-route state.");
 assert.match(nav, /aria-current=\{active && ownsCurrentRoute \? "page" : undefined\}/);
-assert.match(nav, /useSyncExternalStore/);
+assert.match(nav, /const \[desktopShell, setDesktopShell\] = useState\(false\)/);
+assert.match(nav, /query\.addEventListener\("change", update\)/);
 assert.match(nav, /min-width: 1280px/);
 assert.match(nav, /idPrefix="desktop"/);
 assert.match(nav, /idPrefix="mobile"/, "Desktop and drawer navigation headings keep distinct IDs.");

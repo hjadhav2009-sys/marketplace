@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   resolveCurrentNavigationId,
   type AppNavLink,
@@ -115,26 +115,18 @@ function NavItems({
   );
 }
 
-function subscribeToDesktopShell(onStoreChange: () => void) {
-  const query = window.matchMedia("(min-width: 1280px)");
-  query.addEventListener("change", onStoreChange);
-  return () => query.removeEventListener("change", onStoreChange);
-}
-
-function getDesktopShellSnapshot() {
-  return window.matchMedia("(min-width: 1280px)").matches;
-}
-
-function getDesktopShellServerSnapshot() {
-  return false;
-}
-
 function useDesktopShell() {
-  return useSyncExternalStore(
-    subscribeToDesktopShell,
-    getDesktopShellSnapshot,
-    getDesktopShellServerSnapshot
-  );
+  const [desktopShell, setDesktopShell] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1280px)");
+    const update = () => setDesktopShell(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return desktopShell;
 }
 
 export function AppNav({ links, companyName, accountName, accountCode, marketplace }: AppNavProps) {

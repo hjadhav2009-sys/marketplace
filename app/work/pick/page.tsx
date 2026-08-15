@@ -1,1 +1,5 @@
-import { SmartStagePage } from "../SmartStagePage";export default function Page({searchParams}:{searchParams:Promise<{source?:string;page?:string;success?:string;error?:string}>}){return <SmartStagePage stage="PICK" searchParams={searchParams}/>}
+import { PickWorkspace, type PickSearchParams } from "./PickWorkspace";
+
+export default function Page({ searchParams }: { searchParams: PickSearchParams }) {
+  return <PickWorkspace searchParams={searchParams} />;
+}

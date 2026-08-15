@@ -19,7 +19,7 @@ export type NavigationUser = {
 export const ownerNavigation: readonly AppNavLink[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", section: "OVERVIEW", icon: "overview" },
   { id: "work-hub", href: "/work", label: "Work Hub", section: "WORK", icon: "work" },
-  { id: "pick", href: "/work/pick?source=ORDER", label: "Pick", section: "WORK", icon: "pick" },
+  { id: "pick", href: "/work/pick", label: "Pick", section: "WORK", icon: "pick" },
   { id: "mark", href: "/work/mark", label: "Mark", section: "WORK", icon: "mark" },
   { id: "assemble", href: "/work/assemble", label: "Assemble", section: "WORK", icon: "assemble" },
   { id: "pack", href: "/work/pack", label: "Pack", section: "WORK", icon: "pack" },
@@ -59,10 +59,7 @@ export function navigationForUser(user: NavigationUser): AppNavLink[] {
     );
   }
   if (hasWorkPermission(user, "canPick")) {
-    links.push(
-      { id: "order-pick", href: "/work/pick?source=ORDER", label: "Order Pick", section: "WORK", icon: "pick" },
-      { id: "consignment-pick", href: "/work/consignments/pick", label: "Consignment Pick", section: "WORK", icon: "pick" }
-    );
+    links.push({ id: "pick", href: "/work/pick", label: "Pick", section: "WORK", icon: "pick" });
   }
   if (hasWorkPermission(user, "canMark")) {
     links.push({ id: "marking", href: "/work/marking", label: "Marking", section: "WORK", icon: "mark" });

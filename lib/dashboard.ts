@@ -67,7 +67,7 @@ export function dashboardActions(marketplace: Account["marketplace"]) {
 }
 
 function stageHref(stage: WorkStage) {
-  if (stage === "PICK") return "/work/pick?source=ORDER";
+  if (stage === "PICK") return "/work/pick";
   if (stage === "MARK") return "/work/mark";
   if (stage === "ASSEMBLE") return "/work/assemble";
   return "/work/pack";
@@ -86,7 +86,7 @@ export function dashboardStage(
   if (unavailable) {
     return {
       stage,
-      href: stage === "PICK" && !sources.dailyOrders ? "/work" : stageHref(stage),
+      href: stageHref(stage),
       label: stageLabel(stage),
       cardCount: null,
       itemCount: null,
@@ -101,7 +101,7 @@ export function dashboardStage(
 
   return {
     stage,
-    href: stage === "PICK" && !sources.dailyOrders ? "/work" : stageHref(stage),
+    href: stageHref(stage),
     label: stageLabel(stage),
     cardCount: summary.ORDER.cardCount + summary.CONSIGNMENT.cardCount,
     itemCount: summary.ORDER.itemCount + summary.CONSIGNMENT.itemCount,

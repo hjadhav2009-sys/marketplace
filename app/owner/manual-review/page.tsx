@@ -10,7 +10,7 @@ const reviewLinks = [
   ["Dashboard", "/dashboard"], ["Accounts", "/owner/accounts"], ["Users", "/owner/users"], ["Imports", "/owner/imports"],
   ["Listings", "/owner/sku-mappings"], ["Marking Library", "/owner/marking-library"], ["Process Rules", "/owner/process-rules"],
   ["Customer Picker", "/picker"], ["Assembly", "/work/assembly"], ["Customer Packing", "/packing"],
-  ["Flipkart and Amazon Consignments", "/owner/consignments"], ["Consignment Picker", "/work/consignments/pick"],
+  ["Flipkart and Amazon Consignments", "/owner/consignments"], ["Pick workspace", "/work/pick?source=CONSIGNMENT"],
   ["Marking", "/work/marking"], ["Consignment Packing", "/work/consignments/pack"], ["Universal Scanner", "/work/scan"],
   ["Problems", "/problems"], ["Reports", "/reports"], ["System", "/owner/system"]
 ] as const;

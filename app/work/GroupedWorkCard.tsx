@@ -58,7 +58,16 @@ export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = 
     ? `Package ${card.trackingId ?? card.operationalIdentifier ?? card.reference}`
     : card.sourceType === "ORDER"
       ? `Order Item ${card.orderItemId ?? card.reference}`
-      : `Consignment line ${card.consignmentLineId?.slice(-8) ?? card.reference}`;
+      : card.stage === "PICK"
+        ? `Consignment ${card.consignmentNumber ?? card.reference}`
+        : `Consignment line ${card.consignmentLineId?.slice(-8) ?? card.reference}`;
+  const identityMetadata = card.stage === "PICK"
+    ? card.sourceType === "ORDER"
+      ? card.trackingId ? <>Tracking / package reference <span className="break-all font-medium text-slate-700">{card.trackingId}</span></> : null
+      : card.operationalIdentifier && card.operationalIdentifier !== card.reference
+        ? <>Operational barcode <span className="break-all font-medium text-slate-700">{card.operationalIdentifier}</span></>
+        : null
+    : null;
   const routeCard: WorkRouteDialogCard = { stage: card.stage, sourceType: card.sourceType, groupKey: card.groupKey, groupVersion: card.groupVersion, taskId: card.memberTaskIds[0], completedQuantity: card.completedQuantity, hasExplicitSavedRoute: card.hasExplicitSavedRoute, savedProcessRoute: card.savedProcessRoute, processRoute: card.processRoute, routeDegraded: card.processRouteDegraded, missingInstructionStages: card.availableMissingInstructionStages };
   return (
     <WorkCard
@@ -67,9 +76,9 @@ export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = 
       status={card.status}
       context={<WorkCardContext source={card.sourceType === "ORDER" ? "Customer order" : "Consignment"} marketplace={card.marketplace} stage={card.stage} status={card.status} />}
       media={<WorkImageGallery images={[card.productImageUrl]} alt={card.productTitle ?? card.sellerSku} compact />}
-      identity={<WorkCardIdentity eyebrow={identity} title={card.productTitle ?? "Untitled product"} sellerSku={card.sellerSku} />}
+      identity={<WorkCardIdentity eyebrow={identity} title={card.productTitle ?? "Untitled product"} sellerSku={card.sellerSku} metadata={identityMetadata} />}
       processFlow={<WorkRouteDialogC1A card={routeCard} />}
-      quantity={<WorkCardQuantity stage={card.stage} required={card.requiredQuantity} completed={card.completedQuantity} itemCount={card.memberCount} mode={isPackage ? "package" : "standard"} assignment={card.assignedUserName ? `Assigned to ${card.assignedUserName}` : "Unassigned"} />}
+      quantity={<WorkCardQuantity stage={card.stage} label={card.stage === "PICK" ? "Pick quantity" : undefined} required={card.requiredQuantity} completed={card.completedQuantity} itemCount={card.memberCount} mode={isPackage ? "package" : "standard"} assignment={card.assignedUserName ? `${card.stage === "PICK" ? "Assigned:" : "Assigned to"} ${card.assignedUserName}` : "Unassigned"} />}
       state={<GroupedState card={card} canAct={canAct} />}
       actions={<CardActions card={card} canAct={canAct} canReportProblem={canReportProblem} details={details} token={token} routeCard={routeCard} />}
     />
@@ -80,8 +89,11 @@ function GroupedState({ card, canAct }: { card: Card; canAct: boolean }) {
   const problem = card.status === "PROBLEM" || card.problemCount > 0;
   if (problem) return <WorkCardState tone="danger" title="Work paused">An open problem must be resolved before processing can continue.</WorkCardState>;
   if (card.status === "COMPLETED") return <WorkCardState tone="success" title="Work completed">This work is available as a read-only receipt.</WorkCardState>;
-  if (!canAct) return <WorkCardState title="Read-only work view">Your current permissions do not allow {card.stage.toLowerCase()} actions.</WorkCardState>;
+  if (!canAct) return <WorkCardState title={card.stage === "PICK" ? "Read-only Pick view" : "Read-only work view"}>Your current permissions do not allow {card.stage.toLowerCase()} actions.</WorkCardState>;
+  if (card.stage === "PICK" && card.missingInstructionStages.length > 0) return <WorkCardState tone="warning" title={card.completedQuantity > 0 ? "Picking in progress" : "Ready to pick"}>Saved instructions are unavailable. Acknowledge this in Process Flow before completing. No settings will be invented.</WorkCardState>;
   if (card.missingInstructionStages.length > 0) return <WorkCardState tone="warning" title="Saved instructions unavailable">Acknowledge this in Process Flow before completing. No settings will be invented.</WorkCardState>;
+  if (card.stage === "PICK" && card.completedQuantity > 0) return <WorkCardState title="Picking in progress" />;
+  if (card.stage === "PICK") return <WorkCardState title="Ready to pick">Confirm the product and required quantity.</WorkCardState>;
   return <WorkCardState title="Ready to process">Use the actions for this exact work item.</WorkCardState>;
 }
 
@@ -122,7 +134,7 @@ function CardActions({ card, canAct, canReportProblem, details, token, routeCard
   }
 
   const completionLabel = card.stage === "PICK" ? "Complete Pick" : card.stage === "MARK" ? "Marking Completed" : "Assembly Completed";
-  return <WorkCardActions mode="ready">
+  return <WorkCardActions mode="ready" className={card.stage === "PICK" ? "[&>:last-child:nth-child(odd)]:col-span-2" : ""}>
     <WorkRouteActionButton card={routeCard} label={completionLabel}/>
     <GroupedQuickActions card={card} detailsHref={details} canAct canReportProblem={canReportProblem}/>
   </WorkCardActions>;

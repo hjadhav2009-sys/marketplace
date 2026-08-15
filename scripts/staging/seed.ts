@@ -15,9 +15,10 @@ if (!credentialPath || !fixtureRoot || !importStorageRoot || !productImageStorag
 
 const accounts = [
   { id: "stage3-account-fk-01", name: "Synthetic Flipkart Primary", code: "STAGE-FK-01", marketplace: "FLIPKART", active: true },
-  { id: "stage3-account-amz-01", name: "Synthetic Amazon Primary", code: "STAGE-AMZ-01", marketplace: "AMAZON", active: true },
+  { id: "stage3-account-amz-01", name: "Synthetic Amazon Primary Account With Long Fulfilment Identity", code: "STAGE-AMZ-01", marketplace: "AMAZON", active: true },
   { id: "stage3-account-fk-02", name: "Synthetic Flipkart Isolation", code: "STAGE-FK-02", marketplace: "FLIPKART", active: true },
-  { id: "stage3-account-inactive", name: "Synthetic Inactive Account", code: "STAGE-INACTIVE-01", marketplace: "FLIPKART", active: false }
+  { id: "stage3-account-inactive", name: "Synthetic Inactive Account", code: "STAGE-INACTIVE-01", marketplace: "FLIPKART", active: false },
+  { id: "stage4-account-pick-projection", name: "Synthetic Pick Projection Failure", code: "STAGE-PICK-FAIL", marketplace: "FLIPKART", active: true }
 ] as const;
 
 const users = [
@@ -219,6 +220,9 @@ async function seed() {
     await prisma.consignmentLine.create({ data: { id: lineId, consignmentBatchId: batchId, accountId: accounts[0].id, rowNumber: index + 1, sellerSkuSource: sku, requiredQuantity: index + 1, marketplaceListingId: `stage3-listing-${listings[index][0]}`, matchStatus: "EXACT_SKU", processRoute: route, activated: true, sellerSkuSnapshot: sku, productTitleSnapshot: listings[index][2], catalogSnapshotJson: snapshot(sku, listings[index][2], route) } });
     await createTask({ id: `${lineId}-${stage.toLowerCase()}`, consignmentLineId: lineId, sourceType: "CONSIGNMENT", stage, sequence: stage === "PACK" ? 4 : 2, status: "READY", quantity: index + 1, assigned: stage === "PACK" ? users[6].id : stage === "MARK" ? users[4].id : users[5].id, sku, title: listings[index][2], route });
   }
+  await prisma.consignmentBatch.create({ data: { id: "stage4-batch-amazon-pick", accountId: accounts[1].id, marketplace: "AMAZON", externalConsignmentNumber: "STAGE-AMZ-CONSIGNMENT-PICK-001", displayName: "Synthetic Amazon Pick Consignment", status: "ACTIVE", sourceFileName: "synthetic-amazon-pick.csv", sourceFileSha256: "8".repeat(64), totalSourceRows: 1, totalValidLines: 1, totalRequiredQuantity: 3, matchedLines: 1, unmatchedLines: 0, createdByUserId: users[0].id, activatedAt: new Date(), activatedByUserId: users[0].id } });
+  await prisma.consignmentLine.create({ data: { id: "stage4-line-amazon-pick", consignmentBatchId: "stage4-batch-amazon-pick", accountId: accounts[1].id, rowNumber: 1, sellerSkuSource: "STAGE-AMZ-SKU-001", requiredQuantity: 3, marketplaceListingId: "stage3-listing-amazon", matchStatus: "EXACT_SKU", processRoute: null, activated: true, sellerSkuSnapshot: "STAGE-AMZ-SKU-001", productTitleSnapshot: "Synthetic Amazon Product", catalogSnapshotJson: snapshot("STAGE-AMZ-SKU-001", "Synthetic Amazon Product", null) } });
+  await createTask({ id: "stage4-line-amazon-pick-task", accountId: accounts[1].id, consignmentLineId: "stage4-line-amazon-pick", sourceType: "CONSIGNMENT", stage: "PICK", sequence: 1, status: "READY", quantity: 3, sku: "STAGE-AMZ-SKU-001", title: "Synthetic Amazon Product", route: null });
   await prisma.marketplaceListing.create({ data: { id: "stage4-c1-listing-no-image", accountId: accounts[0].id, marketplace: "FLIPKART", sellerSkuId: "STAGE-C1-NO-IMAGE-SKU", sku: "STAGE-C1-NO-IMAGE-SKU", productTitle: "Synthetic C1 missing image product", listingStatus: "ACTIVE", fsn: "STAGE-C1-NO-IMAGE-FSN", listingId: "STAGE-C1-NO-IMAGE-LISTING" } });
   await prisma.consignmentBatch.create({ data: { id: "stage4-batch-c1-work-cards", accountId: accounts[0].id, marketplace: "FLIPKART", externalConsignmentNumber: `STAGE-C1-${"LONG-CONSIGNMENT-REFERENCE-".repeat(4)}001`, displayName: `Synthetic C1 ${"Long Worker Card Evidence ".repeat(4)}`, status: "ACTIVE", sourceFileName: "synthetic-c1-work-cards.csv", sourceFileSha256: "4".repeat(64), totalSourceRows: 4, totalValidLines: 4, totalRequiredQuantity: 13, matchedLines: 4, unmatchedLines: 0, createdByUserId: users[0].id, activatedAt: new Date(), activatedByUserId: users[0].id } });
   const c1Lines = [
@@ -312,10 +316,13 @@ async function seed() {
     { id: "stage4-delete-completed", accountId: accounts[0].id, actorUserId: users[0].id, actionKind: "RESTORE_QUARANTINED_FILES", state: "COMPLETED", clientRequestId: "stage4-restored", requestFingerprint: "e".repeat(64), scopeFingerprint: "f".repeat(64), scopeJson: JSON.stringify({ synthetic: true }), previewJson: JSON.stringify({ synthetic: true }), completedAt: new Date() },
     { id: "stage4-delete-purged", accountId: accounts[0].id, actorUserId: users[0].id, actionKind: "PURGE_QUARANTINED_FILES", state: "PURGED", clientRequestId: "stage4-purged", requestFingerprint: "1".repeat(64), scopeFingerprint: "2".repeat(64), scopeJson: JSON.stringify({ synthetic: true, deletionJobId: "stage4-delete-historical-source" }), previewJson: JSON.stringify({ synthetic: true, affectedFiles: 1 }), totalFiles: 1, totalBytes: 22, completedAt: new Date() }
   ] });
+  await prisma.order.create({ data: { id: "stage4-order-pick-projection-failure", accountId: accounts[4].id, marketplace: "FLIPKART", shipmentId: "STAGE-PICK-FAIL-SHIP", orderItemId: "STAGE-PICK-FAIL-ITEM", trackingId: "STAGE-PICK-FAIL-TRACK", awb: "STAGE-PICK-FAIL-AWB", sku: "STAGE-PICK-FAIL-SKU", qty: 1, orderNo: "STAGE-PICK-FAIL-ORDER", productDescription: "Synthetic projection unavailable Pick work", pickStatus: "READY", packStatus: "READY", status: "READY" } });
+  await createTask({ id: "stage4-order-pick-projection-failure-task", accountId: accounts[4].id, orderId: "stage4-order-pick-projection-failure", sourceType: "ORDER", stage: "PICK", sequence: 1, status: "READY", quantity: 1, sku: "STAGE-PICK-FAIL-SKU", title: "Synthetic projection unavailable Pick work", route: "PICK_PACK" });
 
   for (const account of accounts.filter((item) => item.active)) for (const sourceType of ["ORDER", "CONSIGNMENT"] as const) for (const stage of ["PICK", "MARK", "ASSEMBLE", "PACK"] as const) {
     await rebuildWorkGroupProjection({ accountId: account.id, sourceType, stage }, prisma);
   }
+  await prisma.workProjectionState.update({ where: { accountId_sourceType_stage: { accountId: accounts[4].id, sourceType: "ORDER", stage: "PICK" } }, data: { state: "FAILED", errorSummary: "Synthetic C2 projection failure" } });
   await prisma.auditLog.createMany({ data: [
     { id: "stage3-seed-audit", userId: users[0].id, accountId: accounts[0].id, action: "STAGE4_6_SYNTHETIC_SEED", entityType: "SyntheticStaging", entityId: "phase-7.3.6-stage4.6c1-semantic-fixtures-v2", metadata: JSON.stringify({ synthetic: true }) },
     { id: "stage4-delete-audit", userId: users[0].id, accountId: accounts[0].id, action: "DATA_MANAGEMENT_PREVIEW", entityType: "DataDeletionJob", entityId: "stage4-delete-preview", metadata: JSON.stringify({ synthetic: true, result: "PREVIEWED" }) }

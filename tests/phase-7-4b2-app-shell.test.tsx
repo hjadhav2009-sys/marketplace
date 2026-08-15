@@ -26,24 +26,24 @@ const sorted = (values: readonly string[]) => [...values].sort();
 const legacyOwnerHrefs = [
   "/dashboard", "/work", "/owner/product-inventory", "/owner/catalog/missing", "/owner/process-rules",
   "/owner/marking-library", "/owner/product-inventory/refresh", "/owner/imports", "/owner/consignments",
-  "/work/pick?source=ORDER", "/work/mark", "/work/assemble", "/work/pack", "/work/scan", "/work/problems",
+  "/work/pick", "/work/mark", "/work/assemble", "/work/pack", "/work/scan", "/work/problems",
   "/owner/work-route-summary", "/owner/accounts", "/owner/users", "/reports", "/owner/system",
   "/owner/data-management", "/change-password",
 ];
-assert.deepEqual(sorted(navigationForUser(user({ role: "OWNER" })).map((link) => link.href)), sorted(legacyOwnerHrefs), "Owner href authorization is unchanged from B1b.");
+assert.deepEqual(sorted(navigationForUser(user({ role: "OWNER" })).map((link) => link.href)), sorted(legacyOwnerHrefs), "Owner href authorization is unchanged apart from the approved canonical Pick destination.");
 
 const legacyWorkerSets: Array<[string, Partial<NavigationUser>, string[]]> = [
-  ["picker", { canPick: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick?source=ORDER", "/work/consignments/pick", "/work/problems", "/change-password"]],
+  ["picker", { canPick: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick", "/work/problems", "/change-password"]],
   ["marker", { canMark: true, canReportProblem: true }, ["/work", "/work/scan", "/work/marking", "/work/problems", "/change-password"]],
   ["assembler", { canAssemble: true, canReportProblem: true }, ["/work", "/work/scan", "/work/assembly", "/work/problems", "/change-password"]],
   ["packer", { role: "PACKER", canPack: true, canReportProblem: true }, ["/work", "/work/scan", "/packing", "/work/consignments/pack", "/work/problems", "/change-password"]],
-  ["pick-and-pack", { canPick: true, canPack: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick?source=ORDER", "/work/consignments/pick", "/packing", "/work/consignments/pack", "/work/problems", "/change-password"]],
+  ["pick-and-pack", { canPick: true, canPack: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick", "/packing", "/work/consignments/pack", "/work/problems", "/change-password"]],
   ["view-all", { canViewAllWork: true, canViewConsignments: true }, ["/work", "/work/scan", "/work/assembly", "/work/problems", "/owner/consignments", "/change-password"]],
   ["import-manager", { canImportConsignments: true, canManageConsignments: true, canViewConsignments: true }, ["/work/problems", "/owner/consignments", "/change-password"]],
   ["no-capability", {}, ["/change-password"]],
 ];
 for (const [label, permissions, expected] of legacyWorkerSets) {
-  assert.deepEqual(sorted(hrefs(permissions)), sorted(expected), `${label} keeps the exact B1b authorized href set.`);
+  assert.deepEqual(sorted(hrefs(permissions)), sorted(expected), `${label} keeps its authorized destinations with one canonical Pick entry.`);
 }
 
 assert.equal(normalizeNavigationPath("/work/pick?source=ORDER#queue"), "/work/pick");

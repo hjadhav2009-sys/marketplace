@@ -28,8 +28,8 @@ export function WorkCardState({ children, title, tone = "neutral" }: { children?
   );
 }
 
-export function WorkCardActions({ children, mode }: { children: ReactNode; mode: "ready" | "problem" | "completed" | "read-only" }) {
-  return <div className="grid min-w-0 grid-cols-2 gap-2" data-action-mode={mode}>{children}</div>;
+export function WorkCardActions({ children, className = "", mode }: { children: ReactNode; className?: string; mode: "ready" | "problem" | "completed" | "read-only" }) {
+  return <div className={`grid min-w-0 grid-cols-2 gap-2 ${className}`.trim()} data-action-mode={mode}>{children}</div>;
 }
 
 export function WorkCardDisclosure({ children, label }: { children: ReactNode; label: ReactNode }) {

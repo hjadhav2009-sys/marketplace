@@ -3,7 +3,7 @@
 ## Boundary and identity
 
 - Starting final HEAD: `6b3724e305955c12d167f72d594f58de8fe7b4fb`
-- Starting browser-tested runtime: `aa21bf90a0bcaaeff2ad8e39a6b8b00638c65146`
+- Starting browser-tested runtime: `aa21bf9f3b52b8bec71b7bc02d5285e7fbe0522e`
 - Starting BUILD_ID: `fZtN7_qir5U_s7xXJY1FU`
 - Branch: `phase-7.4c1a1-interaction-truth-closure`
 - Runtime commit: `47cdfd1af7a33a1dec87ee6f95c581976a031ed2`

@@ -87,11 +87,15 @@ const coordinator = read("components/MobileOverlayCoordinator.tsx");
 const accountMenu = read("components/MobileAccountMenu.tsx");
 const pageHeader = read("components/PageHeader.tsx");
 const seed = read("scripts/staging/seed.ts");
+const workSourceTabs = read("app/work/LiveStageSummary.tsx");
+const dataManagement = read("app/owner/data-management/page.tsx");
 
 assert.match(shell, /navigationForUser\(user\)/, "Permission-derived links are still created by the Server Component shell.");
 assert.doesNotMatch(nav, /canPick|canPack|canMark|canAssemble|canViewAllWork/, "The client navigation never receives permission computation.");
 assert.match(nav, /resolveCurrentNavigationId\(pathname, links\)/, "One central resolver owns current-route state.");
 assert.match(nav, /aria-current=\{active && ownsCurrentRoute \? "page" : undefined\}/);
+assert.doesNotMatch(workSourceTabs, /aria-current/, "Work-source tabs use aria-selected without claiming page-route ownership.");
+assert.match(dataManagement, /aria-current=\{tab===key\?"true":undefined\}/, "In-page Data Management navigation does not claim page-route ownership.");
 assert.match(nav, /const \[desktopShell, setDesktopShell\] = useState\(false\)/);
 assert.match(nav, /query\.addEventListener\("change", update\)/);
 assert.match(nav, /min-width: 1280px/);

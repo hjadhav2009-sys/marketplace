@@ -88,7 +88,7 @@ export default async function DataManagementPage({ searchParams }: {
     {query.success ? <p role="status" tabIndex={-1} autoFocus className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-semibold text-emerald-800">The authorized action completed. Review Deletion History for its durable receipt.</p> : null}
     <p className="mb-1 text-xs font-semibold text-slate-500 sm:hidden">Swipe to see all data sections →</p>
     <nav aria-label="Data management sections" className="mb-5 flex gap-2 overflow-x-auto pb-2">
-      {tabs.map(([key, label]) => <Link key={key} href={`/owner/data-management?tab=${key}`} aria-current={tab===key?"page":undefined} className={`min-h-11 shrink-0 rounded-md border px-3 py-2 text-sm font-bold ${tab === key ? "border-slate-950 bg-slate-950 text-white" : "bg-white text-slate-700"}`}>{label}</Link>)}
+      {tabs.map(([key, label]) => <Link key={key} href={`/owner/data-management?tab=${key}`} aria-current={tab===key?"true":undefined} className={`min-h-11 shrink-0 rounded-md border px-3 py-2 text-sm font-bold ${tab === key ? "border-slate-950 bg-slate-950 text-white" : "bg-white text-slate-700"}`}>{label}</Link>)}
     </nav>
 
     {!account && !["overview", "history", "reset"].includes(tab) ? <Card><h2 className="text-lg font-bold">Choose a seller account</h2><p className="mt-2 text-slate-600">Account-scoped data is shown only after the owner selects an account.</p><Link href="/accounts" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 py-2 font-bold text-white">Choose seller account</Link></Card> : null}

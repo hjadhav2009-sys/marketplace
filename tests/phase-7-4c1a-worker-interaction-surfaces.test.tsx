@@ -35,7 +35,7 @@ assert.doesNotMatch(quantity, /grid-cols-3/, "Compact quantity no longer renders
 const packageQuantity = renderToStaticMarkup(<WorkCardQuantity stage="PACK" required={9} completed={0} itemCount={3} mode="package" assignment="Assigned" />);
 assert.match(packageQuantity, /3 items[\s\S]*9 units/);
 
-for (const invariant of [/role="dialog"/, /aria-modal="true"/, /data-app-shell-root/, /\.inert = true/, /document\.body\.style\.overflow = "hidden"/, /event\.key === "Escape"/, /event\.key !== "Tab"/, /history\.pushState/, /popstate/, /openerRef/, /createPortal/]) assert.match(overlay, invariant, `Overlay contract lost ${invariant}.`);
+for (const invariant of [/role="dialog"/, /aria-modal="true"/, /data-app-shell-root/, /\.inert = true/, /document\.body\.style\.overflow = "hidden"/, /event\.key === "Escape"/, /event\.key !== "Tab"/, /focusable\.includes\(document\.activeElement/, /history\.pushState/, /popstate/, /openerRef/, /createPortal/]) assert.match(overlay, invariant, `Overlay contract lost ${invariant}.`);
 assert.match(overlay, /items-end md:items-center/, "Compact widths use a bottom sheet and desktop uses the requested surface alignment.");
 assert.match(overlay, /max-h-\[90dvh\]/);
 assert.match(overlay, /surface === "drawer"[\s\S]*md:ml-auto/);

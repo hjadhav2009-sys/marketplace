@@ -128,7 +128,7 @@ The suite additionally checks one completion receipt/log per completed Pick, cor
 - Engine: installed Google Chrome through repository `playwright-core`
 - Exact runtime: `065b9519e3a1aa74b7d9c064dfdc3d09a7eb12e6`
 - BUILD_ID: `1EGWkxn4chvBfr-67uYA-`
-- Final C2 records: 23/23 passed.
+- Final C2 records: 24/24 passed, including separately exercised read-only Order and Consignment Pick states.
 - Six exact widths: 360x800, 390x844, 430x932, 768x1024, 1024x768, 1440x900.
 - 200% reflow equivalents: 320, 384, 512, and 720 CSS-pixel layouts representing the requested 390, 768, 1024, and 1440 contexts.
 - Horizontal overflow: 0 records.
@@ -143,7 +143,7 @@ The suite additionally checks one completion receipt/log per completed Pick, cor
 - Process Flow focus entry, Escape, and focus return: passed.
 - Owner-review screenshots: ignored under `.codex-tmp/phase-7-4c2/owner-review/`; mobile Order, Consignment, selector, ready/in-progress/problem content, Process Flow, Amazon, true empty, and desktop Order/Consignment are represented.
 
-The first browser run found one real copy issue: missing-instruction warning priority hid `Picking in progress`. The runtime was corrected and rebuilt. Other first-run failures were harness false negatives: the closed mobile drawer intentionally has no visible current link, and read-only Open Problem is inspection rather than mutation. The corrected final matrix is 23/23.
+The first browser run found one real copy issue: missing-instruction warning priority hid `Picking in progress`. The runtime was corrected and rebuilt. Other first-run failures were harness false negatives: the closed mobile drawer intentionally has no visible current link, and read-only Open Problem is inspection rather than mutation. The corrected final matrix is 24/24, with read-only Order and Consignment Pick states covered independently.
 
 ## Design review
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { PrismaClient, type ProcessRoute, type WorkStage, type WorkTaskStatus } from "@prisma/client";
 import { hashPassword } from "../../lib/password";
 import { rebuildWorkGroupProjection } from "../../src/lib/workflow/work-group-projection";
+import { createImmutableRouteProvenance } from "../../src/lib/workflow/route-provenance";
 
 const prisma = new PrismaClient();
 const credentialPath = process.env.STAGING_CREDENTIAL_PATH;
@@ -239,7 +240,8 @@ async function seed() {
   ];
   for (const item of c1a1Cases) {
     const image = item.id.endsWith("case-c") ? syntheticImageRoute("stage3-fk-gallery") : null;
-    const cardSnapshot = JSON.stringify({ sellerSku: item.sku, productTitle: item.title, primaryImage: image, routeRecommendation: item.savedRoute ?? "PICK_PACK", routeRecommendationSource: item.savedRoute ? "PRODUCT_RULE" : "SYSTEM_FALLBACK", hasExplicitSavedRoute: Boolean(item.savedRoute), savedProcessRoute: item.savedRoute, synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase() });
+    const provenance = createImmutableRouteProvenance({ route: item.savedRoute ?? "PICK_PACK", rule: item.savedRoute ? { id: `${item.id}-saved-rule`, route: item.savedRoute } : null, now: new Date(0) });
+    const cardSnapshot = JSON.stringify({ ...provenance, sellerSku: item.sku, productTitle: item.title, primaryImage: image, synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase() });
     await prisma.consignmentLine.create({ data: { id: item.id, consignmentBatchId: "stage4-batch-c1a1-route-truth", accountId: accounts[0].id, rowNumber: item.row, sellerSkuSource: item.sku, requiredQuantity: item.quantity, marketplaceListingId: item.listingId, matchStatus: "EXACT_SKU", processRoute: item.savedRoute, activated: true, sellerSkuSnapshot: item.sku, productTitleSnapshot: item.title, catalogSnapshotJson: cardSnapshot } });
     await createTask({ id: `${item.id}-${item.stage.toLowerCase()}`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage: item.stage, sequence: item.stage === "PICK" ? 1 : 2, status: "READY", quantity: item.quantity, assigned: item.assigned, sku: item.sku, title: item.title, route: item.savedRoute, metadataJson: JSON.stringify({ synthetic: true, c1a1Case: item.id.slice(-1).toUpperCase(), workerNote: item.id.endsWith("case-a") ? "Actual flow intentionally differs from the saved product default." : null }), workCardSnapshotJson: cardSnapshot, routeSnapshotJson: actualRouteSnapshot({ savedRoute: item.savedRoute, actualRoute: item.actualRoute, currentStage: item.stage, completedStages: item.stage === "MARK" ? ["PICK"] : [] }) });
   }

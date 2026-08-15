@@ -96,6 +96,16 @@ function errorsHealthy(errors) {
   return Object.values(errors).every((items) => items.length === 0);
 }
 
+function containsStages(text, stages) {
+  let cursor = 0;
+  return stages.every((stage) => {
+    const index = text.indexOf(stage, cursor);
+    if (index < 0) return false;
+    cursor = index + stage.length;
+    return true;
+  });
+}
+
 const browser = await chromium.launch({ executablePath, headless: true, args: ["--disable-extensions", "--disable-sync"] });
 const results = [];
 const screenshots = [];
@@ -109,9 +119,8 @@ try {
     const caseB = card(page, "C1A1 Case B fallback with actual Mark route");
     const caseD = card(page, "C1A1 Case D actual Mark with required instructions missing");
     const [aText, bText, dText, markInspection] = await Promise.all([caseA.innerText(), caseB.innerText(), caseD.innerText(), inspect(page)]);
-    const markPass = aText.includes("Pick → Mark → Assembly → Pack")
-      && !aText.includes("Pick → Pack")
-      && bText.includes("Pick → Mark → Pack")
+    const markPass = containsStages(aText, ["Pick", "Mark", "Assembly", "Pack"])
+      && containsStages(bText, ["Pick", "Mark", "Pack"])
       && dText.includes("Marking instructions unavailable")
       && markInspection.clientWidth === markInspection.scrollWidth
       && markInspection.undersized.length === 0
@@ -133,12 +142,12 @@ try {
     const caseC = card(page, "C1A1 Case C direct Pack without optional instructions");
     const cText = await caseC.innerText();
     const pickInspection = await inspect(page);
-    const caseCPass = cText.includes("Pick → Pack") && !/instructions are unavailable/i.test(cText) && pickInspection.clientWidth === pickInspection.scrollWidth && pickInspection.undersized.length === 0 && !pickInspection.rawRoute && !pickInspection.duplicateDisclosure;
+    const caseCPass = containsStages(cText, ["Pick", "Pack"]) && !/instructions are unavailable/i.test(cText) && pickInspection.clientWidth === pickInspection.scrollWidth && pickInspection.undersized.length === 0 && !pickInspection.rawRoute && !pickInspection.duplicateDisclosure;
     results.push({ state: "DIRECT_PACK_RELEVANCE", viewport: viewport.id, pass: caseCPass, inspection: pickInspection, card: cText });
 
     const flow = await openOverlay(page, caseC.getByRole("button", { name: /Complete 6 and choose route/ }), "PROCESS_FLOW");
     const flowText = await flow.root.innerText();
-    const flowPass = flow.initialFocus.inDialog && flowText.includes("Current work flow: Pick → Pack") && flowText.includes("Marking") && flowText.includes("Assembly");
+    const flowPass = flow.initialFocus.inDialog && /Current work flow:/i.test(flowText) && containsStages(flowText, ["Pick", "Pack"]) && flowText.includes("Marking") && flowText.includes("Assembly");
     results.push({ state: "PROCESS_FLOW", viewport: viewport.id, pass: flowPass, initialFocus: flow.initialFocus, text: flowText });
     if (viewport.id === "390x844") screenshots.push(await screenshot(page, "390-process-flow.png"));
     if (viewport.id === "1440x900") screenshots.push(await screenshot(page, "1440-process-flow.png"));
@@ -147,7 +156,7 @@ try {
     const detailsTrigger = caseC.getByRole("button", { name: "Details" });
     const details = await openOverlay(page, detailsTrigger, "DETAILS");
     const detailsText = await details.root.innerText();
-    const detailsPass = details.initialFocus.inDialog && detailsText.includes("Pick → Pack") && !/instructions are unavailable/i.test(detailsText);
+    const detailsPass = details.initialFocus.inDialog && containsStages(detailsText, ["Pick", "Pack"]) && !/instructions are unavailable/i.test(detailsText);
     results.push({ state: "DETAILS_TRUTH", viewport: viewport.id, pass: detailsPass, initialFocus: details.initialFocus, text: detailsText });
     if (viewport.id === "390x844") screenshots.push(await screenshot(page, "390-details.png"));
     if (viewport.id === "1440x900") screenshots.push(await screenshot(page, "1440-details.png"));

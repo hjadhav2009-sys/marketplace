@@ -20,7 +20,7 @@ export const ownerNavigation: readonly AppNavLink[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", section: "OVERVIEW", icon: "overview" },
   { id: "work-hub", href: "/work", label: "Work Hub", section: "WORK", icon: "work" },
   { id: "pick", href: "/work/pick", label: "Pick", section: "WORK", icon: "pick" },
-  { id: "mark", href: "/work/mark", label: "Mark", section: "WORK", icon: "mark" },
+  { id: "mark", href: "/work/mark", label: "Mark", section: "WORK", icon: "mark", ownedPaths: ["/work/marking"] },
   { id: "assemble", href: "/work/assemble", label: "Assemble", section: "WORK", icon: "assemble" },
   { id: "pack", href: "/work/pack", label: "Pack", section: "WORK", icon: "pack" },
   { id: "scan", href: "/work/scan", label: "Universal Scan", section: "WORK", icon: "scan" },
@@ -62,7 +62,7 @@ export function navigationForUser(user: NavigationUser): AppNavLink[] {
     links.push({ id: "pick", href: "/work/pick", label: "Pick", section: "WORK", icon: "pick" });
   }
   if (hasWorkPermission(user, "canMark")) {
-    links.push({ id: "marking", href: "/work/marking", label: "Marking", section: "WORK", icon: "mark" });
+    links.push({ id: "marking", href: "/work/mark", label: "Marking", section: "WORK", icon: "mark", ownedPaths: ["/work/marking"] });
   }
   if (hasWorkPermission(user, "canAssemble") || user.canViewAllWork) {
     links.push({ id: "assembly", href: "/work/assembly", label: "Assembly", section: "WORK", icon: "assemble" });

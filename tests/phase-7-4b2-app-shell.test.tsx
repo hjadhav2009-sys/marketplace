@@ -34,7 +34,7 @@ assert.deepEqual(sorted(navigationForUser(user({ role: "OWNER" })).map((link) =>
 
 const legacyWorkerSets: Array<[string, Partial<NavigationUser>, string[]]> = [
   ["picker", { canPick: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick", "/work/problems", "/change-password"]],
-  ["marker", { canMark: true, canReportProblem: true }, ["/work", "/work/scan", "/work/marking", "/work/problems", "/change-password"]],
+  ["marker", { canMark: true, canReportProblem: true }, ["/work", "/work/scan", "/work/mark", "/work/problems", "/change-password"]],
   ["assembler", { canAssemble: true, canReportProblem: true }, ["/work", "/work/scan", "/work/assembly", "/work/problems", "/change-password"]],
   ["packer", { role: "PACKER", canPack: true, canReportProblem: true }, ["/work", "/work/scan", "/packing", "/work/consignments/pack", "/work/problems", "/change-password"]],
   ["pick-and-pack", { canPick: true, canPack: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick", "/packing", "/work/consignments/pack", "/work/problems", "/change-password"]],
@@ -53,6 +53,7 @@ for (const [pathname, expected] of [
   ["/work/pick", "pick"],
   ["/work/pick/stage3-group", "pick"],
   ["/work/mark", "mark"],
+  ["/work/marking/synthetic-task", "mark"],
   ["/owner/product-inventory/stage3-listing", "product-inventory"],
   ["/owner/product-inventory/refresh", "new-import"],
   ["/owner/imports/stage4-import/mapping", "import-history"],
@@ -71,6 +72,9 @@ for (const [pathname, expected] of [
   assert.equal(resolveCurrentNavigationId(pathname, ownerNavigation), expected, `${pathname} has one explicit navigation owner.`);
 }
 assert.equal(ownerNavigation.find((link) => link.id === "dashboard")?.ownedPaths, undefined, "Dashboard has no broad /owner prefix ownership.");
+const markerNavigation = navigationForUser(user({ canMark: true }));
+assert.equal(markerNavigation.find((link) => link.id === "marking")?.href, "/work/mark", "Marker navigation enters the professional Mark workspace.");
+assert.equal(resolveCurrentNavigationId("/work/marking/synthetic-task", markerNavigation), "marking", "Legacy Mark search/detail routes remain owned by the canonical Mark navigation family.");
 
 const ownerSections = [...new Set(ownerNavigation.map((link) => link.section))];
 assert.deepEqual(ownerSections, ["OVERVIEW", "WORK", "CATALOG", "IMPORTS", "PEOPLE", "INSIGHTS & SYSTEM", "PROFILE"]);

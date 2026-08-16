@@ -79,8 +79,8 @@ assert.match(task, /WorkRouteDialogC1A[\s\S]*WorkTaskQuickActions/);
 const protectedHashes: Record<string, string> = {
   "src/lib/workflow/route-decision-policy.ts": "7e80762e3062d66b8c30491cf3decef6f3325009e946a66f94299df271a3b53e",
   "src/lib/workflow/route-selection.ts": "d7f465a9cfe7b92254ea2d6479eb238dfca25f3eff729a2ed6fc0ca3c517402f",
-  "src/lib/workflow/grouped-transition.ts": "5a52d4798bed591c1f6f8af9c6c6646e65ad6596595a5b7f9c797ffee4f2517c",
-  "src/lib/workflow/grouped-progress.ts": "98592bc58d9e2ce8deff9417e4917415ad0ddf82d679d7b620fd0a2903890266",
+  "src/lib/workflow/grouped-transition.ts": "efc08a8e389cd1f11980a4d52d4c656a5962ddc5c09c7a494dc7d51251fc504f",
+  "src/lib/workflow/grouped-progress.ts": "9d60cdf710b67b548ca8083e1da92619a7bf784806ee51afac83722cce94be8b",
   "src/lib/workflow/task-store.ts": "f5f6018e48e9398797ca058b6ec634e12904b512f46ac96a37d06bab1e52dd3a",
   "src/lib/workflow/order-pack-scope.ts": "65e30f0f66dd536f16b92bed8b0979f9b13da4609a9ab45df7541b1d564ad6f3",
   "src/lib/workflow/worker-access.ts": "30b946c5facf23e977393c2031f5808a023cd5d753f1928a3cea2b93469a377c",

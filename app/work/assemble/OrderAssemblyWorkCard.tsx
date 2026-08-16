@@ -30,7 +30,8 @@ export function OrderAssemblyWorkCard({ task, user, workers }: { task: OrderAsse
   const canAct = canAssemble && assignmentAllows && ["READY", "IN_PROGRESS"].includes(task.status);
   const canReportProblem = canAct && (user.role === "OWNER" || user.canReportProblem);
   const problem = task.status === "PROBLEM";
-  const completed = task.status === "COMPLETED" || task.status === "SKIPPED";
+  const skipped = task.status === "SKIPPED";
+  const completed = task.status === "COMPLETED" || skipped;
   const returnPath = "/work/assemble?source=ORDER";
   const token = `${task.id}:${task.version}:${task.status}:${requestId}`;
   const hidden = (suffix: string) => <><input type="hidden" name="taskId" value={task.id}/><input type="hidden" name="expectedStatus" value={task.status}/><input type="hidden" name="clientRequestId" value={`${token}:${suffix}`}/><input type="hidden" name="returnPath" value={returnPath}/></>;
@@ -47,7 +48,7 @@ export function OrderAssemblyWorkCard({ task, user, workers }: { task: OrderAsse
     identity={<WorkCardIdentity eyebrow={`Order item ${order.orderItemId ?? order.id}`} title={order.productDescription ?? "Untitled product"} sellerSku={order.sku} metadata={order.trackingId ? <>Tracking / AWB <span className="break-all font-medium text-slate-700">{order.trackingId}</span></> : <>AWB <span className="break-all font-medium text-slate-700">{order.awb}</span></>}/>} 
     processFlow={<WorkProcessFlow currentStage="ASSEMBLE" route={route.processRoute} fallback={route.source === "SYSTEM_FALLBACK"}/>} 
     quantity={<WorkCardQuantity stage="ASSEMBLE" label="Assembly quantity" required={task.requiredQuantity} completed={task.completedQuantity} itemCount={1} assignment={task.assignedUser ? `Assigned to ${task.assignedUser.name}` : "Unassigned"}/>} 
-    state={<div className="grid gap-2">{problem ? <WorkCardState tone="danger" title="Work paused">An open problem must be resolved before Assembly can continue.</WorkCardState> : completed ? <WorkCardState tone="success" title="Assembly completed">This task is available as a read-only receipt.</WorkCardState> : !canAssemble || !assignmentAllows ? <WorkCardState title="Read-only Assembly view">Your permissions or assignment do not allow this Assembly action.</WorkCardState> : null}<AssemblyGuidance guidance={guidance} missing={!guidance}/></div>}
+    state={<div className="grid gap-2">{problem ? <WorkCardState tone="danger" title="Work paused">An open problem must be resolved before Assembly can continue.</WorkCardState> : completed ? <WorkCardState tone="success" title={skipped ? "Assembly skipped" : "Assembly completed"}>This task is available as a read-only receipt.</WorkCardState> : !canAssemble || !assignmentAllows ? <WorkCardState title="Read-only Assembly view">Your permissions or assignment do not allow this Assembly action.</WorkCardState> : null}<AssemblyGuidance guidance={guidance} missing={!guidance}/></div>}
     actions={<WorkCardActions mode={problem ? "problem" : completed ? "completed" : canAct ? "ready" : "read-only"}>
       {canAct ? <form action={completeOrderAssemblyAction} className="col-span-2">{hidden("complete")}<SubmitButton pendingText="Completing..." className="w-full">Assembly Completed</SubmitButton></form> : null}
       {canAct && task.requiredQuantity - task.completedQuantity > 1 ? <button type="button" onClick={openPartial} className={buttonStyles({ variant: "secondary", className: "w-full" })}>Partial Quantity</button> : null}

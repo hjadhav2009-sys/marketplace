@@ -290,6 +290,12 @@ function isTransientWorkflowConflict(error: unknown) {
 
 async function refreshTaskProjection(tx:Transaction,task:{id:string;accountId:string;sourceType:"ORDER"|"CONSIGNMENT";stage:"PICK"|"MARK"|"ASSEMBLE"|"PACK";orderId:string|null;consignmentLineId:string|null}){await refreshAffectedWorkGroups({accountId:task.accountId,sourceType:task.sourceType,stages:[task.stage],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[],consignmentLineIds:task.consignmentLineId?[task.consignmentLineId]:[]},tx);}
 
+async function refreshDeterministicStageHandoff(tx:Transaction,task:{id:string;accountId:string;sourceType:"ORDER"|"CONSIGNMENT";stage:"PICK"|"MARK"|"ASSEMBLE"|"PACK";orderId:string|null;consignmentLineId:string|null},nextStage:WorkStage){
+  await tx.workChangeEvent.create({data:{accountId:task.accountId,eventType:"STAGE_COMPLETED",sourceType:task.sourceType,stage:task.stage,entityId:task.id}});
+  await tx.workChangeEvent.create({data:{accountId:task.accountId,eventType:"WORK_ROUTED",sourceType:task.sourceType,stage:nextStage,entityId:task.id}});
+  await refreshAffectedWorkGroups({accountId:task.accountId,sourceType:task.sourceType,stages:[task.stage,nextStage],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[],consignmentLineIds:task.consignmentLineId?[task.consignmentLineId]:[]},tx);
+}
+
 export async function claimWorkTask(input: { taskId: string; accountId: string; actorUserId: string; clientRequestId?: string }, client: Client = prisma) {
   const mutate=()=>client.$transaction(async (tx) => {
     const { user, task } = await taskForMutation(tx, input);
@@ -443,7 +449,8 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
       }
       await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id });
     }
-    await refreshTaskProjection(tx,task);
+    if (nextStatus === "COMPLETED" && deterministicNextStage) await refreshDeterministicStageHandoff(tx,task,deterministicNextStage);
+    else await refreshTaskProjection(tx,task);
     return { completedQuantity: targetQuantity, completed: nextStatus === "COMPLETED", idempotent: false };
   });
   return recoverIdempotentReplay({clientRequestId:input.clientRequestId,mutate,replay:async() => {

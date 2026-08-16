@@ -34,7 +34,7 @@ async function routeFinishedMember(tx:Transaction,input:{task:MemberTask;actorUs
   if(destination.preselected){
     const existing=next?await tx.workTask.findFirst({where:{accountId:input.accountId,...sourceWhere(task),stage:next,sequenceNumber:task.sequenceNumber+1}}):null;
     if(!next||!existing)throw new Error("The selected downstream work is unavailable. Refresh the Marking queue.");
-    assertPreparedPreselectedDownstreamTask(existing,{accountId:input.accountId,sourceType:task.sourceType,orderId:task.orderId,consignmentLineId:task.consignmentLineId,stage:next,sequenceNumber:task.sequenceNumber+1,workCardSnapshotJson:task.workCardSnapshotJson,routeSnapshot:snapshot});
+    assertPreparedPreselectedDownstreamTask(existing,{accountId:input.accountId,sourceType:task.sourceType,orderId:task.orderId,consignmentLineId:task.consignmentLineId,stage:next,sequenceNumber:task.sequenceNumber+1,workCardSnapshotJson:task.workCardSnapshotJson,routeSnapshot:snapshot,currentStage:input.stage});
     await tx.workTask.update({where:{id:existing.id},data:{status:"READY",routeSnapshotJson:JSON.stringify(routedSnapshot),version:{increment:1}}});
     return{next,routedSnapshot,decisionType:null,reason:null,workerNote:"",missingInstructionStage:null,preselected:true};
   }

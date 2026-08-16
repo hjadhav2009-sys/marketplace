@@ -13,6 +13,7 @@ import {
 } from "@/components/work-card";
 import { GroupedQuickActions } from "@/components/work-card/GroupedQuickActions";
 import { MarkingGuidance } from "@/components/work-card/MarkingGuidance";
+import { AssemblyGuidance } from "@/components/work-card/AssemblyGuidance";
 import { WorkRouteActionButton, WorkRouteDialogC1A, type WorkRouteDialogCard } from "@/components/work-card/WorkRouteDialogC1A";
 import type { GroupedWorkCard as Card } from "@/src/lib/workflow/grouped-work";
 import type { WorkChangeDetail } from "./LiveWorkRefresh";
@@ -68,7 +69,7 @@ export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = 
       : card.operationalIdentifier && card.operationalIdentifier !== card.reference
         ? <>Operational barcode <span className="break-all font-medium text-slate-700">{card.operationalIdentifier}</span></>
         : null
-    : card.stage === "MARK"
+    : card.stage === "MARK" || card.stage === "ASSEMBLE"
       ? card.sourceType === "ORDER"
         ? card.trackingId ? <>Tracking / AWB <span className="break-all font-medium text-slate-700">{card.trackingId}</span></> : null
         : card.consignmentNumber ? <>Consignment <span className="break-all font-medium text-slate-700">{card.consignmentNumber}</span></> : null
@@ -93,10 +94,12 @@ export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = 
 function GroupedState({ card, canAct }: { card: Card; canAct: boolean }) {
   const problem = card.status === "PROBLEM" || card.problemCount > 0;
   const marking = card.stage === "MARK" ? <MarkingGuidance guidance={card.markingGuidance} manual={card.manualMarkingGuidance} missing={card.missingInstructionStages.includes("MARK")} /> : null;
-  if (problem) return <div className="grid gap-2"><WorkCardState tone="danger" title="Work paused">An open problem must be resolved before processing can continue.</WorkCardState>{marking}</div>;
-  if (card.status === "COMPLETED") return <div className="grid gap-2"><WorkCardState tone="success" title="Work completed">This work is available as a read-only receipt.</WorkCardState>{marking}</div>;
-  if (!canAct) return <div className="grid gap-2"><WorkCardState title={card.stage === "PICK" ? "Read-only Pick view" : "Read-only work view"}>Your current permissions do not allow {card.stage.toLowerCase()} actions.</WorkCardState>{marking}</div>;
+  const assembly = card.stage === "ASSEMBLE" ? <AssemblyGuidance guidance={card.assemblyGuidance} missing={card.missingInstructionStages.includes("ASSEMBLE")} /> : null;
+  if (problem) return <div className="grid gap-2"><WorkCardState tone="danger" title="Work paused">An open problem must be resolved before processing can continue.</WorkCardState>{marking}{assembly}</div>;
+  if (card.status === "COMPLETED") return <div className="grid gap-2"><WorkCardState tone="success" title="Work completed">This work is available as a read-only receipt.</WorkCardState>{marking}{assembly}</div>;
+  if (!canAct) return <div className="grid gap-2"><WorkCardState title={card.stage === "PICK" ? "Read-only Pick view" : "Read-only work view"}>Your current permissions do not allow {card.stage.toLowerCase()} actions.</WorkCardState>{marking}{assembly}</div>;
   if (marking) return marking;
+  if (assembly) return assembly;
   if (card.stage === "PICK" && card.missingInstructionStages.length > 0) return <WorkCardState tone="warning" title={card.completedQuantity > 0 ? "Picking in progress" : "Ready to pick"}>Saved instructions are unavailable. Acknowledge this in Process Flow before completing. No settings will be invented.</WorkCardState>;
   if (card.missingInstructionStages.length > 0) return <WorkCardState tone="warning" title="Saved instructions unavailable">Acknowledge this in Process Flow before completing. No settings will be invented.</WorkCardState>;
   if (card.stage === "PICK" && card.completedQuantity > 0) return <WorkCardState title="Picking in progress" />;
@@ -143,6 +146,9 @@ function CardActions({ card, canAct, canReportProblem, details, token, routeCard
   const completionLabel = card.stage === "PICK" ? "Complete Pick" : card.stage === "MARK" ? "Marking Completed" : "Assembly Completed";
   if (card.stage === "MARK" && (routeCard.selectableNextStages?.length ?? 0) <= 1) {
     return <WorkCardActions mode="ready"><form action={completeGroupedStageAction} className="col-span-2">{hidden}<input type="hidden" name="useRecommended" value="1"/><SubmitButton pendingText="Completing..." className="w-full">Marking Completed</SubmitButton></form><GroupedQuickActions card={card} detailsHref={details} canAct canReportProblem={canReportProblem}/></WorkCardActions>;
+  }
+  if (card.stage === "ASSEMBLE") {
+    return <WorkCardActions mode="ready"><form action={completeGroupedStageAction} className="col-span-2">{hidden}<input type="hidden" name="useRecommended" value="1"/><SubmitButton pendingText="Completing..." className="w-full">Assembly Completed</SubmitButton></form><GroupedQuickActions card={card} detailsHref={details} canAct canReportProblem={canReportProblem}/></WorkCardActions>;
   }
   return <WorkCardActions mode="ready" className={card.stage === "PICK" ? "[&>:last-child:nth-child(odd)]:col-span-2" : ""}>
     <WorkRouteActionButton card={routeCard} label={completionLabel}/>

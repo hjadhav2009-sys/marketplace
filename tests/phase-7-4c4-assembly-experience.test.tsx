@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AssemblySourceSelector } from "../app/work/assemble/AssemblySourceSelector";
+import { AssemblyGuidance } from "../components/work-card/AssemblyGuidance";
+import { navigationForUser, type NavigationUser } from "../lib/app-navigation";
+import { assemblySourceLabel, combinedAssemblyMetrics, resolveAssemblySource, supportedAssemblySources, type AssemblySummary } from "../src/lib/workflow/assembly-workspace";
+import { resolveAssemblyGuidance } from "../src/lib/workflow/assembly-guidance";
+
+const read = (file: string) => readFileSync(file, "utf8");
+const item = (cardCount: number, overrides: Partial<AssemblySummary["ORDER"]> = {}) => ({ cardCount, itemCount: cardCount, requiredQuantity: cardCount * 6, problems: 0, assignedToMe: 0, oldestWaitingAt: null, projectionUnavailable: false, projectionState: "READY", ...overrides });
+const summary = (orders: number, consignments: number): AssemblySummary => ({ ORDER: item(orders), CONSIGNMENT: item(consignments) });
+
+assert.deepEqual(supportedAssemblySources("FLIPKART"), ["ORDER", "CONSIGNMENT"]);
+assert.deepEqual(supportedAssemblySources("AMAZON"), ["CONSIGNMENT"], "Amazon does not expose unsupported Daily Orders.");
+assert.deepEqual(supportedAssemblySources("MEESHO"), []);
+assert.equal(assemblySourceLabel("ORDER"), "Customer Orders");
+assert.equal(assemblySourceLabel("CONSIGNMENT"), "Consignments");
+assert.equal(resolveAssemblySource({ summary: summary(2, 0), supportedSources: ["ORDER", "CONSIGNMENT"] }).selectedSource, "ORDER");
+assert.equal(resolveAssemblySource({ summary: summary(0, 2), supportedSources: ["ORDER", "CONSIGNMENT"] }).selectedSource, "CONSIGNMENT");
+assert.equal(resolveAssemblySource({ summary: summary(2, 2), supportedSources: ["ORDER", "CONSIGNMENT"] }).selectedSource, null);
+assert.equal(resolveAssemblySource({ requestedSource: "CONSIGNMENT", summary: summary(2, 2), supportedSources: ["ORDER", "CONSIGNMENT"] }).selectedSource, "CONSIGNMENT");
+assert.deepEqual(combinedAssemblyMetrics({ ORDER: item(2, { problems: 1, assignedToMe: 1 }), CONSIGNMENT: item(3, { problems: 2, assignedToMe: 2 }) }, ["ORDER", "CONSIGNMENT"]), { openWork: 5, requiredQuantity: 30, problems: 3, assignedToMe: 3 });
+
+const selector = renderToStaticMarkup(<AssemblySourceSelector initial={{ ORDER: item(2, { problems: 1, assignedToMe: 1 }), CONSIGNMENT: item(1) }} selectedSource={null} sources={["ORDER", "CONSIGNMENT"]}/>);
+for (const copy of ["Assembly work source", "Customer Orders", "Consignments", "2 open", "12 units", "1 problems", "1 assigned to me"]) assert.match(selector, new RegExp(copy));
+assert.doesNotMatch(selector, />ORDER<|>CONSIGNMENT</);
+
+const saved = resolveAssemblyGuidance({ metadataJson: JSON.stringify({ version: 1, source: "PROCESS_RULE", routeChoice: "ASSEMBLE", processRoute: "PICK_ASSEMBLE_PACK", requestFingerprint: "private-fingerprint", processRuleId: "private-rule", assemblyTitle: "Attach safety clasp", assemblyInstructions: "Place the clasp in the rear channel and confirm both tabs are flush.", assemblyImageUrl: "https://example.invalid/assembly.png", sellerSkuSnapshot: "C4-SKU", requestedByUserId: "private-user", requestedAt: "2026-01-01T00:00:00.000Z" }) });
+assert.ok(saved);
+assert.equal(saved.imageUrl, "https://example.invalid/assembly.png");
+const guidance = renderToStaticMarkup(<AssemblyGuidance guidance={{ ...saved, imageUrl: null }}/>);
+for (const copy of ["Assembly guidance", "Attach safety clasp", "Place the clasp"]) assert.match(guidance, new RegExp(copy));
+assert.doesNotMatch(guidance, /private-fingerprint|private-rule|private-user|PICK_ASSEMBLE_PACK/);
+const missing = resolveAssemblyGuidance({ metadataJson: JSON.stringify({ instructionStatus: "MISSING", missingInstructionStage: "ASSEMBLE", warning: "MANUAL ROUTE", workerNote: "Use the approved paper guide." }) });
+assert.ok(missing);
+assert.match(renderToStaticMarkup(<AssemblyGuidance guidance={missing}/>), /Use the approved paper guide/);
+assert.equal(resolveAssemblyGuidance({ metadataJson: "{" }), null);
+
+const defaults: NavigationUser = { role: "PICKER", canPick: false, canPack: false, canReportProblem: false, canMark: false, canAssemble: false, canManageMarkingLibrary: false, canManageProcessRules: false, canViewAllWork: false, canViewConsignments: false, canImportConsignments: false, canManageConsignments: false };
+const assemblerNav = navigationForUser({ ...defaults, canAssemble: true });
+assert.equal(assemblerNav.find((link) => link.id === "assembly")?.href, "/work/assemble");
+assert.deepEqual(assemblerNav.find((link) => link.id === "assembly")?.ownedPaths, ["/work/assembly"]);
+
+const workspace = read("app/work/assemble/AssemblyWorkspace.tsx");
+const orderCard = read("app/work/assemble/OrderAssemblyWorkCard.tsx");
+const assemblyGuidance = read("components/work-card/AssemblyGuidance.tsx");
+const groupedCard = read("app/work/GroupedWorkCard.tsx");
+const legacy = read("app/work/assembly/page.tsx");
+const actions = read("app/work/assembly/actions.ts");
+const eligibility = read("src/lib/workflow/route-stage-eligibility.ts");
+const dynamicRoute = read("src/lib/workflow/dynamic-route.ts");
+for (const copy of ["Review the product and Assembly instructions", "Open work", "Required quantity", "Problems", "Assigned to me", "No active Assembly work", "Assembly queue temporarily unavailable"]) assert.match(workspace, new RegExp(copy));
+for (const copy of ["Active", "Completed today", "Assigned to me", "Customer Order Assembly views"]) assert.match(workspace, new RegExp(copy));
+assert.match(workspace, /getOrderAssemblyQueue/);
+assert.match(workspace, /getGroupedWork/);
+assert.match(orderCard, /WorkCard/);
+assert.match(orderCard, /AssemblyGuidance/);
+assert.match(orderCard, /Assembly Completed/);
+assert.match(orderCard, /completeOrderAssemblyAction/);
+assert.match(orderCard, /Partial Quantity/);
+assert.match(orderCard, /setOrderAssemblyProgressAction/);
+assert.match(orderCard, /max=\{task\.requiredQuantity - 1\}/);
+assert.match(orderCard, /WorkProcessFlow currentStage="ASSEMBLE"/);
+assert.match(orderCard, /Recent stage history/);
+assert.match(assemblyGuidance, /WorkImageGallery/);
+assert.match(groupedCard, /card\.stage === "ASSEMBLE"/);
+assert.match(groupedCard, /name="useRecommended" value="1"/);
+assert.doesNotMatch(groupedCard.slice(groupedCard.indexOf('if (card.stage === "ASSEMBLE")'), groupedCard.indexOf('if (card.stage === "ASSEMBLE")') + 450), /WorkRouteActionButton/);
+assert.match(legacy, /redirect\(`\/work\/assemble\?\$\{destination\.toString\(\)\}`\)/);
+assert.match(legacy, /!query\.q\?\.trim\(\) && status === "active"/);
+for (const status of ["problem", "completed"]) assert.match(legacy, new RegExp(`query\\.status === "${status}"`));
+for (const service of ["claimOrderAssemblyTask", "completeOrderAssemblyTask", "setOrderAssemblyProgress", "reportOrderAssemblyProblem", "resolveOrderAssemblyProblem", "skipOrderAssemblyTask", "reassignOrderAssemblyTask"]) assert.match(actions, new RegExp(service));
+assert.match(eligibility, /if \(currentStage === "ASSEMBLE"\) return \["PACK"\]/);
+assert.match(dynamicRoute, /forwardStageCandidates\(from\)/);
+assert.doesNotMatch(workspace, /OrderAssemblyCard/);
+assert.doesNotMatch(workspace, /PICK_ASSEMBLE_PACK|PICK_MARK_ASSEMBLE_PACK/);
+
+console.log("Phase 7.4C4 Assembly experience contracts passed.");

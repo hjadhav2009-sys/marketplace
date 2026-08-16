@@ -12,6 +12,8 @@ import { useWorkerOverlay } from "@/components/worker-overlay/WorkerOverlay";
 import { humanProcessRoute } from "./WorkProcessFlow";
 import { MarkingDetails } from "./MarkingGuidance";
 import type { ManualMarkingGuidance, MarkingGuidance } from "@/src/lib/workflow/marking-guidance";
+import type { AssemblyGuidanceModel } from "@/src/lib/workflow/assembly-guidance";
+import { AssemblyDetails } from "./AssemblyGuidance";
 
 const PROBLEM_REASONS = ["PRODUCT_NOT_FOUND", "WRONG_PRODUCT", "QUANTITY_SHORT", "DAMAGED_PRODUCT", "MARKING_FILE_MISSING", "MARKING_FILE_WRONG", "MARKING_FAILED", "PACKING_BLOCKED", "IDENTIFIER_NOT_MATCHING", "OTHER"];
 
@@ -21,6 +23,7 @@ export type GroupedQuickCard = {
   savedProcessRoute: string | null; actualProcessRoute: string | null; processRoute: string; hasExplicitSavedRoute: boolean; requiredQuantity: number; completedQuantity: number; pendingQuantity: number;
   assignedUserName: string | null; memberCount: number; problemCount: number; missingInstructionStages: WorkStage[];
   markingGuidance: MarkingGuidance | null; manualMarkingGuidance: ManualMarkingGuidance | null;
+  assemblyGuidance?: AssemblyGuidanceModel | null;
   orderItemId: string | null; orderNumber: string | null; shipmentId: string | null; trackingId: string | null; consignmentNumber: string | null;
 };
 
@@ -60,6 +63,7 @@ function GroupedDetails({ card, detailsHref }: { card: GroupedQuickCard; details
     <DetailSection title="Identifiers"><dl className="grid gap-2">{identifiers(card).map((item) => <div key={item.label}><dt className="text-xs font-semibold text-slate-500">{item.label}</dt><dd className="break-all text-sm font-medium">{item.value}</dd></div>)}</dl></DetailSection>
     {card.markingGuidance ? <DetailSection title="Marking"><MarkingDetails guidance={card.markingGuidance}/></DetailSection> : null}
     {card.manualMarkingGuidance ? <DetailSection title="Manual marking guidance"><p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{card.manualMarkingGuidance.warning}{card.manualMarkingGuidance.workerNote ? <span className="mt-1 block whitespace-pre-wrap font-medium">Worker note: {card.manualMarkingGuidance.workerNote}</span> : null}</p></DetailSection> : null}
+    {card.assemblyGuidance ? <DetailSection title="Assembly guidance"><AssemblyDetails guidance={card.assemblyGuidance}/></DetailSection> : null}
     {loading ? <p role="status" className="text-sm text-slate-600">Loading current details…</p> : null}
     {error ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Current quick details could not be loaded. Open full details for the complete record.</p> : null}
     {data?.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{data.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : null}

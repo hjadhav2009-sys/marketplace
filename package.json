@@ -165,6 +165,8 @@
     "phase7.4c3:browser": "node scripts/qa/phase-7-4c3-browser.mjs",
     "phase7.4c3c:test": "tsx tests/phase-7-4c3c-grouped-mark-determinism.test.ts && tsx tests/phase-7-4c3c-mark-entry.test.tsx",
     "phase7.4c3c:browser": "node scripts/qa/phase-7-4c3c-browser.mjs",
+    "phase7.4c4:test": "tsx tests/phase-7-4c4-assembly-safety.test.ts && tsx tests/phase-7-4c4-assembly-experience.test.tsx",
+    "phase7.4c4:browser": "node scripts/qa/phase-7-4c4-browser.mjs",
     "phase7.4c1a1:browser": "node scripts/qa/phase-7-4c1a1-browser.mjs",
     "stage4-2c:editor-proof": "node scripts/qa/stage4-2c-editor-proof.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",

@@ -35,10 +35,10 @@ assert.deepEqual(sorted(navigationForUser(user({ role: "OWNER" })).map((link) =>
 const legacyWorkerSets: Array<[string, Partial<NavigationUser>, string[]]> = [
   ["picker", { canPick: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick", "/work/problems", "/change-password"]],
   ["marker", { canMark: true, canReportProblem: true }, ["/work", "/work/scan", "/work/mark", "/work/problems", "/change-password"]],
-  ["assembler", { canAssemble: true, canReportProblem: true }, ["/work", "/work/scan", "/work/assembly", "/work/problems", "/change-password"]],
+  ["assembler", { canAssemble: true, canReportProblem: true }, ["/work", "/work/scan", "/work/assemble", "/work/problems", "/change-password"]],
   ["packer", { role: "PACKER", canPack: true, canReportProblem: true }, ["/work", "/work/scan", "/packing", "/work/consignments/pack", "/work/problems", "/change-password"]],
   ["pick-and-pack", { canPick: true, canPack: true, canReportProblem: true }, ["/work", "/work/scan", "/work/pick", "/packing", "/work/consignments/pack", "/work/problems", "/change-password"]],
-  ["view-all", { canViewAllWork: true, canViewConsignments: true }, ["/work", "/work/scan", "/work/assembly", "/work/problems", "/owner/consignments", "/change-password"]],
+  ["view-all", { canViewAllWork: true, canViewConsignments: true }, ["/work", "/work/scan", "/work/assemble", "/work/problems", "/owner/consignments", "/change-password"]],
   ["import-manager", { canImportConsignments: true, canManageConsignments: true, canViewConsignments: true }, ["/work/problems", "/owner/consignments", "/change-password"]],
   ["no-capability", {}, ["/change-password"]],
 ];
@@ -54,6 +54,8 @@ for (const [pathname, expected] of [
   ["/work/pick/stage3-group", "pick"],
   ["/work/mark", "mark"],
   ["/work/marking/synthetic-task", "mark"],
+  ["/work/assembly", "assemble"],
+  ["/work/assembly/history", "assemble"],
   ["/owner/product-inventory/stage3-listing", "product-inventory"],
   ["/owner/product-inventory/refresh", "new-import"],
   ["/owner/imports/stage4-import/mapping", "import-history"],

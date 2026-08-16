@@ -349,17 +349,17 @@ export async function completeConsignmentPackTasksInTransaction(tx: Transaction,
   return { taskIds: tasks.map(task => task.id), completedAt };
 }
 
-async function assertDeterministicMarkCompletion(tx: Transaction, task: {
+async function assertDeterministicStageCompletion(tx: Transaction, task: {
   consignmentLineId: string | null;
   sequenceNumber: number;
   routeSnapshotJson: string | null;
   consignmentLine: { processRoute: ProcessRoute | null } | null;
-}): Promise<WorkStage> {
+}, currentStage: "MARK" | "ASSEMBLE"): Promise<WorkStage> {
   const snapshot = parseWorkRouteSnapshot(task.routeSnapshotJson);
   let selectedStages: WorkStage[];
   let completedStages: WorkStage[];
 
-  if (snapshot?.currentStage === "MARK") {
+  if (snapshot?.currentStage === currentStage || (currentStage === "ASSEMBLE" && snapshot?.actualStages.includes("ASSEMBLE"))) {
     selectedStages = snapshot.actualStages;
     completedStages = snapshot.completedStages;
   } else if (snapshot) {
@@ -367,20 +367,20 @@ async function assertDeterministicMarkCompletion(tx: Transaction, task: {
       && snapshot.actualStages.length === 1
       && snapshot.actualStages[0] === "PICK"
       && snapshot.completedStages.length === 0;
-    if (!legacyPlan) throw new Error("Choose where Mark work goes next before completing marking.");
+    if (!legacyPlan) throw new Error(currentStage === "MARK" ? "Choose where Mark work goes next before completing marking." : "Assembly route is not ready for completion.");
     selectedStages = snapshot.recommendedStages;
     completedStages = snapshot.completedStages;
   } else if (!task.routeSnapshotJson && routeSupported(task.consignmentLine?.processRoute ?? null)) {
     selectedStages = recommendedStages(task.consignmentLine!.processRoute);
     completedStages = [];
   } else {
-    throw new Error("Choose where Mark work goes next before completing marking.");
+    throw new Error(currentStage === "MARK" ? "Choose where Mark work goes next before completing marking." : "Assembly route is not ready for completion.");
   }
 
-  const eligibility = resolveForwardStageEligibility({ currentStage: "MARK", selectedStages, completedStages });
+  const eligibility = resolveForwardStageEligibility({ currentStage, selectedStages, completedStages });
   const expectedNextStage = eligibility.valid ? eligibility.preselectedNextStage : null;
-  if (expectedNextStage !== "ASSEMBLE" && expectedNextStage !== "PACK") {
-    throw new Error("Choose where Mark work goes next before completing marking.");
+  if ((currentStage === "MARK" && expectedNextStage !== "ASSEMBLE" && expectedNextStage !== "PACK") || (currentStage === "ASSEMBLE" && expectedNextStage !== "PACK")) {
+    throw new Error(currentStage === "MARK" ? "Choose where Mark work goes next before completing marking." : "Assembly must continue to Packing.");
   }
 
   const downstream = await tx.workTask.findFirst({
@@ -388,7 +388,7 @@ async function assertDeterministicMarkCompletion(tx: Transaction, task: {
     select: { stage: true, status: true },
   });
   if (!downstream || downstream.stage !== expectedNextStage || downstream.status !== "LOCKED") {
-    throw new Error("Mark route does not match the next task. Refresh before completing marking.");
+    throw new Error(currentStage === "MARK" ? "Mark route does not match the next task. Refresh before completing marking." : "Assembly route does not match the prepared Packing task. Refresh before completing assembly.");
   }
   return expectedNextStage;
 }
@@ -410,9 +410,12 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     const fingerprint=requestFingerprint({expectedQuantity:input.expectedQuantity,targetQuantity,requestKind});
     if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This work was taken by another worker.");
     const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind, clientRequestId: input.clientRequestId,fingerprint }); if (prior) return prior;
-    const deterministicMarkNextStage = task.stage === "MARK" && requestKind === "COMPLETE" ? await assertDeterministicMarkCompletion(tx, task) : null;
+    const deterministicNextStage = requestKind === "COMPLETE" && (task.stage === "MARK" || task.stage === "ASSEMBLE")
+      ? await assertDeterministicStageCompletion(tx, task, task.stage)
+      : null;
     if (task.stage === "PICK" && requestKind !== "COMPLETE" && targetQuantity === task.requiredQuantity) throw new Error("Use Complete Pick and choose a processing flow to finish picking.");
     if (task.stage === "MARK" && requestKind !== "COMPLETE" && targetQuantity === task.requiredQuantity) throw new Error("Use the Mark completion action to finish marking.");
+    if (task.stage === "ASSEMBLE" && requestKind !== "COMPLETE" && targetQuantity === task.requiredQuantity) throw new Error("Use Assembly Completed to finish assembly.");
     if (task.status === "COMPLETED" && targetQuantity === task.requiredQuantity) return { completedQuantity: task.completedQuantity, completed: true, idempotent: true };
     if (!["READY", "IN_PROGRESS"].includes(task.status)) throw new Error("Task cannot advance from its current status.");
     if (task.completedQuantity !== input.expectedQuantity) throw new Error("Work changed; refresh before updating.");
@@ -426,7 +429,18 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action, requestKind,fingerprint, before: task.completedQuantity, after: targetQuantity, clientRequestId: input.clientRequestId });
     if (nextStatus === "COMPLETED") {
       const unlocked = await unlockNextTask(tx, task.consignmentLineId!, task.sequenceNumber);
-      if (deterministicMarkNextStage && unlocked.count !== 1) throw new Error("Mark route changed; refresh before completing marking.");
+      if (deterministicNextStage && unlocked.count !== 1) throw new Error(task.stage === "MARK" ? "Mark route changed; refresh before completing marking." : "Assembly route changed; refresh before completing assembly.");
+      if (task.stage === "ASSEMBLE" && deterministicNextStage === "PACK") {
+        const prior = parseWorkRouteSnapshot(task.routeSnapshotJson) ?? createWorkRouteSnapshot({ processRoute: line.processRoute, currentStage: "ASSEMBLE" });
+        const routeSnapshotJson = JSON.stringify({
+          ...prior,
+          routeVersion: prior.routeVersion + 1,
+          currentStage: "PACK",
+          selectedNextStage: "PACK",
+          completedStages: [...new Set([...prior.completedStages, "ASSEMBLE" as const])],
+        });
+        await tx.workTask.updateMany({ where: { consignmentLineId: task.consignmentLineId! }, data: { routeSnapshotJson } });
+      }
       await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id });
     }
     await refreshTaskProjection(tx,task);

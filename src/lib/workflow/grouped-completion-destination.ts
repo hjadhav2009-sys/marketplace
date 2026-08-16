@@ -15,7 +15,7 @@ export function resolveGroupedCompletionDestination(input: {
 }): GroupedCompletionDestination {
   if (input.currentStage === "PACK") return { nextStage: undefined, preselected: false };
 
-  if (input.currentStage === "MARK") {
+  if (input.currentStage === "MARK" || input.currentStage === "ASSEMBLE") {
     const eligibility = resolveForwardStageEligibility({
       currentStage: input.currentStage,
       selectedStages: input.snapshot.actualStages,
@@ -23,7 +23,7 @@ export function resolveGroupedCompletionDestination(input: {
     });
     if (eligibility.valid && eligibility.preselectedNextStage) {
       if (input.requestedNextStage && input.requestedNextStage !== eligibility.preselectedNextStage) {
-        throw new Error("The next processing stage is already selected. Complete Marking to continue.");
+        throw new Error(`The next processing stage is already selected. Complete ${input.currentStage === "MARK" ? "Marking" : "Assembly"} to continue.`);
       }
       return { nextStage: eligibility.preselectedNextStage, preselected: true };
     }
@@ -99,6 +99,7 @@ export function assertPreparedPreselectedDownstreamTask(task: {
   sequenceNumber: number;
   workCardSnapshotJson: string | null;
   routeSnapshot: WorkRouteSnapshotV2;
+  currentStage: WorkStage;
 }) {
   if (
     task.accountId !== input.accountId ||
@@ -107,9 +108,9 @@ export function assertPreparedPreselectedDownstreamTask(task: {
     task.consignmentLineId !== input.consignmentLineId ||
     task.stage !== input.stage ||
     task.sequenceNumber !== input.sequenceNumber
-  ) throw new Error("The selected downstream work no longer matches this Mark task.");
+  ) throw new Error(`The selected downstream work no longer matches this ${input.currentStage === "MARK" ? "Mark" : "Assembly"} task.`);
   if (task.status !== "LOCKED" || task.completedQuantity !== 0 || task.assignedUserId || task.startedAt || task.completedAt) {
-    throw new Error(`${task.stage === "ASSEMBLE" ? "Assembly" : "Packing"} work is no longer safely locked for Mark completion.`);
+    throw new Error(`${task.stage === "ASSEMBLE" ? "Assembly" : "Packing"} work is no longer safely locked for ${input.currentStage === "MARK" ? "Mark" : "Assembly"} completion.`);
   }
   if (task.workCardSnapshotJson !== input.workCardSnapshotJson) {
     throw new Error(`${task.stage === "ASSEMBLE" ? "Assembly" : "Packing"} work has different immutable product provenance.`);

@@ -72,12 +72,12 @@ for (const fixture of ["stage4-line-amazon-pick", "stage4-account-pick-projectio
 const protectedHashes: Record<string, string> = {
   "src/lib/workflow/route-decision-policy.ts": "7e80762e3062d66b8c30491cf3decef6f3325009e946a66f94299df271a3b53e",
   "src/lib/workflow/route-selection.ts": "d7f465a9cfe7b92254ea2d6479eb238dfca25f3eff729a2ed6fc0ca3c517402f",
-  "src/lib/workflow/grouped-transition.ts": "efc08a8e389cd1f11980a4d52d4c656a5962ddc5c09c7a494dc7d51251fc504f",
-  "src/lib/workflow/grouped-progress.ts": "9d60cdf710b67b548ca8083e1da92619a7bf784806ee51afac83722cce94be8b",
+  "src/lib/workflow/grouped-transition.ts": "ac4c205be3bb2f774e215d752f4e19bd65a57ebbf9515bd67e0663632fddd49e",
+  "src/lib/workflow/grouped-progress.ts": "3f53d7b582d950ab216a92c17d4dd5cf0d559483e99137a502b3b7ca13439c56",
   "src/lib/workflow/stage-transition.ts": "d104a70482a5d438885fd7f5df53bc5b2bd44de681bd0031d1bddc6139db3d2b",
   "src/lib/workflow/order-pack-scope.ts": "65e30f0f66dd536f16b92bed8b0979f9b13da4609a9ab45df7541b1d564ad6f3",
   "src/lib/workflow/order-problems.ts": "d2f6c7f2fb570883c93b7733832a3fc5e088654cd9b91cee00e67715b4533314",
-  "src/lib/workflow/task-store.ts": "f5f6018e48e9398797ca058b6ec634e12904b512f46ac96a37d06bab1e52dd3a",
+  "src/lib/workflow/task-store.ts": "42160d2df33775d826541bf7d0360f74dcdf55f2b08d706d471fc7201c69d7b8",
 };
 for (const [file, expected] of Object.entries(protectedHashes)) assert.equal(createHash("sha256").update(read(file)).digest("hex"), expected, `${file} crossed the protected C2 boundary.`);
 

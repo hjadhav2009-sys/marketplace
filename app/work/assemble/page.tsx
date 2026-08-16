@@ -1,1 +1,5 @@
-import { SmartStagePage } from "../SmartStagePage";export default function Page({searchParams}:{searchParams:Promise<{source?:string;page?:string;success?:string;error?:string}>}){return <SmartStagePage stage="ASSEMBLE" searchParams={searchParams}/>}
+import { AssemblyWorkspace, type AssemblySearchParams } from "./AssemblyWorkspace";
+
+export default function Page({ searchParams }: { searchParams: AssemblySearchParams }) {
+  return <AssemblyWorkspace searchParams={searchParams}/>;
+}

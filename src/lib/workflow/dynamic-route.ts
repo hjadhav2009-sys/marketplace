@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ProcessRoute, WorkStage } from "@prisma/client";
+import { forwardStageCandidates } from "./route-stage-eligibility";
 
 export type WorkRouteDecisionReason = "DEFAULT" | "WORKER_SELECTION" | "MANAGER_OVERRIDE";
 export type WorkRouteSnapshotV2 = {
@@ -36,7 +37,7 @@ export function recommendedNextStage(snapshot: WorkRouteSnapshotV2, fromStage: W
 export function assertValidStageTransition(snapshot: WorkRouteSnapshotV2, from: WorkStage, to?: WorkStage) {
   if (from === "PACK") { if (to) throw new Error("Packing is final and cannot route work backwards."); return; }
   if (!to) throw new Error("Choose a valid next stage.");
-  const allowed = from === "PICK" ? ["MARK", "ASSEMBLE", "PACK"] : from === "MARK" ? ["ASSEMBLE", "PACK"] : ["MARK", "PACK"];
+  const allowed = forwardStageCandidates(from);
   if (!allowed.includes(to)) throw new Error("That stage transition is not allowed.");
   if (snapshot.completedStages.includes(to) || snapshot.actualStages.includes(to)) throw new Error(`${to === "MARK" ? "Marking" : to === "ASSEMBLE" ? "Assembly" : "Packing"} was already selected or completed.`);
   if (to === "MARK" && snapshot.completedStages.includes("MARK")) throw new Error("Marking was already completed.");

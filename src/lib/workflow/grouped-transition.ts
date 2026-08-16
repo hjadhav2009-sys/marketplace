@@ -38,7 +38,7 @@ async function completeGroupedStageUnlocked(input:CompleteGroupedStageInput,clie
    if(memberDestination.preselected){
     const existing=next?await tx.workTask.findFirst({where:{accountId:input.selectedAccountId,...sourceWhere(task),stage:next,sequenceNumber:task.sequenceNumber+1}}):null;
     if(!next||!existing)throw new Error("The selected downstream work is unavailable. Refresh the Marking queue.");
-    assertPreparedPreselectedDownstreamTask(existing,{accountId:input.selectedAccountId,sourceType:task.sourceType,orderId:task.orderId,consignmentLineId:task.consignmentLineId,stage:next,sequenceNumber:task.sequenceNumber+1,workCardSnapshotJson:task.workCardSnapshotJson,routeSnapshot:snapshot});
+    assertPreparedPreselectedDownstreamTask(existing,{accountId:input.selectedAccountId,sourceType:task.sourceType,orderId:task.orderId,consignmentLineId:task.consignmentLineId,stage:next,sequenceNumber:task.sequenceNumber+1,workCardSnapshotJson:task.workCardSnapshotJson,routeSnapshot:snapshot,currentStage:input.stage});
     prepared.push({task,snapshot:advanceGroupedRouteSnapshot({snapshot,currentStage:input.stage,nextStage:next,actorUserId:input.actorUserId,useRecommendedNextStage:Boolean(input.useRecommendedNextStage),preselected:true}),nextMetadata:null,existing,decision:null,savedRoute:savedRoute??null,savedNextStage:null,missingStage:null,sourceContext:null,preselected:true});
     continue;
    }

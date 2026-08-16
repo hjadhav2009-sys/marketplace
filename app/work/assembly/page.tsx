@@ -12,6 +12,12 @@ export default async function OrderAssemblyPage({ searchParams }: { searchParams
   const user = await requireUser(); const account = await requireAccount(user);
   if (!(hasWorkPermission(user, "canAssemble") || user.canViewAllWork)) redirect(capabilityHomePath(user));
   const query = await searchParams; const status = query.status === "problem" || query.status === "completed" || query.status === "mine" ? query.status : "active"; const page = Math.max(1, Number(query.page) || 1);
+  if (!query.q?.trim() && status === "active") {
+    const destination = new URLSearchParams({ source: "ORDER" });
+    if (query.assemblySuccess) destination.set("success", query.assemblySuccess);
+    if (query.assemblyError) destination.set("error", query.assemblyError);
+    redirect(`/work/assemble?${destination.toString()}`);
+  }
   const [result, workers] = await Promise.all([
     getOrderAssemblyQueue({ actorUserId: user.id, accountId: account.id, page, search: query.q, status }),
     user.role === "OWNER" ? prisma.user.findMany({ where: { active: true, OR: [{ accountId: account.id }, { assignedAccounts: { some: { id: account.id } } }], AND: [{ OR: [{ role: "OWNER" }, { canAssemble: true }] }] }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : []

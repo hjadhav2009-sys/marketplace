@@ -11,15 +11,13 @@ import { refreshAffectedWorkGroups } from "./work-group-projection";
 import { reportOrderWorkflowProblem, resolveOrderWorkflowProblem } from "./order-problems";
 import { assertReusableDownstreamTask } from "./downstream-task-safety";
 import { beginWorkflowActionReceipt, completeWorkflowActionReceipt, withWorkflowActionRequestGate } from "./workflow-action-receipt";
+import { ORDER_ASSEMBLY_PROBLEM_CATEGORIES } from "./order-assembly-contract";
+
+export { ORDER_ASSEMBLY_PROBLEM_CATEGORIES } from "./order-assembly-contract";
 
 type Client = PrismaClient;
 type Transaction = Prisma.TransactionClient;
 type AssemblyOrder = { id: string; accountId: string; sku: string; qty: number; productDescription: string | null; imageUrl: string | null };
-
-export const ORDER_ASSEMBLY_PROBLEM_CATEGORIES = [
-  "PRODUCT_NOT_AVAILABLE", "WRONG_PRODUCT", "PART_MISSING", "ASSEMBLY_INSTRUCTION_MISSING", "ASSEMBLY_IMAGE_MISSING",
-  "ASSEMBLY_FAILED", "DAMAGED_PRODUCT", "QUANTITY_MISMATCH", "OTHER"
-] as const;
 
 const MANUAL_DIVERSION_STATES = new Set(["NO_RULE", "READY_MADE", "REQUIRED_NO_TASK", "AMBIGUOUS_LISTING"]);
 export function canOfferManualAssemblyDiversion(state: string | null | undefined) {
@@ -176,12 +174,14 @@ async function replay(tx: Transaction, input: { taskId: string; actorUserId: str
   const log = await tx.workActionLog.findFirst({ where: { taskId: input.taskId, clientRequestId: input.clientRequestId }, orderBy: { createdAt: "asc" } });
   if (!log) return null;
   if (log.actorUserId !== input.actorUserId) throw new Error("Request ID was already used by another worker.");
-  const expectedAction = input.requestKind === "CLAIM" ? "TASK_CLAIMED" : input.requestKind === "COMPLETE" ? "TASK_COMPLETED" : input.requestKind === "REPORT_PROBLEM" ? "TASK_PROBLEM_REPORTED" : null;
+  const expectedAction = input.requestKind === "CLAIM" ? "TASK_CLAIMED" : input.requestKind === "COMPLETE" ? "TASK_COMPLETED" : input.requestKind === "REPORT_PROBLEM" ? "TASK_PROBLEM_REPORTED" : input.requestKind === "SET_PROGRESS" ? "TASK_PROGRESS_SET" : null;
   if (!expectedAction || log.requestKind !== input.requestKind || log.action !== expectedAction) throw new Error("Request ID was already used for a different action.");
   const metadata = log.metadataJson ? JSON.parse(log.metadataJson) as { requestFingerprint?: string } : {};
   if (input.requestFingerprint && metadata.requestFingerprint !== input.requestFingerprint) throw new Error("Request ID was already used with a different payload.");
   const status = log.action === "TASK_COMPLETED" ? "COMPLETED" as const : log.action === "TASK_PROBLEM_REPORTED" ? "PROBLEM" as const : "IN_PROGRESS" as const;
-  return { taskId: input.taskId, status, idempotent: true };
+  return input.requestKind === "SET_PROGRESS"
+    ? { taskId: input.taskId, status, completedQuantity: log.quantityAfter, idempotent: true }
+    : { taskId: input.taskId, status, idempotent: true };
 }
 
 async function recoverAssemblyReplay<T>(input: { clientRequestId?: string; mutate: () => Promise<T>; replay: () => Promise<T | null> }) {
@@ -199,8 +199,8 @@ async function recoverAssemblyReplay<T>(input: { clientRequestId?: string; mutat
 
 async function retryAssemblyMutation<T>(action:()=>Promise<T>){let last:unknown;for(let attempt=0;attempt<6;attempt+=1){try{return await action();}catch(error){last=error;const transient=error instanceof Error&&(/database is locked|unique constraint|write conflict|P2002|P2034/i.test(error.message)||"code" in error&&["P2002","P2034"].includes(String((error as{code?:string}).code)));if(!transient||attempt===5)throw error;await new Promise(resolve=>setTimeout(resolve,20*(attempt+1)));}}throw last;}
 
-async function actionLog(tx: Transaction, input: { taskId: string; accountId: string; actorUserId: string; action: "TASK_CLAIMED" | "TASK_COMPLETED" | "TASK_PROBLEM_REPORTED" | "TASK_PROBLEM_RESOLVED" | "TASK_REASSIGNED" | "TASK_UNASSIGNED"; requestKind: WorkRequestKind; clientRequestId?: string; note?: string; metadata?: Record<string, unknown> }) {
-  await tx.workActionLog.create({ data: { taskId: input.taskId, accountId: input.accountId, actorUserId: input.actorUserId, action: input.action, requestKind: input.clientRequestId ? input.requestKind : null, clientRequestId: input.clientRequestId || null, note: input.note?.slice(0, 1_000) || null, metadataJson: input.metadata ? JSON.stringify(input.metadata) : null } });
+async function actionLog(tx: Transaction, input: { taskId: string; accountId: string; actorUserId: string; action: "TASK_CLAIMED" | "TASK_COMPLETED" | "TASK_PROGRESS_SET" | "TASK_PROBLEM_REPORTED" | "TASK_PROBLEM_RESOLVED" | "TASK_REASSIGNED" | "TASK_UNASSIGNED"; requestKind: WorkRequestKind; clientRequestId?: string; note?: string; quantityBefore?: number; quantityAfter?: number; metadata?: Record<string, unknown> }) {
+  await tx.workActionLog.create({ data: { taskId: input.taskId, accountId: input.accountId, actorUserId: input.actorUserId, action: input.action, requestKind: input.clientRequestId ? input.requestKind : null, clientRequestId: input.clientRequestId || null, quantityBefore: input.quantityBefore, quantityAfter: input.quantityAfter, note: input.note?.slice(0, 1_000) || null, metadataJson: input.metadata ? JSON.stringify(input.metadata) : null } });
 }
 
 export async function claimOrderAssemblyTask(input: { taskId: string; accountId: string; actorUserId: string; clientRequestId?: string }, client: Client = prisma) {
@@ -222,6 +222,68 @@ export async function claimOrderAssemblyTask(input: { taskId: string; accountId:
   }) });
 }
 
+export async function setOrderAssemblyProgress(input: {
+  taskId: string;
+  accountId: string;
+  actorUserId: string;
+  expectedStatus: string;
+  expectedQuantity: number;
+  targetQuantity: number;
+  clientRequestId?: string;
+}, client: Client = prisma) {
+  if (!Number.isSafeInteger(input.expectedQuantity) || !Number.isSafeInteger(input.targetQuantity)) throw new Error("Assembly quantity must be a whole number.");
+  const requestFingerprint = fingerprint({ expectedStatus: input.expectedStatus, expectedQuantity: input.expectedQuantity, targetQuantity: input.targetQuantity });
+  return recoverAssemblyReplay({ clientRequestId: input.clientRequestId, mutate: () => client.$transaction(async (tx) => {
+    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
+    if (!hasWorkPermission(user, "canAssemble")) throw new Error("Assembly permission is required.");
+    const prior = await replay(tx, { ...input, requestKind: "SET_PROGRESS", requestFingerprint });
+    if (prior) return prior;
+    if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This assembly task was taken by another worker.");
+    if (!["READY", "IN_PROGRESS"].includes(task.status) || task.status !== input.expectedStatus || task.completedQuantity !== input.expectedQuantity) throw new Error("Assembly changed; refresh before saving quantity.");
+    if (input.targetQuantity <= task.completedQuantity || input.targetQuantity >= task.requiredQuantity) throw new Error("Partial Assembly quantity must leave at least one unit for Assembly Completed.");
+    const changed = await tx.workTask.updateMany({
+      where: { id: task.id, status: task.status, completedQuantity: task.completedQuantity, assignedUserId: task.assignedUserId },
+      data: { status: "IN_PROGRESS", completedQuantity: input.targetQuantity, assignedUserId: task.assignedUserId ?? user.id, startedAt: task.startedAt ?? new Date(), startedByUserId: task.startedByUserId ?? user.id },
+    });
+    if (changed.count !== 1) throw new Error("Assembly changed; refresh before saving quantity.");
+    await actionLog(tx, { ...input, action: "TASK_PROGRESS_SET", requestKind: "SET_PROGRESS", quantityBefore: task.completedQuantity, quantityAfter: input.targetQuantity, metadata: { requestFingerprint } });
+    await tx.workChangeEvent.create({ data: { accountId: input.accountId, eventType: "ORDER_ASSEMBLY_PROGRESS", sourceType: "ORDER", stage: "ASSEMBLE", entityId: task.id } });
+    await refreshAffectedWorkGroups({ accountId: input.accountId, sourceType: "ORDER", stages: ["ASSEMBLE"], taskIds: [task.id], orderIds: task.orderId ? [task.orderId] : [] }, tx);
+    return { taskId: task.id, status: "IN_PROGRESS" as const, completedQuantity: input.targetQuantity, idempotent: false };
+  }), replay: () => client.$transaction(async (tx) => {
+    const { user, task } = await orderAssemblyTaskForMutation(tx, input);
+    if (!hasWorkPermission(user, "canAssemble")) throw new Error("Assembly permission is required.");
+    return replay(tx, { ...input, taskId: task.id, requestKind: "SET_PROGRESS", requestFingerprint });
+  }) });
+}
+
+function assertPreparedOrderPackingTask(task: {
+  orderId: string | null;
+  sequenceNumber: number;
+  requiredQuantity: number;
+  workCardSnapshotJson: string | null;
+  routeSnapshotJson: string | null;
+}, next: {
+  id: string;
+  orderId: string | null;
+  stage: string;
+  sequenceNumber: number;
+  requiredQuantity: number;
+  completedQuantity: number;
+  status: string;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  workCardSnapshotJson: string | null;
+  routeSnapshotJson: string | null;
+} | null) {
+  if (!next || next.orderId !== task.orderId || next.stage !== "PACK" || next.sequenceNumber !== task.sequenceNumber + 1 || next.requiredQuantity !== task.requiredQuantity) {
+    throw new Error("Assembly route does not match the prepared Packing task. Refresh before completing assembly.");
+  }
+  if (next.status !== "LOCKED" || next.completedQuantity !== 0 || next.startedAt || next.completedAt) throw new Error("Prepared Packing work is no longer safely locked.");
+  if (next.workCardSnapshotJson !== task.workCardSnapshotJson || next.routeSnapshotJson !== task.routeSnapshotJson) throw new Error("Prepared Packing work has different immutable route or product provenance.");
+  return next;
+}
+
 export async function completeOrderAssemblyTask(input: { taskId: string; accountId: string; actorUserId: string; expectedStatus: string; clientRequestId?: string }, client: Client = prisma) {
   const requestFingerprint = fingerprint({ expectedStatus: input.expectedStatus });
   return recoverAssemblyReplay({ clientRequestId: input.clientRequestId, mutate: () => client.$transaction(async (tx) => {
@@ -232,14 +294,16 @@ export async function completeOrderAssemblyTask(input: { taskId: string; account
     if (task.status === "PROBLEM") throw new Error("Assembly has a reported problem.");
     if (task.assignedUserId && task.assignedUserId !== user.id && user.role !== "OWNER") throw new Error("This assembly task was taken by another worker.");
     if (!(["READY", "IN_PROGRESS"] as string[]).includes(task.status) || task.status !== input.expectedStatus) throw new Error("Assembly changed; refresh before completing.");
+    const next = assertPreparedOrderPackingTask(task, await tx.workTask.findFirst({ where: { orderId: task.orderId, sequenceNumber: task.sequenceNumber + 1 }, select: { id: true, orderId: true, stage: true, sequenceNumber: true, requiredQuantity: true, completedQuantity: true, status: true, startedAt: true, completedAt: true, workCardSnapshotJson: true, routeSnapshotJson: true } }));
     const changed = await tx.workTask.updateMany({ where: { id: task.id, status: task.status, assignedUserId: task.assignedUserId }, data: { status: "COMPLETED", assignedUserId: task.assignedUserId ?? user.id, completedQuantity: task.requiredQuantity, startedAt: task.startedAt ?? new Date(), startedByUserId: task.startedByUserId ?? user.id, completedAt: new Date(), completedByUserId: user.id } });
     if (changed.count !== 1) throw new Error(task.assignedUserId ? "Assembly changed; refresh before completing." : "This assembly task was taken by another worker.");
-    const next=await tx.workTask.findFirst({where:{orderId:task.orderId,sequenceNumber:task.sequenceNumber+1}}),routeState=parseWorkRouteSnapshot(task.routeSnapshotJson)??createWorkRouteSnapshot({processRoute:null,currentStage:"ASSEMBLE"}),raw=safeObject(task.routeSnapshotJson),routeSnapshotJson=JSON.stringify({...raw,routeVersion:routeState.routeVersion+1,completedStages:[...new Set([...routeState.completedStages,"ASSEMBLE"])],currentStage:next?.stage??null,selectedNextStage:next?.stage??null});
+    const routeState=parseWorkRouteSnapshot(task.routeSnapshotJson)??createWorkRouteSnapshot({processRoute:null,currentStage:"ASSEMBLE"}),raw=safeObject(task.routeSnapshotJson),routeSnapshotJson=JSON.stringify({...raw,routeVersion:routeState.routeVersion+1,completedStages:[...new Set([...routeState.completedStages,"ASSEMBLE"])],currentStage:next.stage,selectedNextStage:next.stage});
     await actionLog(tx, { ...input, action: "TASK_COMPLETED", requestKind: "COMPLETE", metadata: { requestFingerprint } });
     await tx.workTask.updateMany({where:{orderId:task.orderId},data:{routeSnapshotJson}});
-    await tx.workTask.updateMany({ where: { orderId: task.orderId, sequenceNumber: task.sequenceNumber + 1, status: "LOCKED" }, data: { status: "READY" } });
+    const unlocked = await tx.workTask.updateMany({ where: { id: next.id, status: "LOCKED", completedQuantity: 0 }, data: { status: "READY" } });
+    if (unlocked.count !== 1) throw new Error("Assembly route changed; refresh before completing assembly.");
     await tx.workChangeEvent.create({data:{accountId:input.accountId,eventType:"ORDER_ASSEMBLY_COMPLETED",sourceType:"ORDER",stage:"ASSEMBLE",entityId:task.id}});
-    await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"ORDER",stages:["ASSEMBLE",...(next?[next.stage]:[])],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[]},tx);
+    await refreshAffectedWorkGroups({accountId:input.accountId,sourceType:"ORDER",stages:["ASSEMBLE","PACK"],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[]},tx);
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "ORDER_ASSEMBLY_COMPLETED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ orderId: task.orderId, quantity: task.requiredQuantity }) } });
     return { taskId: task.id, status: "COMPLETED" as const, idempotent: false };
   }), replay: () => client.$transaction(async (tx) => {
@@ -304,7 +368,7 @@ export const ORDER_ASSEMBLY_TASK_INCLUDE = {
   order: { select: { id: true, awb: true, trackingId: true, orderNo: true, shipmentId: true, orderItemId: true, sku: true, qty: true, productDescription: true, imageUrl: true, pickStatus: true, packStatus: true } },
   assignedUser: { select: { id: true, name: true } },
   problemReportedBy: { select: { id: true, name: true } },
-  actionLogs: { where: { action: "TASK_PROBLEM_REPORTED" as const }, orderBy: { createdAt: "desc" as const }, take: 1, select: { note: true } }
+  actionLogs: { orderBy: { createdAt: "desc" as const }, take: 5, select: { action: true, note: true, createdAt: true, actorUser: { select: { name: true } } } }
 } satisfies Prisma.WorkTaskInclude;
 
 export async function getOrderAssemblyTask(input: { actorUserId: string; accountId: string; taskId: string }, client: Client = prisma) {

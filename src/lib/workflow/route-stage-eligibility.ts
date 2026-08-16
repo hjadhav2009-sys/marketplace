@@ -2,7 +2,7 @@ import type { WorkStage } from "@prisma/client";
 
 const WORK_STAGES = new Set<WorkStage>(["PICK", "MARK", "ASSEMBLE", "PACK"]);
 
-function forwardCandidates(currentStage: WorkStage): WorkStage[] {
+export function forwardStageCandidates(currentStage: WorkStage): WorkStage[] {
   if (currentStage === "PICK") return ["MARK", "ASSEMBLE", "PACK"];
   if (currentStage === "MARK") return ["ASSEMBLE", "PACK"];
   if (currentStage === "ASSEMBLE") return ["PACK"];
@@ -19,7 +19,7 @@ export function resolveForwardStageEligibility(input: {
   completedStages: WorkStage[];
 }) {
   const valid = validStageList(input.selectedStages) && validStageList(input.completedStages);
-  const candidates = forwardCandidates(input.currentStage);
+  const candidates = forwardStageCandidates(input.currentStage);
   if (!valid) return { valid: false, selectableStages: candidates, preselectedNextStage: null } as const;
 
   const selectableStages = candidates.filter(

@@ -45,12 +45,23 @@ async function session(browser, viewport, scenario) {
   await page.locator('input[name="username"]').fill(user.username);
   await page.locator('input[name="password"]').fill(user.password);
   await Promise.all([page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 20_000 }), page.locator("form").first().evaluate((form) => form.requestSubmit())]);
+  if (new URL(page.url()).pathname === "/accounts") {
+    await page.locator('input[name="accountId"][value="stage3-account-fk-01"]').check();
+    await Promise.all([
+      page.waitForURL((url) => url.pathname !== "/accounts", { timeout: 20_000 }),
+      page.getByRole("button", { name: "Select account" }).click(),
+    ]);
+  }
   return { context, page, errors };
 }
 
 async function navigateViaRenderedMarkLink(page, width) {
   if (width < 1280) {
-    await page.getByRole("button", { name: "Open navigation" }).click();
+    const trigger = page.getByRole("button", { name: "Open navigation" });
+    if (await trigger.count() === 0) {
+      throw new Error(`Missing mobile navigation trigger at ${page.url()}\n${(await page.locator("body").innerText()).slice(0, 2_000)}`);
+    }
+    await trigger.click();
     const mobileNavigation = page.getByRole("navigation", { name: "Mobile navigation" });
     await Promise.all([page.waitForURL((url) => url.pathname === "/work/mark"), mobileNavigation.getByRole("link", { name: "Marking", exact: true }).click()]);
   } else {
@@ -147,6 +158,13 @@ try {
     if (testCase.id === "390x844") {
       await openConsignmentMark(marker.page);
       const partialCard = marker.page.locator("[data-responsive-work-card]", { hasText: "STAGE-C3B-GALLERY-MARK" }).first();
+      const unresolvedCard = marker.page.locator("[data-responsive-work-card]", { hasText: "Synthetic C3A Mark with Pack and Assembly choices" }).first();
+      await unresolvedCard.getByRole("button", { name: "Marking Completed" }).click();
+      const routeDialog = marker.page.locator('[data-worker-overlay="PROCESS_FLOW"] [role="dialog"]');
+      await routeDialog.waitFor();
+      const routeText = await routeDialog.innerText();
+      results.push({ state: "UNRESOLVED_PROCESS_FLOW", viewport: testCase.id, pass: routeText.includes("Send to Pack") && routeText.includes("Send to Assembly"), routeText });
+      await marker.page.keyboard.press("Escape");
       await partialCard.getByRole("button", { name: "Partial Quantity" }).click();
       const dialog = marker.page.locator('[data-worker-overlay="PARTIAL_QUANTITY"] [role="dialog"]');
       await dialog.waitFor();

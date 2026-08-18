@@ -213,4 +213,3 @@ No Scanner source or service file changed in C6A. The required C6, Universal Sca
 - `mobile-app`: unchanged
 - Real data: untouched
 - Push result and final clean worktree: recorded in the completion handoff after the documentation commit is pushed
-

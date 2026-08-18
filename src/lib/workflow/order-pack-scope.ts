@@ -6,6 +6,7 @@ import { refreshAffectedWorkGroups } from "./work-group-projection";
 import { resolveOrderShipmentWorkflowPrerequisites } from "./workflow-prerequisites";
 import { routeFingerprint } from "./dynamic-route";
 import { beginWorkflowActionReceipt, completeWorkflowActionReceipt, withWorkflowActionRequestGate } from "./workflow-action-receipt";
+import { advanceFinalPackRouteSnapshot } from "./final-pack-route-snapshot";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -132,6 +133,17 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
     }
     assertOrderPackScopeEligible(scope);
     const verifiedOrderIds = scope.shipmentOrders.filter(order => order.packStatus !== "PACKED").map((order) => order.id);
+    const packTasks = await tx.workTask.findMany({
+      where: { accountId: input.accountId, sourceType: "ORDER", orderId: { in: verifiedOrderIds }, stage: "PACK", status: { in: ["READY", "IN_PROGRESS"] } },
+      select: { id: true, orderId: true, requiredQuantity: true, assignedUserId: true, routeSnapshotJson: true },
+      orderBy: { id: "asc" },
+    });
+    if (packTasks.length !== verifiedOrderIds.length || new Set(packTasks.map(task => task.orderId)).size !== verifiedOrderIds.length) {
+      throw new Error("The authoritative Pack work changed; refresh before completing the package.");
+    }
+    if (packTasks.some(task => task.assignedUserId && task.assignedUserId !== access.user.id)) {
+      throw new Error("Packing assignment conflict. This package contains work assigned to different workers.");
+    }
     const update = await tx.order.updateMany({
       where: {
         id: { in: verifiedOrderIds },
@@ -143,9 +155,12 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
       data: { status: "PACKED", packStatus: "PACKED", packedAt: new Date() }
     });
     if (update.count !== verifiedOrderIds.length) throw new Error("Shipment changed; scan again before packing.");
-    const packTasks = await tx.workTask.findMany({ where: { accountId: input.accountId, sourceType: "ORDER", orderId: { in: verifiedOrderIds }, stage: "PACK", status: { in: ["READY", "IN_PROGRESS"] } }, select: { id: true, requiredQuantity: true } });
     const completedAt = new Date();
-    for (const task of packTasks) await tx.workTask.update({ where: { id: task.id }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, assignedUserId: access.user.id, startedAt: completedAt, startedByUserId: access.user.id, completedAt, completedByUserId: access.user.id, version: { increment: 1 } } });
+    for (const task of packTasks) {
+      const routeSnapshotJson = advanceFinalPackRouteSnapshot({ routeSnapshotJson: task.routeSnapshotJson });
+      await tx.workTask.update({ where: { id: task.id }, data: { status: "COMPLETED", completedQuantity: task.requiredQuantity, assignedUserId: task.assignedUserId ?? access.user.id, startedAt: completedAt, startedByUserId: access.user.id, completedAt, completedByUserId: access.user.id, routeSnapshotJson, version: { increment: 1 } } });
+      await tx.workTask.updateMany({ where: { accountId: input.accountId, sourceType: "ORDER", orderId: task.orderId!, id: { not: task.id } }, data: { routeSnapshotJson } });
+    }
 
     await tx.scanLog.createMany({
       data: scope.shipmentOrders.filter(order => verifiedOrderIds.includes(order.id)).map((order) => ({
@@ -174,6 +189,7 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
       }
     });
     await refreshAffectedWorkGroups({ accountId: input.accountId, sourceType: "ORDER", stages: ["PACK"], taskIds:packTasks.map(task=>task.id),orderIds:verifiedOrderIds }, tx);
+    if (input.source !== "grouped-work") await tx.workChangeEvent.create({ data: { accountId: input.accountId, eventType: "STAGE_COMPLETED", sourceType: "ORDER", stage: "PACK", entityId: packTasks[0]!.id } });
 
     const result = {
       packedCount: update.count,

@@ -55,7 +55,7 @@ export function navigationForUser(user: NavigationUser): AppNavLink[] {
   if (hasStageAccess) {
     links.push(
       { id: "work", href: "/work", label: "Work", section: "WORK", icon: "work" },
-      { id: "scan-pack", href: "/work/scan", label: "Scan / Pack", section: "WORK", icon: "scan" }
+      { id: "universal-scan", href: "/work/scan", label: "Universal Scan", section: "WORK", icon: "scan" }
     );
   }
   if (hasWorkPermission(user, "canPick")) {
@@ -68,10 +68,7 @@ export function navigationForUser(user: NavigationUser): AppNavLink[] {
     links.push({ id: "assembly", href: "/work/assemble", label: "Assembly", section: "WORK", icon: "assemble", ownedPaths: ["/work/assembly"] });
   }
   if (hasWorkPermission(user, "canPack")) {
-    links.push(
-      { id: "order-pack", href: "/packing", label: "Order Pack", section: "WORK", icon: "pack" },
-      { id: "consignment-pack", href: "/work/consignments/pack", label: "Consignment Pack", section: "WORK", icon: "pack" }
-    );
+    links.push({ id: "pack", href: "/work/pack", label: "Pack", section: "WORK", icon: "pack" });
   }
   if (user.canReportProblem || user.canManageConsignments || user.canViewAllWork) {
     links.push({ id: "work-problems", href: "/work/problems", label: "Work Problems", section: "WORK", icon: "problem" });

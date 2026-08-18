@@ -75,9 +75,9 @@ const protectedHashes: Record<string, string> = {
   "src/lib/workflow/grouped-transition.ts": "ac4c205be3bb2f774e215d752f4e19bd65a57ebbf9515bd67e0663632fddd49e",
   "src/lib/workflow/grouped-progress.ts": "3f53d7b582d950ab216a92c17d4dd5cf0d559483e99137a502b3b7ca13439c56",
   "src/lib/workflow/stage-transition.ts": "d104a70482a5d438885fd7f5df53bc5b2bd44de681bd0031d1bddc6139db3d2b",
-  "src/lib/workflow/order-pack-scope.ts": "65e30f0f66dd536f16b92bed8b0979f9b13da4609a9ab45df7541b1d564ad6f3",
+  "src/lib/workflow/order-pack-scope.ts": "c216b0ea7d7ed33e95eff2e0f21abbf8133150fa6b41e5321ab3f0892dcc11cf",
   "src/lib/workflow/order-problems.ts": "d2f6c7f2fb570883c93b7733832a3fc5e088654cd9b91cee00e67715b4533314",
-  "src/lib/workflow/task-store.ts": "20eebe98fb98cdfa052f5fce872ea88325d5fe358fcaa47d10ff863c8649127c",
+  "src/lib/workflow/task-store.ts": "5e686e2621e8b3ad193480f6663c7be094ad5c68df90c4eef14d912115bfbc8a",
 };
 for (const [file, expected] of Object.entries(protectedHashes)) assert.equal(createHash("sha256").update(read(file)).digest("hex"), expected, `${file} crossed the protected C3 UI boundary.`);
 

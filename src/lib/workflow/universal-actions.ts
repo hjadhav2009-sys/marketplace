@@ -60,6 +60,7 @@ export async function applyUniversalCandidateAction(input: {
 
   if (!hasWorkPermission(scope.user, "canPack")) throw new Error("Order packing permission is required.");
   if (order.packStatus === "PACKED") return { updatedCount: 0, idempotent: true };
-  const result = await packCustomerOrderShipmentSafely({ actorUserId: input.actorUserId, accountId: input.accountId, orderId: input.sourceId, expectedStatus: input.expectedStatus, source: "universal-scan", clientRequestId: input.clientRequestId }, client);
+  const expectedPackStatus = input.expectedStatus === "PACK_READY" ? "READY" : input.expectedStatus;
+  const result = await packCustomerOrderShipmentSafely({ actorUserId: input.actorUserId, accountId: input.accountId, orderId: input.sourceId, expectedStatus: expectedPackStatus, source: "universal-scan", clientRequestId: input.clientRequestId }, client);
   return { updatedCount: result.packedCount, idempotent: result.idempotent };
 }

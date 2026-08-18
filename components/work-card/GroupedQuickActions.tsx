@@ -14,6 +14,8 @@ import { MarkingDetails } from "./MarkingGuidance";
 import type { ManualMarkingGuidance, MarkingGuidance } from "@/src/lib/workflow/marking-guidance";
 import type { AssemblyGuidanceModel } from "@/src/lib/workflow/assembly-guidance";
 import { AssemblyDetails } from "./AssemblyGuidance";
+import { PackReadiness } from "./PackReadiness";
+import type { PackReadinessModel } from "@/src/lib/workflow/grouped-work";
 
 const PROBLEM_REASONS = ["PRODUCT_NOT_FOUND", "WRONG_PRODUCT", "QUANTITY_SHORT", "DAMAGED_PRODUCT", "MARKING_FILE_MISSING", "MARKING_FILE_WRONG", "MARKING_FAILED", "PACKING_BLOCKED", "IDENTIFIER_NOT_MATCHING", "OTHER"];
 
@@ -24,10 +26,11 @@ export type GroupedQuickCard = {
   assignedUserName: string | null; memberCount: number; problemCount: number; missingInstructionStages: WorkStage[];
   markingGuidance: MarkingGuidance | null; manualMarkingGuidance: ManualMarkingGuidance | null;
   assemblyGuidance?: AssemblyGuidanceModel | null;
+  packReadiness?: PackReadinessModel | null; assignmentConflict?: boolean; assignedUserNames?: string[];
   orderItemId: string | null; orderNumber: string | null; shipmentId: string | null; trackingId: string | null; consignmentNumber: string | null;
 };
 
-type QuickTask = { taskId: string; orderId: string | null; version: number; status: string; requiredQuantity: number; completedQuantity: number; assignment: string; reference: string; problemReason: string | null; problemReporter: string | null; problemReportedAt: string | null };
+type QuickTask = { taskId: string; orderId: string | null; version: number; status: string; requiredQuantity: number; completedQuantity: number; assignment: string; reference: string; productTitle: string | null; sellerSku: string | null; imageUrl: string | null; problemReason: string | null; problemReporter: string | null; problemReportedAt: string | null };
 type QuickDetails = { groupVersion: string; tasks: QuickTask[]; history: Array<{ id: string; action: string; actor: string; createdAt: string; quantityAfter: number | null }>; instructions: string[] };
 
 export function GroupedQuickActions({ card, detailsHref, canAct, canReportProblem }: { card: GroupedQuickCard; detailsHref: string; canAct: boolean; canReportProblem: boolean }) {
@@ -56,9 +59,10 @@ function GroupedPartialQuantity({ card }: { card: GroupedQuickCard }) {
 
 function GroupedDetails({ card, detailsHref }: { card: GroupedQuickCard; detailsHref: string }) {
   const { data, loading, error } = useQuickDetails(card);
+  const orderPackage = card.stage === "PACK" && card.sourceType === "ORDER";
   return <div className="grid gap-5">
-    <DetailSection title="Product"><div className="flex items-start gap-3"><ProductImage src={card.productImageUrl} alt={card.productTitle ?? card.sellerSku} size="md" showBadge={false}/><div className="min-w-0"><ProductSummary card={card}/><p className="mt-2 text-sm text-slate-600">{card.sourceType === "ORDER" ? "Customer order" : "Consignment"} · {card.marketplace}</p></div></div></DetailSection>
-    <DetailSection title="Process flow"><p className="font-semibold">{humanProcessRoute(card.processRoute)}</p><p className="mt-1 text-sm text-slate-600">Current stage: {titleCase(card.stage)}</p></DetailSection>
+    <DetailSection title={orderPackage ? "Package" : "Product"}><div className="flex items-start gap-3"><ProductImage src={card.productImageUrl} alt={orderPackage ? `Package ${card.trackingId ?? card.groupKey}` : card.productTitle ?? card.sellerSku} size="md" showBadge={false}/><div className="min-w-0"><ProductSummary card={card}/><p className="mt-2 text-sm text-slate-600">{card.sourceType === "ORDER" ? "Customer order" : "Consignment"} · {card.marketplace}</p></div></div></DetailSection>
+    {orderPackage && card.packReadiness ? <PackReadiness model={card.packReadiness} title="Package readiness" /> : <DetailSection title="Process flow"><p className="font-semibold">{humanProcessRoute(card.processRoute)}</p><p className="mt-1 text-sm text-slate-600">Current stage: {titleCase(card.stage)}</p></DetailSection>}
     <DetailSection title="Quantity"><p className="tabular-nums">{card.requiredQuantity} required · {card.completedQuantity} completed · {card.pendingQuantity} remaining</p><p className="mt-1 text-sm text-slate-600">{card.assignedUserName ? `Assigned to ${card.assignedUserName}` : "Unassigned"}</p></DetailSection>
     <DetailSection title="Identifiers"><dl className="grid gap-2">{identifiers(card).map((item) => <div key={item.label}><dt className="text-xs font-semibold text-slate-500">{item.label}</dt><dd className="break-all text-sm font-medium">{item.value}</dd></div>)}</dl></DetailSection>
     {card.markingGuidance ? <DetailSection title="Marking"><MarkingDetails guidance={card.markingGuidance}/></DetailSection> : null}
@@ -66,6 +70,7 @@ function GroupedDetails({ card, detailsHref }: { card: GroupedQuickCard; details
     {card.assemblyGuidance ? <DetailSection title="Assembly guidance"><AssemblyDetails guidance={card.assemblyGuidance}/></DetailSection> : null}
     {loading ? <p role="status" className="text-sm text-slate-600">Loading current details…</p> : null}
     {error ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Current quick details could not be loaded. Open full details for the complete record.</p> : null}
+    {orderPackage && data?.tasks.length ? <DetailSection title={`Underlying order items (${data.tasks.length})`}><ul className="divide-y divide-slate-200 rounded-md border border-slate-200">{data.tasks.map((task) => <li key={task.taskId} className="flex min-w-0 gap-3 p-3"><ProductImage src={task.imageUrl} alt={task.productTitle ?? task.sellerSku ?? task.reference} size="sm" showBadge={false}/><div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-950">{task.productTitle ?? "Order item"}</p><p className="break-all font-mono text-xs text-slate-600">{task.sellerSku ?? task.reference}</p><p className="mt-1 text-xs tabular-nums text-slate-600">{task.requiredQuantity} units · {task.assignment}</p></div></li>)}</ul></DetailSection> : null}
     {data?.instructions.length ? <DetailSection title="Instructions"><div className="space-y-1 text-sm">{data.instructions.map((line) => <p key={line} className="whitespace-pre-wrap">{line}</p>)}</div></DetailSection> : null}
     {data && card.missingInstructionStages.length ? <DetailSection title="Missing required instructions"><p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Saved instructions are unavailable for {card.missingInstructionStages.map(titleCase).join(" and ")}. No settings will be invented.</p></DetailSection> : null}
     {data?.tasks.some((task) => task.problemReason) ? <DetailSection title="Problem">{data.tasks.filter((task) => task.problemReason).map((task) => <p key={task.taskId} className="text-sm font-semibold text-rose-800">{titleCase(task.problemReason!)} · {task.reference}</p>)}</DetailSection> : null}
@@ -100,7 +105,10 @@ function useQuickDetails(card: GroupedQuickCard) {
 }
 
 function identifiers(card: GroupedQuickCard) { return [{ label: "Order Item ID", value: card.orderItemId }, { label: "Order ID", value: card.orderNumber }, { label: "Shipment", value: card.shipmentId }, { label: "Tracking / AWB", value: card.trackingId }, { label: "Consignment", value: card.consignmentNumber }].filter((item): item is { label: string; value: string } => Boolean(item.value)); }
-function ProductSummary({ card }: { card: GroupedQuickCard }) { return <div><p className="break-words font-semibold text-slate-950">{card.productTitle ?? "Untitled product"}</p><p className="mt-1 break-all font-mono text-sm text-slate-700">Seller SKU {card.sellerSku}</p></div>; }
+function ProductSummary({ card }: { card: GroupedQuickCard }) {
+  if (card.stage === "PACK" && card.sourceType === "ORDER") return <div><p className="break-all font-semibold text-slate-950">Package {card.trackingId ?? card.groupKey}</p><p className="mt-1 text-sm tabular-nums text-slate-700">{card.memberCount} order items · {card.requiredQuantity} units</p></div>;
+  return <div><p className="break-words font-semibold text-slate-950">{card.productTitle ?? "Untitled product"}</p><p className="mt-1 break-all font-mono text-sm text-slate-700">Seller SKU {card.sellerSku}</p></div>;
+}
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) { return <section><h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h3><div className="mt-2">{children}</div></section>; }
 function FullDetailsLink({ href }: { href: string }) { const { closeOverlay } = useWorkerOverlay(); return <Link href={href} onClick={() => closeOverlay({ preserveHistory: true, returnFocus: false })} className={buttonStyles({ variant: "secondary", className: "w-full" })}>Open full details</Link>; }
 function titleCase(value: string) { return value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()); }

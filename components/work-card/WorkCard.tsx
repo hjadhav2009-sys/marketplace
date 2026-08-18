@@ -42,16 +42,17 @@ type WorkCardIdentityProps = {
   eyebrow: ReactNode;
   metadata?: ReactNode;
   sellerSku: ReactNode;
+  sellerSkuLabel?: string;
   title: ReactNode;
 };
 
-export function WorkCardIdentity({ description, eyebrow, metadata, sellerSku, title }: WorkCardIdentityProps) {
+export function WorkCardIdentity({ description, eyebrow, metadata, sellerSku, sellerSkuLabel = "Seller SKU", title }: WorkCardIdentityProps) {
   return (
     <div className="min-w-0">
       <p className="break-words text-xs font-semibold uppercase tracking-wide text-berry">{eyebrow}</p>
       <h2 className="mt-1 break-words text-base font-semibold leading-snug text-slate-950 sm:text-lg">{title}</h2>
       {description ? <div className="mt-1 break-words text-sm leading-5 text-slate-600">{description}</div> : null}
-      <p className="mt-2 break-all font-mono text-sm font-semibold text-slate-800">Seller SKU {sellerSku}</p>
+      <p className="mt-2 break-all font-mono text-sm font-semibold text-slate-800">{sellerSkuLabel} {sellerSku}</p>
       {metadata ? <div className="mt-2 min-w-0 text-xs leading-5 text-slate-500">{metadata}</div> : null}
     </div>
   );

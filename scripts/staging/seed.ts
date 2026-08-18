@@ -73,6 +73,28 @@ function actualRouteSnapshot(input: { savedRoute: ProcessRoute | null; actualRou
   return JSON.stringify({ version: 3, routeRecommendation: input.savedRoute ?? "PICK_PACK", routeRecommendationSource: input.savedRoute ? "EXPLICIT_PRODUCT_RULE" : "SYSTEM_FALLBACK", hasExplicitSavedRoute: Boolean(input.savedRoute), selectedActualRoute: input.actualRoute, actualProcessRoute: input.actualRoute, actualStages: actualStages[input.actualRoute], currentStage: input.currentStage, completedStages: input.completedStages ?? [], decision: "SYNTHETIC_C1A1_ROUTE_TRUTH" });
 }
 
+function c5PackRouteSnapshot(route: ProcessRoute) {
+  const actualStages: Record<ProcessRoute, WorkStage[]> = {
+    PICK_PACK: ["PICK", "PACK"],
+    PICK_MARK_PACK: ["PICK", "MARK", "PACK"],
+    PICK_ASSEMBLE_PACK: ["PICK", "ASSEMBLE", "PACK"],
+    PICK_MARK_ASSEMBLE_PACK: ["PICK", "MARK", "ASSEMBLE", "PACK"],
+  };
+  return JSON.stringify({
+    version: 2,
+    routeVersion: 1,
+    recommendedStages: actualStages[route],
+    actualProcessRoute: route,
+    actualStages: actualStages[route],
+    currentStage: "PACK",
+    selectedNextStage: "PACK",
+    completedStages: actualStages[route].filter((stage) => stage !== "PACK"),
+    decisions: [],
+    savedProcessRoute: route,
+    savedProcessRuleId: `stage4-c5-${route.toLowerCase()}-rule`,
+  });
+}
+
 const syntheticPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWPYJxH7H4QZYAwATQoIyfshja4AAAAASUVORK5CYII=",
   "base64"
@@ -352,6 +374,46 @@ async function seed() {
   await createTask({ id: "stage4-order-pack-assembly-locked-pick", orderId: "stage4-order-pack-assembly-locked", stage: "PICK", sequence: 1, status: "COMPLETED", quantity: 1, assigned: users[2].id, sku: "STAGE-FK-SKU-003", title: "Synthetic Pack blocked by pending Assembly", route: "PICK_ASSEMBLE_PACK" });
   await createTask({ id: "stage4-order-pack-assembly-locked-assemble", orderId: "stage4-order-pack-assembly-locked", stage: "ASSEMBLE", sequence: 2, status: "READY", quantity: 1, assigned: users[5].id, sku: "STAGE-FK-SKU-003", title: "Synthetic Pack blocked by pending Assembly", route: "PICK_ASSEMBLE_PACK" });
   await createTask({ id: "stage4-order-pack-assembly-locked-pack", orderId: "stage4-order-pack-assembly-locked", stage: "PACK", sequence: 3, status: "LOCKED", quantity: 1, assigned: users[6].id, sku: "STAGE-FK-SKU-003", title: "Synthetic Pack blocked by pending Assembly", route: "PICK_ASSEMBLE_PACK" });
+
+  await prisma.uploadBatch.createMany({ data: [
+    { id: "stage4-c5-upload-a", accountId: accounts[0].id, createdByUserId: users[0].id, fileName: "c5-package-a.csv", importType: "ORDER_LABEL", status: "IMPORTED", totalRows: 3, createdRows: 3 },
+    { id: "stage4-c5-upload-b", accountId: accounts[0].id, createdByUserId: users[0].id, fileName: "c5-package-b.csv", importType: "ORDER_LABEL", status: "IMPORTED", totalRows: 2, createdRows: 2 },
+  ] });
+  const c5PackageItems = [
+    { id: "stage4-c5-package-a", batchId: "stage4-c5-upload-a", sku: "STAGE-C5-PACKAGE-SKU-A", title: "C5 direct-route package item", route: "PICK_PACK" as const, quantity: 1 },
+    { id: "stage4-c5-package-b", batchId: "stage4-c5-upload-a", sku: "STAGE-C5-PACKAGE-SKU-B", title: "C5 marked package item", route: "PICK_MARK_PACK" as const, quantity: 2 },
+    { id: "stage4-c5-package-c", batchId: "stage4-c5-upload-b", sku: "STAGE-C5-PACKAGE-SKU-C-WITH-A-LONG-IDENTIFIER-FOR-WRAPPING", title: "C5 assembled package item with a deliberately long identity for responsive verification", route: "PICK_ASSEMBLE_PACK" as const, quantity: 3 },
+  ];
+  for (const [index, item] of c5PackageItems.entries()) {
+    const stages = item.route === "PICK_PACK" ? ["PICK", "PACK"] as const : item.route === "PICK_MARK_PACK" ? ["PICK", "MARK", "PACK"] as const : ["PICK", "ASSEMBLE", "PACK"] as const;
+    const routeJson = c5PackRouteSnapshot(item.route);
+    const cardJson = JSON.stringify({ sellerSku: item.sku, productTitle: item.title, primaryImage: index === 2 ? null : syntheticImageRoute(index === 1 ? "stage3-fk-mark" : "stage3-fk-direct"), savedProcessRoute: item.route, synthetic: true, c5Case: "mixed-package" });
+    await prisma.order.create({ data: { id: item.id, accountId: accounts[0].id, batchId: item.batchId, marketplace: "FLIPKART", shipmentId: `STAGE-C5-SHIP-${index + 1}`, orderItemId: `STAGE-C5-ITEM-${index + 1}`, trackingId: "PACKAGE-C5-MIXED-ROUTES-LONG-REFERENCE-0000000000000001", awb: `STAGE-C5-PACKAGE-AWB-${index + 1}`, sku: item.sku, qty: item.quantity, orderNo: `STAGE-C5-ORDER-${index + 1}`, productDescription: item.title, imageUrl: index === 2 ? null : syntheticImageRoute(index === 1 ? "stage3-fk-mark" : "stage3-fk-direct"), pickStatus: "PICKED", packStatus: "READY", status: "READY" } });
+    for (const [sequence, stage] of stages.entries()) await createTask({ id: `${item.id}-${stage.toLowerCase()}`, orderId: item.id, stage, sequence: sequence + 1, status: stage === "PACK" ? "READY" : "COMPLETED", quantity: item.quantity, assigned: stage === "PACK" ? users[6].id : users[2].id, sku: item.sku, title: item.title, route: item.route, workCardSnapshotJson: cardJson, routeSnapshotJson: routeJson });
+  }
+  {
+    const id = "stage4-c5-order-scanner", sku = "STAGE-C5-ORDER-SCANNER", title = "C5 scanner Customer Order package", route = "PICK_PACK" as const, routeJson = c5PackRouteSnapshot(route);
+    await prisma.order.create({ data: { id, accountId: accounts[0].id, batchId: "stage4-c5-upload-b", marketplace: "FLIPKART", shipmentId: "STAGE-C5-SCANNER-SHIP", orderItemId: "STAGE-C5-SCANNER-ITEM", trackingId: "PACKAGE-C5-SCANNER", awb: "PACKAGE-C5-SCANNER", sku, qty: 2, orderNo: "STAGE-C5-SCANNER-ORDER", productDescription: title, pickStatus: "PICKED", packStatus: "READY", status: "READY" } });
+    await createTask({ id: `${id}-pick`, orderId: id, stage: "PICK", sequence: 1, status: "COMPLETED", quantity: 2, assigned: users[2].id, sku, title, route, routeSnapshotJson: routeJson });
+    await createTask({ id: `${id}-pack`, orderId: id, stage: "PACK", sequence: 2, status: "READY", quantity: 2, assigned: users[6].id, sku, title, route, routeSnapshotJson: routeJson });
+  }
+  for (const suffix of ["a", "b"] as const) {
+    const orderId = `stage4-c5-conflict-${suffix}`, sku = `STAGE-C5-CONFLICT-${suffix.toUpperCase()}`, route = "PICK_PACK" as const, routeJson = c5PackRouteSnapshot(route);
+    await prisma.order.create({ data: { id: orderId, accountId: accounts[0].id, batchId: "stage4-c5-upload-b", marketplace: "FLIPKART", shipmentId: `STAGE-C5-CONFLICT-${suffix}`, orderItemId: `STAGE-C5-CONFLICT-${suffix}`, trackingId: "PACKAGE-C5-ASSIGNMENT-CONFLICT", awb: `STAGE-C5-CONFLICT-AWB-${suffix}`, sku, qty: 1, orderNo: `STAGE-C5-CONFLICT-${suffix}`, productDescription: `C5 assignment conflict item ${suffix}`, pickStatus: "PICKED", packStatus: "READY", status: "READY" } });
+    await createTask({ id: `${orderId}-pick`, orderId, stage: "PICK", sequence: 1, status: "COMPLETED", quantity: 1, assigned: users[2].id, sku, title: `C5 assignment conflict item ${suffix}`, route, routeSnapshotJson: routeJson });
+    await createTask({ id: `${orderId}-pack`, orderId, stage: "PACK", sequence: 2, status: "READY", quantity: 1, assigned: suffix === "a" ? users[6].id : users[7].id, sku, title: `C5 assignment conflict item ${suffix}`, route, routeSnapshotJson: routeJson });
+  }
+  await prisma.consignmentBatch.create({ data: { id: "stage4-c5-consignment-batch", accountId: accounts[0].id, marketplace: "FLIPKART", externalConsignmentNumber: "C5-CONSIGNMENT", displayName: "C5 Packing Consignment", status: "ACTIVE", sourceFileName: "c5-consignment.csv", sourceFileSha256: "c5-consignment-synthetic" } });
+  for (const [index, item] of ([
+    { id: "stage4-c5-consignment-grouped", sku: "STAGE-C5-CONSIGNMENT-GROUPED", title: "C5 grouped Consignment Pack", route: "PICK_MARK_ASSEMBLE_PACK" as const, quantity: 4 },
+    { id: "stage4-c5-consignment-scanner", sku: "STAGE-C5-CONSIGNMENT-SCANNER", title: "C5 scanner Consignment Pack", route: "PICK_PACK" as const, quantity: 2 },
+  ]).entries()) {
+    const stages = item.route === "PICK_PACK" ? ["PICK", "PACK"] as const : ["PICK", "MARK", "ASSEMBLE", "PACK"] as const;
+    const routeJson = c5PackRouteSnapshot(item.route);
+    const cardJson = JSON.stringify({ sellerSku: item.sku, productTitle: item.title, primaryImage: index ? null : syntheticImageRoute("stage3-fk-mark-assembly"), savedProcessRoute: item.route, synthetic: true, c5Case: "consignment-pack" });
+    await prisma.consignmentLine.create({ data: { id: item.id, consignmentBatchId: "stage4-c5-consignment-batch", accountId: accounts[0].id, rowNumber: index + 1, sellerSkuSource: item.sku, requiredQuantity: item.quantity, matchStatus: "OWNER_SELECTED", processRoute: item.route, activated: true, sellerSkuSnapshot: item.sku, productTitleSnapshot: item.title, productImageSnapshot: index ? null : syntheticImageRoute("stage3-fk-mark-assembly"), fnskuSnapshot: `C5-FNSKU-${index + 1}`, catalogSnapshotJson: cardJson } });
+    for (const [sequence, stage] of stages.entries()) await createTask({ id: `${item.id}-${stage.toLowerCase()}`, consignmentLineId: item.id, sourceType: "CONSIGNMENT", stage, sequence: sequence + 1, status: stage === "PACK" ? "READY" : "COMPLETED", quantity: item.quantity, assigned: stage === "PACK" ? users[6].id : users[2].id, sku: item.sku, title: item.title, route: item.route, workCardSnapshotJson: cardJson, routeSnapshotJson: routeJson });
+  }
   await prisma.consignmentLine.create({ data: { id: "stage3-line-held-missing", consignmentBatchId: "stage3-batch-review_required", accountId: accounts[0].id, rowNumber: 1, sellerSkuSource: "STAGE-MISSING-SKU-001", requiredQuantity: 5, matchStatus: "NOT_FOUND", activated: false } });
   await prisma.consignmentImportIssue.create({ data: { id: "stage3-consignment-missing-issue", consignmentBatchId: "stage3-batch-review_required", consignmentLineId: "stage3-line-held-missing", severity: "ERROR", issueType: "MISSING_LISTING", message: "Synthetic missing listing requires owner resolution.", rowNumber: 2, safeDataJson: JSON.stringify({ sourceFileName: "synthetic-missing.csv", sourceTableName: "Synthetic", sellerSku: "STAGE-MISSING-SKU-001" }) } });
   await prisma.consignmentImportIssue.createMany({ data: [

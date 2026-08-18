@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
@@ -40,7 +41,7 @@ export default async function ProfessionalProblemsPage({ searchParams }: { searc
       </form>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600"><p><strong className="text-slate-950">{workspace.total}</strong> open {workspace.source === "ORDER" ? "Customer Order" : "Consignment"} problem{workspace.total === 1 ? "" : "s"}</p>{workspace.stage !== "ALL" ? <p>Filtered to {stageLabel(workspace.stage)}</p> : null}</div>
       {workspace.items.length
-        ? <section className="grid gap-4" aria-label="Open problems">{workspace.items.map((item) => <ProblemWorkspaceCard key={`${item.source}:${item.id}`} item={item} returnPath={returnPath}/>)}</section>
+        ? <section className="grid gap-4" aria-label="Open problems">{workspace.items.map((item) => <ProblemWorkspaceCard key={`${item.source}:${item.id}`} item={item} returnPath={returnPath} mutationRequestBase={randomUUID()}/>)}</section>
         : <EmptyState title={`No open ${workspace.source === "ORDER" ? "Customer Order" : "Consignment"} problems`} description={workspace.stage === "ALL" ? "Nothing in this source needs problem resolution right now." : `No ${stageLabel(workspace.stage)} problems match this source.`} action={{ href: "/work", label: "Back to Work Hub" }}/>
       }
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Problem pages"><p className="text-sm text-slate-600">Page {workspace.page}</p><div className="flex gap-2">{workspace.hasPrevious ? <Link href={pageHref(workspace.source, workspace.stage, workspace.page - 1)} className={buttonStyles({ variant: "secondary" })}>Previous</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-400">Previous</span>}{workspace.hasNext ? <Link href={pageHref(workspace.source, workspace.stage, workspace.page + 1)} className={buttonStyles({ variant: "secondary" })}>Next</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-400">Next</span>}</div></nav>

@@ -483,6 +483,11 @@ export function claimAndIncrementWorkTask(input: { taskId: string; accountId: st
 
 const PROBLEM_CATEGORIES = new Set(["PRODUCT_NOT_FOUND","WRONG_PRODUCT","QUANTITY_SHORT","DAMAGED_PRODUCT","MARKING_FILE_MISSING","MARKING_FILE_WRONG","MARKING_FAILED","PACKING_BLOCKED","IDENTIFIER_NOT_MATCHING","OTHER"]);
 
+export function resolveConsignmentProblemRestoredStatus(statusBeforeProblem: unknown, completedQuantity: number): "READY" | "IN_PROGRESS" {
+  if (statusBeforeProblem === "READY" || statusBeforeProblem === "IN_PROGRESS") return statusBeforeProblem;
+  return completedQuantity > 0 ? "IN_PROGRESS" : "READY";
+}
+
 export async function reportWorkTaskProblem(input: { taskId: string; accountId: string; actorUserId: string; reason: string; note?: string; expectedQuantity: number; clientRequestId?: string }, client: Client = prisma) {
   if (!PROBLEM_CATEGORIES.has(input.reason)) throw new Error("Select a valid problem reason.");
   const fingerprint=requestFingerprint({expectedQuantity:input.expectedQuantity,reason:input.reason,note:input.note?.trim()||null});
@@ -518,7 +523,7 @@ export async function resolveWorkTaskProblem(input: { taskId: string; accountId:
     if (!task?.consignmentLine || task.consignmentLine.accountId !== input.accountId) throw new Error("Problem task is unavailable.");
     const prior = await duplicateResult(tx, { taskId: task.id, actorUserId: user.id, requestKind: "RESOLVE_PROBLEM", clientRequestId: input.clientRequestId,fingerprint }); if (prior) return prior;
     if (task.status !== "PROBLEM") throw new Error("Problem task is unavailable.");
-    const restored = task.completedQuantity > 0 ? "IN_PROGRESS" : "READY";
+    const restored = resolveConsignmentProblemRestoredStatus(task.statusBeforeProblem, task.completedQuantity);
     await tx.workTask.update({ where: { id: task.id }, data: { status: restored, problemResolutionNote: input.resolutionNote.trim().slice(0, 1000), problemResolvedAt: new Date(), problemResolvedByUserId: user.id } });
     await logAction(tx, { accountId: input.accountId, taskId: task.id, actorUserId: user.id, action: "TASK_PROBLEM_RESOLVED", requestKind: "RESOLVE_PROBLEM",fingerprint, before: task.completedQuantity, after: task.completedQuantity, clientRequestId: input.clientRequestId, note: input.resolutionNote });
     await tx.auditLog.create({ data: { userId: user.id, accountId: input.accountId, action: "CONSIGNMENT_TASK_PROBLEM_RESOLVED", entityType: "WorkTask", entityId: task.id, metadata: JSON.stringify({ restoredStatus: restored }) } });

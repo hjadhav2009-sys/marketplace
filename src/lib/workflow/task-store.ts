@@ -296,6 +296,11 @@ async function refreshDeterministicStageHandoff(tx:Transaction,task:{id:string;a
   await refreshAffectedWorkGroups({accountId:task.accountId,sourceType:task.sourceType,stages:[task.stage,nextStage],taskIds:[task.id],orderIds:task.orderId?[task.orderId]:[],consignmentLineIds:task.consignmentLineId?[task.consignmentLineId]:[]},tx);
 }
 
+function advanceDeterministicRouteSnapshot(input:{routeSnapshotJson:string|null;processRoute:ProcessRoute|null;completedStage:"MARK"|"ASSEMBLE";nextStage:WorkStage}){
+  const prior=parseWorkRouteSnapshot(input.routeSnapshotJson)??createWorkRouteSnapshot({processRoute:input.processRoute,currentStage:input.completedStage});
+  return JSON.stringify({...prior,routeVersion:prior.routeVersion+1,currentStage:input.nextStage,selectedNextStage:input.nextStage,completedStages:[...new Set([...prior.completedStages,input.completedStage])]});
+}
+
 export async function claimWorkTask(input: { taskId: string; accountId: string; actorUserId: string; clientRequestId?: string }, client: Client = prisma) {
   const mutate=()=>client.$transaction(async (tx) => {
     const { user, task } = await taskForMutation(tx, input);
@@ -436,15 +441,8 @@ export async function setWorkTaskProgress(input: { taskId: string; accountId: st
     if (nextStatus === "COMPLETED") {
       const unlocked = await unlockNextTask(tx, task.consignmentLineId!, task.sequenceNumber);
       if (deterministicNextStage && unlocked.count !== 1) throw new Error(task.stage === "MARK" ? "Mark route changed; refresh before completing marking." : "Assembly route changed; refresh before completing assembly.");
-      if (task.stage === "ASSEMBLE" && deterministicNextStage === "PACK") {
-        const prior = parseWorkRouteSnapshot(task.routeSnapshotJson) ?? createWorkRouteSnapshot({ processRoute: line.processRoute, currentStage: "ASSEMBLE" });
-        const routeSnapshotJson = JSON.stringify({
-          ...prior,
-          routeVersion: prior.routeVersion + 1,
-          currentStage: "PACK",
-          selectedNextStage: "PACK",
-          completedStages: [...new Set([...prior.completedStages, "ASSEMBLE" as const])],
-        });
+      if ((task.stage === "MARK" || task.stage === "ASSEMBLE") && deterministicNextStage) {
+        const routeSnapshotJson=advanceDeterministicRouteSnapshot({routeSnapshotJson:task.routeSnapshotJson,processRoute:line.processRoute,completedStage:task.stage,nextStage:deterministicNextStage});
         await tx.workTask.updateMany({ where: { consignmentLineId: task.consignmentLineId! }, data: { routeSnapshotJson } });
       }
       await recalculateConsignmentCompletion(tx, { batchId: line.consignmentBatchId, actorUserId: user.id });

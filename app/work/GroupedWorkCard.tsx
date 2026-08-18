@@ -18,10 +18,12 @@ import { WorkRouteActionButton, WorkRouteDialogC1A, type WorkRouteDialogCard } f
 import type { GroupedWorkCard as Card } from "@/src/lib/workflow/grouped-work";
 import type { WorkChangeDetail } from "./LiveWorkRefresh";
 import { completeGroupedStageAction } from "./stage-actions";
+import { workChangeMatchesCard } from "./work-change-card-match";
 
 export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = false }: { card: Card; canAct: boolean; canReportProblem?: boolean }) {
   const [card, setCard] = useState(initialCard);
   const [removed, setRemoved] = useState(false);
+  const { groupKey, memberTaskIds, sourceType, stage } = card;
 
   useEffect(() => {
     setCard(initialCard);
@@ -31,13 +33,13 @@ export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = 
   useEffect(() => {
     const changed = async (event: Event) => {
       const detail = (event as CustomEvent<WorkChangeDetail>).detail;
-      if (detail.groupKey !== card.groupKey) return;
-      if (detail.eventType === "STAGE_COMPLETED" && detail.stage === card.stage) {
+      if (!workChangeMatchesCard({ groupKey, memberTaskIds }, detail)) return;
+      if (detail.eventType === "STAGE_COMPLETED" && detail.stage === stage) {
         setRemoved(true);
         return;
       }
       try {
-        const response = await fetch(`/api/work/groups/${card.stage.toLowerCase()}/${card.groupKey}?source=${card.sourceType}`, { cache: "no-store" });
+        const response = await fetch(`/api/work/groups/${stage.toLowerCase()}/${groupKey}?source=${sourceType}`, { cache: "no-store" });
         if (response.status === 404) {
           setRemoved(true);
           return;
@@ -49,7 +51,7 @@ export function GroupedWorkCard({ card: initialCard, canAct, canReportProblem = 
     };
     window.addEventListener("work-change", changed);
     return () => window.removeEventListener("work-change", changed);
-  }, [card.groupKey, card.sourceType, card.stage]);
+  }, [groupKey, memberTaskIds, sourceType, stage]);
 
   if (removed) return null;
 

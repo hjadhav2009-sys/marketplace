@@ -7,10 +7,11 @@ import { packCustomerOrderShipmentSafely } from "./order-pack-scope";
 import { claimOrderAssemblyTask, completeOrderAssemblyTask, reportOrderAssemblyProblem, sendOrderToAssembly } from "./order-assembly";
 import { completePickWithNextRoute } from "./route-selection";
 import { completeOrderMarkingTask } from "./order-route-tasks";
+import { completeStageAndChooseNext } from "./stage-transition";
 
 type Client = PrismaClient;
-export type UniversalCandidateAction = "ORDER_PICK" | "ORDER_PICK_ROUTE" | "ORDER_MARK_COMPLETE" | "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_PICK_ROUTE" | "TASK_CLAIM" | "TASK_INCREMENT" | "TASK_COMPLETE";
-const UNIVERSAL_ACTIONS = new Set<UniversalCandidateAction>(["ORDER_PICK", "ORDER_PICK_ROUTE", "ORDER_MARK_COMPLETE", "ORDER_PACK", "ASSEMBLY_SEND", "ASSEMBLY_CLAIM", "ASSEMBLY_COMPLETE", "ASSEMBLY_PROBLEM", "TASK_PICK_ROUTE", "TASK_CLAIM", "TASK_INCREMENT", "TASK_COMPLETE"]);
+export type UniversalCandidateAction = "ORDER_PICK" | "ORDER_PICK_ROUTE" | "ORDER_MARK_COMPLETE" | "ORDER_PACK" | "ASSEMBLY_SEND" | "ASSEMBLY_CLAIM" | "ASSEMBLY_COMPLETE" | "ASSEMBLY_PROBLEM" | "TASK_PICK_ROUTE" | "TASK_MARK_ROUTE" | "TASK_CLAIM" | "TASK_INCREMENT" | "TASK_COMPLETE";
+const UNIVERSAL_ACTIONS = new Set<UniversalCandidateAction>(["ORDER_PICK", "ORDER_PICK_ROUTE", "ORDER_MARK_COMPLETE", "ORDER_PACK", "ASSEMBLY_SEND", "ASSEMBLY_CLAIM", "ASSEMBLY_COMPLETE", "ASSEMBLY_PROBLEM", "TASK_PICK_ROUTE", "TASK_MARK_ROUTE", "TASK_CLAIM", "TASK_INCREMENT", "TASK_COMPLETE"]);
 
 export async function applyUniversalCandidateAction(input: {
   actorUserId: string;
@@ -18,12 +19,14 @@ export async function applyUniversalCandidateAction(input: {
   sourceId: string;
   action: UniversalCandidateAction;
   expectedQuantity?: number;
+  expectedVersion?: number;
   expectedStatus?: string;
   clientRequestId: string;
   manualTitle?: string;
   manualInstructions?: string;
   manualImageUrl?: string;
   route?: string;
+  nextStage?: string;
   routeReason?: string;
   routeOtherReason?: string;
   workerNote?: string;
@@ -38,6 +41,24 @@ export async function applyUniversalCandidateAction(input: {
   if (input.action === "ASSEMBLY_COMPLETE") return completeOrderAssemblyTask({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", clientRequestId: input.clientRequestId }, client);
   if (input.action === "ASSEMBLY_PROBLEM") return reportOrderAssemblyProblem({ actorUserId: input.actorUserId, accountId: input.accountId, taskId: input.sourceId, expectedStatus: input.expectedStatus ?? "", reason: "OTHER", note: "Reported from universal scanner.", clientRequestId: input.clientRequestId }, client);
   if (input.action === "TASK_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"CONSIGNMENT", taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedQuantity: input.expectedQuantity ?? -1, route: input.route ?? "", routeReason:input.routeReason,routeOtherReason:input.routeOtherReason,workerNote:input.workerNote,confirmMissingInstructions:input.confirmMissingInstructions,clientRequestId: input.clientRequestId }, client);
+  if (input.action === "TASK_MARK_ROUTE") {
+    if (input.nextStage !== "ASSEMBLE" && input.nextStage !== "PACK") throw new Error("Choose a valid Marking destination.");
+    return completeStageAndChooseNext({
+      actorUserId: input.actorUserId,
+      selectedAccountId: input.accountId,
+      taskId: input.sourceId,
+      currentStage: "MARK",
+      expectedVersion: input.expectedVersion ?? -1,
+      expectedCompletedQuantity: input.expectedQuantity ?? -1,
+      nextStage: input.nextStage,
+      useRecommendedNextStage: false,
+      routeReason: input.routeReason,
+      routeOtherReason: input.routeOtherReason,
+      workerNote: input.workerNote,
+      confirmMissingInstructions: input.confirmMissingInstructions,
+      clientRequestId: input.clientRequestId,
+    }, client);
+  }
   if (input.action === "ORDER_PICK_ROUTE") return completePickWithNextRoute({ sourceType:"ORDER", orderIds: [input.sourceId], accountId: input.accountId, actorUserId: input.actorUserId, route: input.route ?? "", routeReason:input.routeReason,routeOtherReason:input.routeOtherReason,workerNote:input.workerNote,confirmMissingInstructions:input.confirmMissingInstructions,clientRequestId: input.clientRequestId }, client);
   if (input.action === "ORDER_MARK_COMPLETE") return completeOrderMarkingTask({ taskId: input.sourceId, accountId: input.accountId, actorUserId: input.actorUserId, expectedStatus: input.expectedStatus ?? "", clientRequestId: input.clientRequestId }, client);
 

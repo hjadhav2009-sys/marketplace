@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/AppShell";
 import { AwbBarcodeScanner } from "@/components/AwbBarcodeScanner";
 import { PageHeader } from "@/components/PageHeader";
-import { UniversalScannerPanel } from "@/components/UniversalScannerPanel";
+import { ProfessionalUniversalScanner as UniversalScannerPanel } from "@/components/ProfessionalUniversalScanner";
 import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
 import { hasWorkPermission } from "@/lib/work-permissions";
 import { getLatestImportedBatch, getPackingDashboard } from "@/lib/data";

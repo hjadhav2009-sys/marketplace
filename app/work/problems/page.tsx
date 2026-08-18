@@ -1,16 +1,15 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
-import { EmptyState } from "@/components/EmptyState";
-import { PageHeader } from "@/components/PageHeader";
-import { SubmitButton } from "@/components/SubmitButton";
-import { capabilityHomePath, requireAccount, requireUser } from "@/lib/auth";
-import { hasWorkPermission } from "@/lib/work-permissions";
-import { prisma } from "@/lib/prisma";
-import { WORK_TASK_INCLUDE } from "@/src/lib/workflow/queues";
-import { assertWorkerAccountAccess, userCanManageConsignmentTasks, userCanMutateStage, userCanViewAllConsignmentWork } from "@/src/lib/workflow/worker-access";
-import { reassignTaskAction, resolveTaskProblemAction } from "../actions";
-import { WorkTaskCard } from "../WorkTaskCard";
+import ProfessionalProblemsPage from "./ProfessionalProblemsPage";
 
-export default async function WorkProblemsPage({searchParams}:{searchParams:Promise<{page?:string;success?:string;error?:string}>}){const user=await requireUser();if(!(hasWorkPermission(user,"canReportProblem")||hasWorkPermission(user,"canManageConsignments")||hasWorkPermission(user,"canViewAllWork")))redirect(capabilityHomePath(user));const account=await requireAccount(user);await assertWorkerAccountAccess(user.id,account.id);const query=await searchParams;const page=Math.max(1,Number(query.page)||1);const take=50;const canViewAll=userCanViewAllConsignmentWork(user);const canManage=userCanManageConsignmentTasks(user);const visibility=canViewAll?{}:{OR:[{assignedUserId:user.id},{problemReportedByUserId:user.id}]};const where={accountId:account.id,sourceType:"CONSIGNMENT" as const,status:"PROBLEM" as const,...visibility};const [tasks,total,workers]=await Promise.all([prisma.workTask.findMany({where,include:WORK_TASK_INCLUDE,orderBy:{problemReportedAt:"asc"},skip:(page-1)*take,take}),prisma.workTask.count({where}),canManage?prisma.user.findMany({where:{active:true,OR:[{accountId:account.id},{assignedAccounts:{some:{id:account.id}}}]},select:{id:true,name:true,role:true,canPick:true,canMark:true,canAssemble:true,canPack:true}}):[]]);const returnPath=`/work/problems?page=${page}`;
-return <AppShell><PageHeader eyebrow="Blocked consignment work" title="Work Problems" description="Problem history and quantities are preserved. Resolving returns work to Ready or In progress."><Link href="/work" className="rounded-md border px-4 py-2 text-sm font-bold">Work Hub</Link></PageHeader>{query.success?<div role="status" className="mb-3 rounded-md bg-teal-50 p-3 font-bold text-teal-800">{query.success}</div>:null}{query.error?<div role="alert" className="mb-3 rounded-md bg-rose-50 p-3 font-bold text-rose-700">{query.error}</div>:null}<section className="space-y-4">{tasks.map((task)=><div key={task.id}><WorkTaskCard task={task} returnPath={returnPath} user={user}/>{canManage?<div className="mt-2 grid gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 sm:grid-cols-2"><form action={resolveTaskProblemAction} className="grid gap-2"><input type="hidden" name="taskId" value={task.id}/><input type="hidden" name="clientRequestId" value={`${task.id}:resolve:${task.updatedAt.toISOString()}`}/><input type="hidden" name="returnPath" value={returnPath}/><textarea name="resolutionNote" required maxLength={1000} placeholder="Resolution note" className="min-h-20 rounded-md border p-2"/><SubmitButton pendingText="Resolving...">Resolve and return to work</SubmitButton></form><form action={reassignTaskAction} className="grid gap-2"><input type="hidden" name="taskId" value={task.id}/><input type="hidden" name="clientRequestId" value={`${task.id}:assign:${task.updatedAt.toISOString()}`}/><input type="hidden" name="returnPath" value={returnPath}/><select name="assignedUserId" defaultValue={task.assignedUserId??""} className="min-h-11 rounded-md border px-2"><option value="">Unassigned</option>{workers.filter((worker)=>userCanMutateStage(worker,task.stage)).map((worker)=><option key={worker.id} value={worker.id}>{worker.name}</option>)}</select><SubmitButton pendingText="Assigning..." variant="secondary">Update assignment</SubmitButton></form></div>:null}</div>)}</section>{!tasks.length?<EmptyState title="No open work problems" description="Nothing in your permitted seller account needs problem resolution right now." action={{href:"/work",label:"Back to Work Hub"}}/>:null}<nav className="mt-5 flex items-center justify-between gap-3 text-sm font-bold" aria-label="Problem pages"><span>{total?`Showing ${(page-1)*take+1}–${Math.min(page*take,total)} of ${total} problems`:"No problems to show"}</span><div className="flex gap-2">{page>1?<Link href={`?page=${page-1}`} className="inline-flex min-h-11 items-center rounded-md border px-3 py-2">Previous</Link>:<span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border bg-slate-50 px-3 py-2 text-slate-400">Previous</span>}{page*take<total?<Link href={`?page=${page+1}`} className="inline-flex min-h-11 items-center rounded-md border px-3 py-2">Next</Link>:<span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border bg-slate-50 px-3 py-2 text-slate-400">Next</span>}</div></nav></AppShell>;}
+export default async function WorkProblemsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    page?: string;
+    source?: string;
+    stage?: string;
+    success?: string;
+    error?: string;
+  }>;
+}) {
+  return <ProfessionalProblemsPage searchParams={searchParams} />;
+}

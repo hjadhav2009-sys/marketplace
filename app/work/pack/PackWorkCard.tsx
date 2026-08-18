@@ -59,7 +59,7 @@ export function PackWorkCard({ card: initialCard, canAct, canReportProblem }: { 
   const assignmentConflict = Boolean(card.assignmentConflict);
   const actionable = canAct && !problem && !blocked && !assignmentConflict && card.status !== "COMPLETED";
   const assignment = assignmentConflict
-    ? `Mixed assignments: ${card.assignedUserNames?.join(", ") || "multiple workers"}`
+    ? `Assigned to ${card.assignedUserNames?.join(", ") || "another worker"}`
     : card.assignedUserName ? `Assigned to ${card.assignedUserName}` : "Unassigned";
 
   return (
@@ -96,7 +96,7 @@ export function PackWorkCard({ card: initialCard, canAct, canReportProblem }: { 
 
 function PackState({ card, canAct }: { card: Card; canAct: boolean }) {
   if (card.status === "PROBLEM" || card.problemCount > 0) return <WorkCardState tone="danger" title="Packing paused">Resolve the open problem before completing this package.</WorkCardState>;
-  if (card.assignmentConflict) return <WorkCardState tone="warning" title="Packing assignment conflict">This package contains work assigned to different workers. No Pack action is available until ownership is resolved.</WorkCardState>;
+  if (card.assignmentConflict) return <WorkCardState tone="warning" title="Packing assignment conflict">This package contains Packing work assigned to another worker.</WorkCardState>;
   if (!card.packReadiness) return <WorkCardState tone="danger" title="Readiness unavailable">Packing stays disabled because authoritative prerequisite state could not be resolved.</WorkCardState>;
   if (!card.packReadiness.packReady) return <WorkCardState tone="warning" title="Not ready to pack">{card.packReadiness.blocker ?? "Complete the required upstream work before packing."}</WorkCardState>;
   if (!canAct) return <WorkCardState title="Read-only Pack view">Your current permissions do not allow Pack actions.</WorkCardState>;

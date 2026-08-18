@@ -7,6 +7,7 @@ import { resolveOrderShipmentWorkflowPrerequisites } from "./workflow-prerequisi
 import { routeFingerprint } from "./dynamic-route";
 import { beginWorkflowActionReceipt, completeWorkflowActionReceipt, withWorkflowActionRequestGate } from "./workflow-action-receipt";
 import { advanceFinalPackRouteSnapshot } from "./final-pack-route-snapshot";
+import { resolveOrderPackActorEligibility } from "./order-pack-actor-eligibility";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -141,7 +142,8 @@ export async function packCustomerOrderShipmentSafelyInTransaction(
     if (packTasks.length !== verifiedOrderIds.length || new Set(packTasks.map(task => task.orderId)).size !== verifiedOrderIds.length) {
       throw new Error("The authoritative Pack work changed; refresh before completing the package.");
     }
-    if (packTasks.some(task => task.assignedUserId && task.assignedUserId !== access.user.id)) {
+    const actorEligibility = resolveOrderPackActorEligibility({ actorUserId: access.user.id, packTasks });
+    if (!actorEligibility.eligible) {
       throw new Error("Packing assignment conflict. This package contains work assigned to different workers.");
     }
     const update = await tx.order.updateMany({

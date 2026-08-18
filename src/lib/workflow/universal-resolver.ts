@@ -11,6 +11,10 @@ import { parseOrderMarkingMetadata } from "./route-task-metadata";
 import { resolveConsignmentLineWorkflowPrerequisites, resolveOrderShipmentWorkflowPrerequisites, type WorkflowPrerequisiteSummary } from "./workflow-prerequisites";
 import { parseImmutableRouteProvenance, type ImmutableRouteProvenance } from "./route-provenance";
 import type { PostPickRoute } from "./route-selection";
+import { parseWorkRouteSnapshot } from "./dynamic-route";
+import { resolveForwardStageEligibility } from "./route-stage-eligibility";
+import { resolveWorkRoutePresentation } from "./work-route-presentation";
+import { resolveOrderPackActorEligibility } from "./order-pack-actor-eligibility";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type UniversalScanIntent = "ANY" | "PICK" | "MARK" | "ASSEMBLE" | "PACK";
@@ -22,6 +26,7 @@ export type UniversalWorkCandidate = {
   actionType: "ORDER_PICK" | "ORDER_MARK" | "ORDER_PACK" | "ORDER_SEND_TO_ASSEMBLY" | "ORDER_ASSEMBLY" | "ORDER_WAITING_ASSEMBLY" | "CONSIGNMENT_PICK" | "CONSIGNMENT_MARK" | "CONSIGNMENT_ASSEMBLE" | "CONSIGNMENT_PACK" | "PROBLEM" | "READ_ONLY";
   sourceId: string;
   taskId?: string;
+  taskVersion?: number;
   workGroupKey?: string;
   orderId?: string;
   consignmentLineId?: string;
@@ -82,6 +87,7 @@ export type UniversalWorkCandidate = {
   workflowPrerequisites?: WorkflowPrerequisiteSummary;
   missingInstructionStages?: WorkStage[];
   routeDecision?: UniversalScannerRouteDecision;
+  stageRouteDecision?: UniversalScannerStageRouteDecision;
 };
 
 export type UniversalScannerRouteDecision = {
@@ -89,6 +95,16 @@ export type UniversalScannerRouteDecision = {
   savedProcessRoute: ProcessRoute | null;
   savedRoute: PostPickRoute;
   options: Array<{ route: PostPickRoute; reasonRequired: boolean; missingInstructionStages: WorkStage[] }>;
+};
+
+export type UniversalScannerStageRouteDecision = {
+  selectableNextStages: Array<"ASSEMBLE" | "PACK">;
+  preselectedNextStage: "ASSEMBLE" | "PACK" | null;
+  processRoute: ProcessRoute;
+  savedProcessRoute: ProcessRoute | null;
+  hasExplicitSavedRoute: boolean;
+  routeDegraded: boolean;
+  missingInstructionStages: WorkStage[];
 };
 
 const PROCESS_ROUTE_CHOICE: Record<ProcessRoute, PostPickRoute> = {
@@ -113,6 +129,44 @@ function scannerRouteDecision(provenance: ImmutableRouteProvenance | null): Univ
         ...(route === "ASSEMBLE" || route === "MARK_ASSEMBLE" ? (!provenance?.assemblyInstructionSnapshot ? ["ASSEMBLE" as const] : []) : [])
       ]
     }))
+  };
+}
+
+function scannerMarkRouteDecision(input: {
+  routeSnapshotJson: string | null;
+  metadataJson: string | null;
+  provenance: ImmutableRouteProvenance | null;
+}): UniversalScannerStageRouteDecision | null {
+  const snapshot = parseWorkRouteSnapshot(input.routeSnapshotJson);
+  if (!snapshot) return null;
+  const eligibility = resolveForwardStageEligibility({
+    currentStage: "MARK",
+    selectedStages: snapshot.actualStages,
+    completedStages: snapshot.completedStages,
+  });
+  if (!eligibility.valid) return null;
+  const presentation = resolveWorkRoutePresentation({
+    routeSnapshotJson: input.routeSnapshotJson,
+    metadataJson: input.metadataJson,
+    savedProcessRoute: input.provenance?.savedProcessRoute ?? null,
+    currentStage: "MARK",
+  });
+  const selectableNextStages = eligibility.selectableStages.filter(
+    (stage): stage is "ASSEMBLE" | "PACK" => stage === "ASSEMBLE" || stage === "PACK",
+  );
+  const preselectedNextStage = eligibility.preselectedNextStage === "ASSEMBLE" || eligibility.preselectedNextStage === "PACK"
+    ? eligibility.preselectedNextStage
+    : null;
+  return {
+    selectableNextStages,
+    preselectedNextStage,
+    processRoute: presentation.processRoute,
+    savedProcessRoute: presentation.savedProcessRoute,
+    hasExplicitSavedRoute: Boolean(input.provenance?.hasExplicitSavedRoute && input.provenance.savedProcessRoute),
+    routeDegraded: presentation.degraded,
+    missingInstructionStages: [
+      ...(!input.provenance?.assemblyInstructionSnapshot ? ["ASSEMBLE" as const] : []),
+    ],
   };
 }
 
@@ -294,6 +348,7 @@ export async function resolveUniversalWork(
   const orderMarkTasks = gateOrders.length ? await client.workTask.findMany({ where: { accountId: { in: accountIds }, sourceType: "ORDER", orderId: { in: gateOrders.map((order) => order.id) }, stage: "MARK", status: { in: ["READY", "IN_PROGRESS", "PROBLEM"] } }, select: { id: true, orderId: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, metadataJson: true, workGroupMembership:{select:{groupKey:true}},assignedUser: { select: { name: true } } } }) : [];
   const orderMarkTaskByOrder = new Map(orderMarkTasks.flatMap((task) => task.orderId ? [[task.orderId, task] as const] : []));
   const orderPickTasks=gateOrders.length?await client.workTask.findMany({where:{accountId:{in:accountIds},sourceType:"ORDER",orderId:{in:gateOrders.map(order=>order.id)},stage:"PICK"},select:{id:true,orderId:true,workCardSnapshotJson:true,routeSnapshotJson:true,workGroupMembership:{select:{groupKey:true}}}}):[],orderPickTaskByOrder=new Map(orderPickTasks.flatMap(task=>task.orderId?[[task.orderId,task] as const]:[]));
+  const orderPackTasks=gateOrders.length?await client.workTask.findMany({where:{accountId:{in:accountIds},sourceType:"ORDER",orderId:{in:gateOrders.map(order=>order.id)},stage:"PACK",status:{in:["READY","IN_PROGRESS"]}},select:{orderId:true,assignedUserId:true,assignedUser:{select:{name:true}}}}):[];
 
   const listingIds = [...new Set(identifierRows.map((row) => row.marketplaceListingId))];
   const taskLineMatch: Prisma.ConsignmentLineWhereInput = {
@@ -322,7 +377,7 @@ export async function resolveUniversalWork(
     OR: [{ id: code }, { consignmentLine: taskLineMatch }]
   };
   const taskSelect = {
-    id: true, accountId: true, stage: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, completedAt: true, problemReason: true,workCardSnapshotJson:true,routeSnapshotJson:true,
+    id: true, accountId: true, stage: true, status: true, requiredQuantity: true, completedQuantity: true, assignedUserId: true, completedAt: true, problemReason: true,workCardSnapshotJson:true,routeSnapshotJson:true,metadataJson:true,version:true,
     assignedUser: { select: { name: true } }, completedByUser: { select: { name: true } }, problemReportedByUserId: true,
     consignmentLine: {
       select: {
@@ -431,7 +486,10 @@ export async function resolveUniversalWork(
       const totalQuantity = shipment.reduce((total, item) => total + item.qty, 0);
       const workflow = await resolveOrderShipmentWorkflowPrerequisites({ accountId: order.accountId, orderIds: shipment.map(item => item.id) }, client);
       const packReady = workflow.package.packReady && shipment.every((item) => ["READY", "PACKED"].includes(item.packStatus));
-      const packable = packReady && hasWorkPermission(scope.user, "canPack");
+      const shipmentOrderIds = new Set(shipment.filter((item) => item.packStatus !== "PACKED").map((item) => item.id));
+      const shipmentPackTasks = orderPackTasks.filter((task) => task.orderId && shipmentOrderIds.has(task.orderId));
+      const actorEligibility = resolveOrderPackActorEligibility({ actorUserId: scope.user.id, packTasks: shipmentPackTasks });
+      const packable = packReady && hasWorkPermission(scope.user, "canPack") && actorEligibility.eligible;
       const products = [...new Set(shipment.map((item) => item.sku))];
       candidates.push({
         ...common,
@@ -455,11 +513,12 @@ export async function resolveUniversalWork(
         productCount: products.length,
         workflowPrerequisites: workflow.package,
         canAct: packable,
-        readOnlyReason: problemCount ? "Shipment contains problem work." : workflow.package.blocker ? `${workflow.package.blocker} Pack is locked.` : packable ? null : packReady ? "Pack permission is required." : "Shipment changed; scan again before packing."
+        assignedUserName: summarize(shipmentPackTasks.map((task) => task.assignedUser?.name)),
+        readOnlyReason: problemCount ? "Shipment contains problem work." : workflow.package.blocker ? `${workflow.package.blocker} Pack is locked.` : actorEligibility.reason ?? (packable ? null : packReady ? "Pack permission is required." : "Shipment changed; scan again before packing.")
       });
     } else if (!isProblem) {
-      const workflow=await resolveOrderShipmentWorkflowPrerequisites({accountId:order.accountId,orderIds:[order.id]},client),packReady=workflow.package.packReady&&order.packStatus==="READY",packable=packReady&&hasWorkPermission(scope.user,"canPack");
-      candidates.push({ ...common, candidateKey: `order:${order.id}:pack`, actionType: "ORDER_PACK", stage:"PACK", status: packReady ? "PACK_READY" : workflow.package.stages.MARK.state!=="SATISFIED"&&workflow.package.stages.MARK.state!=="NOT_REQUIRED"?"MARK_PENDING":workflow.package.stages.ASSEMBLE.state!=="SATISFIED"&&workflow.package.stages.ASSEMBLE.state!=="NOT_REQUIRED"?"ASSEMBLY_PENDING":"PICK_PENDING", workflowPrerequisites:workflow.package,canAct: packable, readOnlyReason: packable ? null : !packReady ? `${workflow.package.blocker??"Workflow prerequisites are incomplete."} Pack is locked.` : "Pack permission is required." });
+      const workflow=await resolveOrderShipmentWorkflowPrerequisites({accountId:order.accountId,orderIds:[order.id]},client),packReady=workflow.package.packReady&&order.packStatus==="READY",packTasks=orderPackTasks.filter(task=>task.orderId===order.id),actorEligibility=resolveOrderPackActorEligibility({actorUserId:scope.user.id,packTasks}),packable=packReady&&hasWorkPermission(scope.user,"canPack")&&actorEligibility.eligible;
+      candidates.push({ ...common, candidateKey: `order:${order.id}:pack`, actionType: "ORDER_PACK", stage:"PACK", status: packReady ? "PACK_READY" : workflow.package.stages.MARK.state!=="SATISFIED"&&workflow.package.stages.MARK.state!=="NOT_REQUIRED"?"MARK_PENDING":workflow.package.stages.ASSEMBLE.state!=="SATISFIED"&&workflow.package.stages.ASSEMBLE.state!=="NOT_REQUIRED"?"ASSEMBLY_PENDING":"PICK_PENDING", workflowPrerequisites:workflow.package,assignedUserName:summarize(packTasks.map(task=>task.assignedUser?.name)),canAct: packable, readOnlyReason: actorEligibility.reason??(packable ? null : !packReady ? `${workflow.package.blocker??"Workflow prerequisites are incomplete."} Pack is locked.` : "Pack permission is required.") });
     }
   }
 
@@ -472,7 +531,10 @@ export async function resolveUniversalWork(
     if (!visibleProblem) continue;
     const capabilities = getWorkTaskCapabilities(scope.user, task);
     let workflow=consignmentWorkflowByLine.get(line.id);if(!workflow){workflow=await resolveConsignmentLineWorkflowPrerequisites({accountId:task.accountId,consignmentLineId:line.id},client);consignmentWorkflowByLine.set(line.id,workflow);}
-    const canAct = task.status !== "PROBLEM" && capabilities.canProgress && (task.stage!=="PACK"||workflow.packReady);
+    const provenance=parseImmutableRouteProvenance(task.workCardSnapshotJson)??parseImmutableRouteProvenance(task.routeSnapshotJson),missingInstructionStages:WorkStage[]=[];if(!provenance?.markingInstructionSnapshot)missingInstructionStages.push("MARK");if(!provenance?.assemblyInstructionSnapshot)missingInstructionStages.push("ASSEMBLE");
+    const stageRouteDecision=task.stage==="MARK"?scannerMarkRouteDecision({routeSnapshotJson:task.routeSnapshotJson,metadataJson:task.metadataJson,provenance}):null;
+    const routeReady=task.stage!=="MARK"||Boolean(stageRouteDecision?.preselectedNextStage||stageRouteDecision?.selectableNextStages.length);
+    const canAct = task.status !== "PROBLEM" && capabilities.canProgress && (task.stage!=="PACK"||workflow.packReady) && routeReady;
     const matchingRows = identifierRows.filter((row) => row.marketplaceListingId === line.marketplaceListingId);
     let matchType = highestPriorityIdentifierType(matchingRows);
     if (task.id === code) matchType = "WORK_TASK_ID";
@@ -485,13 +547,13 @@ export async function resolveUniversalWork(
     else if (!matchType && line.listingIdSnapshot && [code, upper].includes(line.listingIdSnapshot)) matchType = "LISTING_ID";
     else if (!matchType && line.consignmentBatch.externalConsignmentNumber === code) matchType = "CONSIGNMENT_NUMBER";
     const asset = line.markingAsset;
-    const provenance=parseImmutableRouteProvenance(task.workCardSnapshotJson)??parseImmutableRouteProvenance(task.routeSnapshotJson),missingInstructionStages:WorkStage[]=[];if(!provenance?.markingInstructionSnapshot)missingInstructionStages.push("MARK");if(!provenance?.assemblyInstructionSnapshot)missingInstructionStages.push("ASSEMBLE");
     candidates.push({
       candidateKey: `task:${task.id}`,
       sourceType: "CONSIGNMENT_TASK",
       actionType: task.stage==="PICK"&&capabilities.canProgress?"CONSIGNMENT_PICK":canAct ? taskAction(task.stage, task.status) : task.status === "PROBLEM" ? "PROBLEM" : "READ_ONLY",
       sourceId: task.id,
       taskId: task.id,
+      taskVersion: task.version,
       consignmentLineId: line.id,
       accountId: task.accountId,
       accountName: account.accountDisplayName ?? account.name,
@@ -523,6 +585,7 @@ export async function resolveUniversalWork(
       workflowPrerequisites:workflow,
       missingInstructionStages,
       routeDecision:task.stage==="PICK"?scannerRouteDecision(provenance):undefined,
+      stageRouteDecision:stageRouteDecision??undefined,
       markingMasterDesignId: asset?.masterDesignId,
       markingAssetName: asset?.name,
       markingPosition: asset?.markingPosition,
@@ -534,7 +597,7 @@ export async function resolveUniversalWork(
       markingPasses: asset?.passes,
       markingInstructions: asset?.instructions,
       canAct,
-      readOnlyReason: canAct ? null : task.stage==="PACK"&&workflow.blocker?`${workflow.blocker} Pack is locked.`:task.stage==="PICK"&&capabilities.canProgress?"Pack locked. Open Details to continue in Pick work.":task.status === "COMPLETED" ? "Packing is complete. This result is read-only." : task.status === "PROBLEM" ? "Problem requires authorized review." : "Task is assigned to another worker or you lack stage permission."
+      readOnlyReason: canAct ? null : task.stage==="PACK"&&workflow.blocker?`${workflow.blocker} Pack is locked.`:task.stage==="MARK"&&!stageRouteDecision?"Process Flow is unavailable. Open Details before completing Marking.":task.stage==="PICK"&&capabilities.canProgress?"Pack locked. Open Details to continue in Pick work.":task.status === "COMPLETED" ? "Packing is complete. This result is read-only." : task.status === "PROBLEM" ? "Problem requires authorized review." : "Task is assigned to another worker or you lack stage permission."
     });
   }
 

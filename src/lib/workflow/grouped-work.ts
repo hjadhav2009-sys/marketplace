@@ -10,6 +10,7 @@ import { parseManualMarkingGuidance, resolveMarkingGuidance, type ManualMarkingG
 import { resolveForwardStageEligibility } from "./route-stage-eligibility";
 import { resolveAssemblyGuidance, type AssemblyGuidanceModel } from "./assembly-guidance";
 import { resolveConsignmentLineWorkflowPrerequisites, resolveOrderShipmentWorkflowPrerequisites, WORKFLOW_STAGES, type WorkflowPrerequisiteSummary, type WorkflowPrerequisiteState } from "./workflow-prerequisites";
+import { resolveOrderPackActorEligibility } from "./order-pack-actor-eligibility";
 
 type Client=PrismaClient|Prisma.TransactionClient;
 export type GroupedWorkSource=ProjectionSource;
@@ -49,11 +50,11 @@ export async function getGroupedWork(input:{actorUserId:string;accountId:string;
   const baseCard=card(row,ids,missing,{orderItemId:representative?.order?.orderItemId,orderNumber:representative?.order?.orderNo,shipmentId:representative?.order?.shipmentId,trackingId:representative?.order?.trackingId,consignmentLineId:representative?.consignmentLineId,consignmentNumber:representative?.consignmentLine?.consignmentBatch.externalConsignmentNumber},route,availableMissing,markingGuidance,manualMarkingGuidance,assemblyGuidance);
   if(row.stage!=="PACK"){cards.push(baseCard);continue;}
   const assignedUserNames=[...new Set(memberships.map(item=>item.task.assignedUser?.name).filter((value):value is string=>Boolean(value)))];
-  const assignedUserIds=[...new Set(memberships.map(item=>item.task.assignedUserId).filter((value):value is string=>Boolean(value)))];
   if(row.sourceType==="ORDER"){
    const orderIds=[...new Set(memberships.map(item=>item.task.order?.id).filter((value):value is string=>Boolean(value)))];
    const readiness=await resolveOrderShipmentWorkflowPrerequisites({accountId:input.accountId,orderIds},client);
-   cards.push({...baseCard,packReadiness:packReadiness(readiness.package,[...readiness.perOrder.values()]),assignmentConflict:assignedUserIds.length>1,assignedUserNames});
+   const actorEligibility=resolveOrderPackActorEligibility({actorUserId:user.id,packTasks:memberships.map(item=>({assignedUserId:item.task.assignedUserId}))});
+   cards.push({...baseCard,packReadiness:packReadiness(readiness.package,[...readiness.perOrder.values()]),assignmentConflict:actorEligibility.assignmentConflict,assignedUserNames});
   }else if(representative?.consignmentLineId){
    const readiness=await resolveConsignmentLineWorkflowPrerequisites({accountId:input.accountId,consignmentLineId:representative.consignmentLineId},client);
    cards.push({...baseCard,packReadiness:packReadiness(readiness),assignmentConflict:false,assignedUserNames});

@@ -81,6 +81,7 @@ Focused validation:
 
 - `tests/phase-7-4c6a-problem-state-fidelity.test.ts`
 - `scripts/qa/phase-7-4c6a-browser.mjs`
+- `scripts/qa/phase-7-4c6a-browser-v2.mjs` (final expanded browser gate)
 - `package.json`
 
 Documentation:
@@ -97,19 +98,24 @@ Documentation:
 - legacy null, quantity zero → `READY`;
 - legacy null, positive quantity → `IN_PROGRESS`;
 - unsupported/malformed prior values use the quantity fallback;
-- a reported quantity-zero `IN_PROGRESS` Mark task resolves back to `IN_PROGRESS`;
+- the actual report service records and restores quantity-zero `IN_PROGRESS` Mark truth;
+- the actual report service records and restores partially completed `IN_PROGRESS` truth;
+- every READY/IN_PROGRESS/null/unsupported restoration case asserts database state before and after resolution;
 - completed Pick remains `COMPLETED`;
 - downstream Pack remains `LOCKED`;
+- Assembly resolution preserves completed Pick/Mark and locked Pack;
+- Pack resolution preserves completed Pick/Mark/Assembly;
+- Customer Order stage-aware restoration remains unchanged;
 - quantity and assignment remain unchanged by resolution;
+- reassignment leaves completed quantity and route snapshot truth unchanged;
 - same request ID and same reassignment payload replays idempotently;
 - same request ID with a changed assignee is rejected;
 - a new request ID with a new authorized assignee succeeds;
 - an incompatible stage worker is rejected;
 - a cross-account worker is rejected;
+- an unauthorized non-manager is rejected;
 - reassignment does not resolve the Problem;
 - exactly two action logs represent two legitimate reassignment mutations.
-
-The existing C6 suite continues to prove Order stage-aware Problem resolution without rewind.
 
 ## Required validation
 
@@ -117,8 +123,13 @@ Passed:
 
 - `npm.cmd run typecheck`
 - `npm.cmd run lint`
+- `npm.cmd run phase7.4c3a:test`
+- `npm.cmd run phase7.4c3a1:test`
+- `npm.cmd run phase7.4c3a2:test`
 - `npm.cmd run phase7.4c3c:test`
 - `npm.cmd run phase7.4c4:test`
+- `npm.cmd run phase7.4c4a:test`
+- `npm.cmd run phase7.4c4a1:test`
 - `npm.cmd run phase7.4c5:test`
 - `npm.cmd run phase7.4c6:test`
 - `npm.cmd run phase7.4c6a:test`
@@ -126,8 +137,12 @@ Passed:
 - `npm.cmd run direct-stage-actions:test`
 - `npm.cmd run workflow:test`
 - `npm.cmd run grouped-details:test`
+- `npm.cmd run live-work:test`
 - `node --check scripts/qa/phase-7-4c6a-browser.mjs`
+- `node --check scripts/qa/phase-7-4c6a-browser-v2.mjs`
 - `git diff --check`
+
+The three C3A package aliases intentionally invoke the same SQLite test file. They were run sequentially to avoid a shared temporary-file race; all three passed.
 
 Lint completed with zero errors. Its 152 warnings are confined to the bundled `.agents/skills/impeccable` tooling and were not introduced by C6A runtime files.
 
@@ -148,21 +163,22 @@ The stopped synthetic staging root was reset after the build. Its exact-build re
 - Address: `127.0.0.1:3188`
 - Real data: untouched
 - Widths: `390 × 844`, `1440 × 900`
-- Browser report: `.codex-tmp/phase-7-4c6a/browser-report.json`
+- Final browser report: `.codex-tmp/phase-7-4c6a/browser-report-v2.json`
 - Screenshots: `.codex-tmp/phase-7-4c6a/owner-review/`
 
-At both widths, the browser performed real server-action submissions:
+The final gate contains eight passing records: four required scenarios at each width. At both widths, the browser performed real worker and owner server-action submissions:
 
-1. Opened the genuine Consignment Mark Problem.
-2. Recorded the first hidden reassignment request ID.
-3. Reassigned Marker → Owner.
-4. Verified the Problem remained open.
-5. Loaded a fresh server render.
-6. Recorded a distinct second request ID.
-7. Reassigned Owner → Marker.
-8. Verified the Problem remained open and exactly two reassignment action logs existed.
-9. Resolved the Problem independently.
-10. Verified the final task states directly from the synthetic SQLite database.
+1. Reset the synthetic Mark task to `IN_PROGRESS`, quantity zero, with completed Pick and locked Pack.
+2. Logged in as the Marker, opened the real individual worker card, and submitted its `Problem` / `Report problem` form.
+3. Verified database truth: `PROBLEM`, `statusBeforeProblem = IN_PROGRESS`, quantity zero.
+4. Logged in as Owner and recorded the first hidden reassignment request ID.
+5. Reassigned Marker A → Marker B and verified the Problem stayed open.
+6. Loaded a fresh server render and recorded a distinct second request ID.
+7. Reassigned Marker B → Marker C and verified the Problem stayed open.
+8. Verified exactly two reassignment logs and zero resolution logs before resolution.
+9. Resolved the Problem independently and verified Mark returned to `IN_PROGRESS`, Pick remained `COMPLETED`, and Pack remained `LOCKED`.
+10. Repeated actual worker reporting and owner resolution for a normal `READY`, quantity-zero task and verified it returned to `READY`.
+11. Opened Universal Scan as Marker, scanned the unresolved Mark fixture, selected `Marking Completed`, and verified Process Flow offered both Assembly and Pack.
 
 Results at both widths:
 
@@ -171,11 +187,14 @@ Results at both widths:
 - second reassignment succeeded: yes
 - Problem stayed open after each reassignment: yes
 - assignment action logs: 2
+- resolution logs before explicit resolution: 0
 - Pick final status: `COMPLETED`
 - Mark final status: `IN_PROGRESS`
 - Mark final quantity: 0
 - Pack final status: `LOCKED`
-- final assignee: Marker
+- final assignee: distinct synthetic Marker C
+- normal READY report/resolve restoration: `READY`
+- unresolved Scanner Mark opened Process Flow: yes
 - document overflow: 0 px
 - enabled controls under 44 px: 0
 - console errors: 0
@@ -187,7 +206,7 @@ Results at both widths:
 
 No Scanner source or service file changed in C6A. The required C6, Universal Scanner, direct-stage, and workflow regression suites all passed, retaining:
 
-- unresolved Mark → Process Flow;
+- unresolved Mark → `Marking Completed` → Process Flow (also browser-proven at both widths);
 - actor-blocked Pack without `Pack Completed`;
 - successful scan clear/focus behavior;
 - completed scan read-only behavior.

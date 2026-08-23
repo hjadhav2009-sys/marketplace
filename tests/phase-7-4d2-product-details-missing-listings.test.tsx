@@ -27,7 +27,7 @@ assert.match(detailView, /saveCatalogFieldLocksAction/);
 assert.match(editAdapter, /updateManualListingAction/);
 for (const name of ["sellerSku", "productTitle", "brand", "category", "subCategory", "fsn", "listingIdentifier", "listingStatus", "mrp", "sellingPrice", "mainImageUrl", "description", "manualLocked"]) assert.match(editForm, new RegExp(`name=\\"${name}\\"`));
 assert.match(missingAdapter, /MissingListingsWorkspace/);
-assert.match(missingView, /Orders \+ Consignments/);
+assert.match(missingView, /All sources/);
 assert.match(missingView, /Resolve row/);
 assert.match(resolutionAdapter, /MissingListingResolutionWorkspace/);
 for (const label of ["Link existing", "Create minimal", "Create full"]) assert.ok(resolutionView.includes(label));

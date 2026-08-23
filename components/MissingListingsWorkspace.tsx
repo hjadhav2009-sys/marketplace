@@ -37,7 +37,7 @@ export async function MissingListingsWorkspace({ searchParams }: { searchParams:
     <Surface padding="compact" className="mb-4 mt-4">
       <form className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_auto]">
         <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-slate-600">Search seller SKU or source identity</span><input className="ui-field-control w-full" type="search" name="q" defaultValue={result.query} placeholder="SKU, title, FSN, ASIN, or reference"/></label>
-        <label><span className="mb-1 block text-xs font-semibold text-slate-600">Source</span><select className="ui-field-control w-full" name="source" defaultValue={result.source}><option value="all">Orders + Consignments</option><option value="orders">Orders</option><option value="consignments">Consignments</option></select></label>
+        <label><span className="mb-1 block text-xs font-semibold text-slate-600">Source</span><select className="ui-field-control w-full" name="source" defaultValue={result.source}><option value="all">All sources</option><option value="orders">Orders</option><option value="consignments">Consignments</option></select></label>
         <label><span className="mb-1 block text-xs font-semibold text-slate-600">Reason</span><select className="ui-field-control w-full" name="reason" defaultValue={result.reason}><option value="all">All reasons</option><option value="missing">Not found</option><option value="ambiguous">Multiple matches</option><option value="conflict">Identifier conflict</option></select></label>
         <button className={`${buttonStyles({ variant: "secondary" })} self-end`}>Apply</button>
       </form>

@@ -31,6 +31,8 @@ assert.match(missingView, /Orders \+ Consignments/);
 assert.match(missingView, /Resolve row/);
 assert.match(resolutionAdapter, /MissingListingResolutionWorkspace/);
 for (const label of ["Link existing", "Create minimal", "Create full"]) assert.ok(resolutionView.includes(label));
+assert.doesNotMatch(resolutionView, /aria-current/, "The local resolution selector must not create a second page-current item beside shell navigation.");
+assert.match(resolutionView, /\(selected\)/, "The active resolution method remains explicit to assistive technology.");
 assert.match(resolutionView, /searchProductInventory/);
 assert.match(resolutionView, /savedCandidateIds/);
 assert.match(boundedForm, /ADVANCED_PAGE_SIZE = 40/);

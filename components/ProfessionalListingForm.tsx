@@ -24,13 +24,14 @@ export type ProfessionalListingValue = {
   updatedAt: Date;
 };
 
-export function ProfessionalListingForm({ action, marketplace, clientRequestId, listing }: {
+export function ProfessionalListingForm({ action, marketplace, listing }: {
   action: (data: FormData) => Promise<void>;
   marketplace: string;
   clientRequestId: string;
   listing: ProfessionalListingValue;
 }) {
   const [dirty, setDirty] = useState(false);
+  const clientRequestId = `listing-edit:${listing.updatedAt.toISOString()}:${listing.id}`.slice(0, 160);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
     window.addEventListener("beforeunload", warn);

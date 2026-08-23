@@ -1,10 +1,10 @@
-import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { saveCatalogFieldLocksAction } from "@/app/owner/product-inventory/[listingId]/actions";
 import { LOCKABLE_CATALOG_FIELDS } from "@/app/owner/product-inventory/[listingId]/fields";
 import { marketplaceIdentities, markingLabel, processingLabel } from "@/app/owner/product-inventory/presentation";
 import { formatDateTime } from "@/lib/format";
 import { displayAttributeValue, loadProductDetail, parseManualLocks, productImageUrls } from "@/lib/product-inventory-details";
+import { stableActionRequestId } from "@/lib/stable-action-request-id";
 import { PageHeader } from "./PageHeader";
 import { StatusBadge } from "./StatusBadge";
 import { SubmitButton } from "./SubmitButton";
@@ -36,6 +36,7 @@ export function ProductInventoryDetails({ result, accountName, showEmpty }: { re
     hasFile: Boolean(markingAsset.files.length)
   }));
   const locks = parseManualLocks(listing.manualLocksJson);
+  const lockRequestId = stableActionRequestId("catalog-locks", listing.id, listing.updatedAt);
   const identities = marketplaceIdentities({
     marketplace: listing.marketplace,
     sellerSkuId: listing.sellerSkuId,
@@ -58,7 +59,7 @@ export function ProductInventoryDetails({ result, accountName, showEmpty }: { re
       <aside className="min-w-0 space-y-4">
         <WorkImageGallery images={productImageUrls(listing as unknown as Record<string, unknown>)} alt={listing.productTitle ?? listing.sellerSkuId} priority/>
         <Surface padding="compact"><h2 className="font-semibold text-slate-950">Saved processing truth</h2><p className="mt-1 text-sm leading-6 text-slate-600">No saved default uses Direct to Pack. Active work keeps its frozen route snapshot.</p><dl className="my-3 grid gap-2"><Summary label="Route" value={processingLabel(rule?.route)}/><Summary label="Marking" value={markingLabel(rule?.route, Boolean(listing.markingAssetLinks.length))}/><Summary label="Assembly" value={rule?.route.includes("ASSEMBLE") ? rule.assemblyTitle ?? "Assembly configured" : "Not required by default"}/></dl><ProfessionalProcessRuleEditor listingId={listing.id} rule={rule} assets={assets}/></Surface>
-        <Surface padding="compact"><h2 className="font-semibold text-slate-950">Manual protection</h2><p className="mt-1 text-sm leading-6 text-slate-600">Protected owner values survive marketplace refresh. Unchecked fields remain refreshable.</p><form action={saveCatalogFieldLocksAction} className="mt-3"><input type="hidden" name="marketplaceListingId" value={listing.id}/><input type="hidden" name="expectedUpdatedAt" value={listing.updatedAt.toISOString()}/><input type="hidden" name="clientRequestId" value={randomUUID()}/><fieldset className="grid gap-2"><legend className="sr-only">Fields protected from automated refresh</legend>{LOCKABLE_CATALOG_FIELDS.map((field) => <label key={field} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-stone-50"><input type="checkbox" name="lockedField" value={field} defaultChecked={locks.has(field)}/>{fieldLabel(field)}</label>)}</fieldset><SubmitButton className="mt-3 w-full" pendingText="Saving protection...">Save protection</SubmitButton></form></Surface>
+        <Surface padding="compact"><h2 className="font-semibold text-slate-950">Manual protection</h2><p className="mt-1 text-sm leading-6 text-slate-600">Protected owner values survive marketplace refresh. Unchecked fields remain refreshable.</p><form action={saveCatalogFieldLocksAction} className="mt-3"><input type="hidden" name="marketplaceListingId" value={listing.id}/><input type="hidden" name="expectedUpdatedAt" value={listing.updatedAt.toISOString()}/><input type="hidden" name="clientRequestId" value={lockRequestId}/><fieldset className="grid gap-2"><legend className="sr-only">Fields protected from automated refresh</legend>{LOCKABLE_CATALOG_FIELDS.map((field) => <label key={field} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-stone-50"><input type="checkbox" name="lockedField" value={field} defaultChecked={locks.has(field)}/>{fieldLabel(field)}</label>)}</fieldset><SubmitButton className="mt-3 w-full" pendingText="Saving protection...">Save protection</SubmitButton></form></Surface>
       </aside>
       <main className="min-w-0 space-y-4">
         <Surface padding="compact"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">Listing record</h2><p className="mt-1 text-sm text-slate-600">Operational values appear first. Empty supported fields stay hidden by default.</p></div><Link href={detailHref(listing.id, { empty: !showEmpty, query: attributeQuery, page })} className={buttonStyles({ variant: "quiet" })}>{showEmpty ? "Hide empty fields" : "Show empty fields"}</Link></div><div className="mt-4 divide-y divide-slate-200">

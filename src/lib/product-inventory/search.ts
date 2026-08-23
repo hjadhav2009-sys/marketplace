@@ -1,10 +1,12 @@
-import { IdentifierType, Prisma, type PrismaClient } from "@prisma/client";
+import { IdentifierType, Prisma, ProcessRoute, type PrismaClient } from "@prisma/client";
 import { normalizeListingIdentifier } from "@/src/lib/marking/identifiers";
 
 export const PRODUCT_INVENTORY_PAGE_SIZE = 25;
+export const MEESHO_LIST_IDENTITY_KEYS = ["product_id", "catalog_id", "meesho_product_id", "meesho_catalog_id"];
 
 export type ProductInventorySearchInput = {
   accountId: string;
+  marketplace?: string | null;
   query?: string | null;
   status?: string | null;
   route?: string | null;
@@ -14,7 +16,10 @@ export type ProductInventorySearchInput = {
 };
 
 const include = {
-  identifiers: { where: { active: true }, orderBy: { identifierType: "asc" as const } },
+  identifiers: {
+    where: { active: true, identifierType: { in: ["SELLER_SKU", "FSN", "LISTING_ID", "ASIN", "FNSKU"] as IdentifierType[] } },
+    orderBy: { identifierType: "asc" as const }
+  },
   processRules: { where: { active: true }, take: 1 },
   markingAssetLinks: { where: { active: true }, take: 1 }
 } satisfies Prisma.MarketplaceListingInclude;
@@ -24,10 +29,12 @@ function normalizedIdentifierValues(query: string) {
 }
 
 export function productInventoryBaseWhere(input: ProductInventorySearchInput): Prisma.MarketplaceListingWhereInput {
+  const route = input.route && Object.values(ProcessRoute).includes(input.route as ProcessRoute) ? input.route as ProcessRoute : null;
   return {
     accountId: input.accountId,
+    ...(input.marketplace ? { marketplace: input.marketplace } : {}),
     ...(input.status === "active" ? { listingStatus: { notIn: ["INACTIVE", "ARCHIVED"] } } : input.status === "inactive" ? { listingStatus: { in: ["INACTIVE", "ARCHIVED"] } } : {}),
-    ...(input.route === "none" ? { processRules: { none: { active: true } } } : input.route ? { processRules: { some: { active: true, route: input.route as never } } } : {}),
+    ...(input.route === "none" ? { processRules: { none: { active: true } } } : route ? { processRules: { some: { active: true, route } } } : {}),
     ...(input.image === "missing" ? { mainImageUrl: null } : input.image === "available" ? { mainImageUrl: { not: null } } : {})
   };
 }
@@ -40,6 +47,7 @@ export function productInventoryExactWhere(query: string): Prisma.MarketplaceLis
       { sku: { equals: query } },
       { fsn: { equals: query } },
       { listingId: { equals: query } },
+      { attributes: { some: { technicalKey: { in: MEESHO_LIST_IDENTITY_KEYS }, valueText: { equals: query } } } },
       { identifiers: { some: { active: true, OR: [{ rawValue: { equals: query } }, { normalizedValue: { in: normalizedValues } }] } } }
     ]
   };
@@ -57,6 +65,7 @@ export function productInventoryContainsWhere(query: string): Prisma.Marketplace
       { liveTitle: { contains: query } },
       { liveCategory: { contains: query } },
       { subCategory: { contains: query } },
+      { attributes: { some: { technicalKey: { in: MEESHO_LIST_IDENTITY_KEYS }, valueText: { contains: query } } } },
       { identifiers: { some: { active: true, OR: [{ rawValue: { contains: query } }, { normalizedValue: { in: normalizedValues } }] } } }
     ]
   };
@@ -65,8 +74,7 @@ export function productInventoryContainsWhere(query: string): Prisma.Marketplace
 export async function searchProductInventory(client: PrismaClient, input: ProductInventorySearchInput) {
   const query = input.query?.trim().slice(0, 160) ?? "";
   const pageSize = Math.max(1, Math.min(input.pageSize ?? PRODUCT_INVENTORY_PAGE_SIZE, 100));
-  const page = Math.max(1, input.page ?? 1);
-  const skip = (page - 1) * pageSize;
+  const requestedPage = Math.max(1, input.page ?? 1);
   const base = productInventoryBaseWhere(input);
   const exact = query ? productInventoryExactWhere(query) : undefined;
   const contains = query ? productInventoryContainsWhere(query) : undefined;
@@ -77,6 +85,8 @@ export async function searchProductInventory(client: PrismaClient, input: Produc
     client.marketplaceListing.count({ where: allWhere }),
     exact ? client.marketplaceListing.count({ where: { AND: [base, exact] } }) : Promise.resolve(0)
   ]);
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(total / pageSize)));
+  const skip = (page - 1) * pageSize;
 
   const exactTake = Math.max(0, Math.min(pageSize, exactCount - skip));
   const exactRows = exactTake > 0 && exact

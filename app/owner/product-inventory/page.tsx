@@ -1,60 +1,127 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { ProductImage } from "@/components/ProductImage";
-import { StatusBadge } from "@/components/StatusBadge";
+import { buttonStyles } from "@/components/ui/buttonStyles";
+import { Metric } from "@/components/ui/Metric";
 import { requireAccount, requireUser } from "@/lib/auth";
-import { formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { PRODUCT_INVENTORY_PAGE_SIZE, searchProductInventory } from "@/src/lib/product-inventory/search";
+import { InventoryCard } from "./InventoryCard";
+import { InventoryFilters } from "./InventoryFilters";
+import { normalizeProcessingFilter, productInventoryHref, type ProductInventoryFilterState } from "./presentation";
 
-const routeLabel = (route?: string) => route === "PICK_PACK" ? "Direct to Pack" : route === "PICK_MARK_PACK" ? "Send to Marking" : route === "PICK_ASSEMBLE_PACK" ? "Send to Assembly" : route === "PICK_MARK_ASSEMBLE_PACK" ? "Marking then Assembly" : "Direct to Pack (no saved default)";
+type SearchParams = { q?: string; status?: string; processing?: string; default?: string; image?: string; page?: string };
 
-type SearchParams = { q?: string; status?: string; default?: string; image?: string; page?: string };
+function metricHref(state: ProductInventoryFilterState, changes: Partial<ProductInventoryFilterState>) {
+  return productInventoryHref({ ...state, ...changes }, 1);
+}
 
 export default async function ProductInventoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requireUser(["OWNER"]);
   const account = await requireAccount(user);
   const params = await searchParams;
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const state: ProductInventoryFilterState = {
+    q: params.q?.trim().slice(0, 160) ?? "",
+    status: params.status === "active" || params.status === "inactive" ? params.status : "all",
+    image: params.image === "available" || params.image === "missing" ? params.image : "all",
+    processing: normalizeProcessingFilter(params.processing ?? params.default)
+  };
+  const summaryWhere = { accountId: account.id, marketplace: account.marketplace };
   const [summary, result] = await Promise.all([
     prisma.$transaction([
-      prisma.marketplaceListing.count({ where: { accountId: account.id } }),
-      prisma.marketplaceListing.count({ where: { accountId: account.id, listingStatus: { notIn: ["INACTIVE", "ARCHIVED"] } } }),
-      prisma.marketplaceListing.count({ where: { accountId: account.id, mainImageUrl: null } }),
-      prisma.marketplaceListing.count({ where: { accountId: account.id, processRules: { none: { active: true } } } })
+      prisma.marketplaceListing.count({ where: summaryWhere }),
+      prisma.marketplaceListing.count({ where: { ...summaryWhere, listingStatus: { notIn: ["INACTIVE", "ARCHIVED"] } } }),
+      prisma.marketplaceListing.count({ where: { ...summaryWhere, processRules: { none: { active: true } } } }),
+      prisma.marketplaceListing.count({ where: { ...summaryWhere, mainImageUrl: null } })
     ]),
-    searchProductInventory(prisma, { accountId: account.id, query: params.q, status: params.status, route: params.default, image: params.image, page })
+    searchProductInventory(prisma, {
+      accountId: account.id,
+      marketplace: account.marketplace,
+      query: state.q,
+      status: state.status,
+      route: state.processing === "all" ? undefined : state.processing,
+      image: state.image,
+      page
+    })
   ]);
-  const [total, active, missingImage, noDefault] = summary;
+  const [total, active, noDefault, missingImage] = summary;
+  const displayAttributes = account.marketplace === "MEESHO" && result.listings.length ? await prisma.marketplaceListingAttribute.findMany({
+    where: {
+      accountId: account.id,
+      marketplace: account.marketplace,
+      marketplaceListingId: { in: result.listings.map((listing) => listing.id) },
+      technicalKey: { in: ["product_id", "catalog_id", "meesho_product_id", "meesho_catalog_id"] }
+    },
+    select: { marketplaceListingId: true, technicalKey: true, valueText: true },
+    orderBy: { technicalKey: "asc" },
+    take: result.listings.length * 4
+  }) : [];
+  const attributesByListing = new Map<string, typeof displayAttributes>();
+  for (const attribute of displayAttributes) attributesByListing.set(attribute.marketplaceListingId, [...(attributesByListing.get(attribute.marketplaceListingId) ?? []), attribute]);
   const pages = Math.max(1, Math.ceil(result.total / PRODUCT_INVENTORY_PAGE_SIZE));
-  const href = (nextPage: number) => { const next = new URLSearchParams(); if (result.query) next.set("q", result.query); if (params.status && params.status !== "all") next.set("status", params.status); if (params.default) next.set("default", params.default); if (params.image) next.set("image", params.image); next.set("page", String(nextPage)); return `/owner/product-inventory?${next.toString()}`; };
+  const currentPage = result.page;
+  const hasFilters = state.status !== "all" || state.image !== "all" || state.processing !== "all";
 
   return <AppShell>
     <div className="mx-auto w-full max-w-[1440px]">
-      <PageHeader eyebrow="Marketplace product catalog" title="Product Inventory" description="Fast account-scoped listing and catalog search. This is not physical stock inventory." action={{ href: "/owner/product-inventory/refresh", label: "Refresh Product Inventory" }} />
-      <div className="mb-4 flex flex-wrap gap-2"><Link href="/owner/product-inventory/new" className="inline-flex min-h-11 items-center rounded-md bg-slate-950 px-4 font-bold text-white">Create Listing</Link><Link href="/owner/catalog/missing" className="inline-flex min-h-11 items-center rounded-md border border-amber-300 bg-amber-50 px-4 font-bold text-amber-900">Resolve Missing Listings</Link></div>
-      <section className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">{[["Products", total], ["Active", active], ["No saved default", noDefault], ["Missing image", missingImage]].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-950">{Number(value).toLocaleString()}</p></div>)}</section>
-      <form className="mb-4 grid min-w-0 gap-2 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[minmax(18rem,1fr)_auto_auto_auto_auto_auto]">
-        <input name="q" defaultValue={result.query} autoComplete="off" aria-label="Search Product Inventory" placeholder="Search SKU, ID, title, or category" className="min-h-11 min-w-0 rounded-md border border-slate-300 px-3 md:col-span-2 lg:col-span-4 xl:col-span-1" />
-        <select name="status" defaultValue={params.status ?? "all"} className="min-h-11 min-w-0 rounded-md border border-slate-300 px-3"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
-        <select name="image" defaultValue={params.image ?? "all"} className="min-h-11 min-w-0 rounded-md border border-slate-300 px-3"><option value="all">All images</option><option value="available">Image available</option><option value="missing">Missing image</option></select>
-        <select name="default" defaultValue={params.default ?? ""} className="min-h-11 min-w-0 rounded-md border border-slate-300 px-3"><option value="">All processing</option><option value="none">No saved default</option><option value="PICK_PACK">Direct to Pack</option><option value="PICK_MARK_PACK">Marking</option><option value="PICK_ASSEMBLE_PACK">Assembly</option><option value="PICK_MARK_ASSEMBLE_PACK">Marking + Assembly</option></select>
-        <button className="min-h-11 rounded-md bg-slate-950 px-4 font-bold text-white">Search</button>
-        <Link href="/owner/product-inventory" className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-200 px-4 font-bold text-slate-800">Clear</Link>
-      </form>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm"><p className="font-bold text-slate-700">{result.total.toLocaleString()} results{result.query && result.exactCount > 0 ? ` / ${result.exactCount} exact` : ""}</p><p className="text-slate-500">Page {Math.min(page, pages)} of {pages}</p></div>
-      <div className="space-y-3">
-        {result.listings.map((listing, index) => { const identifiers = new Map(listing.identifiers.map((identifier) => [identifier.identifierType, identifier.rawValue])); const rule = listing.processRules[0]; return <article key={listing.id} className="grid min-w-0 gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[5.5rem_minmax(0,1fr)] lg:grid-cols-[5.5rem_minmax(0,1fr)_18rem] lg:items-center">
-          <ProductImage src={listing.mainImageUrl} alt={listing.productTitle ?? listing.sellerSkuId} size="inventory" showBadge={false} priority={index < 4} />
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{listing.marketplace}</span><StatusBadge value={listing.listingStatus ?? "UNKNOWN"} /></div><h2 className="mt-2 break-words text-base font-semibold leading-5 text-slate-950"><Link href={`/owner/product-inventory/${listing.id}`} className="hover:text-berry hover:underline">{listing.productTitle ?? "Missing title"}</Link></h2><p className="mt-1 break-all text-xs font-medium text-slate-600 sm:hidden">Seller SKU: {listing.sellerSkuId}</p><dl className="mt-2 hidden gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid sm:grid-cols-2"><Identity label="Seller SKU" value={listing.sellerSkuId} /><Identity label="Internal SKU" value={listing.sku} /><Identity label="FSN / Listing ID" value={[listing.fsn, listing.listingId].filter(Boolean).join(" / ")} /><Identity label="ASIN / FNSKU" value={[identifiers.get("ASIN"), identifiers.get("FNSKU")].filter(Boolean).join(" / ")} /></dl><details className="mt-2 sm:hidden"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-berry">More identifiers</summary><dl className="grid gap-2 text-xs text-slate-600"><Identity label="Internal SKU" value={listing.sku} /><Identity label="FSN / Listing ID" value={[listing.fsn, listing.listingId].filter(Boolean).join(" / ")} /><Identity label="ASIN / FNSKU" value={[identifiers.get("ASIN"), identifiers.get("FNSKU")].filter(Boolean).join(" / ")} /></dl></details><p className="mt-2 break-words text-xs text-slate-500">{listing.liveCategory ?? listing.subCategory ?? "No category"}</p></div>
-          <div className="flex min-w-0 flex-col gap-2 border-t border-slate-100 pt-3 text-xs lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"><p className="font-semibold text-slate-800">{routeLabel(rule?.route)}</p><p className={listing.markingAssetLinks.length ? "text-teal-700" : "text-slate-500"}>{listing.markingAssetLinks.length ? "Marking mapped" : "No marking mapping"}</p><p className="text-slate-500">Changed {formatDateTime(listing.updatedAt)}</p><Link href={`/owner/product-inventory/${listing.id}`} className="mt-1 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-300 px-4 font-semibold text-slate-800 hover:bg-slate-50">View details</Link></div>
-        </article>; })}
-        {!result.listings.length ? <div className="rounded-md border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">No products match these account-scoped filters.</div> : null}
+      <PageHeader
+        eyebrow={`${account.marketplace} / ${account.accountDisplayName ?? account.name}`}
+        title="Product Inventory"
+        description="Marketplace product and listing catalog."
+        action={{ href: "/owner/product-inventory/refresh", label: "Refresh Product Inventory" }}
+      >
+        <Link href="/owner/catalog/missing" className={buttonStyles({ variant: "secondary" })}>Missing Listings</Link>
+      </PageHeader>
+
+      <section aria-label="Product Inventory summary" className="mb-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white lg:grid-cols-4">
+        <Link href="/owner/product-inventory" className="min-h-11 border-b border-r border-slate-200 p-3 hover:bg-stone-50 lg:border-b-0">
+          <Metric label="Products" value={total.toLocaleString()} />
+        </Link>
+        <Link href={metricHref(state, { status: "active" })} className="min-h-11 border-b border-slate-200 p-3 hover:bg-stone-50 lg:border-b-0 lg:border-r">
+          <Metric label="Active" value={active.toLocaleString()} tone="success" />
+        </Link>
+        <Link href={metricHref(state, { processing: "none" })} className="min-h-11 border-r border-slate-200 p-3 hover:bg-stone-50">
+          <Metric label="No saved default" value={noDefault.toLocaleString()} tone={noDefault ? "warning" : "neutral"} />
+        </Link>
+        <Link href={metricHref(state, { image: "missing" })} className="min-h-11 p-3 hover:bg-stone-50">
+          <Metric label="Missing image" value={missingImage.toLocaleString()} tone={missingImage ? "warning" : "neutral"} />
+        </Link>
+      </section>
+
+      <InventoryFilters state={state} />
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <p className="font-semibold text-slate-800">{result.total.toLocaleString()} {result.total === 1 ? "product" : "products"}{result.query && result.exactCount > 0 ? ` / ${result.exactCount.toLocaleString()} exact` : ""}</p>
+        <p className="text-slate-500">Selected seller account only</p>
       </div>
-      <footer className="mt-4 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white p-3"><span className="text-sm font-semibold text-slate-600">{result.total.toLocaleString()} results</span><div className="flex gap-2">{page > 1 ? <Link className="inline-flex min-h-11 items-center rounded-md border px-4 text-sm font-bold" href={href(page - 1)}>Previous</Link> : null}{page < pages ? <Link className="inline-flex min-h-11 items-center rounded-md border px-4 text-sm font-bold" href={href(page + 1)}>Next</Link> : null}</div></footer>
+
+      {result.listings.length ? <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        {result.listings.map((listing, index) => <InventoryCard key={listing.id} listing={{ ...listing, attributes: attributesByListing.get(listing.id) ?? [] }} priority={index < 2} />)}
+      </div> : total === 0 ? <EmptyState
+        title="No products imported"
+        description={`No products have been imported for this seller account. Refresh ${account.marketplace} Product Inventory to add its marketplace catalog.`}
+        action={{ href: "/owner/product-inventory/refresh", label: "Refresh Product Inventory" }}
+      /> : state.q ? <EmptyState
+        title="No products match this search"
+        description={`No product in the selected seller account matches “${state.q}”. Try a Seller SKU, marketplace ID, title, or category.`}
+        action={{ href: "/owner/product-inventory", label: "Clear search and filters" }}
+      /> : hasFilters ? <EmptyState
+        title="No products match the selected filters"
+        description="Adjust the status, image, or processing filters for the selected seller account."
+        action={{ href: "/owner/product-inventory", label: "Clear filters" }}
+      /> : null}
+
+      {result.total > 0 ? <nav aria-label="Product Inventory pagination" className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="justify-self-start">
+          {currentPage > 1 ? <Link className={buttonStyles({ variant: "secondary" })} href={productInventoryHref(state, currentPage - 1)}>Previous</Link> : <span className={buttonStyles({ variant: "secondary", className: "pointer-events-none opacity-50" })} aria-disabled="true">Previous</span>}
+        </div>
+        <p className="text-center text-sm font-semibold tabular-nums text-slate-700">Page {currentPage} of {pages}</p>
+        <div className="justify-self-end">
+          {currentPage < pages ? <Link className={buttonStyles({ variant: "secondary" })} href={productInventoryHref(state, currentPage + 1)}>Next</Link> : <span className={buttonStyles({ variant: "secondary", className: "pointer-events-none opacity-50" })} aria-disabled="true">Next</span>}
+        </div>
+      </nav> : null}
     </div>
   </AppShell>;
 }
-
-function Identity({ label, value }: { label: string; value: string | null | undefined }) { return <div className="min-w-0"><dt className="font-bold text-slate-500">{label}</dt><dd className="break-all font-semibold text-slate-800">{value || "-"}</dd></div>; }

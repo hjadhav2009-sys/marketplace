@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type Marketplace, type PrismaClient } from "@prisma/client";
 
 export const MISSING_LISTINGS_PAGE_SIZE = 25;
 export const ORDER_MISSING_ISSUES = ["MISSING_FLIPKART_LISTING_MAPPING", "AMBIGUOUS_LISTING"];
@@ -65,7 +65,7 @@ export function normalizeMissingListingFilters(input: {
 export async function loadMissingListings(
   client: PrismaClient,
   accountId: string,
-  marketplace: string,
+  marketplace: Marketplace,
   raw: { source?: string | null; reason?: string | null; query?: string | null; page?: number }
 ) {
   const filters = normalizeMissingListingFilters(raw);

@@ -452,7 +452,7 @@ async function runViewport(browser, viewport, results) {
   await submit(minimalB.page, "Create minimal listing", /\/owner\/catalog\/missing\?resolved=/);
   const minimal = await orderProof(fixture, fixture.minimalOrder, `D2A-MINIMAL-SKU-${viewport.suffix}`);
   const minimalIssue = await db.importRowIssue.findUniqueOrThrow({ where: { id: fixture.minimalIssue } });
-  const minimalReceipts = await db.workflowActionReceipt.count({ where: { accountId: fixture.account, requestKind: "MISSING_LISTING_RESOLUTION", clientRequestId: stableRequestId("missing-minimal", fixture.minimalIssue, 0) } });
+  const minimalReceipts = await db.workflowActionReceipt.count({ where: { accountId: fixture.account, requestKind: "MISSING_LISTING_RESOLUTION", clientRequestId: stableRequestId("missing-minimal", fixture.minimalIssue, 1) } });
   const minimalErrors = mergeErrors(authErrors, minimalA.errors, minimalB.errors);
   results.push({
     state: "CREATE_MINIMAL_MUTATION_AND_REPLAY",
@@ -483,7 +483,7 @@ async function runViewport(browser, viewport, results) {
   const full = await orderProof(fixture, fixture.fullOrder, `D2A-FULL-SKU-${viewport.suffix}`);
   const fullIssue = await db.importRowIssue.findUniqueOrThrow({ where: { id: fixture.fullIssue } });
   const storedAttributes = await db.marketplaceListingAttribute.findMany({ where: { marketplaceListingId: full.listing.id }, select: { technicalKey: true, valueText: true } });
-  const fullReceipts = await db.workflowActionReceipt.count({ where: { accountId: fixture.account, requestKind: "MISSING_LISTING_RESOLUTION", clientRequestId: stableRequestId("missing-full", fixture.fullIssue, 0) } });
+  const fullReceipts = await db.workflowActionReceipt.count({ where: { accountId: fixture.account, requestKind: "MISSING_LISTING_RESOLUTION", clientRequestId: stableRequestId("missing-full", fixture.fullIssue, 1) } });
   const fullErrors = mergeErrors(authErrors, fullAErrors, fullBErrors);
   results.push({
     state: "CREATE_FULL_883_FIELD_MUTATION_AND_REPLAY",
@@ -520,7 +520,7 @@ async function runViewport(browser, viewport, results) {
   const ambiguousIssue = await db.importRowIssue.findUniqueOrThrow({ where: { id: fixture.ambiguousIssue } });
   const ambiguousTasks = await db.workTask.findMany({ where: { orderId: fixture.ambiguousOrder }, select: { id: true, workCardSnapshotJson: true } });
   const ambiguousAudit = await db.auditLog.findMany({ where: { accountId: fixture.account, action: "MISSING_LISTING_RESOLVED", entityId: fixture.ambiguousIssue }, select: { metadata: true } });
-  const ambiguousReceipts = await db.workflowActionReceipt.count({ where: { accountId: fixture.account, requestKind: "MISSING_LISTING_RESOLUTION", clientRequestId: stableRequestId("missing-link", fixture.ambiguousIssue, 0, fixture.candidateB) } });
+  const ambiguousReceipts = await db.workflowActionReceipt.count({ where: { accountId: fixture.account, requestKind: "MISSING_LISTING_RESOLUTION", clientRequestId: stableRequestId("missing-link", fixture.ambiguousIssue, 1, fixture.candidateB) } });
   const ambiguousErrors = mergeErrors(authErrors, ambiguousA.errors, ambiguousB.errors);
   results.push({
     state: "AMBIGUOUS_EXACT_CANDIDATE_MUTATION_AND_REPLAY",

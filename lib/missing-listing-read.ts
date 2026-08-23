@@ -25,7 +25,8 @@ export type MissingListingItem = {
 
 function orderIssueTypes(reason: MissingListingReason) {
   if (reason === "missing") return ["MISSING_FLIPKART_LISTING_MAPPING"];
-  if (reason === "ambiguous" || reason === "conflict") return ["AMBIGUOUS_LISTING"];
+  if (reason === "ambiguous") return ["AMBIGUOUS_LISTING"];
+  if (reason === "conflict") return [];
   return ORDER_MISSING_ISSUES;
 }
 
@@ -69,7 +70,7 @@ export async function loadMissingListings(
   raw: { source?: string | null; reason?: string | null; query?: string | null; page?: number }
 ) {
   const filters = normalizeMissingListingFilters(raw);
-  const includeOrders = filters.source !== "consignments";
+  const includeOrders = filters.source !== "consignments" && filters.reason !== "conflict";
   const includeConsignments = filters.source !== "orders";
   const orderWhere: Prisma.ImportRowIssueWhereInput = {
     batch: { accountId },

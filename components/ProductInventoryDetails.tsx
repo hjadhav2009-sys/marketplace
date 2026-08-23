@@ -3,7 +3,7 @@ import { saveCatalogFieldLocksAction } from "@/app/owner/product-inventory/[list
 import { LOCKABLE_CATALOG_FIELDS } from "@/app/owner/product-inventory/[listingId]/fields";
 import { marketplaceIdentities, markingLabel, processingLabel } from "@/app/owner/product-inventory/presentation";
 import { formatDateTime } from "@/lib/format";
-import { displayAttributeValue, loadProductDetail, parseManualLocks, productImageUrls } from "@/lib/product-inventory-details";
+import { displayAttributeValue, loadProductDetail, parseManualLocks, productImageUrls, safeExternalHttpUrl } from "@/lib/product-inventory-details";
 import { stableActionRequestId } from "@/lib/stable-action-request-id";
 import { PageHeader } from "./PageHeader";
 import { StatusBadge } from "./StatusBadge";
@@ -37,6 +37,10 @@ export function ProductInventoryDetails({ result, accountName, showEmpty }: { re
   }));
   const locks = parseManualLocks(listing.manualLocksJson);
   const lockRequestId = stableActionRequestId("catalog-locks", listing.id, listing.updatedAt);
+  const marketplaceLinks = [
+    { label: "Generated Direct Product URL", href: safeExternalHttpUrl(listing.generatedDirectProductUrl) },
+    { label: "Canonical Product URL", href: safeExternalHttpUrl(listing.canonicalProductUrl) }
+  ].filter((link): link is { label: string; href: string } => Boolean(link.href));
   const identities = marketplaceIdentities({
     marketplace: listing.marketplace,
     sellerSkuId: listing.sellerSkuId,
@@ -58,6 +62,7 @@ export function ProductInventoryDetails({ result, accountName, showEmpty }: { re
     <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)]">
       <aside className="min-w-0 space-y-4">
         <WorkImageGallery images={productImageUrls(listing as unknown as Record<string, unknown>)} alt={listing.productTitle ?? listing.sellerSkuId} priority/>
+        {marketplaceLinks.length ? <Surface padding="compact"><h2 className="font-semibold text-slate-950">Marketplace links</h2><p className="mt-1 text-sm leading-6 text-slate-600">Open only validated HTTP or HTTPS catalog destinations.</p><div className="mt-3 grid gap-2">{marketplaceLinks.map((link) => <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" className={buttonStyles({ variant: "quiet", className: "w-full justify-between" })}><span>{link.label}</span><span aria-hidden="true">↗</span></a>)}</div></Surface> : null}
         <Surface padding="compact"><h2 className="font-semibold text-slate-950">Saved processing truth</h2><p className="mt-1 text-sm leading-6 text-slate-600">No saved default uses Direct to Pack. Active work keeps its frozen route snapshot.</p><dl className="my-3 grid gap-2"><Summary label="Route" value={processingLabel(rule?.route)}/><Summary label="Marking" value={markingLabel(rule?.route, Boolean(listing.markingAssetLinks.length))}/><Summary label="Assembly" value={rule?.route.includes("ASSEMBLE") ? rule.assemblyTitle ?? "Assembly configured" : "Not required by default"}/></dl><ProfessionalProcessRuleEditor listingId={listing.id} rule={rule} assets={assets}/></Surface>
         <Surface padding="compact"><h2 className="font-semibold text-slate-950">Manual protection</h2><p className="mt-1 text-sm leading-6 text-slate-600">Protected owner values survive marketplace refresh. Unchecked fields remain refreshable.</p><form action={saveCatalogFieldLocksAction} className="mt-3"><input type="hidden" name="marketplaceListingId" value={listing.id}/><input type="hidden" name="expectedUpdatedAt" value={listing.updatedAt.toISOString()}/><input type="hidden" name="clientRequestId" value={lockRequestId}/><fieldset className="grid gap-2"><legend className="sr-only">Fields protected from automated refresh</legend>{LOCKABLE_CATALOG_FIELDS.map((field) => <label key={field} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-stone-50"><input type="checkbox" name="lockedField" value={field} defaultChecked={locks.has(field)}/>{fieldLabel(field)}</label>)}</fieldset><SubmitButton className="mt-3 w-full" pendingText="Saving protection...">Save protection</SubmitButton></form></Surface>
       </aside>

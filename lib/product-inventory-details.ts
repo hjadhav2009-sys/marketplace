@@ -109,7 +109,7 @@ export function safeExternalHttpUrl(value: string | null) {
   if (!value) return null;
   try {
     const parsed = new URL(value);
-    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : null;
+    return (parsed.protocol === "https:" || parsed.protocol === "http:") && !parsed.username && !parsed.password ? parsed.toString() : null;
   } catch {
     return null;
   }

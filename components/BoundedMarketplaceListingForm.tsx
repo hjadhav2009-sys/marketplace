@@ -46,7 +46,7 @@ export function BoundedMarketplaceListingForm({ action, issueId, issueVersion, c
   useEffect(() => { setAdvancedPage(1); }, [advancedSearch, profileId]);
 
   return <form action={action} className="space-y-4 overflow-hidden">
-    <input type="hidden" name="issueId" value={issueId}/><input type="hidden" name="expectedIssueVersion" value={issueVersion}/><input type="hidden" name="clientRequestId" value={clientRequestId}/><input type="hidden" name="resolutionAction" value="CREATE_FULL"/><input type="hidden" name="expectedProfileTechnicalFingerprint" value={selectedProfile?.schema?.technicalHeaderFingerprint ?? ""}/>
+    <input type="hidden" name="issueId" value={issueId}/><input type="hidden" name="expectedIssueVersion" value={issueVersion}/><input type="hidden" name="clientRequestId" value={clientRequestId}/><input type="hidden" name="expectedProfileTechnicalFingerprint" value={selectedProfile?.schema?.technicalHeaderFingerprint ?? ""}/>
     {Object.entries(contextFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value}/>)}
     {Object.entries(attributeValues).filter(([key, value]) => value.trim() && !visibleKeys.has(key)).map(([key, value]) => <input key={key} type="hidden" name={`attribute:${key}`} value={value}/>)}
     <Surface padding="compact"><Heading title="Protected product identity" description="These values come from the retained work row and selected seller account."/><div className="mt-4 grid gap-3 sm:grid-cols-2"><ReadOnly label="Marketplace" value={marketplace}/><ReadOnly label="Seller SKU" value={sellerSku}/>{knownIdentifiers.map((item) => <ReadOnly key={`${item.type}:${item.value}`} label={item.type} value={item.value}/>)}</div></Surface>

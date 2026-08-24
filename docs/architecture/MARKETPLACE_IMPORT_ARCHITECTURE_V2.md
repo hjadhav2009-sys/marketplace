@@ -50,12 +50,16 @@ Product Catalog creates and refreshes the marketplace listing master. Daily Orde
 
 ### Product Catalog
 
-- Accept one or more category catalog files.
-- Use technical-header profiles; filenames are not authoritative.
-- Present known categories as reusable file slots.
-- Allow an owner to add a future category profile.
-- A valid category catalog row with a valid Merchant/Seller SKU may create a new `MarketplaceListing`.
-- All Listings remains backward-compatible and optional; it is not required.
+- Accept one or more category catalog files. The current category families are reusable source profiles feeding one canonical Amazon destination contract; a future category profile must not require an application redesign.
+- Use the frozen [Amazon Compact Catalog Contract V1](./AMAZON_COMPACT_CATALOG_CONTRACT_V1.md) for normal Product Catalog processing. Amazon workbooks may contain hundreds of columns, but normal operational import extracts only the useful canonical fields and ignores unrelated columns.
+- Seller SKU is the only mandatory canonical field and remains the listing identity inside the selected seller account. ASIN is optional supporting identity.
+- Technical keys are high-confidence detection signals, not a requirement to persist every source column as a catalog attribute.
+- Preserve repeated source-column identity by sheet/table and column position; duplicate human headers such as repeated `Other Image URL` columns must not overwrite one another.
+- Reuse versioned `MarketplaceFileProfile` mappings. Detection follows technical key, exact saved mapping, exact normalized human header, approved alias, then owner mapping. Seller SKU never uses fuzzy guessing.
+- Present known categories as reusable file slots, allow an owner to add a future source profile, and retain uploaded files for retry after mapping.
+- Missing optional fields and blank incoming optional values do not block import or erase useful stored values.
+- A valid category catalog row with a valid Merchant/Seller SKU may create a new `MarketplaceListing` as `NEEDS_ENRICHMENT`; All Listings remains backward-compatible and optional.
+- Different Seller SKUs remain distinct even when they share an ASIN. Conflicting nonblank identities for the same Seller SKU require review.
 
 ### Daily Orders
 

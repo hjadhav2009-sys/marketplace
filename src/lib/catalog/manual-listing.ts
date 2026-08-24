@@ -109,6 +109,7 @@ function canonicalSellerSku(value: unknown) {
 }
 
 function manualData(common: ManualListingCommonInput, manualLocked: boolean): ManualListingData {
+  const submittedListingStatus = optionalText(common.listingStatus, "Listing status", 80);
   const values = {
     productTitle: optionalText(common.productTitle, "Title", 500),
     liveBrand: optionalText(common.brand, "Brand", 240),
@@ -116,19 +117,19 @@ function manualData(common: ManualListingCommonInput, manualLocked: boolean): Ma
     subCategory: optionalText(common.subCategory, "Sub-category", 240),
     fsn: optionalText(common.fsn, "FSN / ASIN", 160),
     listingId: optionalText(common.listingId, "Listing identifier", 160),
-    listingStatus: optionalText(common.listingStatus, "Listing status", 80) ?? "NEEDS_ENRICHMENT",
+    listingStatus: submittedListingStatus ?? "NEEDS_ENRICHMENT",
     mrp: optionalPrice(common.mrp, "MRP"),
     sellingPrice: optionalPrice(common.sellingPrice, "Selling price"),
     mainImageUrl: optionalHttpUrl(common.mainImageUrl),
     description: optionalText(common.description, "Description", 12_000, true)
   };
-  const entered = MANAGED_FIELDS.filter((field) => values[field] !== null);
+  const ownerSuppliedFields = MANAGED_FIELDS.filter((field) => values[field] !== null && (field !== "listingStatus" || submittedListingStatus !== null));
   const updatedAt = new Date().toISOString();
   const stamp = { sourceProfile: "MANUAL_OWNER", authority: manualLocked ? 500 : 0, importedAt: updatedAt, sourceAuthority: "MANUAL_OWNER", updatedAt };
   return {
     ...values,
-    fieldProvenanceJson: JSON.stringify(Object.fromEntries(entered.map((field) => [field, stamp]))),
-    manualLocksJson: JSON.stringify(Object.fromEntries((manualLocked ? entered : []).map((field) => [field, true])))
+    fieldProvenanceJson: JSON.stringify(Object.fromEntries(ownerSuppliedFields.map((field) => [field, stamp]))),
+    manualLocksJson: JSON.stringify(Object.fromEntries((manualLocked ? ownerSuppliedFields : []).map((field) => [field, true])))
   };
 }
 

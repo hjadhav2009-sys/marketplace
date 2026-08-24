@@ -183,6 +183,8 @@
     "phase7.4d2:browser": "node scripts/qa/phase-7-4d2-browser.mjs",
     "phase7.4d2a:test": "tsx tests/phase-7-4d2a-catalog-form-completeness.test.tsx",
     "phase7.4d2a:browser": "node scripts/phase-7-4d2a-browser.mjs",
+    "phase7.4d2a1:test": "tsx tests/phase-7-4d2a1-final-catalog-intent-contract.test.tsx",
+    "phase7.4d2a1:browser": "node scripts/phase-7-4d2a1-browser.mjs",
     "phase7.4c1a1:browser": "node scripts/qa/phase-7-4c1a1-browser.mjs",
     "stage4-2c:editor-proof": "node scripts/qa/stage4-2c-editor-proof.mjs",
     "stage4.1-performance:test": "tsx tests/stage4-1-product-search-performance.test.ts && tsx tests/grouped-scale.test.ts",

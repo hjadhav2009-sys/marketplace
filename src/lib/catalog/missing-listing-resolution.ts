@@ -190,10 +190,11 @@ function commonListingData(common: CommonFields | undefined, manualLocked: boole
   if ((common?.images?.length ?? 0) > 10) throw new Error("At most 10 image URLs may be submitted.");
   const images = (common?.images ?? []).map((value) => safeUrl(value, "Image URL")).filter((value): value is string => Boolean(value));
   const gallery = preferredFlipkartGallery(Object.fromEntries(images.map((value, index) => [`imageUrl${index + 1}`, value])));
+  const submittedListingStatus = optionalText(common?.listingStatus, "Listing status", 80);
   const data = {
     productTitle: optionalText(common?.productTitle, "Title", 500),
     subCategory: optionalText(common?.subCategory, "Sub-category", 240),
-    listingStatus: optionalText(common?.listingStatus, "Listing status", 80) ?? "NEEDS_ENRICHMENT",
+    listingStatus: submittedListingStatus ?? "NEEDS_ENRICHMENT",
     mrp: nonNegativeNumber(common?.mrp, "MRP"),
     sellingPrice: nonNegativeNumber(common?.sellingPrice, "Selling price"),
     liveTitle: optionalText(common?.liveTitle, "Live title", 500),
@@ -209,13 +210,15 @@ function commonListingData(common: CommonFields | undefined, manualLocked: boole
     mainImageUrl: gallery[0] ?? null,
     ...Object.fromEntries(Array.from({ length: 10 }, (_, index) => [`imageUrl${index + 1}`, gallery[index] ?? null]))
   };
-  const entered = Object.entries(data).filter(([, value]) => value !== null).map(([key]) => key);
+  const ownerSuppliedFields = Object.entries(data)
+    .filter(([key, value]) => value !== null && (key !== "listingStatus" || submittedListingStatus !== null))
+    .map(([key]) => key);
   const updatedAt = new Date().toISOString();
   const stamp = { sourceProfile: "MANUAL_OWNER", authority: manualLocked ? 500 : 0, importedAt: updatedAt, sourceAuthority: "MANUAL_OWNER", updatedAt };
   return {
     ...data,
-    fieldProvenanceJson: JSON.stringify(Object.fromEntries(entered.map((key) => [key, stamp]))),
-    manualLocksJson: JSON.stringify(Object.fromEntries((manualLocked ? entered : []).map((key) => [key, true])))
+    fieldProvenanceJson: JSON.stringify(Object.fromEntries(ownerSuppliedFields.map((key) => [key, stamp]))),
+    manualLocksJson: JSON.stringify(Object.fromEntries((manualLocked ? ownerSuppliedFields : []).map((key) => [key, true])))
   };
 }
 

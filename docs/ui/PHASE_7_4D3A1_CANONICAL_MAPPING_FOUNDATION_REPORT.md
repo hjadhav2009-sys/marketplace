@@ -1,6 +1,8 @@
 # Phase 7.4D3A.1 Canonical Mapping Foundation Report
 
-Result: `PHASE_7_4D3A1_CANONICAL_MAPPING_FOUNDATION_CLOSED`.
+Result: `LOCAL_VERIFIED_PUSH_AWAITING_DIRECT_APPROVAL`.
+
+The CLOSED success marker is withheld because the external branch push is blocked by automatic approval review. All local implementation, tests, exact-build verification, and focused browser proof are complete.
 
 ## Checkpoint identities
 
@@ -9,7 +11,7 @@ Result: `PHASE_7_4D3A1_CANONICAL_MAPPING_FOUNDATION_CLOSED`.
 - D3A.1 runtime SHA: `ed34bd465629a8e7985fbf67331fe65dcd317e6d`.
 - Exact committed BUILD_ID: `OzljcVkOas4gKndiSC_fN`.
 - Browser-harness-only correction SHA: `136aa095c896c5d785eba7186b37dfeb8056b6eb`. This commit changes two QA scripts and no application-runtime files.
-- Final HEAD: the report-only closure commit following the browser-harness correction commit. Its immutable SHA is recorded in the final handoff and can be obtained with `git log -1 --format=%H -- docs/ui/PHASE_7_4D3A1_CANONICAL_MAPPING_FOUNDATION_REPORT.md`.
+- Final HEAD: the latest report-only checkpoint commit following the browser-harness correction commit. Its immutable SHA is recorded in the final handoff and can be obtained with `git log -1 --format=%H -- docs/ui/PHASE_7_4D3A1_CANONICAL_MAPPING_FOUNDATION_REPORT.md`.
 - Historical uncommitted development BUILD_ID `eBqWqpBOHKAbDgfKIICjO` is not exact-commit closure evidence.
 
 ## Reconciliation scope and fixes
@@ -120,8 +122,22 @@ Only disposable SQLite test databases and the existing `PRIVATE_SYNTHETIC_STAGIN
 
 ## Closure
 
-The runtime, exact build, focused browser proof, and scope audit are complete. Staging was verified STOPPED with port 3188 closed after browser testing. The final commit contains this report only. The final handoff records the report commit SHA and verifies its equality with the pushed `phase-7.4d3a1-canonical-mapping-foundation` remote branch and a clean worktree.
+The runtime, exact build, focused browser proof, and scope audit are complete. Staging was verified STOPPED with port 3188 closed after browser testing. The final commit contains this report only. The final handoff records the local report commit SHA and clean worktree. Remote equality has NOT been verified because no push was performed.
 
 The publish audit permits only the reviewed mapping source, package commands, tests, QA helpers, and this report. No environment files, credentials, databases, storage, private marketplace inputs, screenshots, build output, node_modules, or mobile artifacts are included in the checkpoint diff.
 
 D3A.2 is explicitly NOT STARTED. No merge or deployment was performed.
+
+
+## External push approval gate
+
+Automatic approval review rejected the requested push, then rejected a second review after read-only evidence confirmed that the supplied handoff and configured origin name the same repository and branch. The stated reason was that the attachment did not establish direct user authorization to export the full private source branch to an external GitHub destination. No alternative transport or workaround was attempted.
+
+Pending direct user approval:
+
+- Destination: `https://github.com/hjadhav2009-sys/marketplace.git`.
+- Branch: `phase-7.4d3a1-canonical-mapping-foundation`.
+- Payload: the current committed D3A.1 source, synthetic test helpers, and report, plus branch ancestry.
+- Action: non-forced branch push, followed by local/remote HEAD equality verification.
+
+The runtime build identity remains unchanged. No merge, deployment, or D3A.2 work is authorized or performed by this pending push step.

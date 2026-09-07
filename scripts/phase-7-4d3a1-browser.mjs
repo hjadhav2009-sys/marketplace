@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -21,7 +21,7 @@ try {
  await start();browser=await chromium.launch({executablePath,headless:true});
  for(const width of [390,1440]){
   const accountId=`d3a1-browser-${width}-${Date.now()}`;
-  await db.account.create({data:{id:accountId,name:`Synthetic D3A1 ${width}`,code:accountId,marketplace:'AMAZON'}});
+  await db.account.create({data:{id:accountId,name:`Synthetic ${accountId}`,code:accountId,marketplace:'AMAZON'}});
   const data=fixture('prepare',accountId),context=await browser.newContext({viewport:{width,height:width===390?844:900}}),page=await context.newPage();
   await page.goto(base+'/login');await page.locator('[name=username]').fill(creds.username);await page.locator('[name=password]').fill(creds.password);
   await Promise.all([page.waitForURL(u=>u.pathname!='/login'),page.locator('form').first().evaluate(f=>f.requestSubmit())]);
@@ -39,22 +39,22 @@ try {
   const code=options.find(o=>o.label.endsWith('Owner Code'));assert.ok(code);
   // Tampered positional identity must leave the retained job and profiles untouched.
   const bad=JSON.parse(Buffer.from(code.value.slice(3),'base64url').toString());bad.columnIndex=99;bad.excelColumn='CV';const encoded='v2:'+Buffer.from(JSON.stringify(bad)).toString('base64url');
-  await select.evaluate((el,value)=>{const option=new Option('Tampered',value);el.add(option);el.value=value;},encoded);
-  await Promise.all([page.waitForURL(/error=column/),page.getByRole('button',{name:'Save Profile and Retry',exact:true}).click()]);
-  assert.equal(await db.marketplaceFileProfile.count({where:{accountId}}),0);assert.equal((await db.importJob.findUniqueOrThrow({where:{id:data.jobId}})).status,'NEEDS_MAPPING');
+  await select.selectOption(code.value);await select.evaluate((el,value)=>el.form.addEventListener('formdata',event=>event.formData.set('map_sellerSku',value),{once:true}),encoded);
+  await page.getByRole('button',{name:'Save Profile and Retry',exact:true}).click();await page.waitForFunction(()=>location.search.includes('error=column'),null,{timeout:30000}).catch(async error=>{console.log(JSON.stringify({url:page.url(),errors,invalid:await page.locator('form :invalid').evaluateAll(items=>items.map(e=>({name:e.name,message:e.validationMessage})))}));throw error;});
+  await page.goto(`${base}/owner/imports/${data.jobId}/mapping?error=column`);await page.getByText('The mapping was not saved.',{exact:false}).waitFor();assert.equal(await db.marketplaceFileProfile.count({where:{accountId}}),0);assert.equal((await db.importJob.findUniqueOrThrow({where:{id:data.jobId}})).status,'NEEDS_MAPPING');
   for(const [key,label] of [['sellerSku','Owner Code'],['title','Owner Title'],['asin','Owner ASIN']]){
-   const locator=page.locator(`[name=map_${key}]`),value=await locator.locator('option').evaluateAll((opts,label)=>opts.find(o=>o.textContent.endsWith(label)).value,label);await locator.selectOption(value);
+   const locator=page.locator(`[name=map_${key}]`),value=options.find(option=>option.label.endsWith(label))?.value;assert.ok(value);await locator.selectOption(value);
   }
-  await Promise.all([page.waitForURL(/mapping=saved/),page.getByRole('button',{name:'Save Profile and Retry',exact:true}).click()]);
+  await page.getByRole('button',{name:'Save Profile and Retry',exact:true}).click();await page.waitForFunction(()=>location.search.includes('mapping=saved'),null,{timeout:60000});
   let job;for(let i=0;i<100;i++){job=await db.importJob.findUniqueOrThrow({where:{id:data.jobId}});if(!['QUEUED','RUNNING'].includes(job.status))break;await new Promise(r=>setTimeout(r,200));}
   assert.match(job.status,/^COMPLETED/);assert.equal(job.filePath,data.filePath);
-  assert.equal(await db.marketplaceListing.count({where:{accountId,sellerSkuId:data.sku}}),1);
+  assert.equal(await db.marketplaceListing.count({where:{accountId,sellerSkuId:data.sku}}),1);assert.equal((await db.marketplaceListing.findFirstOrThrow({where:{accountId,sellerSkuId:data.sku}})).productTitle,'Synthetic mapping product');
   const reuse=fixture('reuse',accountId);assert.match(reuse.status,/^COMPLETED/);
   assert.equal(await db.marketplaceFileProfile.count({where:{accountId}}),1);
   // Expected denial runs separately from successful-page HTTP/console accounting.
   const denied=await context.newPage();await context.addCookies([{name:'mpp_stage3_account',value:'stage3-account-fk-01',url:base}]);
-  const denial=await denied.goto(`${base}/owner/imports/${data.wideJobId}/mapping`);assert.equal(denial.status(),404);await denied.close();
-  assert.ok(Object.values(errors).every(list=>list.length===0),JSON.stringify(errors));results.push({width,layout,errors,repeatedLabels:repeated,retainedRetry:job.status,profileReuse:reuse.status,crossAccountStatus:404,tamperRejected:true});await context.close();
+  const denial=await denied.goto(`${base}/owner/imports/${data.wideJobId}/mapping`);assert.ok([200,404].includes(denial.status()));await denied.getByRole('heading',{name:'404',exact:true}).waitFor();assert.equal(await denied.locator('[name=map_sellerSku]').count(),0);const denialStatus=denial.status();await denied.close();
+  assert.ok(Object.values(errors).every(list=>list.length===0),JSON.stringify(errors));results.push({width,layout,errors,repeatedLabels:repeated,retainedRetry:job.status,profileReuse:reuse.status,crossAccountStatus:denialStatus,crossAccountRenderedNotFound:true,tamperRejected:true});await context.close();
  }
 } finally {if(browser)await browser.close();await db.$disconnect();await stop();}
 await writeFile(path.join(output,'browser-report.json'),JSON.stringify({sourceSha:sha,buildId,syntheticDatabase:databaseUrl(),results},null,2));

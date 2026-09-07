@@ -8,6 +8,8 @@ const [command,accountId]=process.argv.slice(2);
 try {
  const account=await prisma.account.findUniqueOrThrow({where:{id:accountId}}),user=await prisma.user.findUniqueOrThrow({where:{id:"stage3-owner"}});
  const sku=`D3A1-${randomUUID()}`,asin=`B0${randomUUID().replaceAll("-","").slice(0,8).toUpperCase()}`;
+ // Existing D2A.1 Amazon PRODUCT_CATALOG rows enrich established listings only.
+ await prisma.marketplaceListing.create({data:{accountId:account.id,marketplace:"AMAZON",sellerSkuId:sku,sku}});
  const job=await createProductInventoryImportJob({account,user,files:[new File([`Owner Code,Owner Title,Owner ASIN\n${sku},Synthetic mapping product,${asin}\n`],"synthetic-mapping.csv",{type:"text/csv"})]});
  await processProductInventoryJob(job.id);
  const result=await prisma.importJob.findUniqueOrThrow({where:{id:job.id}});

@@ -3,9 +3,11 @@ import type { Marketplace, MarketplaceFileProfile, MarketplaceImportPurpose, Pri
 import { prisma } from "@/lib/prisma";
 import type { DynamicListingFormSchema } from "@/src/lib/catalog/dynamic-form-profiles";
 import { assertWorkerAccountAccess } from "@/src/lib/workflow/worker-access";
+import { decodeCanonicalFieldMapping, legacyMappingView, sameSourceColumn, sourceColumnFingerprint, type CanonicalFieldMappingV2, type DecodedCanonicalFieldMapping, type SourceColumnRefV2 } from "./source-column-mapping";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type CanonicalFieldMapping = Record<string, string>;
+export type SavedCanonicalFieldMapping = CanonicalFieldMapping | CanonicalFieldMappingV2;
 
 export function normalizeMarketplaceHeader(value: unknown) {
   return String(value ?? "").normalize("NFKC").trim().toLowerCase().replace(/[\s_.\-/\\]+/g, " ").replace(/[^\p{L}\p{N}#\[\] ]/gu, "").replace(/\s+/g, " ");
@@ -32,23 +34,40 @@ export const FLIPKART_ORDER_SIGNATURES = ["ORDER ITEM ID", "Order Id", "SKU", "Q
 
 export function profileMapping(profile: Pick<MarketplaceFileProfile, "fieldMappingJson">): CanonicalFieldMapping {
   const parsed = JSON.parse(profile.fieldMappingJson) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Saved field mapping is invalid.");
-  return parsed as CanonicalFieldMapping;
+  return legacyMappingView(decodeCanonicalFieldMapping(parsed));
 }
 
-export async function findHeaderProfile(input: { accountId?: string; marketplace: Marketplace; importPurpose: MarketplaceImportPurpose; headers: unknown[] }, client: Client = prisma) {
-  const fingerprint = headerFingerprint(input.headers);
-  const profile = await client.marketplaceFileProfile.findFirst({ where: { marketplace: input.marketplace, importPurpose: input.importPurpose, headerFingerprint: fingerprint, active: true, OR: [{ accountId: input.accountId ?? null }, { accountId: null }] }, orderBy: [{ accountId: "desc" }, { version: "desc" }] });
-  return profile ? { state: "MATCHED" as const, profile, mapping: profileMapping(profile), fingerprint } : { state: "NEEDS_MAPPING" as const, profile: null, mapping: null, fingerprint };
+export function profileFieldMapping(profile: Pick<MarketplaceFileProfile, "fieldMappingJson">): DecodedCanonicalFieldMapping {
+  return decodeCanonicalFieldMapping(JSON.parse(profile.fieldMappingJson) as unknown);
+}
+
+export async function findHeaderProfile(input: { accountId?: string; marketplace: Marketplace; importPurpose: MarketplaceImportPurpose; headers: unknown[]; sourceColumns?: SourceColumnRefV2[] }, client: Client = prisma) {
+  const positionalFingerprint = input.sourceColumns?.length ? sourceColumnFingerprint(input.sourceColumns) : null;
+  const legacyFingerprint = headerFingerprint(input.headers);
+  const fingerprints = [...new Set([positionalFingerprint, legacyFingerprint].filter((value): value is string => Boolean(value)))];
+  const profiles = await client.marketplaceFileProfile.findMany({ where: { marketplace: input.marketplace, importPurpose: input.importPurpose, headerFingerprint: { in: fingerprints }, active: true, OR: [{ accountId: input.accountId ?? null }, { accountId: null }] }, orderBy: [{ accountId: "desc" }, { version: "desc" }] });
+  const scoped = profiles.filter((item) => item.accountId === input.accountId);
+  const candidates = scoped.length ? scoped : profiles;
+  const profile = candidates.find((item) => item.headerFingerprint === positionalFingerprint) ?? candidates[0] ?? null;
+  if (profile && input.sourceColumns?.length) {
+    const saved = profileFieldMapping(profile);
+    if (saved.version === 2 && Object.values(saved.fields).some(ref => !input.sourceColumns!.some(column => sameSourceColumn(column, ref)))) {
+      return { state: "NEEDS_MAPPING" as const, profile: null, mapping: null, fieldMapping: null, fingerprint: positionalFingerprint ?? legacyFingerprint };
+    }
+  }
+  const fingerprint = profile?.headerFingerprint ?? positionalFingerprint ?? legacyFingerprint;
+  return profile ? { state: "MATCHED" as const, profile, mapping: profileMapping(profile), fieldMapping: profileFieldMapping(profile), fingerprint } : { state: "NEEDS_MAPPING" as const, profile: null, mapping: null, fieldMapping: null, fingerprint };
 }
 
 function canManageProfiles(user: Pick<User, "role" | "canImportConsignments">) { return user.role === "OWNER" || user.canImportConsignments; }
 
-export async function saveHeaderProfile(input: { actorUserId: string; accountId: string; marketplace: Marketplace; importPurpose: MarketplaceImportPurpose; profileName: string; headers: string[]; mapping: CanonicalFieldMapping; requiredFields: string[]; optionalFields?: string[]; dataSheetRule?: Record<string, unknown>; dataStartRule?: Record<string, unknown>; formSchema?: Record<string, unknown>; technicalHeaderFingerprint?: string; humanHeaderFingerprint?: string; templateKind?: string; productTypes?: string[]; fieldGroups?: string[] }, client: PrismaClient = prisma) {
+export async function saveHeaderProfile(input: { actorUserId: string; accountId: string; marketplace: Marketplace; importPurpose: MarketplaceImportPurpose; profileName: string; headers: string[]; sourceColumns?: SourceColumnRefV2[]; mapping: SavedCanonicalFieldMapping; requiredFields: string[]; optionalFields?: string[]; dataSheetRule?: Record<string, unknown>; dataStartRule?: Record<string, unknown>; formSchema?: Record<string, unknown>; technicalHeaderFingerprint?: string; humanHeaderFingerprint?: string; templateKind?: string; productTypes?: string[]; fieldGroups?: string[] }, client: PrismaClient = prisma) {
   return client.$transaction(async (tx) => {
-    const { user } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
+    const { user, account } = await assertWorkerAccountAccess(input.actorUserId, input.accountId, tx);
     if (!canManageProfiles(user)) throw new Error("Import profile management permission is required.");
-    const fingerprint = headerFingerprint(input.headers); const mapped = new Set(Object.keys(input.mapping));
+    if (account.marketplace !== input.marketplace) throw new Error("Import profile marketplace does not match the selected account.");
+    const decoded = decodeCanonicalFieldMapping(input.mapping); const fingerprint = input.sourceColumns?.length ? sourceColumnFingerprint(input.sourceColumns) : headerFingerprint(input.headers); const mapped = new Set(Object.keys(decoded.fields));
+    if(decoded.version===2&&(!input.sourceColumns?.length||Object.values(decoded.fields).some(ref=>!input.sourceColumns!.some(column=>sameSourceColumn(column,ref)))))throw new Error("Saved positional field mapping does not match the source columns.");
     if (!input.profileName.trim() || !input.requiredFields.every((field) => mapped.has(field))) throw new Error("Map every required canonical field before saving.");
     const latest = await tx.marketplaceFileProfile.findFirst({ where: { marketplace: input.marketplace, importPurpose: input.importPurpose, headerFingerprint: fingerprint }, orderBy: { version: "desc" } });
     const profile = await tx.marketplaceFileProfile.create({ data: { accountId: input.accountId, marketplace: input.marketplace, importPurpose: input.importPurpose, profileName: input.profileName.normalize("NFKC").trim().slice(0, 160), headerFingerprint: fingerprint, fieldMappingJson: JSON.stringify(input.mapping), requiredFieldsJson: JSON.stringify(input.requiredFields), optionalFieldsJson: JSON.stringify(input.optionalFields ?? []), dataSheetRuleJson: input.dataSheetRule ? JSON.stringify(input.dataSheetRule) : null, dataStartRuleJson: input.dataStartRule ? JSON.stringify(input.dataStartRule) : null, formSchemaJson:input.formSchema?JSON.stringify(input.formSchema):null,technicalHeaderFingerprint:input.technicalHeaderFingerprint??null,humanHeaderFingerprint:input.humanHeaderFingerprint??null,templateKind:input.templateKind?.slice(0,120)??null,productTypesJson:input.productTypes?JSON.stringify(input.productTypes):null,fieldGroupsJson:input.fieldGroups?JSON.stringify(input.fieldGroups):null, version: (latest?.version ?? 0) + 1, active: true, createdByUserId: user.id } });
